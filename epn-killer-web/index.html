@@ -2,10 +2,24 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>XPLR</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>XPLR — Virtual Cards Platform</title>
+  <meta name="description" content="Issue virtual Visa & Mastercard instantly. Built for arbitrage, travel, and online services." />
+  <meta name="theme-color" content="#000000" />
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json" />
+
+  <!-- iOS PWA -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="XPLR" />
+  <link rel="apple-touch-icon" href="/icon-192.svg" />
+
+  <!-- Prevent zoom on iOS inputs -->
+  <meta name="format-detection" content="telephone=no" />
 </head>
-<body>
+<body style="margin:0;background:#000;">
   <div id="root"></div>
   <script type="module" src="/src/main.tsx"></script>
 </body>

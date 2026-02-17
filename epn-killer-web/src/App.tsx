@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Teams from './pages/Teams';
 import Referrals from './pages/Referrals';
 import AdminPanel from './pages/AdminPanel';
+import LandingPage from './pages/LandingPage';
 
 // ProtectedRoute component - checks for token in localStorage
 interface ProtectedRouteProps {
@@ -33,8 +34,8 @@ const RootRedirect: React.FC = () => {
     return <Navigate to="/dashboard" replace />;
   }
 
-  // User is not logged in, redirect to login
-  return <Navigate to="/login" replace />;
+  // User is not logged in, show landing page
+  return <Navigate to="/landing" replace />;
 };
 
 const App: React.FC = () => {
@@ -44,6 +45,7 @@ const App: React.FC = () => {
       <Route path="/" element={<RootRedirect />} />
 
       {/* Public routes */}
+      <Route path="/landing" element={<LandingPage />} />
       <Route path="/login" element={<LoginForm />} />
       <Route path="/register" element={<RegisterForm />} />
 

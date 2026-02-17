@@ -484,6 +484,24 @@ func IssueCards(userID int, req models.MassIssueRequest) (interface{}, error) {
 		}
 	}
 
+	// RevShare: 5% commission to referrer on card issuance
+	if successCount > 0 {
+		go func() {
+			referrerID := GetReferrerID(userID)
+			if referrerID <= 0 {
+				return
+			}
+			issueAmount := decimal.NewFromInt(int64(successCount)).Mul(req.DailyLimit)
+			if issueAmount.LessThanOrEqual(decimal.Zero) {
+				issueAmount = decimal.NewFromInt(int64(successCount))
+			}
+			desc := fmt.Sprintf("%d cards issued (limit $%.2f each)", successCount, req.DailyLimit)
+			if err := CreditRevShare(referrerID, userID, issueAmount, desc); err != nil {
+				log.Printf("Warning: RevShare failed for user %d -> referrer %d: %v", userID, referrerID, err)
+			}
+		}()
+	}
+
 	return response, nil
 }
 

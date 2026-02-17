@@ -1,0 +1,24 @@
+{
+  "name": "XPLR — Virtual Cards Platform",
+  "short_name": "XPLR",
+  "description": "Issue virtual Visa & Mastercard instantly. Built for arbitrage, travel, and online services.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#0071e3",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

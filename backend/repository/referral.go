@@ -199,6 +199,77 @@ func ProcessReferralRegistration(referredID int, referralCode string) error {
 	return nil
 }
 
+// GetReferrerID returns the referrer_id for a user, or 0 if none.
+func GetReferrerID(userID int) int {
+	if GlobalDB == nil {
+		return 0
+	}
+	var referrerID int
+	err := GlobalDB.QueryRow(
+		"SELECT referrer_id FROM referrals WHERE referred_id = $1 AND status = 'ACTIVE' LIMIT 1",
+		userID,
+	).Scan(&referrerID)
+	if err != nil {
+		return 0
+	}
+	return referrerID
+}
+
+// CreditRevShare atomically credits RevShare commission to the referrer and records it.
+// commission = amount * 5%.  All in one DB transaction.
+func CreditRevShare(referrerID int, sourceUserID int, sourceAmount decimal.Decimal, description string) error {
+	if GlobalDB == nil {
+		return fmt.Errorf("database connection not initialized")
+	}
+	commission := sourceAmount.Mul(decimal.NewFromFloat(0.05)).Round(2)
+	if commission.LessThanOrEqual(decimal.Zero) {
+		return nil
+	}
+
+	tx, err := GlobalDB.Begin()
+	if err != nil {
+		return fmt.Errorf("begin tx: %v", err)
+	}
+	defer tx.Rollback()
+
+	// 1. Credit referrer balance atomically
+	_, err = tx.Exec(
+		"UPDATE users SET balance_rub = COALESCE(balance_rub, 0) + $1, balance = COALESCE(balance, 0) + $1 WHERE id = $2",
+		commission, referrerID,
+	)
+	if err != nil {
+		return fmt.Errorf("credit balance: %v", err)
+	}
+
+	// 2. Record REFERRAL_REVENUE transaction
+	_, err = tx.Exec(
+		`INSERT INTO transactions (user_id, amount, fee, transaction_type, status, details, executed_at)
+		 VALUES ($1, $2, 0, 'REFERRAL_REVENUE', 'APPROVED', $3, NOW())`,
+		referrerID, commission,
+		fmt.Sprintf("RevShare 5%%: %s (from user %d)", description, sourceUserID),
+	)
+	if err != nil {
+		return fmt.Errorf("record tx: %v", err)
+	}
+
+	// 3. Update commission_earned in referrals table
+	_, err = tx.Exec(
+		`UPDATE referrals SET commission_earned = COALESCE(commission_earned, 0) + $1 WHERE referrer_id = $2 AND referred_id = $3`,
+		commission, referrerID, sourceUserID,
+	)
+	if err != nil {
+		log.Printf("Warning: failed to update referrals commission_earned: %v", err)
+		// non-fatal
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit: %v", err)
+	}
+
+	log.Printf("✅ RevShare $%s credited to referrer %d (from user %d: %s)", commission.String(), referrerID, sourceUserID, description)
+	return nil
+}
+
 // AddReferralCommission adds commission to referrer's referral records.
 func AddReferralCommission(referrerID int, amount decimal.Decimal) error {
 	if GlobalDB == nil {
