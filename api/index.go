@@ -209,7 +209,7 @@ func migrateHandler(w http.ResponseWriter, r *http.Request) {
 
 		`CREATE TABLE IF NOT EXISTS api_keys (
 			id SERIAL PRIMARY KEY,
-			user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+			user_id INTEGER,
 			api_key UUID UNIQUE DEFAULT uuid_generate_v4(),
 			permissions VARCHAR(50) DEFAULT 'READ_ONLY',
 			description TEXT,
@@ -220,24 +220,24 @@ func migrateHandler(w http.ResponseWriter, r *http.Request) {
 		`CREATE TABLE IF NOT EXISTS teams (
 			id SERIAL PRIMARY KEY,
 			name VARCHAR(255) NOT NULL,
-			owner_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+			owner_id INTEGER,
 			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 		)`,
 
 		`CREATE TABLE IF NOT EXISTS team_members (
 			id SERIAL PRIMARY KEY,
-			team_id INTEGER REFERENCES teams(id) ON DELETE CASCADE,
-			user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+			team_id INTEGER,
+			user_id INTEGER,
 			role VARCHAR(50) DEFAULT 'member',
-			invited_by INTEGER REFERENCES users(id),
+			invited_by INTEGER,
 			joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 			UNIQUE(team_id, user_id)
 		)`,
 
 		`CREATE TABLE IF NOT EXISTS user_grades (
 			id SERIAL PRIMARY KEY,
-			user_id INTEGER REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+			user_id INTEGER UNIQUE,
 			grade VARCHAR(50) DEFAULT 'STANDARD',
 			total_spent NUMERIC(20,4) DEFAULT 0.0000,
 			fee_percent NUMERIC(5,2) DEFAULT 6.70,
@@ -246,8 +246,8 @@ func migrateHandler(w http.ResponseWriter, r *http.Request) {
 
 		`CREATE TABLE IF NOT EXISTS referrals (
 			id SERIAL PRIMARY KEY,
-			referrer_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-			referred_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+			referrer_id INTEGER,
+			referred_id INTEGER,
 			referral_code VARCHAR(50) UNIQUE NOT NULL,
 			status VARCHAR(50) DEFAULT 'PENDING',
 			commission_earned NUMERIC(20,4) DEFAULT 0.0000,
