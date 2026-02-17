@@ -9,8 +9,8 @@ import (
 
 	_ "github.com/lib/pq"
 
-	"github.com/aalabin/xplr/backend/handlers"
-	"github.com/aalabin/xplr/backend/repository"
+	"github.com/djalben/xplr-core/backend/handlers"
+	"github.com/djalben/xplr-core/backend/repository"
 )
 
 // Handler is the Vercel Cron entry point for syncing card balances.

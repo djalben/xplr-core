@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/aalabin/xplr/backend/models"
+	"github.com/djalben/xplr-core/backend/models"
 )
 
 // CreateTeam - Создать команду

@@ -6,8 +6,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/aalabin/xplr/backend/models"
-	"github.com/aalabin/xplr/backend/notification"
+	"github.com/djalben/xplr-core/backend/models"
+	"github.com/djalben/xplr-core/backend/notification"
 	"github.com/shopspring/decimal"
 )
 

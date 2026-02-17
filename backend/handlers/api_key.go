@@ -5,8 +5,8 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/aalabin/xplr/backend/repository"
-	"github.com/aalabin/xplr/backend/middleware" // <--- ДОБАВЛЕНО: для доступа к UserIDKey
+	"github.com/djalben/xplr-core/backend/repository"
+	"github.com/djalben/xplr-core/backend/middleware" // <--- ДОБАВЛЕНО: для доступа к UserIDKey
 	// УДАЛЕНО: "database/sql" (Не нужен, так как GlobalDB здесь не объявляется)
 	// УДАЛЕНО: "github.com/google/uuid" (Не используется)
 )

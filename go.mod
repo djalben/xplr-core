@@ -1,4 +1,4 @@
-module github.com/aalabin/xplr
+module github.com/djalben/xplr-core
 
 go 1.20
 

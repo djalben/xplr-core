@@ -1,6 +1,6 @@
 {
-  "buildCommand": "cd epn-killer-web && npm install && npm run build",
-  "outputDirectory": "epn-killer-web/dist",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" },

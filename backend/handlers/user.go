@@ -5,9 +5,9 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/aalabin/xplr/backend/middleware"
-	"github.com/aalabin/xplr/backend/models"
-	"github.com/aalabin/xplr/backend/repository"
+	"github.com/djalben/xplr-core/backend/middleware"
+	"github.com/djalben/xplr-core/backend/models"
+	"github.com/djalben/xplr-core/backend/repository"
 	"github.com/shopspring/decimal"
 )
 

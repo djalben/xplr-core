@@ -17,5 +17,5 @@
     "noFallthroughCasesInSwitch": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src", "vite-env.d.ts"]
+  "include": ["epn-killer-web/src", "vite-env.d.ts"]
 }

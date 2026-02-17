@@ -10,9 +10,9 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
-	"github.com/aalabin/xplr/backend/middleware"
-	"github.com/aalabin/xplr/backend/notification"
-	"github.com/aalabin/xplr/backend/repository"
+	"github.com/djalben/xplr-core/backend/middleware"
+	"github.com/djalben/xplr-core/backend/notification"
+	"github.com/djalben/xplr-core/backend/repository"
 )
 
 var wallesterRepo *repository.WallesterRepository

@@ -8,8 +8,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/aalabin/xplr/backend/core"
-	"github.com/aalabin/xplr/backend/models"
+	"github.com/djalben/xplr-core/backend/core"
+	"github.com/djalben/xplr-core/backend/models"
 	"github.com/shopspring/decimal"
 )
 
