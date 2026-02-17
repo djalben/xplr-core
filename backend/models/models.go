@@ -115,6 +115,7 @@ type Card struct {
 	ServiceSlug            string          `json:"service_slug"`         // Метка: 'arbitrage', 'travel', 'subscriptions' (для API)
 	ServiceID              *int            `json:"service_id,omitempty"` // ID из таблицы services в Supabase
 	DailySpendLimit        decimal.Decimal `json:"daily_spend_limit"`
+	SpendLimit             decimal.Decimal `json:"spend_limit"`
 	FailedAuthCount        int             `json:"failed_auth_count"`
 	CardType               string          `json:"card_type"`
 	Category               string          `json:"category"` // 'arbitrage', 'travel', 'services'

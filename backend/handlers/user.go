@@ -71,6 +71,28 @@ func TopUpBalanceHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GetUserStatsHandler - GET /api/v1/user/stats - Returns spend totals grouped by card category (last 30 days)
+func GetUserStatsHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	stats, err := repository.GetUserSpendStats(userID)
+	if err != nil {
+		log.Printf("Error fetching stats for user %d: %v", userID, err)
+		http.Error(w, "Failed to fetch stats", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"period":     "last_30_days",
+		"categories": stats,
+	})
+}
+
 // GetMeHandler - Возвращает данные о текущем пользователе (Задача 3.1)
 func GetMeHandler(w http.ResponseWriter, r *http.Request) {
 	// 1. Извлечение UserID из контекста JWT/API Key

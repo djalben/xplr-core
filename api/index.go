@@ -73,6 +73,7 @@ func ensureDB() {
 	// 6. Auto-migrations (idempotent)
 	migrations := []string{
 		`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='cards' AND column_name='category') THEN ALTER TABLE cards ADD COLUMN category VARCHAR(50) DEFAULT 'arbitrage'; END IF; END $$`,
+		`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='cards' AND column_name='spend_limit') THEN ALTER TABLE cards ADD COLUMN spend_limit NUMERIC(20,4) DEFAULT 0; END IF; END $$`,
 	}
 	for _, m := range migrations {
 		if _, err := db.Exec(m); err != nil {
@@ -115,6 +116,7 @@ func buildRouter() *mux.Router {
 	protected.HandleFunc("/grade", handlers.GetUserGradeHandler).Methods("GET")
 	protected.HandleFunc("/deposit", handlers.ProcessDepositHandler).Methods("POST")
 	protected.HandleFunc("/topup", handlers.TopUpBalanceHandler).Methods("POST")
+	protected.HandleFunc("/stats", handlers.GetUserStatsHandler).Methods("GET")
 	protected.HandleFunc("/cards", handlers.GetUserCardsHandler).Methods("GET")
 	protected.HandleFunc("/cards/issue", handlers.MassIssueCardsHandler).Methods("POST")
 	protected.HandleFunc("/cards/{id}/status", handlers.PatchCardStatusHandler).Methods("PATCH")
@@ -122,6 +124,7 @@ func buildRouter() *mux.Router {
 	protected.HandleFunc("/cards/{id}/auto-replenishment", handlers.UnsetCardAutoReplenishmentHandler).Methods("DELETE")
 	protected.HandleFunc("/cards/{id}/details", handlers.GetCardDetailsHandler).Methods("GET")
 	protected.HandleFunc("/cards/{id}/mock-details", handlers.MockCardDetailsHandler).Methods("GET")
+	protected.HandleFunc("/cards/{id}/limit", handlers.UpdateCardSpendLimitHandler).Methods("PATCH")
 	protected.HandleFunc("/cards/{id}/sync-balance", handlers.SyncCardBalanceHandler).Methods("POST")
 	protected.HandleFunc("/report", handlers.GetUserTransactionReportHandler).Methods("GET")
 	protected.HandleFunc("/api-key", handlers.CreateAPIKeyHandler).Methods("POST")

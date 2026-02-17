@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Line } from 'react-chartjs-2';
+import { Line, Pie } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
+  ArcElement,
   Title,
   Tooltip,
   Legend,
@@ -20,6 +21,7 @@ ChartJS.register(
   LinearScale,
   PointElement,
   LineElement,
+  ArcElement,
   Title,
   Tooltip,
   Legend,
@@ -118,6 +120,15 @@ const Dashboard: React.FC = () => {
   const [autoReplenishAmount, setAutoReplenishAmount] = useState('');
   const [isSettingAutoReplenish, setIsSettingAutoReplenish] = useState(false);
 
+  // Spend stats for pie chart
+  const [spendStats, setSpendStats] = useState<{ category: string; total_spent: string; tx_count: number }[]>([]);
+
+  // Limit edit modal
+  const [showLimitModal, setShowLimitModal] = useState(false);
+  const [limitCardId, setLimitCardId] = useState<number | null>(null);
+  const [limitValue, setLimitValue] = useState('');
+  const [isSavingLimit, setIsSavingLimit] = useState(false);
+
   // Toast notification (success/error for block/unblock)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
@@ -191,6 +202,14 @@ const Dashboard: React.FC = () => {
       } catch (error) {
         console.error('Error fetching transactions:', error);
         setTransactions([]);
+      }
+
+      // Fetch spend stats for pie chart
+      try {
+        const statsResponse = await axios.get(`${API_BASE_URL}/user/stats`, config);
+        setSpendStats(statsResponse.data?.categories || []);
+      } catch (error) {
+        console.error('Error fetching stats:', error);
       }
 
       setIsLoading(false);
@@ -388,6 +407,32 @@ const Dashboard: React.FC = () => {
     } catch (error) {
       console.error('Error disabling auto-replenish:', error);
       setToast({ message: 'Не удалось отключить автопополнение', type: 'error' });
+    }
+  };
+
+  // Open limit edit modal
+  const openLimitModal = (cardId: number, currentLimit: number) => {
+    setLimitCardId(cardId);
+    setLimitValue(String(currentLimit || 0));
+    setShowLimitModal(true);
+  };
+
+  // Save card spend limit
+  const handleSaveLimit = async () => {
+    if (limitCardId === null) return;
+    setIsSavingLimit(true);
+    try {
+      const token = localStorage.getItem('token');
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+      await axios.patch(`${API_BASE_URL}/user/cards/${limitCardId}/limit`, { limit: parseFloat(limitValue) || 0 }, config);
+      setCards(prev => prev.map(c => c.id === limitCardId ? { ...c, daily_spend_limit: parseFloat(limitValue) || 0 } : c));
+      setToast({ message: 'Spend limit updated', type: 'success' });
+      setShowLimitModal(false);
+    } catch (error) {
+      console.error('Error saving limit:', error);
+      setToast({ message: 'Failed to update limit', type: 'error' });
+    } finally {
+      setIsSavingLimit(false);
     }
   };
 
@@ -826,26 +871,66 @@ const Dashboard: React.FC = () => {
               padding: '20px',
               borderRadius: theme.borderRadius.lg,
               border: `1px solid ${theme.colors.border}`,
-              flex: 1
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center'
             }}>
               <div style={{
                 color: theme.colors.textSecondary,
                 fontSize: '12px',
                 textTransform: 'uppercase',
-                letterSpacing: '0.5px'
+                letterSpacing: '0.5px',
+                marginBottom: '10px',
+                alignSelf: 'flex-start'
               }}>
-                Today's Spend
+                Spend by Category (30d)
               </div>
-              <div style={{
-                fontSize: '24px',
-                fontWeight: 'bold',
-                marginTop: '10px',
-                color: theme.colors.error
-              }}>
-                -₽ 1,240.50
-              </div>
-              <div style={{ fontSize: '12px', color: theme.colors.textSecondary, marginTop: '5px' }}>
-                32 transactions
+              {spendStats.length > 0 ? (
+                <div style={{ width: '140px', height: '140px' }}>
+                  <Pie
+                    data={{
+                      labels: spendStats.map(s => {
+                        const labels: Record<string, string> = { arbitrage: 'Реклама', travel: 'Путешествия', services: 'Универсал' };
+                        return labels[s.category] || s.category;
+                      }),
+                      datasets: [{
+                        data: spendStats.map(s => parseFloat(s.total_spent)),
+                        backgroundColor: spendStats.map(s => {
+                          const colors: Record<string, string> = { arbitrage: '#3b82f6', travel: '#14b8a6', services: '#8b5cf6' };
+                          return colors[s.category] || '#6b7280';
+                        }),
+                        borderWidth: 0
+                      }]
+                    }}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: true,
+                      plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                          backgroundColor: '#1a1a2e',
+                          titleColor: '#fff',
+                          bodyColor: '#00e096',
+                          callbacks: { label: (ctx: any) => `$${ctx.parsed.toFixed(2)}` }
+                        }
+                      }
+                    }}
+                  />
+                </div>
+              ) : (
+                <div style={{ color: '#666', fontSize: '12px', marginTop: '20px' }}>No spend data yet</div>
+              )}
+              <div style={{ display: 'flex', gap: '12px', marginTop: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                {spendStats.map(s => (
+                  <div key={s.category} style={{ fontSize: '10px', color: '#aaa', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{
+                      width: '8px', height: '8px', borderRadius: '50%', display: 'inline-block',
+                      backgroundColor: s.category === 'arbitrage' ? '#3b82f6' : s.category === 'travel' ? '#14b8a6' : '#8b5cf6'
+                    }}></span>
+                    {s.category === 'arbitrage' ? 'Реклама' : s.category === 'travel' ? 'Путешествия' : 'Универсал'}
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -855,7 +940,7 @@ const Dashboard: React.FC = () => {
               padding: '20px',
               borderRadius: theme.borderRadius.lg,
               border: `1px solid ${theme.colors.border}`,
-              flex: 1
+              flex: 0
             }}>
               <div style={{
                 color: theme.colors.textSecondary,
@@ -869,7 +954,7 @@ const Dashboard: React.FC = () => {
                 {cards.filter(c => c.card_status === 'ACTIVE').length} <span style={{ fontSize: '14px', color: theme.colors.textSecondary }}>/ {cards.length}</span>
               </div>
               <div style={{ fontSize: '12px', color: theme.colors.textSecondary, marginTop: '5px' }}>
-                {cards.filter(c => c.card_status === 'BLOCKED').length} blocked
+                {cards.filter(c => c.card_status === 'BLOCKED').length} blocked · {cards.filter(c => c.card_status === 'FROZEN').length} frozen · {cards.filter(c => c.card_status === 'CLOSED').length} closed
               </div>
             </div>
           </div>
@@ -1124,6 +1209,29 @@ const Dashboard: React.FC = () => {
                 }}>
                   {isLoadingDetails ? '...' : details ? '🔒 Hide' : '👁 Show Details'}
                 </button>
+                {card.card_status !== 'CLOSED' && (
+                <button
+                onClick={() => openLimitModal(card.id, card.daily_spend_limit)}
+                style={{
+                  background: 'transparent',
+                  border: `1px solid ${theme.colors.border}`,
+                  color: theme.colors.textSecondary,
+                  padding: '5px 10px',
+                  borderRadius: '8px',
+                  fontSize: '11px',
+                  cursor: 'pointer'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = theme.colors.accent;
+                  e.currentTarget.style.color = theme.colors.accent;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = theme.colors.border;
+                  e.currentTarget.style.color = theme.colors.textSecondary;
+                }}>
+                  ⚡ Limit: ${card.daily_spend_limit || 0}
+                </button>
+                )}
                 <button
                 onClick={() => openAutoReplenishModal(card.id)}
                 style={{
@@ -1542,6 +1650,53 @@ const Dashboard: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* Limit Edit Modal */}
+      {showLimitModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+          backgroundColor: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(10px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000
+        }} onClick={() => setShowLimitModal(false)}>
+          <div style={{
+            backgroundColor: 'rgba(18, 18, 18, 0.95)', backdropFilter: 'blur(40px)',
+            borderRadius: '24px', padding: '40px', width: '90%', maxWidth: '400px',
+            border: '1px solid rgba(255, 255, 255, 0.1)', boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)'
+          }} onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ margin: '0 0 20px 0', fontSize: '22px', fontWeight: '700', color: '#fff' }}>
+              Set Daily Limit
+            </h2>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#888c95', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>
+              Limit Amount ($)
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="50"
+              value={limitValue}
+              onChange={(e) => setLimitValue(e.target.value)}
+              style={{
+                width: '100%', padding: '16px', backgroundColor: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px',
+                color: '#fff', fontSize: '18px', fontWeight: '600', outline: 'none', marginBottom: '24px'
+              }}
+            />
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button onClick={() => setShowLimitModal(false)} style={{
+                flex: 1, padding: '14px', backgroundColor: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px',
+                color: '#888', fontWeight: '600', fontSize: '14px', cursor: 'pointer'
+              }}>Cancel</button>
+              <button onClick={handleSaveLimit} disabled={isSavingLimit} style={{
+                flex: 1, padding: '14px', backgroundColor: '#00e096',
+                border: 'none', borderRadius: '12px',
+                color: '#0a0a0a', fontWeight: '700', fontSize: '14px',
+                cursor: isSavingLimit ? 'not-allowed' : 'pointer', opacity: isSavingLimit ? 0.6 : 1
+              }}>{isSavingLimit ? 'Saving...' : 'Save Limit'}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast notification */}
       {toast && (

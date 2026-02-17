@@ -106,6 +106,46 @@ func MockCardDetailsHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// UpdateCardSpendLimitHandler handles PATCH /api/v1/user/cards/{id}/limit
+func UpdateCardSpendLimitHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	vars := mux.Vars(r)
+	cardID, err := strconv.Atoi(vars["id"])
+	if err != nil || cardID <= 0 {
+		http.Error(w, "invalid card id", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		Limit decimal.Decimal `json:"limit"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if req.Limit.LessThan(decimal.Zero) {
+		http.Error(w, "limit must be >= 0", http.StatusBadRequest)
+		return
+	}
+	if err := repository.UpdateCardSpendLimit(cardID, userID, req.Limit); err != nil {
+		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "access denied") {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"card_id": cardID,
+		"limit":   req.Limit.String(),
+		"message": "Spend limit updated successfully",
+	})
+}
+
 // patchCardStatusRequest is the JSON body for PATCH /user/cards/:id/status
 type patchCardStatusRequest struct {
 	Status string `json:"status"`

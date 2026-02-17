@@ -20,7 +20,7 @@ func GetCardByID(id int) (models.Card, error) {
 	var teamID sql.NullInt64
 	query := `
 		SELECT id, user_id, provider_card_id, bin, last_4_digits, card_status, 
-		       COALESCE(nickname, '') as nickname, COALESCE(service_slug, 'arbitrage'), daily_spend_limit, failed_auth_count,
+		       COALESCE(nickname, '') as nickname, COALESCE(service_slug, 'arbitrage'), daily_spend_limit, COALESCE(spend_limit, 0) as spend_limit, failed_auth_count,
 		       COALESCE(card_type, 'VISA') as card_type,
 		       COALESCE(category, 'arbitrage') as category,
 		       COALESCE(auto_replenish_enabled, FALSE) as auto_replenish_enabled,
@@ -32,7 +32,7 @@ func GetCardByID(id int) (models.Card, error) {
 	`
 	err := GlobalDB.QueryRow(query, id).Scan(
 		&card.ID, &card.UserID, &card.ProviderCardID, &card.BIN, &card.Last4Digits,
-		&card.CardStatus, &card.Nickname, &card.ServiceSlug, &card.DailySpendLimit, &card.FailedAuthCount,
+		&card.CardStatus, &card.Nickname, &card.ServiceSlug, &card.DailySpendLimit, &card.SpendLimit, &card.FailedAuthCount,
 		&card.CardType, &card.Category, &card.AutoReplenishEnabled, &card.AutoReplenishThreshold,
 		&card.AutoReplenishAmount, &card.CardBalance, &teamID, &card.CreatedAt,
 	)
@@ -52,7 +52,7 @@ func GetUserCards(userID int) ([]models.Card, error) {
 
 	query := `
 		SELECT id, user_id, provider_card_id, bin, last_4_digits, card_status, 
-		       COALESCE(nickname, '') as nickname, COALESCE(service_slug, 'arbitrage'), daily_spend_limit, failed_auth_count,
+		       COALESCE(nickname, '') as nickname, COALESCE(service_slug, 'arbitrage'), daily_spend_limit, COALESCE(spend_limit, 0) as spend_limit, failed_auth_count,
 		       COALESCE(card_type, 'VISA') as card_type,
 		       COALESCE(category, 'arbitrage') as category,
 		       COALESCE(auto_replenish_enabled, FALSE) as auto_replenish_enabled,
@@ -85,6 +85,7 @@ func GetUserCards(userID int) ([]models.Card, error) {
 			&card.Nickname,
 			&card.ServiceSlug,
 			&card.DailySpendLimit,
+			&card.SpendLimit,
 			&card.FailedAuthCount,
 			&card.CardType,
 			&card.Category,
@@ -260,6 +261,72 @@ func UpdateCardStatus(cardID int, userID int, status string) error {
 	}
 	log.Printf("✅ Card %d status updated to %s (user %d)", cardID, status, userID)
 	return nil
+}
+
+// UpdateCardSpendLimit updates the spend_limit for a card owned by userID.
+func UpdateCardSpendLimit(cardID int, userID int, limit decimal.Decimal) error {
+	if GlobalDB == nil {
+		return fmt.Errorf("database connection not initialized")
+	}
+	res, err := GlobalDB.Exec(
+		"UPDATE cards SET spend_limit = $1, daily_spend_limit = $1 WHERE id = $2 AND user_id = $3",
+		limit, cardID, userID,
+	)
+	if err != nil {
+		log.Printf("DB Error UpdateCardSpendLimit card %d: %v", cardID, err)
+		return fmt.Errorf("failed to update spend limit")
+	}
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("card not found or access denied")
+	}
+	log.Printf("✅ Card %d spend_limit updated to %s (user %d)", cardID, limit.String(), userID)
+	return nil
+}
+
+// GetUserSpendStats returns spend totals grouped by card category for the last 30 days.
+func GetUserSpendStats(userID int) ([]map[string]interface{}, error) {
+	if GlobalDB == nil {
+		return nil, fmt.Errorf("database connection not initialized")
+	}
+	query := `
+		SELECT COALESCE(c.category, 'arbitrage') as category,
+		       COALESCE(SUM(t.amount), 0) as total_spent,
+		       COUNT(t.id) as tx_count
+		FROM transactions t
+		LEFT JOIN cards c ON t.card_id = c.id
+		WHERE t.user_id = $1
+		  AND t.transaction_type IN ('CAPTURE', 'ISSUE')
+		  AND t.executed_at >= NOW() - INTERVAL '30 days'
+		GROUP BY COALESCE(c.category, 'arbitrage')
+		ORDER BY total_spent DESC
+	`
+	rows, err := GlobalDB.Query(query, userID)
+	if err != nil {
+		log.Printf("DB Error GetUserSpendStats for user %d: %v", userID, err)
+		return nil, fmt.Errorf("failed to fetch spend stats")
+	}
+	defer rows.Close()
+
+	var stats []map[string]interface{}
+	for rows.Next() {
+		var category string
+		var totalSpent decimal.Decimal
+		var txCount int
+		if err := rows.Scan(&category, &totalSpent, &txCount); err != nil {
+			log.Printf("DB Error scanning spend stats: %v", err)
+			continue
+		}
+		stats = append(stats, map[string]interface{}{
+			"category":    category,
+			"total_spent": totalSpent.String(),
+			"tx_count":    txCount,
+		})
+	}
+	if stats == nil {
+		stats = []map[string]interface{}{}
+	}
+	return stats, nil
 }
 
 // IssueCards — Mock-функция для выпуска виртуальных карт (без реального банка)
