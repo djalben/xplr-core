@@ -140,6 +140,16 @@ func migrateHandler(w http.ResponseWriter, r *http.Request) {
 	migrations := []string{
 		`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`,
 
+		// Drop all tables to reset UUID-based users to SERIAL
+		`DROP TABLE IF EXISTS referrals CASCADE`,
+		`DROP TABLE IF EXISTS user_grades CASCADE`,
+		`DROP TABLE IF EXISTS team_members CASCADE`,
+		`DROP TABLE IF EXISTS teams CASCADE`,
+		`DROP TABLE IF EXISTS api_keys CASCADE`,
+		`DROP TABLE IF EXISTS transactions CASCADE`,
+		`DROP TABLE IF EXISTS cards CASCADE`,
+		`DROP TABLE IF EXISTS users CASCADE`,
+
 		`CREATE TABLE IF NOT EXISTS users (
 			id SERIAL PRIMARY KEY,
 			email VARCHAR(255) UNIQUE NOT NULL,
