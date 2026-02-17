@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -86,6 +87,9 @@ func buildRouter() *mux.Router {
 	// Health
 	r.HandleFunc("/api/health", handlers.HealthCheckHandler).Methods("GET")
 
+	// Temporary migration endpoint — remove after schema is applied
+	r.HandleFunc("/api/migrate", migrateHandler).Methods("POST")
+
 	// Public auth routes
 	r.HandleFunc("/api/v1/auth/register", handlers.RegisterHandler).Methods("POST")
 	r.HandleFunc("/api/v1/auth/login", handlers.LoginHandler).Methods("POST")
@@ -125,6 +129,147 @@ func buildRouter() *mux.Router {
 	protected.HandleFunc("/settings/telegram", handlers.UpdateTelegramChatIDHandler).Methods("POST")
 
 	return r
+}
+
+func migrateHandler(w http.ResponseWriter, r *http.Request) {
+	if repository.GlobalDB == nil {
+		http.Error(w, "DB not initialized", http.StatusServiceUnavailable)
+		return
+	}
+
+	migrations := []string{
+		`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`,
+
+		`CREATE TABLE IF NOT EXISTS users (
+			id SERIAL PRIMARY KEY,
+			email VARCHAR(255) UNIQUE NOT NULL,
+			password_hash VARCHAR(255) NOT NULL,
+			balance NUMERIC(20, 4) DEFAULT 0.0000 NOT NULL,
+			balance_rub NUMERIC(20, 4) DEFAULT 0.0000 NOT NULL,
+			kyc_status VARCHAR(50) DEFAULT 'pending',
+			active_mode VARCHAR(50) DEFAULT 'personal',
+			status VARCHAR(50) DEFAULT 'ACTIVE',
+			telegram_chat_id BIGINT DEFAULT NULL,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+
+		`DO $$ BEGIN
+			IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='balance') THEN
+				ALTER TABLE users ADD COLUMN balance NUMERIC(20,4) DEFAULT 0.0000 NOT NULL;
+			END IF;
+			IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='balance_rub') THEN
+				ALTER TABLE users ADD COLUMN balance_rub NUMERIC(20,4) DEFAULT 0.0000 NOT NULL;
+			END IF;
+			IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='kyc_status') THEN
+				ALTER TABLE users ADD COLUMN kyc_status VARCHAR(50) DEFAULT 'pending';
+			END IF;
+			IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='active_mode') THEN
+				ALTER TABLE users ADD COLUMN active_mode VARCHAR(50) DEFAULT 'personal';
+			END IF;
+			IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='status') THEN
+				ALTER TABLE users ADD COLUMN status VARCHAR(50) DEFAULT 'ACTIVE';
+			END IF;
+			IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='telegram_chat_id') THEN
+				ALTER TABLE users ADD COLUMN telegram_chat_id BIGINT DEFAULT NULL;
+			END IF;
+		END $$`,
+
+		`CREATE TABLE IF NOT EXISTS cards (
+			id SERIAL PRIMARY KEY,
+			user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+			provider_card_id VARCHAR(100) NOT NULL,
+			bin VARCHAR(6) NOT NULL DEFAULT '424242',
+			last_4_digits VARCHAR(4) NOT NULL,
+			card_status VARCHAR(50) DEFAULT 'ACTIVE',
+			nickname VARCHAR(100),
+			daily_spend_limit NUMERIC(20,4) DEFAULT 1000.0000,
+			failed_auth_count INTEGER DEFAULT 0,
+			card_type VARCHAR(20) DEFAULT 'VISA',
+			auto_replenish_enabled BOOLEAN DEFAULT FALSE,
+			auto_replenish_threshold NUMERIC(20,4) DEFAULT 0.0000,
+			auto_replenish_amount NUMERIC(20,4) DEFAULT 0.0000,
+			card_balance NUMERIC(20,4) DEFAULT 0.0000,
+			service_slug VARCHAR(50) DEFAULT 'arbitrage',
+			team_id INTEGER,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+
+		`CREATE TABLE IF NOT EXISTS transactions (
+			id SERIAL PRIMARY KEY,
+			user_id INTEGER REFERENCES users(id),
+			card_id INTEGER REFERENCES cards(id),
+			amount NUMERIC(20,4) NOT NULL,
+			fee NUMERIC(20,4) DEFAULT 0.0000,
+			transaction_type VARCHAR(50) NOT NULL,
+			status VARCHAR(50) NOT NULL,
+			details TEXT,
+			provider_tx_id VARCHAR(255),
+			executed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+
+		`CREATE TABLE IF NOT EXISTS api_keys (
+			id SERIAL PRIMARY KEY,
+			user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+			api_key UUID UNIQUE DEFAULT uuid_generate_v4(),
+			permissions VARCHAR(50) DEFAULT 'READ_ONLY',
+			description TEXT,
+			is_active BOOLEAN DEFAULT TRUE,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+
+		`CREATE TABLE IF NOT EXISTS teams (
+			id SERIAL PRIMARY KEY,
+			name VARCHAR(255) NOT NULL,
+			owner_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+
+		`CREATE TABLE IF NOT EXISTS team_members (
+			id SERIAL PRIMARY KEY,
+			team_id INTEGER REFERENCES teams(id) ON DELETE CASCADE,
+			user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+			role VARCHAR(50) DEFAULT 'member',
+			invited_by INTEGER REFERENCES users(id),
+			joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			UNIQUE(team_id, user_id)
+		)`,
+
+		`CREATE TABLE IF NOT EXISTS user_grades (
+			id SERIAL PRIMARY KEY,
+			user_id INTEGER REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+			grade VARCHAR(50) DEFAULT 'STANDARD',
+			total_spent NUMERIC(20,4) DEFAULT 0.0000,
+			fee_percent NUMERIC(5,2) DEFAULT 6.70,
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+
+		`CREATE TABLE IF NOT EXISTS referrals (
+			id SERIAL PRIMARY KEY,
+			referrer_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+			referred_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+			referral_code VARCHAR(50) UNIQUE NOT NULL,
+			status VARCHAR(50) DEFAULT 'PENDING',
+			commission_earned NUMERIC(20,4) DEFAULT 0.0000,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+	}
+
+	results := make([]string, 0)
+	for i, m := range migrations {
+		_, err := repository.GlobalDB.Exec(m)
+		if err != nil {
+			results = append(results, fmt.Sprintf("migration %d: ERROR: %v", i+1, err))
+		} else {
+			results = append(results, fmt.Sprintf("migration %d: OK", i+1))
+		}
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(http.StatusOK)
+	for _, r := range results {
+		w.Write([]byte(r + "\n"))
+	}
 }
 
 // Handler is the Vercel serverless entry point.
