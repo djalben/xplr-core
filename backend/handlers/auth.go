@@ -55,7 +55,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Email already registered", http.StatusConflict)
 			return
 		}
-		http.Error(w, "Failed to create user: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Failed to create user", http.StatusInternalServerError)
 		return
 	}
 
