@@ -106,6 +106,13 @@ const Dashboard: React.FC = () => {
   const [isCreatingCard, setIsCreatingCard] = useState(false);
   const [activeCardCategory, setActiveCardCategory] = useState<'all' | 'arbitrage' | 'travel' | 'services'>('all');
   
+  // Top-up state
+  const [isTopingUp, setIsTopingUp] = useState(false);
+
+  // Card details reveal state
+  const [revealedCardDetails, setRevealedCardDetails] = useState<Record<number, { full_number: string; cvv: string; expiry: string } | null>>({});
+  const [loadingCardDetails, setLoadingCardDetails] = useState<Record<number, boolean>>({});
+
   // Auto-replenish states
   const [autoReplenishThreshold, setAutoReplenishThreshold] = useState('');
   const [autoReplenishAmount, setAutoReplenishAmount] = useState('');
@@ -364,6 +371,47 @@ const Dashboard: React.FC = () => {
     } catch (error) {
       console.error('Error disabling auto-replenish:', error);
       setToast({ message: 'Не удалось отключить автопополнение', type: 'error' });
+    }
+  };
+
+  // Top up balance
+  const handleTopUp = async () => {
+    setIsTopingUp(true);
+    try {
+      const token = localStorage.getItem('token');
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+      const response = await axios.post(`${API_BASE_URL}/user/topup`, {}, config);
+      const newBalance = response.data.new_balance;
+      if (userData) {
+        setUserData({ ...userData, balance: parseFloat(newBalance) });
+      }
+      setToast({ message: `+$100.00 — Balance: $${parseFloat(newBalance).toFixed(2)}`, type: 'success' });
+    } catch (error) {
+      console.error('Error topping up:', error);
+      setToast({ message: 'Failed to top up balance', type: 'error' });
+    } finally {
+      setIsTopingUp(false);
+    }
+  };
+
+  // Reveal card details (PAN, CVV, expiry)
+  const handleRevealCardDetails = async (cardId: number) => {
+    // Toggle off if already revealed
+    if (revealedCardDetails[cardId]) {
+      setRevealedCardDetails(prev => ({ ...prev, [cardId]: null }));
+      return;
+    }
+    setLoadingCardDetails(prev => ({ ...prev, [cardId]: true }));
+    try {
+      const token = localStorage.getItem('token');
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+      const response = await axios.get(`${API_BASE_URL}/user/cards/${cardId}/mock-details`, config);
+      setRevealedCardDetails(prev => ({ ...prev, [cardId]: response.data }));
+    } catch (error) {
+      console.error('Error fetching card details:', error);
+      setToast({ message: 'Failed to load card details', type: 'error' });
+    } finally {
+      setLoadingCardDetails(prev => ({ ...prev, [cardId]: false }));
     }
   };
 
@@ -708,6 +756,27 @@ const Dashboard: React.FC = () => {
                 Grade: {userGrade.grade} • Fee: {parseFloat(userGrade.fee_percent).toFixed(1)}%
               </div>
             )}
+            <button
+              onClick={handleTopUp}
+              disabled={isTopingUp}
+              style={{
+                display: 'block',
+                marginTop: '12px',
+                padding: '10px 20px',
+                backgroundColor: theme.colors.accent,
+                color: theme.colors.background,
+                border: 'none',
+                borderRadius: theme.borderRadius.sm,
+                fontWeight: '600',
+                fontSize: '13px',
+                cursor: isTopingUp ? 'not-allowed' : 'pointer',
+                opacity: isTopingUp ? 0.6 : 1,
+                transition: '0.2s',
+                width: '100%'
+              }}
+            >
+              {isTopingUp ? 'Processing...' : '+ Top Up $100'}
+            </button>
           </div>
         </div>
 
@@ -885,13 +954,22 @@ const Dashboard: React.FC = () => {
               {cards.length === 0 ? 'No active cards. Click "+ Issue Card" to create one.' : 'No cards in this category.'}
             </div>
           ) : (
-            (activeCardCategory === 'all' ? cards : cards.filter(c => (c.category || 'arbitrage') === activeCardCategory)).map((card) => (
+            (activeCardCategory === 'all' ? cards : cards.filter(c => (c.category || 'arbitrage') === activeCardCategory)).map((card) => {
+              const catColors: Record<string, { bg: string; border: string }> = {
+                arbitrage: { bg: 'rgba(30, 58, 95, 0.7)', border: 'rgba(59, 130, 246, 0.3)' },
+                travel:    { bg: 'rgba(19, 78, 74, 0.7)', border: 'rgba(20, 184, 166, 0.3)' },
+                services:  { bg: 'rgba(40, 40, 50, 0.7)', border: 'rgba(120, 120, 140, 0.3)' },
+              };
+              const cc = catColors[(card.category || 'arbitrage')] || catColors.arbitrage;
+              const details = revealedCardDetails[card.id];
+              const isLoadingDetails = loadingCardDetails[card.id];
+              return (
             <div
               key={card.id}
               style={{
-                backgroundColor: theme.colors.backgroundCard,
+                backgroundColor: card.card_status === 'BLOCKED' ? theme.colors.backgroundCard : cc.bg,
                 backdropFilter: 'blur(20px)',
-                border: card.card_status === 'BLOCKED' ? `1px solid ${theme.colors.error}` : `1px solid ${theme.colors.border}`,
+                border: card.card_status === 'BLOCKED' ? `1px solid ${theme.colors.error}` : `1px solid ${cc.border}`,
                 borderRadius: theme.borderRadius.lg,
                 padding: '20px',
                 transition: '0.3s',
@@ -905,7 +983,7 @@ const Dashboard: React.FC = () => {
               }}
               onMouseLeave={(e) => {
                 if (card.card_status !== 'BLOCKED') {
-                  e.currentTarget.style.borderColor = theme.colors.border;
+                  e.currentTarget.style.borderColor = cc.border;
                   e.currentTarget.style.transform = 'translateY(0)';
                 }
               }}
@@ -918,16 +996,29 @@ const Dashboard: React.FC = () => {
                 <span style={{ fontWeight: '700', fontStyle: 'italic', color: '#fff' }}>
                   {card.bin?.startsWith('4') ? 'VISA' : 'MasterCard'}
                 </span>
-                <span style={{
-                  fontSize: '10px',
-                  padding: '4px 8px',
-                  borderRadius: '4px',
-                  fontWeight: '700',
-                  background: card.card_status === 'ACTIVE' ? theme.colors.accentMuted : `${theme.colors.error}30`,
-                  color: card.card_status === 'ACTIVE' ? theme.colors.accent : theme.colors.error
-                }}>
-                  {card.card_status}
-                </span>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <span style={{
+                    fontSize: '10px',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    fontWeight: '600',
+                    background: 'rgba(255,255,255,0.1)',
+                    color: '#ccc',
+                    textTransform: 'capitalize'
+                  }}>
+                    {(card.category || 'arbitrage') === 'arbitrage' ? 'Реклама' : (card.category || 'arbitrage') === 'travel' ? 'Путешествия' : 'Универсал'}
+                  </span>
+                  <span style={{
+                    fontSize: '10px',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    fontWeight: '700',
+                    background: card.card_status === 'ACTIVE' ? theme.colors.accentMuted : `${theme.colors.error}30`,
+                    color: card.card_status === 'ACTIVE' ? theme.colors.accent : theme.colors.error
+                  }}>
+                    {card.card_status}
+                  </span>
+                </div>
               </div>
 
               <div style={{
@@ -937,8 +1028,25 @@ const Dashboard: React.FC = () => {
                 color: theme.colors.textSecondary,
                 marginBottom: '10px'
               }}>
-                •••• •••• •••• {card.last_4_digits}
+                {details ? details.full_number.replace(/(.{4})/g, '$1 ').trim() : `•••• •••• •••• ${card.last_4_digits}`}
               </div>
+
+              {details && (
+                <div style={{
+                  display: 'flex',
+                  gap: '20px',
+                  fontSize: '13px',
+                  color: '#fff',
+                  marginBottom: '10px',
+                  padding: '10px 12px',
+                  backgroundColor: 'rgba(0,0,0,0.25)',
+                  borderRadius: '8px',
+                  fontFamily: theme.fonts.mono
+                }}>
+                  <div><span style={{ color: '#888', fontSize: '10px' }}>CVV</span><br />{details.cvv}</div>
+                  <div><span style={{ color: '#888', fontSize: '10px' }}>EXPIRY</span><br />{details.expiry}</div>
+                </div>
+              )}
 
               <div style={{
                 display: 'flex',
@@ -966,6 +1074,28 @@ const Dashboard: React.FC = () => {
               )}
 
               <div style={{ marginTop: '15px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <button
+                onClick={() => handleRevealCardDetails(card.id)}
+                disabled={isLoadingDetails}
+                style={{
+                  background: details ? theme.colors.accentMuted : 'transparent',
+                  border: `1px solid ${details ? theme.colors.accent : theme.colors.border}`,
+                  color: details ? theme.colors.accent : theme.colors.textSecondary,
+                  padding: '5px 10px',
+                  borderRadius: '8px',
+                  fontSize: '11px',
+                  cursor: isLoadingDetails ? 'wait' : 'pointer'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = theme.colors.accent;
+                  e.currentTarget.style.color = theme.colors.accent;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = details ? theme.colors.accent : theme.colors.border;
+                  e.currentTarget.style.color = details ? theme.colors.accent : theme.colors.textSecondary;
+                }}>
+                  {isLoadingDetails ? '...' : details ? '🔒 Hide' : '👁 Show Details'}
+                </button>
                 <button
                 onClick={() => openAutoReplenishModal(card.id)}
                 style={{
@@ -1033,7 +1163,8 @@ const Dashboard: React.FC = () => {
                 </button>
               </div>
             </div>
-          ))
+              );
+            })
           )}
         </div>
 

@@ -47,6 +47,65 @@ func GetCardTypesHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(types)
 }
 
+// MockCardDetailsHandler returns simulated card details (PAN, CVV, expiry) for the authorized owner.
+// GET /api/v1/user/cards/{id}/mock-details
+func MockCardDetailsHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	if idStr == "" {
+		http.Error(w, "missing card id", http.StatusBadRequest)
+		return
+	}
+	cardID, err := strconv.Atoi(idStr)
+	if err != nil || cardID <= 0 {
+		http.Error(w, "invalid card id", http.StatusBadRequest)
+		return
+	}
+
+	card, err := repository.GetCardByID(cardID)
+	if err != nil {
+		http.Error(w, "Card not found", http.StatusNotFound)
+		return
+	}
+	if card.UserID != userID {
+		http.Error(w, "Access denied", http.StatusForbidden)
+		return
+	}
+
+	// Generate deterministic mock data from card ID and BIN
+	fullNumber := card.BIN + "00" + strings.Repeat("0", 6-len(card.Last4Digits)) + card.Last4Digits
+	if len(fullNumber) < 16 {
+		fullNumber = fullNumber + strings.Repeat("0", 16-len(fullNumber))
+	}
+	if len(fullNumber) > 16 {
+		fullNumber = fullNumber[:16]
+	}
+	cvv := strconv.Itoa(100 + (cardID*7)%900)
+	expiryMonth := (cardID%12 + 1)
+	expiryYear := 2027
+	expiry := strconv.Itoa(expiryMonth) + "/" + strconv.Itoa(expiryYear)
+	if expiryMonth < 10 {
+		expiry = "0" + expiry
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"card_id":     card.ID,
+		"full_number": fullNumber,
+		"cvv":         cvv,
+		"expiry":      expiry,
+		"card_type":   card.CardType,
+		"bin":         card.BIN,
+		"last_4":      card.Last4Digits,
+	})
+}
+
 // patchCardStatusRequest is the JSON body for PATCH /user/cards/:id/status
 type patchCardStatusRequest struct {
 	Status string `json:"status"`

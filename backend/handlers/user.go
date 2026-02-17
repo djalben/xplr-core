@@ -40,6 +40,37 @@ func GetUserProfileHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+// TopUpBalanceHandler - POST /api/v1/user/topup - Adds $100 to user balance
+func TopUpBalanceHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	amount := decimal.NewFromInt(100)
+
+	if err := repository.ProcessDeposit(userID, amount); err != nil {
+		log.Printf("Error topping up user %d: %v", userID, err)
+		http.Error(w, "Failed to top up balance", http.StatusInternalServerError)
+		return
+	}
+
+	user, err := repository.GetUserByID(userID)
+	if err != nil {
+		log.Printf("Error fetching user %d after topup: %v", userID, err)
+		http.Error(w, "Top up succeeded but failed to fetch updated balance", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message":     "Balance topped up successfully",
+		"amount":      amount.String(),
+		"new_balance": user.BalanceRub.String(),
+	})
+}
+
 // GetMeHandler - Возвращает данные о текущем пользователе (Задача 3.1)
 func GetMeHandler(w http.ResponseWriter, r *http.Request) {
 	// 1. Извлечение UserID из контекста JWT/API Key
