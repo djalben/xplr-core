@@ -29,9 +29,9 @@ type FundRequest struct {
 
 // AuthRequest - Запрос на авторизацию карты (используется в handlers/test_authorize.go)
 type AuthRequest struct {
-	CardID      int             `json:"card_id"`
-	Amount      decimal.Decimal `json:"amount"`
-	MerchantName string         `json:"merchant_name"`
+	CardID       int             `json:"card_id"`
+	Amount       decimal.Decimal `json:"amount"`
+	MerchantName string          `json:"merchant_name"`
 }
 
 // --- СТРУКТУРЫ ПОЛЬЗОВАТЕЛЕЙ И АУТЕНТИФИКАЦИИ ---
@@ -40,13 +40,13 @@ type AuthRequest struct {
 // В Supabase: id (UUID), email, password_hash, balance_rub (numeric), active_mode
 // Для совместимости с кодом используем int для ID (конвертация UUID -> int при необходимости)
 type User struct {
-	ID             int             `json:"id"`              // В Supabase: UUID (конвертируется)
+	ID             int             `json:"id"` // В Supabase: UUID (конвертируется)
 	Email          string          `json:"email"`
-	PasswordHash   string          `json:"-"`               // password_hash в Supabase
-	Balance        decimal.Decimal `json:"balance"`         // Legacy поле
-	BalanceRub     decimal.Decimal `json:"balance_rub"`     // Основной баланс в рублях (XPLR) - соответствует Supabase
-	KYCStatus     string          `json:"kyc_status"`      // Статус верификации (например: pending, verified, rejected)
-	ActiveMode     string          `json:"active_mode"`     // Режим работы: по умолчанию 'personal' - соответствует Supabase
+	PasswordHash   string          `json:"-"`           // password_hash в Supabase
+	Balance        decimal.Decimal `json:"balance"`     // Legacy поле
+	BalanceRub     decimal.Decimal `json:"balance_rub"` // Основной баланс в рублях (XPLR) - соответствует Supabase
+	KYCStatus      string          `json:"kyc_status"`  // Статус верификации (например: pending, verified, rejected)
+	ActiveMode     string          `json:"active_mode"` // Режим работы: по умолчанию 'personal' - соответствует Supabase
 	CreatedAt      time.Time       `json:"created_at"`
 	Status         string          `json:"status"`
 	TeamID         sql.NullInt64   `json:"team_id"`
@@ -72,18 +72,18 @@ type DepositRequest struct {
 
 // Transaction - Структура для транзакции
 type Transaction struct {
-	TransactionID    int             `json:"transaction_id"`
-	UserID           int             `json:"user_id"`
-	UserEmail        string          `json:"user_email,omitempty"`
-	CardID           *int            `json:"card_id,omitempty"`
-	CardLast4Digits  string          `json:"card_last_4_digits,omitempty"`
-	Amount           decimal.Decimal `json:"amount"`
-	Fee              decimal.Decimal `json:"fee"`
-	TransactionType  string          `json:"transaction_type"`
-	Status           string          `json:"status"`
-	Details          string          `json:"details"`
-	ProviderTxID     string          `json:"provider_tx_id,omitempty"` // ID транзакции от провайдера (Wallester) для idempotency
-	ExecutedAt       time.Time       `json:"executed_at"`
+	TransactionID   int             `json:"transaction_id"`
+	UserID          int             `json:"user_id"`
+	UserEmail       string          `json:"user_email,omitempty"`
+	CardID          *int            `json:"card_id,omitempty"`
+	CardLast4Digits string          `json:"card_last_4_digits,omitempty"`
+	Amount          decimal.Decimal `json:"amount"`
+	Fee             decimal.Decimal `json:"fee"`
+	TransactionType string          `json:"transaction_type"`
+	Status          string          `json:"status"`
+	Details         string          `json:"details"`
+	ProviderTxID    string          `json:"provider_tx_id,omitempty"` // ID транзакции от провайдера (Wallester) для idempotency
+	ExecutedAt      time.Time       `json:"executed_at"`
 }
 
 // --- СТРУКТУРЫ АВТОРИЗАЦИИ ---
@@ -102,53 +102,55 @@ type AuthResponse struct {
 // В Supabase: id (UUID), service_id (int), external_id, bin, last_4, status
 // Для совместимости сохраняем текущие поля, добавляем соответствие Supabase полям
 type Card struct {
-	ID                    int             `json:"id"`                    // В Supabase: UUID (конвертируется)
-	UserID                int             `json:"user_id"`              // В Supabase: UUID user_id (конвертируется)
-	TeamID                *int            `json:"team_id,omitempty"`
-	ProviderCardID        string          `json:"provider_card_id"`      // Соответствует external_id в Supabase
-	ExternalID            string          `json:"external_id,omitempty"` // Поле из Supabase (дублирует ProviderCardID)
-	BIN                   string          `json:"bin"`                   // Соответствует Supabase bin
-	Last4Digits           string          `json:"last_4_digits"`         // Соответствует Supabase last_4
-	CardStatus            string          `json:"card_status"`           // Соответствует Supabase status
-	Status                string          `json:"status,omitempty"`      // Прямое соответствие Supabase status (дублирует CardStatus)
-	Nickname              string          `json:"nickname"`
-	ServiceSlug           string          `json:"service_slug"`          // Метка: 'arbitrage', 'travel', 'subscriptions' (для API)
-	ServiceID             *int            `json:"service_id,omitempty"` // ID из таблицы services в Supabase
-	DailySpendLimit       decimal.Decimal `json:"daily_spend_limit"`
-	FailedAuthCount       int             `json:"failed_auth_count"`
-	CardType              string          `json:"card_type"`
-	AutoReplenishEnabled  bool            `json:"auto_replenish_enabled"`
+	ID                     int             `json:"id"`      // В Supabase: UUID (конвертируется)
+	UserID                 int             `json:"user_id"` // В Supabase: UUID user_id (конвертируется)
+	TeamID                 *int            `json:"team_id,omitempty"`
+	ProviderCardID         string          `json:"provider_card_id"`      // Соответствует external_id в Supabase
+	ExternalID             string          `json:"external_id,omitempty"` // Поле из Supabase (дублирует ProviderCardID)
+	BIN                    string          `json:"bin"`                   // Соответствует Supabase bin
+	Last4Digits            string          `json:"last_4_digits"`         // Соответствует Supabase last_4
+	CardStatus             string          `json:"card_status"`           // Соответствует Supabase status
+	Status                 string          `json:"status,omitempty"`      // Прямое соответствие Supabase status (дублирует CardStatus)
+	Nickname               string          `json:"nickname"`
+	ServiceSlug            string          `json:"service_slug"`         // Метка: 'arbitrage', 'travel', 'subscriptions' (для API)
+	ServiceID              *int            `json:"service_id,omitempty"` // ID из таблицы services в Supabase
+	DailySpendLimit        decimal.Decimal `json:"daily_spend_limit"`
+	FailedAuthCount        int             `json:"failed_auth_count"`
+	CardType               string          `json:"card_type"`
+	Category               string          `json:"category"` // 'arbitrage', 'travel', 'services'
+	AutoReplenishEnabled   bool            `json:"auto_replenish_enabled"`
 	AutoReplenishThreshold decimal.Decimal `json:"auto_replenish_threshold"`
-	AutoReplenishAmount   decimal.Decimal `json:"auto_replenish_amount"`
-	CardBalance           decimal.Decimal `json:"card_balance"`         // Виртуальный баланс: при списке карт = BalanceRub пользователя
-	CreatedAt             time.Time       `json:"created_at"`
+	AutoReplenishAmount    decimal.Decimal `json:"auto_replenish_amount"`
+	CardBalance            decimal.Decimal `json:"card_balance"` // Виртуальный баланс: при списке карт = BalanceRub пользователя
+	CreatedAt              time.Time       `json:"created_at"`
 }
 
 // MassIssueRequest - Запрос на массовый выпуск карт
 type MassIssueRequest struct {
-	Count             int             `json:"count"`
-	DailyLimit        decimal.Decimal `json:"daily_limit"`
-	CardNickname      string          `json:"nickname"`
-	MerchantName      string          `json:"merchant_name"`
-	CardType          string          `json:"card_type"`   // VISA или MasterCard
-	ServiceSlug       string          `json:"service_slug"` // 'arbitrage', 'travel', 'subscriptions'
-	TeamID            *int            `json:"team_id,omitempty"`
+	Count        int             `json:"count"`
+	DailyLimit   decimal.Decimal `json:"daily_limit"`
+	CardNickname string          `json:"nickname"`
+	MerchantName string          `json:"merchant_name"`
+	CardType     string          `json:"card_type"`    // VISA или MasterCard
+	ServiceSlug  string          `json:"service_slug"` // 'arbitrage', 'travel', 'subscriptions'
+	Category     string          `json:"category"`     // 'arbitrage', 'travel', 'services'
+	TeamID       *int            `json:"team_id,omitempty"`
 }
 
-// CardIssueResult - Результат выпуска одной карты 
+// CardIssueResult - Результат выпуска одной карты
 type CardIssueResult struct {
 	Success   bool   `json:"success"`
 	Message   string `json:"message"`
 	Card      *Card  `json:"card,omitempty"`
-	Status    string `json:"status"`    
-	CardLast4 string `json:"card_last_4"` 
-	Nickname  string `json:"nickname"`  
+	Status    string `json:"status"`
+	CardLast4 string `json:"card_last_4"`
+	Nickname  string `json:"nickname"`
 }
 
-// MassIssueResponse - Ответ на массовый выпуск карт 
+// MassIssueResponse - Ответ на массовый выпуск карт
 type MassIssueResponse struct {
-	Successful int               `json:"successful_count"` 
-	Failed     int               `json:"failed_count"`     
+	Successful int               `json:"successful_count"`
+	Failed     int               `json:"failed_count"`
 	Results    []CardIssueResult `json:"results"`
 }
 
@@ -156,9 +158,9 @@ type MassIssueResponse struct {
 
 // AutoReplenishRequest - Запрос на настройку автопополнения
 type AutoReplenishRequest struct {
-	Enabled  bool            `json:"enabled"`
+	Enabled   bool            `json:"enabled"`
 	Threshold decimal.Decimal `json:"threshold"`
-	Amount   decimal.Decimal `json:"amount"`
+	Amount    decimal.Decimal `json:"amount"`
 }
 
 // --- СТРУКТУРЫ КОМАНД ---
@@ -213,10 +215,10 @@ type UserGrade struct {
 
 // GradeInfo - Информация о Grade для отображения
 type GradeInfo struct {
-	Grade      string          `json:"grade"`
-	TotalSpent decimal.Decimal `json:"total_spent"`
-	FeePercent decimal.Decimal `json:"fee_percent"`
-	NextGrade  *string         `json:"next_grade,omitempty"`
+	Grade      string           `json:"grade"`
+	TotalSpent decimal.Decimal  `json:"total_spent"`
+	FeePercent decimal.Decimal  `json:"fee_percent"`
+	NextGrade  *string          `json:"next_grade,omitempty"`
 	NextSpend  *decimal.Decimal `json:"next_spend,omitempty"` // Сколько нужно потратить до следующего уровня
 }
 
@@ -224,19 +226,19 @@ type GradeInfo struct {
 
 // Referral - Реферал
 type Referral struct {
-	ID              int             `json:"id"`
-	ReferrerID      int             `json:"referrer_id"`
-	ReferredID      int             `json:"referred_id"`
-	ReferralCode    string          `json:"referral_code"`
-	Status          string          `json:"status"` // 'PENDING', 'ACTIVE', 'COMPLETED'
+	ID               int             `json:"id"`
+	ReferrerID       int             `json:"referrer_id"`
+	ReferredID       int             `json:"referred_id"`
+	ReferralCode     string          `json:"referral_code"`
+	Status           string          `json:"status"` // 'PENDING', 'ACTIVE', 'COMPLETED'
 	CommissionEarned decimal.Decimal `json:"commission_earned"`
-	CreatedAt       time.Time       `json:"created_at"`
+	CreatedAt        time.Time       `json:"created_at"`
 }
 
 // ReferralStats - Статистика реферальной программы
 type ReferralStats struct {
-	TotalReferrals    int             `json:"total_referrals"`
-	ActiveReferrals   int             `json:"active_referrals"`
-	TotalCommission   decimal.Decimal `json:"total_commission"`
-	ReferralCode      string          `json:"referral_code"`
+	TotalReferrals  int             `json:"total_referrals"`
+	ActiveReferrals int             `json:"active_referrals"`
+	TotalCommission decimal.Decimal `json:"total_commission"`
+	ReferralCode    string          `json:"referral_code"`
 }

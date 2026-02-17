@@ -22,6 +22,7 @@ func GetCardByID(id int) (models.Card, error) {
 		SELECT id, user_id, provider_card_id, bin, last_4_digits, card_status, 
 		       COALESCE(nickname, '') as nickname, COALESCE(service_slug, 'arbitrage'), daily_spend_limit, failed_auth_count,
 		       COALESCE(card_type, 'VISA') as card_type,
+		       COALESCE(category, 'arbitrage') as category,
 		       COALESCE(auto_replenish_enabled, FALSE) as auto_replenish_enabled,
 		       COALESCE(auto_replenish_threshold, 0) as auto_replenish_threshold,
 		       COALESCE(auto_replenish_amount, 0) as auto_replenish_amount,
@@ -32,7 +33,7 @@ func GetCardByID(id int) (models.Card, error) {
 	err := GlobalDB.QueryRow(query, id).Scan(
 		&card.ID, &card.UserID, &card.ProviderCardID, &card.BIN, &card.Last4Digits,
 		&card.CardStatus, &card.Nickname, &card.ServiceSlug, &card.DailySpendLimit, &card.FailedAuthCount,
-		&card.CardType, &card.AutoReplenishEnabled, &card.AutoReplenishThreshold,
+		&card.CardType, &card.Category, &card.AutoReplenishEnabled, &card.AutoReplenishThreshold,
 		&card.AutoReplenishAmount, &card.CardBalance, &teamID, &card.CreatedAt,
 	)
 	if teamID.Valid {
@@ -53,6 +54,7 @@ func GetUserCards(userID int) ([]models.Card, error) {
 		SELECT id, user_id, provider_card_id, bin, last_4_digits, card_status, 
 		       COALESCE(nickname, '') as nickname, COALESCE(service_slug, 'arbitrage'), daily_spend_limit, failed_auth_count,
 		       COALESCE(card_type, 'VISA') as card_type,
+		       COALESCE(category, 'arbitrage') as category,
 		       COALESCE(auto_replenish_enabled, FALSE) as auto_replenish_enabled,
 		       COALESCE(auto_replenish_threshold, 0) as auto_replenish_threshold,
 		       COALESCE(auto_replenish_amount, 0) as auto_replenish_amount,
@@ -85,6 +87,7 @@ func GetUserCards(userID int) ([]models.Card, error) {
 			&card.DailySpendLimit,
 			&card.FailedAuthCount,
 			&card.CardType,
+			&card.Category,
 			&card.AutoReplenishEnabled,
 			&card.AutoReplenishThreshold,
 			&card.AutoReplenishAmount,
@@ -286,6 +289,10 @@ func IssueCards(userID int, req models.MassIssueRequest) (interface{}, error) {
 		if serviceSlug == "" {
 			serviceSlug = "arbitrage"
 		}
+		category := req.Category
+		if category == "" {
+			category = "arbitrage"
+		}
 
 		// Если указан team_id, проверяем доступ пользователя к команде
 		if req.TeamID != nil && *req.TeamID > 0 {
@@ -305,8 +312,8 @@ func IssueCards(userID int, req models.MassIssueRequest) (interface{}, error) {
 		}
 
 		err := GlobalDB.QueryRow(`
-			INSERT INTO cards (user_id, provider_card_id, bin, last_4_digits, card_status, nickname, service_slug, daily_spend_limit, failed_auth_count, card_type, card_balance, team_id)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+			INSERT INTO cards (user_id, provider_card_id, bin, last_4_digits, card_status, nickname, service_slug, daily_spend_limit, failed_auth_count, card_type, card_balance, team_id, category)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 			RETURNING id, created_at
 		`,
 			userID,
@@ -321,6 +328,7 @@ func IssueCards(userID int, req models.MassIssueRequest) (interface{}, error) {
 			cardType,
 			decimal.Zero,
 			req.TeamID,
+			category,
 		).Scan(&cardID, &createdAt)
 
 		if err != nil {
@@ -352,6 +360,7 @@ func IssueCards(userID int, req models.MassIssueRequest) (interface{}, error) {
 				Last4Digits:     last4,
 				CardStatus:      "ACTIVE",
 				ServiceSlug:     serviceSlug,
+				Category:        category,
 				DailySpendLimit: req.DailyLimit,
 				FailedAuthCount: 0,
 				CardType:        cardType,
@@ -414,7 +423,7 @@ func UpdateCardAutoReplenishment(cardID int, userID int, enabled bool, threshold
 		return fmt.Errorf("failed to update auto-replenishment settings")
 	}
 
-	log.Printf("✅ Auto-replenishment updated for card %d: enabled=%v, threshold=%s, amount=%s", 
+	log.Printf("✅ Auto-replenishment updated for card %d: enabled=%v, threshold=%s, amount=%s",
 		cardID, enabled, threshold.String(), amount.String())
 	return nil
 }

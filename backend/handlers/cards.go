@@ -6,12 +6,46 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gorilla/mux"
+	"github.com/djalben/xplr-core/backend/middleware"
 	"github.com/djalben/xplr-core/backend/models"
 	"github.com/djalben/xplr-core/backend/repository"
-	"github.com/djalben/xplr-core/backend/middleware"
+	"github.com/gorilla/mux"
 	"github.com/shopspring/decimal"
 )
+
+// GetCardTypesHandler returns available card categories with conditions.
+// GET /api/v1/cards/types (public or protected)
+func GetCardTypesHandler(w http.ResponseWriter, r *http.Request) {
+	types := []map[string]interface{}{
+		{
+			"category":    "arbitrage",
+			"label":       "Для рекламы",
+			"description": "Карты для оплаты рекламных кабинетов Facebook, Google, TikTok и трекеров",
+			"issue_fee":   "5.00",
+			"monthly_fee": "2.00",
+			"currency":    "USD",
+		},
+		{
+			"category":    "travel",
+			"label":       "Для путешествий",
+			"description": "Карты для бронирования отелей, авиабилетов и аренды авто",
+			"issue_fee":   "3.00",
+			"monthly_fee": "1.50",
+			"currency":    "USD",
+		},
+		{
+			"category":    "services",
+			"label":       "Универсальные",
+			"description": "Карты для подписок, онлайн-сервисов и повседневных покупок",
+			"issue_fee":   "2.00",
+			"monthly_fee": "1.00",
+			"currency":    "USD",
+		},
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(types)
+}
 
 // patchCardStatusRequest is the JSON body for PATCH /user/cards/:id/status
 type patchCardStatusRequest struct {
@@ -175,11 +209,11 @@ func SetCardAutoReplenishmentHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"card_id": cardID,
-		"enabled": req.Enabled,
+		"card_id":   cardID,
+		"enabled":   req.Enabled,
 		"threshold": req.Threshold.String(),
-		"amount": req.Amount.String(),
-		"message": "Auto-replenishment settings updated successfully",
+		"amount":    req.Amount.String(),
+		"message":   "Auto-replenishment settings updated successfully",
 	})
 }
 

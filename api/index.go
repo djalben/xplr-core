@@ -70,6 +70,16 @@ func ensureDB() {
 	// 5. Start auto-replenishment (runs as goroutine inside the invocation)
 	go core.StartAutoReplenishmentWorker()
 
+	// 6. Auto-migrations (idempotent)
+	migrations := []string{
+		`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='cards' AND column_name='category') THEN ALTER TABLE cards ADD COLUMN category VARCHAR(50) DEFAULT 'arbitrage'; END IF; END $$`,
+	}
+	for _, m := range migrations {
+		if _, err := db.Exec(m); err != nil {
+			log.Printf("Warning: migration failed: %v", err)
+		}
+	}
+
 	dbReady = true
 	log.Println("Serverless handler initialized successfully")
 }
@@ -92,6 +102,9 @@ func buildRouter() *mux.Router {
 
 	// Wallester webhook (public)
 	r.HandleFunc("/api/v1/webhooks/wallester", handlers.WallesterWebhookHandler).Methods("POST")
+
+	// Public card types endpoint
+	r.HandleFunc("/api/v1/cards/types", handlers.GetCardTypesHandler).Methods("GET")
 
 	// Protected routes under /api/v1/user
 	protected := r.PathPrefix("/api/v1/user").Subrouter()

@@ -52,6 +52,8 @@ interface Card {
   auto_replenish_amount?: string;
   card_balance?: string;
   card_type?: string;
+  category?: string;
+  service_slug?: string;
   team_id?: number;
 }
 
@@ -99,8 +101,10 @@ const Dashboard: React.FC = () => {
   const [showAutoReplenishModal, setShowAutoReplenishModal] = useState(false);
   const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
   const [newCardType, setNewCardType] = useState<'VISA' | 'MasterCard'>('VISA');
+  const [newCardCategory, setNewCardCategory] = useState<'arbitrage' | 'travel' | 'services'>('arbitrage');
   const [newCardNickname, setNewCardNickname] = useState('');
   const [isCreatingCard, setIsCreatingCard] = useState(false);
+  const [activeCardCategory, setActiveCardCategory] = useState<'all' | 'arbitrage' | 'travel' | 'services'>('all');
   
   // Auto-replenish states
   const [autoReplenishThreshold, setAutoReplenishThreshold] = useState('');
@@ -224,7 +228,8 @@ const Dashboard: React.FC = () => {
         nickname: newCardNickname,
         daily_limit: 500,
         merchant_name: newCardNickname || 'Default Merchant',
-        card_type: newCardType // Добавляем тип карты
+        card_type: newCardType,
+        category: newCardCategory
       };
       console.log('[CREATE CARD] Sending request:', requestData);
 
@@ -246,6 +251,7 @@ const Dashboard: React.FC = () => {
         setShowCreateCardModal(false);
         setNewCardNickname('');
         setNewCardType('VISA');
+        setNewCardCategory('arbitrage');
       }, 100);
     } catch (error) {
       console.error('[CREATE CARD] Error:', error);
@@ -817,6 +823,50 @@ const Dashboard: React.FC = () => {
           </button>
         </div>
 
+        {/* Category Tabs */}
+        <div style={{
+          display: 'flex',
+          gap: '8px',
+          marginBottom: '20px',
+          flexWrap: 'wrap'
+        }}>
+          {([
+            { key: 'all', label: 'Все' },
+            { key: 'arbitrage', label: 'Для рекламы' },
+            { key: 'travel', label: 'Для путешествий' },
+            { key: 'services', label: 'Универсальные' },
+          ] as { key: typeof activeCardCategory; label: string }[]).map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveCardCategory(tab.key)}
+              style={{
+                padding: '8px 18px',
+                borderRadius: theme.borderRadius.sm,
+                border: activeCardCategory === tab.key
+                  ? `1px solid ${theme.colors.accent}`
+                  : `1px solid ${theme.colors.border}`,
+                backgroundColor: activeCardCategory === tab.key
+                  ? theme.colors.accentMuted
+                  : 'transparent',
+                color: activeCardCategory === tab.key
+                  ? theme.colors.accent
+                  : theme.colors.textSecondary,
+                fontSize: '13px',
+                fontWeight: activeCardCategory === tab.key ? '600' : '400',
+                cursor: 'pointer',
+                transition: '0.2s'
+              }}
+            >
+              {tab.label}
+              {tab.key !== 'all' && (
+                <span style={{ marginLeft: '6px', opacity: 0.6 }}>
+                  {cards.filter(c => (c.category || 'arbitrage') === tab.key).length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
         {/* Cards Grid */}
         <div style={{
           display: 'grid',
@@ -824,7 +874,7 @@ const Dashboard: React.FC = () => {
           gap: '20px',
           marginBottom: '30px'
         }}>
-          {cards.length === 0 ? (
+          {(activeCardCategory === 'all' ? cards : cards.filter(c => (c.category || 'arbitrage') === activeCardCategory)).length === 0 ? (
             <div style={{
               gridColumn: '1 / -1',
               textAlign: 'center',
@@ -832,10 +882,10 @@ const Dashboard: React.FC = () => {
               color: '#888c95',
               fontSize: '16px'
             }}>
-              No active cards. Click "+ Issue Card" to create one.
+              {cards.length === 0 ? 'No active cards. Click "+ Issue Card" to create one.' : 'No cards in this category.'}
             </div>
           ) : (
-            cards.map((card) => (
+            (activeCardCategory === 'all' ? cards : cards.filter(c => (c.category || 'arbitrage') === activeCardCategory)).map((card) => (
             <div
               key={card.id}
               style={{
@@ -1668,6 +1718,63 @@ const Dashboard: React.FC = () => {
                   }}>
                   MasterCard
                 </button>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{
+                display: 'block',
+                fontSize: '12px',
+                fontWeight: '600',
+                color: '#888c95',
+                textTransform: 'uppercase',
+                letterSpacing: '1px',
+                marginBottom: '12px'
+              }}>
+                Category
+              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {([
+                  { key: 'arbitrage' as const, label: 'Для рекламы', desc: 'Facebook, Google, TikTok', fee: '$5.00' },
+                  { key: 'travel' as const, label: 'Для путешествий', desc: 'Отели, авиабилеты, аренда', fee: '$3.00' },
+                  { key: 'services' as const, label: 'Универсальные', desc: 'Подписки, сервисы, покупки', fee: '$2.00' },
+                ]).map((cat) => (
+                  <button
+                    key={cat.key}
+                    onClick={() => setNewCardCategory(cat.key)}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '14px 16px',
+                      backgroundColor: newCardCategory === cat.key ? 'rgba(0, 224, 150, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                      border: newCardCategory === cat.key ? '2px solid #00e096' : '2px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      transition: '0.2s',
+                      textAlign: 'left'
+                    }}
+                  >
+                    <div>
+                      <div style={{
+                        color: newCardCategory === cat.key ? '#00e096' : '#fff',
+                        fontWeight: '600',
+                        fontSize: '14px'
+                      }}>{cat.label}</div>
+                      <div style={{
+                        color: '#888c95',
+                        fontSize: '12px',
+                        marginTop: '2px'
+                      }}>{cat.desc}</div>
+                    </div>
+                    <div style={{
+                      color: newCardCategory === cat.key ? '#00e096' : '#888c95',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      whiteSpace: 'nowrap'
+                    }}>{cat.fee}</div>
+                  </button>
+                ))}
               </div>
             </div>
 
