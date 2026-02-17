@@ -74,6 +74,7 @@ func ensureDB() {
 	migrations := []string{
 		`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='cards' AND column_name='category') THEN ALTER TABLE cards ADD COLUMN category VARCHAR(50) DEFAULT 'arbitrage'; END IF; END $$`,
 		`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='cards' AND column_name='spend_limit') THEN ALTER TABLE cards ADD COLUMN spend_limit NUMERIC(20,4) DEFAULT 0; END IF; END $$`,
+		`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='is_admin') THEN ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT FALSE; END IF; END $$`,
 	}
 	for _, m := range migrations {
 		if _, err := db.Exec(m); err != nil {
@@ -142,6 +143,13 @@ func buildRouter() *mux.Router {
 
 	// Settings
 	protected.HandleFunc("/settings/telegram", handlers.UpdateTelegramChatIDHandler).Methods("POST")
+
+	// Admin routes (JWT + AdminOnly)
+	admin := r.PathPrefix("/api/v1/admin").Subrouter()
+	admin.Use(middleware.JWTAuthMiddleware)
+	admin.Use(middleware.AdminOnlyMiddleware)
+	admin.HandleFunc("/stats", handlers.AdminStatsHandler).Methods("GET")
+	admin.HandleFunc("/users", handlers.AdminUsersHandler).Methods("GET")
 
 	return r
 }

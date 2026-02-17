@@ -5,6 +5,7 @@ import RegisterForm from './components/auth/RegisterForm';
 import Dashboard from './pages/Dashboard';
 import Teams from './pages/Teams';
 import Referrals from './pages/Referrals';
+import AdminPanel from './pages/AdminPanel';
 
 // ProtectedRoute component - checks for token in localStorage
 interface ProtectedRouteProps {
@@ -68,6 +69,14 @@ const App: React.FC = () => {
         element={
           <ProtectedRoute>
             <Referrals />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute>
+            <AdminPanel />
           </ProtectedRoute>
         }
       />

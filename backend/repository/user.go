@@ -11,14 +11,15 @@ import (
 	"github.com/djalben/xplr-core/backend/notification"
 	"github.com/shopspring/decimal"
 )
+
 // GlobalDB должен быть объявлен в этом пакете (например, globals.go)
 
 // --- ФУНКЦИИ АУТЕНТИФИКАЦИИ И ПОЛУЧЕНИЯ ДАННЫХ ---
 
 // CreateUser создает нового пользователя и сохраняет его в БД.
-func CreateUser(user models.User) (models.User, error) { 
+func CreateUser(user models.User) (models.User, error) {
 	if GlobalDB == nil {
-		return models.User{}, fmt.Errorf("database connection not initialized") 
+		return models.User{}, fmt.Errorf("database connection not initialized")
 	}
 
 	queryUser := `
@@ -33,20 +34,20 @@ func CreateUser(user models.User) (models.User, error) {
 
 	if err != nil {
 		log.Printf("Error creating user %s: %v", user.Email, err)
-		return models.User{}, err 
+		return models.User{}, err
 	}
-	
-	createdUser.Email = user.Email 
-	
+
+	createdUser.Email = user.Email
+
 	log.Printf("User %s created with ID: %d", createdUser.Email, createdUser.ID)
-	
+
 	// Генерируем API-ключ для нового пользователя.
-    _, err = GenerateAPIKey(createdUser.ID)
-    if err != nil {
-        log.Printf("WARNING: Could not generate API key for user %d on creation: %v", createdUser.ID, err)
-    }
-    
-	return createdUser, nil 
+	_, err = GenerateAPIKey(createdUser.ID)
+	if err != nil {
+		log.Printf("WARNING: Could not generate API key for user %d on creation: %v", createdUser.ID, err)
+	}
+
+	return createdUser, nil
 }
 
 // GetUserByEmail - Находит пользователя по email.
@@ -55,7 +56,7 @@ func GetUserByEmail(email string) (models.User, error) {
 		return models.User{}, fmt.Errorf("database connection not initialized")
 	}
 
-	query := `SELECT id, email, password_hash, balance, COALESCE(balance_rub, 0), COALESCE(kyc_status, ''), COALESCE(active_mode, 'personal'), created_at, status, telegram_chat_id FROM users WHERE email = $1`
+	query := `SELECT id, email, password_hash, balance, COALESCE(balance_rub, 0), COALESCE(kyc_status, ''), COALESCE(active_mode, 'personal'), created_at, status, telegram_chat_id, COALESCE(is_admin, FALSE) FROM users WHERE email = $1`
 
 	var user models.User
 
@@ -70,6 +71,7 @@ func GetUserByEmail(email string) (models.User, error) {
 		&user.CreatedAt,
 		&user.Status,
 		&user.TelegramChatID,
+		&user.IsAdmin,
 	)
 
 	if err != nil {
@@ -89,7 +91,7 @@ func GetUserByID(userID int) (models.User, error) {
 		return models.User{}, fmt.Errorf("database connection not initialized")
 	}
 
-	query := `SELECT id, email, password_hash, balance, COALESCE(balance_rub, 0), COALESCE(kyc_status, ''), COALESCE(active_mode, 'personal'), created_at, status, telegram_chat_id FROM users WHERE id = $1`
+	query := `SELECT id, email, password_hash, balance, COALESCE(balance_rub, 0), COALESCE(kyc_status, ''), COALESCE(active_mode, 'personal'), created_at, status, telegram_chat_id, COALESCE(is_admin, FALSE) FROM users WHERE id = $1`
 
 	var user models.User
 
@@ -104,6 +106,7 @@ func GetUserByID(userID int) (models.User, error) {
 		&user.CreatedAt,
 		&user.Status,
 		&user.TelegramChatID,
+		&user.IsAdmin,
 	)
 
 	if err != nil {
@@ -120,19 +123,19 @@ func GetUserByID(userID int) (models.User, error) {
 // UpdateTelegramChatID - Обновляет TelegramChatID пользователя.
 // Принимает int, так как ChatID в Go - это int, а в БД - BIGINT.
 func UpdateTelegramChatID(userID int, chatID int) error {
-    if GlobalDB == nil {
-        return fmt.Errorf("database connection not initialized")
-    }
+	if GlobalDB == nil {
+		return fmt.Errorf("database connection not initialized")
+	}
 
-    _, err := GlobalDB.Exec(
-        "UPDATE users SET telegram_chat_id = $1 WHERE id = $2", 
-        chatID, userID,
-    )
-    if err != nil {
-        log.Printf("DB Error UpdateTelegramChatID: %v", err)
-        return fmt.Errorf("не удалось обновить telegram_chat_id")
-    }
-    return nil
+	_, err := GlobalDB.Exec(
+		"UPDATE users SET telegram_chat_id = $1 WHERE id = $2",
+		chatID, userID,
+	)
+	if err != nil {
+		log.Printf("DB Error UpdateTelegramChatID: %v", err)
+		return fmt.Errorf("не удалось обновить telegram_chat_id")
+	}
+	return nil
 }
 
 // ProcessDeposit - Обрабатывает пополнение баланса пользователя и записывает транзакцию.

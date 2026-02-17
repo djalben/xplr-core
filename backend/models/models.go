@@ -51,6 +51,7 @@ type User struct {
 	Status         string          `json:"status"`
 	TeamID         sql.NullInt64   `json:"team_id"`
 	TelegramChatID sql.NullInt64   `json:"telegram_chat_id"`
+	IsAdmin        bool            `json:"is_admin"`
 }
 
 // APIKey - Структура для ключей
