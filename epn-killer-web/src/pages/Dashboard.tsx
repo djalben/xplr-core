@@ -751,6 +751,35 @@ const Dashboard: React.FC = () => {
           </div>
         ))}
 
+        {/* Referrals link */}
+        <div
+          onClick={() => navigate('/referrals')}
+          style={{
+            padding: '12px 15px',
+            color: theme.colors.textSecondary,
+            cursor: 'pointer',
+            borderRadius: theme.borderRadius.sm,
+            marginBottom: '4px',
+            transition: '0.2s',
+            fontSize: '14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            backgroundColor: 'transparent',
+            borderLeft: '3px solid transparent'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = theme.colors.backgroundCard;
+            e.currentTarget.style.color = theme.colors.textPrimary;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent';
+            e.currentTarget.style.color = theme.colors.textSecondary;
+          }}
+        >
+          ✈️ Referrals
+        </div>
+
         {/* Telegram Connect */}
         <div style={{
           marginTop: 'auto',

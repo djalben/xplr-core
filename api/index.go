@@ -75,6 +75,12 @@ func ensureDB() {
 		`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='cards' AND column_name='category') THEN ALTER TABLE cards ADD COLUMN category VARCHAR(50) DEFAULT 'arbitrage'; END IF; END $$`,
 		`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='cards' AND column_name='spend_limit') THEN ALTER TABLE cards ADD COLUMN spend_limit NUMERIC(20,4) DEFAULT 0; END IF; END $$`,
 		`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='is_admin') THEN ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT FALSE; END IF; END $$`,
+		`CREATE TABLE IF NOT EXISTS referral_codes (
+			id SERIAL PRIMARY KEY,
+			user_id INTEGER UNIQUE NOT NULL,
+			code VARCHAR(20) UNIQUE NOT NULL,
+			created_at TIMESTAMP DEFAULT NOW()
+		)`,
 	}
 	for _, m := range migrations {
 		if _, err := db.Exec(m); err != nil {
@@ -140,6 +146,7 @@ func buildRouter() *mux.Router {
 
 	// Referrals
 	protected.HandleFunc("/referrals", handlers.GetReferralStatsHandler).Methods("GET")
+	protected.HandleFunc("/referrals/list", handlers.GetReferralListHandler).Methods("GET")
 
 	// Settings
 	protected.HandleFunc("/settings/telegram", handlers.UpdateTelegramChatIDHandler).Methods("POST")

@@ -1,103 +1,87 @@
 package repository
 
 import (
+	cryptorand "crypto/rand"
+	"database/sql"
 	"fmt"
 	"log"
+	"math/big"
+	"strings"
 
 	"github.com/djalben/xplr-core/backend/models"
+	"github.com/djalben/xplr-core/backend/notification"
 	"github.com/shopspring/decimal"
 )
 
-// GenerateReferralCode - Генерирует уникальный реферальный код
-func GenerateReferralCode(userID int) string {
-	// Простая генерация: USER{userID}-{random}
-	// В продакшене можно использовать более сложную логику
-	return fmt.Sprintf("USER%d-%s", userID, generateReferralRandomString(8))
-}
-
-// generateReferralRandomString - Генерирует случайную строку для реферального кода
-func generateReferralRandomString(length int) string {
-	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+// generateSecureCode generates a truly random alphanumeric code of given length.
+func generateSecureCode(length int) string {
+	const charset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 	b := make([]byte, length)
 	for i := range b {
-		// Простая генерация на основе индекса (в продакшене использовать crypto/rand)
-		b[i] = charset[(i*7+length)%len(charset)]
+		n, err := cryptorand.Int(cryptorand.Reader, big.NewInt(int64(len(charset))))
+		if err != nil {
+			b[i] = charset[i%len(charset)]
+			continue
+		}
+		b[i] = charset[n.Int64()]
 	}
 	return string(b)
 }
 
-// CreateReferral - Создать реферальную запись
-func CreateReferral(referrerID int, referredID int, referralCode string) error {
-	if GlobalDB == nil {
-		return fmt.Errorf("database connection not initialized")
-	}
-
-	_, err := GlobalDB.Exec(
-		`INSERT INTO referrals (referrer_id, referred_id, referral_code, status)
-		 VALUES ($1, $2, $3, 'ACTIVE')`,
-		referrerID, referredID, referralCode,
-	)
-	if err != nil {
-		log.Printf("DB Error creating referral: %v", err)
-		return fmt.Errorf("failed to create referral")
-	}
-
-	log.Printf("✅ Referral created: referrer %d -> referred %d (code: %s)", referrerID, referredID, referralCode)
-	return nil
-}
-
-// GetUserReferralCode - Получить реферальный код пользователя (или создать новый)
+// GetUserReferralCode returns the user's persistent referral code, creating one if needed.
 func GetUserReferralCode(userID int) (string, error) {
 	if GlobalDB == nil {
 		return "", fmt.Errorf("database connection not initialized")
 	}
 
-	// Проверяем, есть ли уже код
+	// Check referral_codes table first
 	var code string
 	err := GlobalDB.QueryRow(
-		"SELECT referral_code FROM referrals WHERE referrer_id = $1 LIMIT 1",
+		"SELECT code FROM referral_codes WHERE user_id = $1",
 		userID,
 	).Scan(&code)
-
 	if err == nil {
 		return code, nil
 	}
 
-	// Если кода нет, создаем новый
-	newCode := GenerateReferralCode(userID)
-	
-	// Проверяем уникальность
-	var existingCode string
+	// Fallback: check legacy referrals table
 	err = GlobalDB.QueryRow(
-		"SELECT referral_code FROM referrals WHERE referral_code = $1",
-		newCode,
-	).Scan(&existingCode)
-	
-	// Если код уже существует, генерируем новый
-	for err == nil {
-		newCode = GenerateReferralCode(userID)
-		err = GlobalDB.QueryRow(
-			"SELECT referral_code FROM referrals WHERE referral_code = $1",
-			newCode,
-		).Scan(&existingCode)
+		"SELECT referral_code FROM referrals WHERE referrer_id = $1 LIMIT 1",
+		userID,
+	).Scan(&code)
+	if err == nil {
+		// Persist to referral_codes
+		GlobalDB.Exec("INSERT INTO referral_codes (user_id, code) VALUES ($1, $2) ON CONFLICT DO NOTHING", userID, code)
+		return code, nil
 	}
 
-	return newCode, nil
+	// Generate new code and persist
+	for attempts := 0; attempts < 10; attempts++ {
+		newCode := generateSecureCode(8)
+		_, err = GlobalDB.Exec(
+			"INSERT INTO referral_codes (user_id, code) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+			userID, newCode,
+		)
+		if err == nil {
+			log.Printf("✅ Referral code %s created for user %d", newCode, userID)
+			return newCode, nil
+		}
+	}
+
+	return "", fmt.Errorf("failed to generate unique referral code")
 }
 
-// GetReferralStats - Получить статистику реферальной программы пользователя
+// GetReferralStats returns referral program statistics for a user.
 func GetReferralStats(userID int) (*models.ReferralStats, error) {
 	if GlobalDB == nil {
 		return nil, fmt.Errorf("database connection not initialized")
 	}
 
-	// Получить реферальный код
 	code, err := GetUserReferralCode(userID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Подсчитать статистику
 	var totalReferrals, activeReferrals int
 	var totalCommission decimal.Decimal
 
@@ -119,52 +103,108 @@ func GetReferralStats(userID int) (*models.ReferralStats, error) {
 	return &models.ReferralStats{
 		TotalReferrals:  totalReferrals,
 		ActiveReferrals: activeReferrals,
-		TotalCommission:  totalCommission,
+		TotalCommission: totalCommission,
 		ReferralCode:    code,
 	}, nil
 }
 
-// ProcessReferralRegistration - Обработать регистрацию по реферальной ссылке
+// ProcessReferralRegistration handles registration via a referral link.
+// It looks up the referrer from referral_codes, creates the referral record,
+// credits $5 bonus to the new user, and sends Telegram notification to the referrer.
 func ProcessReferralRegistration(referredID int, referralCode string) error {
 	if GlobalDB == nil {
 		return fmt.Errorf("database connection not initialized")
 	}
 
-	// Найти реферера по коду
+	referralCode = strings.TrimSpace(strings.ToUpper(referralCode))
+	if referralCode == "" {
+		return fmt.Errorf("empty referral code")
+	}
+
+	// Look up referrer from referral_codes table
 	var referrerID int
 	err := GlobalDB.QueryRow(
-		"SELECT referrer_id FROM referrals WHERE referral_code = $1 AND status = 'ACTIVE' LIMIT 1",
+		"SELECT user_id FROM referral_codes WHERE code = $1",
 		referralCode,
 	).Scan(&referrerID)
 
 	if err != nil {
-		// Реферальный код не найден или неактивен
-		return fmt.Errorf("invalid referral code")
+		// Fallback: try legacy referrals table
+		err = GlobalDB.QueryRow(
+			"SELECT referrer_id FROM referrals WHERE referral_code = $1 LIMIT 1",
+			referralCode,
+		).Scan(&referrerID)
+		if err != nil {
+			log.Printf("Referral code %s not found in any table", referralCode)
+			return fmt.Errorf("invalid referral code")
+		}
 	}
 
-	// Проверяем, что пользователь еще не был приглашен этим реферером
+	// Cannot refer yourself
+	if referrerID == referredID {
+		return fmt.Errorf("cannot refer yourself")
+	}
+
+	// Check for duplicate
 	var existingID int
 	err = GlobalDB.QueryRow(
 		"SELECT id FROM referrals WHERE referrer_id = $1 AND referred_id = $2",
 		referrerID, referredID,
 	).Scan(&existingID)
-
 	if err == nil {
-		// Уже существует
-		return nil // Не ошибка, просто игнорируем
+		return nil // already exists, silently ignore
 	}
 
-	// Создаем реферальную запись
-	return CreateReferral(referrerID, referredID, referralCode)
+	// Create referral record
+	_, err = GlobalDB.Exec(
+		`INSERT INTO referrals (referrer_id, referred_id, referral_code, status)
+		 VALUES ($1, $2, $3, 'ACTIVE')`,
+		referrerID, referredID, referralCode,
+	)
+	if err != nil {
+		log.Printf("DB Error creating referral: %v", err)
+		return fmt.Errorf("failed to create referral")
+	}
+	log.Printf("✅ Referral created: referrer %d -> referred %d (code: %s)", referrerID, referredID, referralCode)
+
+	// Credit $5 bonus to the new user
+	bonus := decimal.NewFromInt(5)
+	_, err = GlobalDB.Exec(
+		"UPDATE users SET balance_rub = COALESCE(balance_rub, 0) + $1, balance = COALESCE(balance, 0) + $1 WHERE id = $2",
+		bonus, referredID,
+	)
+	if err != nil {
+		log.Printf("Warning: failed to credit referral bonus to user %d: %v", referredID, err)
+	} else {
+		log.Printf("✅ $5 referral bonus credited to new user %d", referredID)
+	}
+
+	// Send Telegram notification to referrer
+	go func() {
+		referrer, err := GetUserByID(referrerID)
+		if err != nil {
+			return
+		}
+		referred, err := GetUserByID(referredID)
+		if err != nil {
+			return
+		}
+		if referrer.TelegramChatID.Valid {
+			msg := fmt.Sprintf("🎉 Новый реферал!\n\nПользователь %s зарегистрировался по вашей ссылке.\nВаш код: %s",
+				referred.Email, referralCode)
+			notification.SendTelegramMessage(referrer.TelegramChatID.Int64, msg)
+		}
+	}()
+
+	return nil
 }
 
-// AddReferralCommission - Добавить комиссию рефереру
+// AddReferralCommission adds commission to referrer's referral records.
 func AddReferralCommission(referrerID int, amount decimal.Decimal) error {
 	if GlobalDB == nil {
 		return fmt.Errorf("database connection not initialized")
 	}
 
-	// Обновляем commission_earned для всех активных рефералов реферера
 	_, err := GlobalDB.Exec(
 		`UPDATE referrals 
 		 SET commission_earned = commission_earned + $1 
@@ -177,4 +217,51 @@ func AddReferralCommission(referrerID int, amount decimal.Decimal) error {
 	}
 
 	return nil
+}
+
+// GetReferralList returns the list of referred users for a referrer.
+func GetReferralList(userID int) ([]map[string]interface{}, error) {
+	if GlobalDB == nil {
+		return nil, fmt.Errorf("database connection not initialized")
+	}
+
+	rows, err := GlobalDB.Query(
+		`SELECT r.referred_id, u.email, r.status, COALESCE(r.commission_earned, 0), r.created_at
+		 FROM referrals r
+		 JOIN users u ON u.id = r.referred_id
+		 WHERE r.referrer_id = $1
+		 ORDER BY r.created_at DESC`,
+		userID,
+	)
+	if err != nil {
+		log.Printf("DB Error fetching referral list: %v", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []map[string]interface{}
+	for rows.Next() {
+		var refID int
+		var email, status string
+		var commission decimal.Decimal
+		var createdAt sql.NullTime
+		if err := rows.Scan(&refID, &email, &status, &commission, &createdAt); err != nil {
+			continue
+		}
+		ca := ""
+		if createdAt.Valid {
+			ca = createdAt.Time.Format("2006-01-02")
+		}
+		list = append(list, map[string]interface{}{
+			"id":         refID,
+			"email":      email,
+			"status":     status,
+			"commission": commission.String(),
+			"created_at": ca,
+		})
+	}
+	if list == nil {
+		list = []map[string]interface{}{}
+	}
+	return list, nil
 }
