@@ -1,5 +1,4 @@
 import apiClient from './axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface RegisterRequest {
   email: string;
@@ -25,9 +24,8 @@ export interface AuthResponse {
 export const register = async (data: RegisterRequest): Promise<AuthResponse> => {
   const response = await apiClient.post<AuthResponse>('/auth/register', data);
 
-  // Сохраняем токен в AsyncStorage
   if (response.data.token) {
-    await AsyncStorage.setItem('jwt_token', response.data.token);
+    localStorage.setItem('jwt_token', response.data.token);
   }
 
   return response.data;
@@ -37,15 +35,14 @@ export const register = async (data: RegisterRequest): Promise<AuthResponse> => 
 export const login = async (data: LoginRequest): Promise<AuthResponse> => {
   const response = await apiClient.post<AuthResponse>('/auth/login', data);
 
-  // Сохраняем токен в AsyncStorage
   if (response.data.token) {
-    await AsyncStorage.setItem('jwt_token', response.data.token);
+    localStorage.setItem('jwt_token', response.data.token);
   }
 
   return response.data;
 };
 
 // Выход из системы
-export const logout = async (): Promise<void> => {
-  await AsyncStorage.removeItem('jwt_token');
+export const logout = (): void => {
+  localStorage.removeItem('jwt_token');
 };
