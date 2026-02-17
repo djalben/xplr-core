@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API_BASE_URL } from '../api/axios';
 import { getUserTeams, createTeam, getTeam, inviteTeamMember, removeTeamMember, updateTeamMemberRole, Team, TeamDetail } from '../api/teams';
+import SidebarLayout from '../components/SidebarLayout';
 
 const Teams: React.FC = () => {
   const navigate = useNavigate();
@@ -117,22 +118,15 @@ const Teams: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center', color: '#888c95' }}>
-        Загрузка...
-      </div>
+      <SidebarLayout>
+        <div style={{ padding: '40px', textAlign: 'center', color: '#888c95' }}>Загрузка...</div>
+      </SidebarLayout>
     );
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      backgroundColor: 'rgba(255, 255, 255, 0.03)',
-      backdropFilter: 'blur(12px)',
-      color: '#ffffff',
-      padding: '30px',
-      position: 'relative',
-      zIndex: 10
-    }}>
+    <SidebarLayout>
+    <div style={{ color: '#ffffff' }}>
       {/* Header */}
       <div style={{
         display: 'flex',
@@ -505,6 +499,7 @@ const Teams: React.FC = () => {
         </div>
       )}
     </div>
+    </SidebarLayout>
   );
 };
 

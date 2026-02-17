@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API_BASE_URL } from '../api/axios';
 import { theme } from '../theme/theme';
+import SidebarLayout from '../components/SidebarLayout';
 
 interface ReferralStats {
   total_referrals: number;
@@ -62,16 +63,17 @@ const Referrals: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: theme.colors.background, color: theme.colors.textPrimary }}>
-        Loading...
-      </div>
+      <SidebarLayout>
+        <div style={{ padding: 40, textAlign: 'center', color: theme.colors.textSecondary }}>Loading...</div>
+      </SidebarLayout>
     );
   }
 
   const revShareRate = '5%';
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: 'rgba(255, 255, 255, 0.03)', backdropFilter: 'blur(12px)', color: theme.colors.textPrimary, padding: '30px', position: 'relative', zIndex: 10 }}>
+    <SidebarLayout>
+    <div style={{ color: theme.colors.textPrimary }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
         <div>
@@ -226,6 +228,7 @@ const Referrals: React.FC = () => {
         </div>
       </div>
     </div>
+    </SidebarLayout>
   );
 };
 
