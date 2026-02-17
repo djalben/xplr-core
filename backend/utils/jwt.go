@@ -2,12 +2,18 @@ package utils
 
 import (
 	"log"
+	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var jwtKey = []byte("my_super_secret_jwt_key") 
+var jwtKey = func() []byte {
+	if secret := os.Getenv("JWT_SECRET"); secret != "" {
+		return []byte(secret)
+	}
+	return []byte("my_super_secret_jwt_key")
+}()
 
 // GenerateJWT создает JWT для данного ID пользователя
 func GenerateJWT(userID int) (string, error) {
@@ -26,6 +32,7 @@ func GenerateJWT(userID int) (string, error) {
 	}
 	return tokenString, nil
 }
+
 // GetJWTSecret возвращает секретный ключ для проверки токена
 func GetJWTSecret() []byte {
 	return jwtKey

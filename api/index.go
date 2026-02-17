@@ -19,56 +19,65 @@ import (
 )
 
 var (
-	router *mux.Router
-	once   sync.Once
+	router     *mux.Router
+	routerOnce sync.Once
+	dbReady    bool
+	dbMu       sync.Mutex
 )
 
-func initOnce() {
-	once.Do(func() {
-		// 1. Database connection
-		dbURL := os.Getenv("DATABASE_URL")
-		if dbURL == "" {
-			log.Println("WARNING: DATABASE_URL is not set")
-			return
-		}
+func ensureDB() {
+	dbMu.Lock()
+	defer dbMu.Unlock()
 
-		db, err := sql.Open("postgres", dbURL)
-		if err != nil {
-			log.Printf("Error opening database: %v", err)
-			return
-		}
-
-		// Connection pool tuning for serverless (short-lived)
-		db.SetMaxOpenConns(5)
-		db.SetMaxIdleConns(2)
-
-		if err = db.PingContext(context.Background()); err != nil {
-			log.Printf("Error pinging database: %v", err)
-			return
-		}
-
-		// 2. Wire DB into packages
-		handlers.GlobalDB = db
-		repository.GlobalDB = db
-
-		// 3. Telegram
-		if token := os.Getenv("TELEGRAM_BOT_TOKEN"); token != "" {
-			telegram.SetBotToken(token)
-		}
-
-		// 4. Wallester
-		handlers.InitWallesterRepository()
-
-		// 5. Start auto-replenishment (runs as goroutine inside the invocation)
-		go core.StartAutoReplenishmentWorker()
-
-		log.Println("Serverless handler initialized successfully")
-	})
-
-	// Build router (always needed even if DB init failed, so health check works)
-	if router == nil {
-		router = buildRouter()
+	if dbReady {
+		return
 	}
+
+	// 1. Database connection
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		log.Println("ERROR: DATABASE_URL is not set")
+		return
+	}
+
+	db, err := sql.Open("postgres", dbURL)
+	if err != nil {
+		log.Printf("Error opening database: %v", err)
+		return
+	}
+
+	// Connection pool tuning for serverless (short-lived)
+	db.SetMaxOpenConns(5)
+	db.SetMaxIdleConns(2)
+
+	if err = db.PingContext(context.Background()); err != nil {
+		log.Printf("Error pinging database: %v", err)
+		return
+	}
+
+	// 2. Wire DB into packages
+	handlers.GlobalDB = db
+	repository.GlobalDB = db
+
+	// 3. Telegram
+	if token := os.Getenv("TELEGRAM_BOT_TOKEN"); token != "" {
+		telegram.SetBotToken(token)
+	}
+
+	// 4. Wallester
+	handlers.InitWallesterRepository()
+
+	// 5. Start auto-replenishment (runs as goroutine inside the invocation)
+	go core.StartAutoReplenishmentWorker()
+
+	dbReady = true
+	log.Println("Serverless handler initialized successfully")
+}
+
+func ensureRouter() {
+	routerOnce.Do(func() {
+		router = buildRouter()
+	})
 }
 
 func buildRouter() *mux.Router {
@@ -120,7 +129,8 @@ func buildRouter() *mux.Router {
 
 // Handler is the Vercel serverless entry point.
 func Handler(w http.ResponseWriter, r *http.Request) {
-	initOnce()
+	ensureRouter()
+	ensureDB()
 
 	// CORS headers (same-origin on Vercel, but keep for local dev / preview URLs)
 	origin := r.Header.Get("Origin")
@@ -135,6 +145,14 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	// Handle preflight
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	// If DB is not ready, return 503 with a clear message (except for health check)
+	if !dbReady && r.URL.Path != "/api/health" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		w.Write([]byte(`{"error":"Database not initialized. Check DATABASE_URL environment variable."}`))
 		return
 	}
 
