@@ -106,6 +106,7 @@ const Dashboard: React.FC = () => {
   const [newCardCategory, setNewCardCategory] = useState<'arbitrage' | 'travel' | 'services'>('arbitrage');
   const [newCardNickname, setNewCardNickname] = useState('');
   const [isCreatingCard, setIsCreatingCard] = useState(false);
+  const [newCardCount, setNewCardCount] = useState(1);
   const [activeCardCategory, setActiveCardCategory] = useState<'all' | 'arbitrage' | 'travel' | 'services'>('all');
   
   // Top-up state
@@ -266,7 +267,7 @@ const Dashboard: React.FC = () => {
       };
 
       const requestData = {
-        count: 1,
+        count: newCardCount,
         nickname: newCardNickname,
         daily_limit: 500,
         merchant_name: newCardNickname || 'Default Merchant',
@@ -294,6 +295,7 @@ const Dashboard: React.FC = () => {
         setNewCardNickname('');
         setNewCardType('VISA');
         setNewCardCategory('arbitrage');
+        setNewCardCount(1);
       }, 100);
     } catch (error) {
       console.error('[CREATE CARD] Error:', error);
@@ -478,10 +480,14 @@ const Dashboard: React.FC = () => {
       const config = { headers: { Authorization: `Bearer ${token}` } };
       const response = await axios.post(`${API_BASE_URL}/user/topup`, {}, config);
       const newBalance = response.data.new_balance;
+      const amountUsd = response.data.amount_usd;
+      const amountRub = response.data.amount_rub;
+      const rate = response.data.rate;
       if (userData) {
         setUserData({ ...userData, balance: parseFloat(newBalance) });
       }
-      setToast({ message: `+$100.00 — Balance: $${parseFloat(newBalance).toFixed(2)}`, type: 'success' });
+      const rateInfo = rate ? ` (${parseFloat(amountRub).toFixed(0)} ₽ по курсу ${parseFloat(rate).toFixed(2)})` : '';
+      setToast({ message: `На счёт зачислено $${parseFloat(amountUsd || '100').toFixed(2)}${rateInfo}`, type: 'success' });
     } catch (error) {
       console.error('Error topping up:', error);
       setToast({ message: 'Failed to top up balance', type: 'error' });
@@ -509,6 +515,14 @@ const Dashboard: React.FC = () => {
     } finally {
       setLoadingCardDetails(prev => ({ ...prev, [cardId]: false }));
     }
+  };
+
+  // Copy card number to clipboard
+  const handleCopyCardNumber = (cardId: number, last4: string) => {
+    const details = revealedCardDetails[cardId];
+    const number = details ? details.full_number : `•••• •••• •••• ${last4}`;
+    navigator.clipboard.writeText(number.replace(/\s/g, ''));
+    setToast({ message: 'Номер скопирован. Используйте его для оплаты в Facebook/Google.', type: 'success' });
   };
 
   // Open confirmation dialog
@@ -1168,7 +1182,9 @@ const Dashboard: React.FC = () => {
           display: 'flex',
           gap: '8px',
           marginBottom: '20px',
-          flexWrap: 'wrap'
+          flexWrap: 'wrap',
+          position: 'relative',
+          zIndex: 2
         }}>
           {([
             { key: 'all', label: 'Все' },
@@ -1310,7 +1326,13 @@ const Dashboard: React.FC = () => {
                 color: theme.colors.textSecondary,
                 marginBottom: '10px'
               }}>
+                <span
+                onClick={() => handleCopyCardNumber(card.id, card.last_4_digits)}
+                style={{ cursor: 'pointer' }}
+                title="Нажмите, чтобы скопировать номер"
+              >
                 {details ? details.full_number.replace(/(.{4})/g, '$1 ').trim() : `•••• •••• •••• ${card.last_4_digits}`}
+              </span>
               </div>
 
               {details && (
@@ -2307,6 +2329,46 @@ const Dashboard: React.FC = () => {
               }}>
                 Card Nickname
               </label>
+
+              {/* Quantity selector — for arbitrage mass issue */}
+              {newCardCategory === 'arbitrage' && (
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    color: '#888c95',
+                    textTransform: 'uppercase',
+                    letterSpacing: '1px',
+                    marginBottom: '12px'
+                  }}>
+                    Количество карт
+                  </label>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    {[1, 5, 10, 50].map((qty) => (
+                      <button
+                        key={qty}
+                        onClick={() => setNewCardCount(qty)}
+                        style={{
+                          flex: 1,
+                          padding: '12px',
+                          backgroundColor: newCardCount === qty ? 'rgba(0, 224, 150, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                          border: newCardCount === qty ? '2px solid #00e096' : '2px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '10px',
+                          color: newCardCount === qty ? '#00e096' : '#888c95',
+                          fontWeight: '700',
+                          fontSize: '16px',
+                          cursor: 'pointer',
+                          transition: '0.2s'
+                        }}
+                      >
+                        {qty}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <input
                 type="text"
                 placeholder="e.g., FB Ads Campaign"
@@ -2372,7 +2434,7 @@ const Dashboard: React.FC = () => {
                     animation: 'spin 0.6s linear infinite'
                   }} />
                 )}
-                {isCreatingCard ? 'Creating...' : 'Create Card'}
+                {isCreatingCard ? 'Creating...' : newCardCount > 1 ? `Issue ${newCardCount} Cards` : 'Create Card'}
               </button>
             </div>
           </div>

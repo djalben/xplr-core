@@ -274,7 +274,7 @@ const AdminPanel: React.FC = () => {
                         <button onClick={async () => {
                           try {
                             const res = await axios.patch(`${API_BASE_URL}/admin/rates/${r.id}/markup`, { markup_percent: parseFloat(editingMarkup?.value ?? '0') }, getConfig());
-                            setRates(res.data || []);
+                            setRates(Array.isArray(res.data) ? res.data : []);
                             setEditingMarkup(null);
                             setToast({ message: 'Markup updated', type: 'success' });
                           } catch { setToast({ message: 'Failed to update markup', type: 'error' }); }

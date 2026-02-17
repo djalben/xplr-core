@@ -7,6 +7,7 @@ import Teams from './pages/Teams';
 import Referrals from './pages/Referrals';
 import AdminPanel from './pages/AdminPanel';
 import LandingPage from './pages/LandingPage';
+import NeuralBackground from './components/NeuralBackground';
 
 // ProtectedRoute component - checks for token in localStorage
 interface ProtectedRouteProps {
@@ -40,6 +41,8 @@ const RootRedirect: React.FC = () => {
 
 const App: React.FC = () => {
   return (
+    <>
+    <NeuralBackground />
     <Routes>
       {/* Root route - redirect based on auth status */}
       <Route path="/" element={<RootRedirect />} />
@@ -83,6 +86,7 @@ const App: React.FC = () => {
         }
       />
     </Routes>
+    </>
   );
 };
 
