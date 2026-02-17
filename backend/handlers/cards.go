@@ -35,11 +35,12 @@ func GetCardTypesHandler(w http.ResponseWriter, r *http.Request) {
 		},
 		{
 			"category":    "services",
-			"label":       "Универсальные",
-			"description": "Карты для подписок, онлайн-сервисов и повседневных покупок",
+			"label":       "Для зарубежных сервисов",
+			"description": "Карты для подписок, онлайн-сервисов и зарубежных покупок",
 			"issue_fee":   "2.00",
 			"monthly_fee": "1.00",
 			"currency":    "USD",
+			"validity":    "1 year",
 		},
 	}
 
@@ -242,7 +243,6 @@ func PatchCardStatusHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func MassIssueCardsHandler(w http.ResponseWriter, r *http.Request) {
-	// Используем константу из middleware для получения ID пользователя
 	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
 	if !ok {
 		http.Error(w, "Ошибка авторизации", http.StatusUnauthorized)
@@ -253,6 +253,47 @@ func MassIssueCardsHandler(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Неверный формат", http.StatusBadRequest)
 		return
+	}
+
+	if req.Count < 1 {
+		req.Count = 1
+	}
+	if req.Count > 100 {
+		http.Error(w, "Максимум 100 карт за раз", http.StatusBadRequest)
+		return
+	}
+
+	// Calculate fee per card based on category
+	feePerCard := decimal.NewFromFloat(5.00) // arbitrage default
+	cat := strings.ToLower(req.Category)
+	switch cat {
+	case "travel":
+		feePerCard = decimal.NewFromFloat(3.00)
+	case "services":
+		feePerCard = decimal.NewFromFloat(2.00)
+	}
+
+	// If price_rub is provided (personal cards), convert RUB → USD
+	if req.PriceRub.GreaterThan(decimal.Zero) {
+		rate, err := repository.GetFinalRate("RUB", "USD")
+		if err == nil && rate.GreaterThan(decimal.Zero) {
+			feePerCard = req.PriceRub.Div(rate).Round(2)
+		}
+	}
+
+	totalFee := feePerCard.Mul(decimal.NewFromInt(int64(req.Count)))
+
+	// Deduct balance before issuing
+	if totalFee.GreaterThan(decimal.Zero) {
+		details := "Card issue fee: " + strconv.Itoa(req.Count) + "x " + cat + " @ $" + feePerCard.StringFixed(2)
+		if err := repository.DeductBalance(userID, totalFee, details); err != nil {
+			if strings.Contains(err.Error(), "недостаточно средств") {
+				http.Error(w, err.Error(), http.StatusPaymentRequired)
+			} else {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+			return
+		}
 	}
 
 	response, err := repository.IssueCards(userID, req)

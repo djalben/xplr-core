@@ -138,6 +138,58 @@ func UpdateTelegramChatID(userID int, chatID int) error {
 	return nil
 }
 
+// DeductBalance - Списывает сумму с баланса пользователя (для оплаты выпуска карт и т.д.)
+func DeductBalance(userID int, amount decimal.Decimal, details string) error {
+	if GlobalDB == nil {
+		return fmt.Errorf("database connection not initialized")
+	}
+	if amount.LessThanOrEqual(decimal.Zero) {
+		return fmt.Errorf("сумма списания должна быть положительной")
+	}
+
+	tx, err := GlobalDB.Begin()
+	if err != nil {
+		return fmt.Errorf("не удалось начать транзакцию: %v", err)
+	}
+	defer tx.Rollback()
+
+	// Check balance
+	var balance decimal.Decimal
+	err = tx.QueryRow("SELECT COALESCE(balance, 0) FROM users WHERE id = $1", userID).Scan(&balance)
+	if err != nil {
+		return fmt.Errorf("не удалось получить баланс: %v", err)
+	}
+	if balance.LessThan(amount) {
+		return fmt.Errorf("недостаточно средств (баланс: $%s, требуется: $%s)", balance.StringFixed(2), amount.StringFixed(2))
+	}
+
+	// Deduct
+	_, err = tx.Exec(
+		"UPDATE users SET balance_rub = COALESCE(balance_rub, 0) - $1, balance = balance - $2 WHERE id = $3",
+		amount, amount, userID,
+	)
+	if err != nil {
+		return fmt.Errorf("не удалось списать баланс: %v", err)
+	}
+
+	// Record transaction
+	_, err = tx.Exec(
+		`INSERT INTO transactions (user_id, amount, fee, transaction_type, status, details, executed_at)
+			VALUES ($1, $2, $3, 'CARD_ISSUE_FEE', 'APPROVED', $4, $5)`,
+		userID, amount, decimal.Zero, details, time.Now(),
+	)
+	if err != nil {
+		log.Printf("DB Error Insert deduction transaction: %v", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("ошибка фиксации: %v", err)
+	}
+
+	log.Printf("User %d: deducted $%s for: %s", userID, amount.StringFixed(2), details)
+	return nil
+}
+
 // ProcessDeposit - Обрабатывает пополнение баланса пользователя и записывает транзакцию.
 func ProcessDeposit(userID int, amount decimal.Decimal) error {
 	if GlobalDB == nil {

@@ -107,7 +107,7 @@ const Dashboard: React.FC = () => {
   const [newCardNickname, setNewCardNickname] = useState('');
   const [isCreatingCard, setIsCreatingCard] = useState(false);
   const [newCardCount, setNewCardCount] = useState(1);
-  const [activeCardCategory, setActiveCardCategory] = useState<'all' | 'arbitrage' | 'travel' | 'services'>('all');
+  const [activeSection, setActiveSection] = useState<'arbitrage' | 'personal'>('arbitrage');
   
   // Top-up state
   const [isTopingUp, setIsTopingUp] = useState(false);
@@ -1074,7 +1074,7 @@ const Dashboard: React.FC = () => {
                   <Pie
                     data={{
                       labels: (spendStats ?? []).map(s => {
-                        const labels: Record<string, string> = { arbitrage: 'Реклама', travel: 'Путешествия', services: 'Универсал' };
+                        const labels: Record<string, string> = { arbitrage: 'Реклама', travel: 'Путешествия', services: 'Зарубежные сервисы' };
                         return labels[s.category] || s.category;
                       }),
                       datasets: [{
@@ -1111,7 +1111,7 @@ const Dashboard: React.FC = () => {
                       width: '8px', height: '8px', borderRadius: '50%', display: 'inline-block',
                       backgroundColor: s.category === 'arbitrage' ? '#3b82f6' : s.category === 'travel' ? '#14b8a6' : '#8b5cf6'
                     }}></span>
-                    {s.category === 'arbitrage' ? 'Реклама' : s.category === 'travel' ? 'Путешествия' : 'Универсал'}
+                    {s.category === 'arbitrage' ? 'Реклама' : s.category === 'travel' ? 'Путешествия' : 'Зарубежные сервисы'}
                   </div>
                 ))}
               </div>
@@ -1153,7 +1153,7 @@ const Dashboard: React.FC = () => {
         }}>
           <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: theme.colors.textPrimary }}>My Cards</h3>
           <button
-          onClick={() => setShowCreateCardModal(true)}
+          onClick={() => { setNewCardCategory(activeSection === 'arbitrage' ? 'arbitrage' : 'travel'); setNewCardCount(1); setShowCreateCardModal(true); }}
           style={{
             backgroundColor: theme.colors.accent,
             color: theme.colors.background,
@@ -1173,52 +1173,50 @@ const Dashboard: React.FC = () => {
             e.currentTarget.style.opacity = '1';
             e.currentTarget.style.backgroundColor = theme.colors.accent;
           }}>
-            {isProfessional ? '+ Mass Issue' : '+ Add Card'}
+            {activeSection === 'arbitrage' ? '+ Массовый выпуск' : '+ Выпустить карту'}
           </button>
         </div>
 
-        {/* Category Tabs */}
+        {/* Section Tabs: Арбитраж | Личные карты */}
         <div style={{
           display: 'flex',
           gap: '8px',
           marginBottom: '20px',
-          flexWrap: 'wrap',
           position: 'relative',
           zIndex: 2
         }}>
           {([
-            { key: 'all', label: 'Все' },
-            { key: 'arbitrage', label: 'Для рекламы' },
-            { key: 'travel', label: 'Для путешествий' },
-            { key: 'services', label: 'Универсальные' },
-          ] as { key: typeof activeCardCategory; label: string }[]).map((tab) => (
+            { key: 'arbitrage' as const, label: 'Арбитраж', icon: '💳', count: (cards ?? []).filter(c => (c.category || 'arbitrage') === 'arbitrage').length },
+            { key: 'personal' as const, label: 'Личные карты', icon: '✈️', count: (cards ?? []).filter(c => { const cat = c.category || 'arbitrage'; return cat === 'travel' || cat === 'services'; }).length },
+          ]).map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setActiveCardCategory(tab.key)}
+              onClick={() => setActiveSection(tab.key)}
               style={{
-                padding: '8px 18px',
+                padding: '10px 24px',
                 borderRadius: theme.borderRadius.sm,
-                border: activeCardCategory === tab.key
+                border: activeSection === tab.key
                   ? `1px solid ${theme.colors.accent}`
                   : `1px solid ${theme.colors.border}`,
-                backgroundColor: activeCardCategory === tab.key
+                backgroundColor: activeSection === tab.key
                   ? theme.colors.accentMuted
                   : 'transparent',
-                color: activeCardCategory === tab.key
+                color: activeSection === tab.key
                   ? theme.colors.accent
                   : theme.colors.textSecondary,
-                fontSize: '13px',
-                fontWeight: activeCardCategory === tab.key ? '600' : '400',
+                fontSize: '14px',
+                fontWeight: activeSection === tab.key ? '700' : '400',
                 cursor: 'pointer',
-                transition: '0.2s'
+                transition: '0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
               }}
             >
-              {tab.label}
-              {tab.key !== 'all' && (
-                <span style={{ marginLeft: '6px', opacity: 0.6 }}>
-                  {(cards ?? []).filter(c => (c.category || 'arbitrage') === tab.key).length}
-                </span>
-              )}
+              {tab.icon} {tab.label}
+              <span style={{ marginLeft: '4px', opacity: 0.6, fontSize: '12px' }}>
+                {tab.count}
+              </span>
             </button>
           ))}
         </div>
@@ -1230,7 +1228,10 @@ const Dashboard: React.FC = () => {
           gap: '20px',
           marginBottom: '30px'
         }}>
-          {(activeCardCategory === 'all' ? (cards ?? []) : (cards ?? []).filter(c => (c.category || 'arbitrage') === activeCardCategory)).length === 0 ? (
+          {(activeSection === 'arbitrage'
+            ? (cards ?? []).filter(c => (c.category || 'arbitrage') === 'arbitrage')
+            : (cards ?? []).filter(c => { const cat = c.category || 'arbitrage'; return cat === 'travel' || cat === 'services'; })
+          ).length === 0 ? (
             <div style={{
               gridColumn: '1 / -1',
               textAlign: 'center',
@@ -1238,10 +1239,13 @@ const Dashboard: React.FC = () => {
               color: '#888c95',
               fontSize: '16px'
             }}>
-              {(cards?.length ?? 0) === 0 ? 'No active cards. Click "+ Issue Card" to create one.' : 'No cards in this category.'}
+              {(cards?.length ?? 0) === 0 ? 'Нет активных карт. Нажмите кнопку выпуска.' : activeSection === 'arbitrage' ? 'Нет карт для рекламы.' : 'Нет личных карт.'}
             </div>
           ) : (
-            (activeCardCategory === 'all' ? (cards ?? []) : (cards ?? []).filter(c => (c.category || 'arbitrage') === activeCardCategory)).map((card) => {
+            (activeSection === 'arbitrage'
+              ? (cards ?? []).filter(c => (c.category || 'arbitrage') === 'arbitrage')
+              : (cards ?? []).filter(c => { const cat = c.category || 'arbitrage'; return cat === 'travel' || cat === 'services'; })
+            ).map((card) => {
               const catColors: Record<string, { bg: string; border: string }> = {
                 arbitrage: { bg: 'rgba(30, 58, 95, 0.7)', border: 'rgba(59, 130, 246, 0.3)' },
                 travel:    { bg: 'rgba(19, 78, 74, 0.7)', border: 'rgba(20, 184, 166, 0.3)' },
@@ -1298,7 +1302,7 @@ const Dashboard: React.FC = () => {
                     color: '#ccc',
                     textTransform: 'capitalize'
                   }}>
-                    {(card.category || 'arbitrage') === 'arbitrage' ? 'Реклама' : (card.category || 'arbitrage') === 'travel' ? 'Путешествия' : 'Универсал'}
+                    {(card.category || 'arbitrage') === 'arbitrage' ? 'Реклама' : (card.category || 'arbitrage') === 'travel' ? 'Путешествия' : 'Сервисы'}
                   </span>
                   <span style={{
                     fontSize: '10px',
@@ -1363,7 +1367,7 @@ const Dashboard: React.FC = () => {
                 <span>₽{card.daily_spend_limit || 0} Daily Limit</span>
               </div>
 
-              {card.auto_replenish_enabled && (
+              {card.auto_replenish_enabled && (card.category || 'arbitrage') === 'arbitrage' && (
                 <div style={{
                   fontSize: '11px',
                   color: theme.colors.accent,
@@ -1374,6 +1378,19 @@ const Dashboard: React.FC = () => {
                 }}>
                   <span>🔄</span>
                   <span>Auto-top-up: ${card.auto_replenish_threshold || 0} → ${card.auto_replenish_amount || 0}</span>
+                </div>
+              )}
+              {(card.category || 'arbitrage') !== 'arbitrage' && (
+                <div style={{
+                  fontSize: '11px',
+                  color: '#14b8a6',
+                  marginBottom: '10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px'
+                }}>
+                  <span>📅</span>
+                  <span>Срок действия: 1 год</span>
                 </div>
               )}
 
@@ -1423,6 +1440,8 @@ const Dashboard: React.FC = () => {
                   ⚡ Limit: ${card.daily_spend_limit || 0}
                 </button>
                 )}
+                {(card.category || 'arbitrage') === 'arbitrage' && (
+                <>
                 <button
                 onClick={() => openAutoReplenishModal(card.id)}
                 style={{
@@ -1467,6 +1486,7 @@ const Dashboard: React.FC = () => {
                     Disable
                   </button>
                 )}
+                </>)}
                 {card.card_status !== 'CLOSED' && (
                 <button
                 onClick={() => handleToggleCardBlock(card.id, card.card_status === 'FROZEN' ? 'FROZEN' : 'ACTIVE_TO_FREEZE')}
@@ -2260,6 +2280,7 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
 
+            {/* Category selection — different per section */}
             <div style={{ marginBottom: '24px' }}>
               <label style={{
                 display: 'block',
@@ -2270,51 +2291,67 @@ const Dashboard: React.FC = () => {
                 letterSpacing: '1px',
                 marginBottom: '12px'
               }}>
-                Category
+                {activeSection === 'arbitrage' ? 'Категория' : 'Тип карты'}
               </label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {([
-                  { key: 'arbitrage' as const, label: 'Для рекламы', desc: 'Facebook, Google, TikTok', fee: '$5.00' },
-                  { key: 'travel' as const, label: 'Для путешествий', desc: 'Отели, авиабилеты, аренда', fee: '$3.00' },
-                  { key: 'services' as const, label: 'Универсальные', desc: 'Подписки, сервисы, покупки', fee: '$2.00' },
-                ]).map((cat) => (
-                  <button
-                    key={cat.key}
-                    onClick={() => setNewCardCategory(cat.key)}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '14px 16px',
-                      backgroundColor: newCardCategory === cat.key ? 'rgba(0, 224, 150, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                      border: newCardCategory === cat.key ? '2px solid #00e096' : '2px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '12px',
-                      cursor: 'pointer',
-                      transition: '0.2s',
-                      textAlign: 'left'
-                    }}
-                  >
-                    <div>
+              {activeSection === 'arbitrage' ? (
+                <div style={{
+                  padding: '14px 16px',
+                  backgroundColor: 'rgba(59, 130, 246, 0.15)',
+                  border: '2px solid rgba(59, 130, 246, 0.4)',
+                  borderRadius: '12px',
+                }}>
+                  <div style={{ color: '#3b82f6', fontWeight: '600', fontSize: '14px' }}>Для рекламы</div>
+                  <div style={{ color: '#888c95', fontSize: '12px', marginTop: '2px' }}>Facebook, Google, TikTok • Лимит: до 100 карт</div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {([
+                    { key: 'travel' as const, label: 'Для путешествий', desc: 'Отели, авиабилеты, аренда • 1 год', feeRub: 990, feeUsd: '$3.00' },
+                    { key: 'services' as const, label: 'Для зарубежных сервисов', desc: 'Подписки, онлайн-сервисы • 1 год', feeRub: 690, feeUsd: '$2.00' },
+                  ]).map((cat) => {
+                    const rubRate = (exchangeRates ?? []).find(r => r.currency_to === 'USD');
+                    const rate = rubRate ? parseFloat(rubRate.final_rate) : 99;
+                    const priceRub = Math.ceil(parseFloat(cat.feeUsd.replace('$', '')) * rate);
+                    return (
+                    <button
+                      key={cat.key}
+                      onClick={() => setNewCardCategory(cat.key)}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '14px 16px',
+                        backgroundColor: newCardCategory === cat.key ? 'rgba(0, 224, 150, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                        border: newCardCategory === cat.key ? '2px solid #00e096' : '2px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        transition: '0.2s',
+                        textAlign: 'left'
+                      }}
+                    >
+                      <div>
+                        <div style={{
+                          color: newCardCategory === cat.key ? '#00e096' : '#fff',
+                          fontWeight: '600',
+                          fontSize: '14px'
+                        }}>{cat.label}</div>
+                        <div style={{
+                          color: '#888c95',
+                          fontSize: '12px',
+                          marginTop: '2px'
+                        }}>{cat.desc}</div>
+                      </div>
                       <div style={{
-                        color: newCardCategory === cat.key ? '#00e096' : '#fff',
-                        fontWeight: '600',
-                        fontSize: '14px'
-                      }}>{cat.label}</div>
-                      <div style={{
-                        color: '#888c95',
-                        fontSize: '12px',
-                        marginTop: '2px'
-                      }}>{cat.desc}</div>
-                    </div>
-                    <div style={{
-                      color: newCardCategory === cat.key ? '#00e096' : '#888c95',
-                      fontSize: '13px',
-                      fontWeight: '600',
-                      whiteSpace: 'nowrap'
-                    }}>{cat.fee}</div>
-                  </button>
-                ))}
-              </div>
+                        color: newCardCategory === cat.key ? '#00e096' : '#888c95',
+                        fontSize: '15px',
+                        fontWeight: '700',
+                        whiteSpace: 'nowrap'
+                      }}>{priceRub}₽</div>
+                    </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <div style={{ marginBottom: '32px' }}>
@@ -2330,8 +2367,8 @@ const Dashboard: React.FC = () => {
                 Card Nickname
               </label>
 
-              {/* Quantity selector — for arbitrage mass issue */}
-              {newCardCategory === 'arbitrage' && (
+              {/* Quantity selector — only for arbitrage (1–100) */}
+              {activeSection === 'arbitrage' && (
                 <div style={{ marginBottom: '20px' }}>
                   <label style={{
                     display: 'block',
@@ -2340,24 +2377,45 @@ const Dashboard: React.FC = () => {
                     color: '#888c95',
                     textTransform: 'uppercase',
                     letterSpacing: '1px',
-                    marginBottom: '12px'
+                    marginBottom: '8px'
                   }}>
-                    Количество карт
+                    Количество карт (1–100)
                   </label>
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    {[1, 5, 10, 50].map((qty) => (
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={newCardCount}
+                      onChange={(e) => {
+                        const v = Math.max(1, Math.min(100, parseInt(e.target.value) || 1));
+                        setNewCardCount(v);
+                      }}
+                      style={{
+                        width: '80px',
+                        padding: '12px',
+                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                        border: '2px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '10px',
+                        color: '#00e096',
+                        fontWeight: '700',
+                        fontSize: '18px',
+                        textAlign: 'center',
+                        outline: 'none'
+                      }}
+                    />
+                    {[5, 10, 25, 50].map((qty) => (
                       <button
                         key={qty}
                         onClick={() => setNewCardCount(qty)}
                         style={{
-                          flex: 1,
-                          padding: '12px',
+                          padding: '10px 14px',
                           backgroundColor: newCardCount === qty ? 'rgba(0, 224, 150, 0.2)' : 'rgba(255, 255, 255, 0.05)',
                           border: newCardCount === qty ? '2px solid #00e096' : '2px solid rgba(255, 255, 255, 0.1)',
                           borderRadius: '10px',
                           color: newCardCount === qty ? '#00e096' : '#888c95',
                           fontWeight: '700',
-                          fontSize: '16px',
+                          fontSize: '14px',
                           cursor: 'pointer',
                           transition: '0.2s'
                         }}
@@ -2365,6 +2423,9 @@ const Dashboard: React.FC = () => {
                         {qty}
                       </button>
                     ))}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#888c95', marginTop: '8px' }}>
+                    Итого: ${(5 * newCardCount).toFixed(2)} ({newCardCount} × $5.00)
                   </div>
                 </div>
               )}
@@ -2434,7 +2495,14 @@ const Dashboard: React.FC = () => {
                     animation: 'spin 0.6s linear infinite'
                   }} />
                 )}
-                {isCreatingCard ? 'Creating...' : newCardCount > 1 ? `Issue ${newCardCount} Cards` : 'Create Card'}
+                {isCreatingCard ? 'Создание...' : activeSection === 'arbitrage'
+                  ? (newCardCount > 1 ? `Выпустить ${newCardCount} карт — $${(5 * newCardCount).toFixed(0)}` : 'Выпустить карту — $5')
+                  : (() => {
+                      const rubRate = (exchangeRates ?? []).find(r => r.currency_to === 'USD');
+                      const rate = rubRate ? parseFloat(rubRate.final_rate) : 99;
+                      const feeUsd = newCardCategory === 'travel' ? 3 : 2;
+                      return `Выпустить — ${Math.ceil(feeUsd * rate)}₽`;
+                    })()}
               </button>
             </div>
           </div>
