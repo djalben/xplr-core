@@ -95,6 +95,78 @@ func AdminSetUserStatusHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// AdminGetExchangeRatesHandler - GET /api/v1/admin/rates
+func AdminGetExchangeRatesHandler(w http.ResponseWriter, r *http.Request) {
+	rates, err := repository.GetAllExchangeRates()
+	if err != nil {
+		log.Printf("Error fetching exchange rates: %v", err)
+		http.Error(w, "Failed to fetch exchange rates", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(rates)
+}
+
+// AdminUpdateMarkupHandler - PATCH /api/v1/admin/rates/{id}/markup
+func AdminUpdateMarkupHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	rateID, err := strconv.Atoi(vars["id"])
+	if err != nil || rateID <= 0 {
+		http.Error(w, "invalid rate id", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		MarkupPercent decimal.Decimal `json:"markup_percent"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if req.MarkupPercent.LessThan(decimal.Zero) {
+		http.Error(w, "markup_percent cannot be negative", http.StatusBadRequest)
+		return
+	}
+	if err := repository.UpdateMarkupPercent(rateID, req.MarkupPercent); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	// Return updated rates
+	rates, _ := repository.GetAllExchangeRates()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(rates)
+}
+
+// PublicGetExchangeRatesHandler - GET /api/v1/rates (no auth needed)
+func PublicGetExchangeRatesHandler(w http.ResponseWriter, r *http.Request) {
+	rates, err := repository.GetAllExchangeRates()
+	if err != nil {
+		log.Printf("Error fetching public exchange rates: %v", err)
+		http.Error(w, "Failed to fetch rates", http.StatusInternalServerError)
+		return
+	}
+	// Return only user-facing fields
+	type PublicRate struct {
+		CurrencyFrom string `json:"currency_from"`
+		CurrencyTo   string `json:"currency_to"`
+		FinalRate    string `json:"final_rate"`
+		UpdatedAt    string `json:"updated_at"`
+	}
+	var publicRates []PublicRate
+	for _, r := range rates {
+		publicRates = append(publicRates, PublicRate{
+			CurrencyFrom: r.CurrencyFrom,
+			CurrencyTo:   r.CurrencyTo,
+			FinalRate:    r.FinalRate,
+			UpdatedAt:    r.UpdatedAt,
+		})
+	}
+	if publicRates == nil {
+		publicRates = []PublicRate{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(publicRates)
+}
+
 // AdminStatsHandler - GET /api/v1/admin/stats
 func AdminStatsHandler(w http.ResponseWriter, r *http.Request) {
 	stats, err := repository.GetAdminStats()

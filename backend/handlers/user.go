@@ -40,7 +40,9 @@ func GetUserProfileHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// TopUpBalanceHandler - POST /api/v1/user/topup - Adds $100 to user balance
+// TopUpBalanceHandler - POST /api/v1/user/topup
+// Accepts optional { "amount_rub": 5000 }. If omitted, defaults to $100 equivalent.
+// Converts RUB to USD using the current final_rate from exchange_rates table.
 func TopUpBalanceHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
 	if !ok || userID == 0 {
@@ -48,9 +50,50 @@ func TopUpBalanceHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	amount := decimal.NewFromInt(100)
+	var req struct {
+		AmountRub *decimal.Decimal `json:"amount_rub"`
+	}
+	json.NewDecoder(r.Body).Decode(&req) // best-effort; if empty body, req.AmountRub stays nil
 
-	if err := repository.ProcessDeposit(userID, amount); err != nil {
+	// Get current RUB/USD exchange rate
+	rate, err := repository.GetFinalRate("RUB", "USD")
+	if err != nil || rate.IsZero() {
+		// Fallback: no rate available, use legacy flat $100
+		log.Printf("TopUp: exchange rate not available, using legacy flat $100: %v", err)
+		amount := decimal.NewFromInt(100)
+		if err := repository.ProcessDeposit(userID, amount); err != nil {
+			http.Error(w, "Failed to top up balance", http.StatusInternalServerError)
+			return
+		}
+		user, _ := repository.GetUserByID(userID)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"message":     "Balance topped up successfully (flat rate)",
+			"amount_usd":  amount.String(),
+			"new_balance": user.BalanceRub.String(),
+		})
+		return
+	}
+
+	var amountUsd decimal.Decimal
+	var amountRub decimal.Decimal
+
+	if req.AmountRub != nil && req.AmountRub.GreaterThan(decimal.Zero) {
+		// User specified RUB amount → convert to USD
+		amountRub = *req.AmountRub
+		amountUsd = amountRub.Div(rate).Round(2)
+	} else {
+		// Default: $100
+		amountUsd = decimal.NewFromInt(100)
+		amountRub = amountUsd.Mul(rate).Round(2)
+	}
+
+	if amountUsd.LessThanOrEqual(decimal.Zero) {
+		http.Error(w, "Amount must be positive", http.StatusBadRequest)
+		return
+	}
+
+	if err := repository.ProcessDeposit(userID, amountUsd); err != nil {
 		log.Printf("Error topping up user %d: %v", userID, err)
 		http.Error(w, "Failed to top up balance", http.StatusInternalServerError)
 		return
@@ -66,7 +109,9 @@ func TopUpBalanceHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message":     "Balance topped up successfully",
-		"amount":      amount.String(),
+		"amount_usd":  amountUsd.StringFixed(2),
+		"amount_rub":  amountRub.StringFixed(2),
+		"rate":        rate.StringFixed(4),
 		"new_balance": user.BalanceRub.String(),
 	})
 }

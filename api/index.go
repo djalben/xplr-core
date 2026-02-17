@@ -15,6 +15,7 @@ import (
 	"github.com/djalben/xplr-core/backend/handlers"
 	"github.com/djalben/xplr-core/backend/middleware"
 	"github.com/djalben/xplr-core/backend/repository"
+	"github.com/djalben/xplr-core/backend/service"
 	"github.com/djalben/xplr-core/backend/telegram"
 )
 
@@ -81,12 +82,26 @@ func ensureDB() {
 			code VARCHAR(20) UNIQUE NOT NULL,
 			created_at TIMESTAMP DEFAULT NOW()
 		)`,
+		`CREATE TABLE IF NOT EXISTS exchange_rates (
+			id SERIAL PRIMARY KEY,
+			currency_from VARCHAR(10) NOT NULL,
+			currency_to VARCHAR(10) NOT NULL,
+			base_rate NUMERIC(20,4) NOT NULL DEFAULT 0,
+			markup_percent NUMERIC(10,2) NOT NULL DEFAULT 0,
+			final_rate NUMERIC(20,4) NOT NULL DEFAULT 0,
+			updated_at TIMESTAMP DEFAULT NOW(),
+			UNIQUE(currency_from, currency_to)
+		)`,
 	}
 	for _, m := range migrations {
 		if _, err := db.Exec(m); err != nil {
 			log.Printf("Warning: migration failed: %v", err)
 		}
 	}
+
+	// 7. Seed default exchange rates & start fetcher
+	repository.SeedDefaultExchangeRates()
+	go service.StartExchangeRateFetcher()
 
 	dbReady = true
 	log.Println("Serverless handler initialized successfully")
@@ -113,6 +128,9 @@ func buildRouter() *mux.Router {
 
 	// Public card types endpoint
 	r.HandleFunc("/api/v1/cards/types", handlers.GetCardTypesHandler).Methods("GET")
+
+	// Public exchange rates
+	r.HandleFunc("/api/v1/rates", handlers.PublicGetExchangeRatesHandler).Methods("GET")
 
 	// Protected routes under /api/v1/user
 	protected := r.PathPrefix("/api/v1/user").Subrouter()
@@ -160,6 +178,8 @@ func buildRouter() *mux.Router {
 	admin.HandleFunc("/users/{id}/balance", handlers.AdminAdjustBalanceHandler).Methods("PATCH")
 	admin.HandleFunc("/users/{id}/role", handlers.AdminToggleRoleHandler).Methods("PATCH")
 	admin.HandleFunc("/users/{id}/status", handlers.AdminSetUserStatusHandler).Methods("PATCH")
+	admin.HandleFunc("/rates", handlers.AdminGetExchangeRatesHandler).Methods("GET")
+	admin.HandleFunc("/rates/{id}/markup", handlers.AdminUpdateMarkupHandler).Methods("PATCH")
 
 	return r
 }

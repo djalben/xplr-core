@@ -38,6 +38,10 @@ const AdminPanel: React.FC = () => {
   const [balanceAmount, setBalanceAmount] = useState('');
   const [isSavingBalance, setIsSavingBalance] = useState(false);
 
+  // Exchange rates
+  const [rates, setRates] = useState<any[]>([]);
+  const [editingMarkup, setEditingMarkup] = useState<{ id: number; value: string } | null>(null);
+
   useEffect(() => {
     fetchAdminData();
   }, []);
@@ -97,12 +101,14 @@ const AdminPanel: React.FC = () => {
       if (!token) { navigate('/login'); return; }
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
-      const [statsRes, usersRes] = await Promise.all([
+      const [statsRes, usersRes, ratesRes] = await Promise.all([
         axios.get(`${API_BASE_URL}/admin/stats`, config),
         axios.get(`${API_BASE_URL}/admin/users`, config),
+        axios.get(`${API_BASE_URL}/admin/rates`, config).catch(() => ({ data: [] })),
       ]);
       setStats(statsRes.data);
       setUsers(usersRes.data || []);
+      setRates(ratesRes.data || []);
       setIsLoading(false);
     } catch (err: any) {
       setIsLoading(false);
@@ -208,6 +214,83 @@ const AdminPanel: React.FC = () => {
           ))}
         </div>
       )}
+
+      {/* Exchange Rate Settings */}
+      <div style={{
+        backgroundColor: theme.colors.backgroundCard,
+        border: `1px solid ${theme.colors.border}`,
+        borderRadius: '16px', padding: '24px', marginBottom: '30px', backdropFilter: 'blur(20px)'
+      }}>
+        <h2 style={{ margin: '0 0 20px', fontSize: '18px', fontWeight: '700' }}>💱 Exchange Rate Settings</h2>
+        {rates.length === 0 ? (
+          <div style={{ color: theme.colors.textSecondary, fontSize: '13px' }}>No exchange rates configured yet.</div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                {['Pair', 'Base Rate', 'Markup %', 'Final Rate (User)', 'Updated', ''].map(h => (
+                  <th key={h} style={{
+                    textAlign: 'left', padding: '12px 8px', fontSize: '11px',
+                    color: theme.colors.textSecondary, fontWeight: '600',
+                    textTransform: 'uppercase', letterSpacing: '0.5px',
+                    borderBottom: `1px solid ${theme.colors.border}`
+                  }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rates.map((r: any) => (
+                <tr key={r.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                  <td style={{ padding: '12px 8px', fontSize: '14px', fontWeight: '700' }}>
+                    {r.currency_from}/{r.currency_to}
+                  </td>
+                  <td style={{ padding: '12px 8px', fontSize: '13px', color: theme.colors.textSecondary }}>
+                    {r.base_rate}
+                  </td>
+                  <td style={{ padding: '12px 8px' }}>
+                    {editingMarkup?.id === r.id ? (
+                      <input
+                        type="number" step="0.01" value={editingMarkup?.value ?? ''}
+                        onChange={e => setEditingMarkup({ id: r.id, value: e.target.value })}
+                        style={{
+                          width: '80px', padding: '6px 8px', backgroundColor: 'rgba(255,255,255,0.08)',
+                          border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px',
+                          color: '#fff', fontSize: '13px', outline: 'none'
+                        }}
+                      />
+                    ) : (
+                      <span style={{ fontSize: '13px', color: '#f59e0b', fontWeight: '600' }}>{r.markup_percent}%</span>
+                    )}
+                  </td>
+                  <td style={{ padding: '12px 8px', fontSize: '15px', fontWeight: '800', color: '#00e096' }}>
+                    {r.final_rate}
+                  </td>
+                  <td style={{ padding: '12px 8px', fontSize: '11px', color: theme.colors.textSecondary }}>
+                    {r.updated_at ? new Date(r.updated_at).toLocaleString() : '—'}
+                  </td>
+                  <td style={{ padding: '12px 8px' }}>
+                    {editingMarkup?.id === r.id ? (
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button onClick={async () => {
+                          try {
+                            const res = await axios.patch(`${API_BASE_URL}/admin/rates/${r.id}/markup`, { markup_percent: parseFloat(editingMarkup?.value ?? '0') }, getConfig());
+                            setRates(res.data || []);
+                            setEditingMarkup(null);
+                            setToast({ message: 'Markup updated', type: 'success' });
+                          } catch { setToast({ message: 'Failed to update markup', type: 'error' }); }
+                        }} style={{ padding: '4px 10px', fontSize: '11px', backgroundColor: '#00e096', color: '#0a0a0a', border: 'none', borderRadius: '4px', fontWeight: '700', cursor: 'pointer' }}>Save</button>
+                        <button onClick={() => setEditingMarkup(null)} style={{ padding: '4px 10px', fontSize: '11px', backgroundColor: 'transparent', color: '#888', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', cursor: 'pointer' }}>✕</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => setEditingMarkup({ id: r.id, value: r.markup_percent })} style={{ padding: '4px 10px', fontSize: '11px', backgroundColor: 'rgba(255,255,255,0.05)', color: '#aaa', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', cursor: 'pointer' }}>Edit</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
 
       {/* Users Table */}
       <div style={{

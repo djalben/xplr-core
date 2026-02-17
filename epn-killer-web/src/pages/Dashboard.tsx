@@ -128,6 +128,9 @@ const Dashboard: React.FC = () => {
   // Spend stats for pie chart
   const [spendStats, setSpendStats] = useState<{ category: string; total_spent: string; tx_count: number }[]>([]);
 
+  // Exchange rates
+  const [exchangeRates, setExchangeRates] = useState<{ currency_from: string; currency_to: string; final_rate: string }[]>([]);
+
   // Limit edit modal
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [limitCardId, setLimitCardId] = useState<number | null>(null);
@@ -215,6 +218,14 @@ const Dashboard: React.FC = () => {
         setSpendStats(statsResponse.data?.categories || []);
       } catch (error) {
         console.error('Error fetching stats:', error);
+      }
+
+      // Fetch exchange rates (public, no auth needed)
+      try {
+        const ratesResponse = await axios.get(`${API_BASE_URL}/rates`);
+        setExchangeRates(ratesResponse.data || []);
+      } catch (error) {
+        console.error('Error fetching rates:', error);
       }
 
       setIsLoading(false);
@@ -970,6 +981,35 @@ const Dashboard: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* Exchange Rates */}
+        {exchangeRates.length > 0 && (
+          <div style={{
+            display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap'
+          }}>
+            {exchangeRates.map((r, i) => (
+              <div key={i} style={{
+                backgroundColor: theme.colors.backgroundCard,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: '12px',
+                padding: '16px 20px',
+                backdropFilter: 'blur(20px)',
+                flex: '1 1 200px',
+                minWidth: '180px'
+              }}>
+                <div style={{ fontSize: '11px', color: theme.colors.textSecondary, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '6px' }}>
+                  💱 {r.currency_from} → {r.currency_to}
+                </div>
+                <div style={{ fontSize: '24px', fontWeight: '800', color: '#00e096' }}>
+                  {parseFloat(r.final_rate).toFixed(2)}
+                </div>
+                <div style={{ fontSize: '11px', color: theme.colors.textSecondary, marginTop: '4px' }}>
+                  1 {r.currency_to} = {parseFloat(r.final_rate).toFixed(2)} {r.currency_from}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Dashboard Grid — только в Professional (арбитраж + статистика по BIN/картам) */}
         {isProfessional && (
