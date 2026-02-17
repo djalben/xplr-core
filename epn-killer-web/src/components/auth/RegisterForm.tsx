@@ -1,12 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { API_BASE_URL } from '../../api/axios';
 import { theme } from '../../theme/theme';
-
-const API_BASE_URL =
-  typeof window !== 'undefined' && window.location?.hostname === 'localhost'
-    ? 'http://localhost:8080/api/v1'
-    : 'https://xplr-backend.onrender.com/api/v1';
 
 interface RegisterFormProps {
   onSwitchToLogin?: () => void;

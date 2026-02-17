@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/aalabin/xplr/config"
-	"github.com/aalabin/xplr/models"
-	"github.com/aalabin/xplr/notification"
-	"github.com/aalabin/xplr/repository"
+	"github.com/aalabin/xplr/backend/config"
+	"github.com/aalabin/xplr/backend/models"
+	"github.com/aalabin/xplr/backend/notification"
+	"github.com/aalabin/xplr/backend/repository"
 	"github.com/shopspring/decimal"
 )
 

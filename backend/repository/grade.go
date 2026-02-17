@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/aalabin/xplr/models"
+	"github.com/aalabin/xplr/backend/models"
 	"github.com/shopspring/decimal"
 )
 

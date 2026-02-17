@@ -4,12 +4,11 @@ import axios from 'axios';
 export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-// Backend API URL (frontend communicates with backend, which connects to Supabase)
-// Local: backend on 8080 (docker-compose). Otherwise Render.
+// Backend API URL — same Vercel domain in production, localhost for dev
 export const API_BASE_URL =
   typeof window !== 'undefined' && window.location?.hostname === 'localhost'
     ? 'http://localhost:8080/api/v1'
-    : 'https://xplr-backend.onrender.com/api/v1';
+    : '/api/v1';
 
 // Создаем экземпляр axios с базовой конфигурацией
 const apiClient = axios.create({

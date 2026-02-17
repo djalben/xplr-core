@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/aalabin/xplr/telegram"
+	"github.com/aalabin/xplr/backend/telegram"
 )
 
 // SendTelegramMessage отправляет сообщение в Telegram.

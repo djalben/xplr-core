@@ -6,8 +6,8 @@ import (
 	"log"
 	"fmt"
 
-	"github.com/aalabin/xplr/middleware"
-	"github.com/aalabin/xplr/repository"
+	"github.com/aalabin/xplr/backend/middleware"
+	"github.com/aalabin/xplr/backend/repository"
 )
 
 // TelegramIDRequest — модель для входящего JSON запроса.

@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/aalabin/xplr/middleware"
-	"github.com/aalabin/xplr/repository"
+	"github.com/aalabin/xplr/backend/middleware"
+	"github.com/aalabin/xplr/backend/repository"
 )
 
 // GetUserTransactionReportHandler обрабатывает запрос GET /api/v1/user/report

@@ -1,0 +1,15 @@
+{
+  "buildCommand": "cd epn-killer-web && npm install && npm run build",
+  "outputDirectory": "epn-killer-web/dist",
+  "framework": "vite",
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/sync",
+      "schedule": "*/10 * * * *"
+    }
+  ]
+}

@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/aalabin/xplr/repository"
+	"github.com/aalabin/xplr/backend/repository"
 )
 
 // GetAdminTransactionReportHandler - Выдает отчет обо всех транзакциях платформы.

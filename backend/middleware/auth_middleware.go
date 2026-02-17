@@ -8,8 +8,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/aalabin/xplr/repository"
-	"github.com/aalabin/xplr/utils"
+	"github.com/aalabin/xplr/backend/repository"
+	"github.com/aalabin/xplr/backend/utils"
 )
 
 // Контекстный ключ для хранения ID пользователя после проверки токена

@@ -15,11 +15,11 @@ import (
 	_ "github.com/lib/pq"
 
 	// ВАЖНО: Убедитесь, что пути верны
-	"github.com/aalabin/xplr/handlers"
-	"github.com/aalabin/xplr/middleware"
-	"github.com/aalabin/xplr/repository"
-	"github.com/aalabin/xplr/core"
-	"github.com/aalabin/xplr/telegram"
+	"github.com/aalabin/xplr/backend/handlers"
+	"github.com/aalabin/xplr/backend/middleware"
+	"github.com/aalabin/xplr/backend/repository"
+	"github.com/aalabin/xplr/backend/core"
+	"github.com/aalabin/xplr/backend/telegram"
 )
 
 // DB - глобальная переменная для подключения к базе данных (будет использоваться только здесь)

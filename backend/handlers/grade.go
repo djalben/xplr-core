@@ -5,8 +5,8 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/aalabin/xplr/middleware"
-	"github.com/aalabin/xplr/repository"
+	"github.com/aalabin/xplr/backend/middleware"
+	"github.com/aalabin/xplr/backend/repository"
 )
 
 // GetUserGradeHandler - GET /api/v1/user/grade

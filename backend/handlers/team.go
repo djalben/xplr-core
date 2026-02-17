@@ -7,9 +7,9 @@ import (
 	"strconv"
 
 	"github.com/gorilla/mux"
-	"github.com/aalabin/xplr/middleware"
-	"github.com/aalabin/xplr/models"
-	"github.com/aalabin/xplr/repository"
+	"github.com/aalabin/xplr/backend/middleware"
+	"github.com/aalabin/xplr/backend/models"
+	"github.com/aalabin/xplr/backend/repository"
 )
 
 // CreateTeamHandler - POST /api/v1/user/teams
