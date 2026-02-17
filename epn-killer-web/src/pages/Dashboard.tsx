@@ -187,7 +187,7 @@ const Dashboard: React.FC = () => {
       // Fetch cards data
       try {
         const cardsResponse = await axios.get(`${API_BASE_URL}/user/cards`, config);
-        setCards(cardsResponse.data || []);
+        setCards(Array.isArray(cardsResponse.data) ? cardsResponse.data : []);
       } catch (error) {
         console.error('Error fetching cards:', error);
         setCards([]);
@@ -206,7 +206,7 @@ const Dashboard: React.FC = () => {
           `${API_BASE_URL}/user/report${params.toString() ? '?' + params.toString() : ''}`,
           config
         );
-        setTransactions(transactionsResponse.data?.transactions || []);
+        setTransactions(Array.isArray(transactionsResponse.data?.transactions) ? transactionsResponse.data.transactions : []);
       } catch (error) {
         console.error('Error fetching transactions:', error);
         setTransactions([]);
@@ -215,7 +215,7 @@ const Dashboard: React.FC = () => {
       // Fetch spend stats for pie chart
       try {
         const statsResponse = await axios.get(`${API_BASE_URL}/user/stats`, config);
-        setSpendStats(statsResponse.data?.categories || []);
+        setSpendStats(Array.isArray(statsResponse.data?.categories) ? statsResponse.data.categories : []);
       } catch (error) {
         console.error('Error fetching stats:', error);
       }
@@ -223,7 +223,7 @@ const Dashboard: React.FC = () => {
       // Fetch exchange rates (public, no auth needed)
       try {
         const ratesResponse = await axios.get(`${API_BASE_URL}/rates`);
-        setExchangeRates(ratesResponse.data || []);
+        setExchangeRates(Array.isArray(ratesResponse.data) ? ratesResponse.data : []);
       } catch (error) {
         console.error('Error fetching rates:', error);
       }
@@ -370,7 +370,7 @@ const Dashboard: React.FC = () => {
   // Open auto-replenish modal
   const openAutoReplenishModal = (cardId: number) => {
     setSelectedCardId(cardId);
-    const card = cards.find(c => c.id === cardId);
+    const card = (cards ?? []).find(c => c.id === cardId);
     if (card) {
       setAutoReplenishThreshold(card.auto_replenish_threshold || '');
       setAutoReplenishAmount(card.auto_replenish_amount || '');
@@ -983,11 +983,11 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Exchange Rates */}
-        {exchangeRates.length > 0 && (
+        {(exchangeRates?.length ?? 0) > 0 && (
           <div style={{
             display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap'
           }}>
-            {exchangeRates.map((r, i) => (
+            {(exchangeRates ?? []).map((r, i) => (
               <div key={i} style={{
                 backgroundColor: theme.colors.backgroundCard,
                 border: `1px solid ${theme.colors.border}`,
@@ -1055,17 +1055,17 @@ const Dashboard: React.FC = () => {
               }}>
                 Spend by Category (30d)
               </div>
-              {spendStats.length > 0 ? (
+              {(spendStats?.length ?? 0) > 0 ? (
                 <div style={{ width: '140px', height: '140px' }}>
                   <Pie
                     data={{
-                      labels: spendStats.map(s => {
+                      labels: (spendStats ?? []).map(s => {
                         const labels: Record<string, string> = { arbitrage: 'Реклама', travel: 'Путешествия', services: 'Универсал' };
                         return labels[s.category] || s.category;
                       }),
                       datasets: [{
-                        data: spendStats.map(s => parseFloat(s.total_spent)),
-                        backgroundColor: spendStats.map(s => {
+                        data: (spendStats ?? []).map(s => parseFloat(s.total_spent)),
+                        backgroundColor: (spendStats ?? []).map(s => {
                           const colors: Record<string, string> = { arbitrage: '#3b82f6', travel: '#14b8a6', services: '#8b5cf6' };
                           return colors[s.category] || '#6b7280';
                         }),
@@ -1091,7 +1091,7 @@ const Dashboard: React.FC = () => {
                 <div style={{ color: '#666', fontSize: '12px', marginTop: '20px' }}>No spend data yet</div>
               )}
               <div style={{ display: 'flex', gap: '12px', marginTop: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                {spendStats.map(s => (
+                {(spendStats ?? []).map(s => (
                   <div key={s.category} style={{ fontSize: '10px', color: '#aaa', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <span style={{
                       width: '8px', height: '8px', borderRadius: '50%', display: 'inline-block',
@@ -1120,10 +1120,10 @@ const Dashboard: React.FC = () => {
                 Active Cards
               </div>
               <div style={{ fontSize: '24px', fontWeight: 'bold', marginTop: '10px', color: theme.colors.textPrimary }}>
-                {cards.filter(c => c.card_status === 'ACTIVE').length} <span style={{ fontSize: '14px', color: theme.colors.textSecondary }}>/ {cards.length}</span>
+                {(cards ?? []).filter(c => c.card_status === 'ACTIVE').length} <span style={{ fontSize: '14px', color: theme.colors.textSecondary }}>/ {cards?.length ?? 0}</span>
               </div>
               <div style={{ fontSize: '12px', color: theme.colors.textSecondary, marginTop: '5px' }}>
-                {cards.filter(c => c.card_status === 'BLOCKED').length} blocked · {cards.filter(c => c.card_status === 'FROZEN').length} frozen · {cards.filter(c => c.card_status === 'CLOSED').length} closed
+                {(cards ?? []).filter(c => c.card_status === 'BLOCKED').length} blocked · {(cards ?? []).filter(c => c.card_status === 'FROZEN').length} frozen · {(cards ?? []).filter(c => c.card_status === 'CLOSED').length} closed
               </div>
             </div>
           </div>
@@ -1200,7 +1200,7 @@ const Dashboard: React.FC = () => {
               {tab.label}
               {tab.key !== 'all' && (
                 <span style={{ marginLeft: '6px', opacity: 0.6 }}>
-                  {cards.filter(c => (c.category || 'arbitrage') === tab.key).length}
+                  {(cards ?? []).filter(c => (c.category || 'arbitrage') === tab.key).length}
                 </span>
               )}
             </button>
@@ -1214,7 +1214,7 @@ const Dashboard: React.FC = () => {
           gap: '20px',
           marginBottom: '30px'
         }}>
-          {(activeCardCategory === 'all' ? cards : cards.filter(c => (c.category || 'arbitrage') === activeCardCategory)).length === 0 ? (
+          {(activeCardCategory === 'all' ? (cards ?? []) : (cards ?? []).filter(c => (c.category || 'arbitrage') === activeCardCategory)).length === 0 ? (
             <div style={{
               gridColumn: '1 / -1',
               textAlign: 'center',
@@ -1222,10 +1222,10 @@ const Dashboard: React.FC = () => {
               color: '#888c95',
               fontSize: '16px'
             }}>
-              {cards.length === 0 ? 'No active cards. Click "+ Issue Card" to create one.' : 'No cards in this category.'}
+              {(cards?.length ?? 0) === 0 ? 'No active cards. Click "+ Issue Card" to create one.' : 'No cards in this category.'}
             </div>
           ) : (
-            (activeCardCategory === 'all' ? cards : cards.filter(c => (c.category || 'arbitrage') === activeCardCategory)).map((card) => {
+            (activeCardCategory === 'all' ? (cards ?? []) : (cards ?? []).filter(c => (c.category || 'arbitrage') === activeCardCategory)).map((card) => {
               const catColors: Record<string, { bg: string; border: string }> = {
                 arbitrage: { bg: 'rgba(30, 58, 95, 0.7)', border: 'rgba(59, 130, 246, 0.3)' },
                 travel:    { bg: 'rgba(19, 78, 74, 0.7)', border: 'rgba(20, 184, 166, 0.3)' },
@@ -1748,7 +1748,7 @@ const Dashboard: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {transactions.length === 0 ? (
+              {(transactions?.length ?? 0) === 0 ? (
                 <tr>
                   <td colSpan={5} style={{
                     padding: '40px 0',
@@ -1760,7 +1760,7 @@ const Dashboard: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                transactions.slice(0, 10).map((tx, index) => {
+                (transactions ?? []).slice(0, 10).map((tx, index) => {
                   const txDate = new Date(tx.executed_at);
                   const timeStr = txDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
                   const statusColor = tx.status === 'APPROVED' || tx.status === 'SUCCESS' ? '#00e096' : '#ff3b3b';
@@ -1893,7 +1893,7 @@ const Dashboard: React.FC = () => {
 
       {/* Confirmation Dialog (Block / Unblock) */}
       {showConfirmDialog && (() => {
-        const card = selectedCardId ? cards.find((c) => c.id === selectedCardId) : null;
+        const card = selectedCardId ? (cards ?? []).find((c) => c.id === selectedCardId) : null;
         const isUnblock = card?.card_status === 'BLOCKED';
         return (
         <div style={{

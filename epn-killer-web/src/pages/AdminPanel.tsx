@@ -107,8 +107,8 @@ const AdminPanel: React.FC = () => {
         axios.get(`${API_BASE_URL}/admin/rates`, config).catch(() => ({ data: [] })),
       ]);
       setStats(statsRes.data);
-      setUsers(usersRes.data || []);
-      setRates(ratesRes.data || []);
+      setUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
+      setRates(Array.isArray(ratesRes.data) ? ratesRes.data : []);
       setIsLoading(false);
     } catch (err: any) {
       setIsLoading(false);
@@ -122,7 +122,7 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  const filteredUsers = users.filter(u =>
+  const filteredUsers = (users ?? []).filter(u =>
     u.email.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -222,7 +222,7 @@ const AdminPanel: React.FC = () => {
         borderRadius: '16px', padding: '24px', marginBottom: '30px', backdropFilter: 'blur(20px)'
       }}>
         <h2 style={{ margin: '0 0 20px', fontSize: '18px', fontWeight: '700' }}>💱 Exchange Rate Settings</h2>
-        {rates.length === 0 ? (
+        {(rates?.length ?? 0) === 0 ? (
           <div style={{ color: theme.colors.textSecondary, fontSize: '13px' }}>No exchange rates configured yet.</div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -239,7 +239,7 @@ const AdminPanel: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {rates.map((r: any) => (
+              {(rates ?? []).map((r: any) => (
                 <tr key={r.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                   <td style={{ padding: '12px 8px', fontSize: '14px', fontWeight: '700' }}>
                     {r.currency_from}/{r.currency_to}
@@ -301,7 +301,7 @@ const AdminPanel: React.FC = () => {
         backdropFilter: 'blur(20px)'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>Users ({filteredUsers.length})</h2>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>Users ({filteredUsers?.length ?? 0})</h2>
           <input
             type="text"
             placeholder="Search by email..."
@@ -334,14 +334,14 @@ const AdminPanel: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredUsers.length === 0 ? (
+            {(filteredUsers?.length ?? 0) === 0 ? (
               <tr>
                 <td colSpan={8} style={{ padding: '30px', textAlign: 'center', color: theme.colors.textSecondary }}>
                   {search ? 'No users match your search' : 'No users found'}
                 </td>
               </tr>
             ) : (
-              filteredUsers.map(u => (
+              (filteredUsers ?? []).map(u => (
                 <tr key={u.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                   <td style={{ padding: '12px 8px', fontSize: '13px', color: theme.colors.textSecondary }}>#{u.id}</td>
                   <td style={{ padding: '12px 8px', fontSize: '13px', fontWeight: '600' }}>{u.email}</td>

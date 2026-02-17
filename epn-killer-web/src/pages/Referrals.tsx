@@ -42,7 +42,7 @@ const Referrals: React.FC = () => {
       // referrals list is optional, may not exist yet
       try {
         const listRes = await axios.get(`${API_BASE_URL}/user/referrals/list`, config);
-        setReferrals(listRes.data || []);
+        setReferrals(Array.isArray(listRes.data) ? listRes.data : []);
       } catch { /* endpoint might not exist yet */ }
       setIsLoading(false);
     } catch (error) {
@@ -153,9 +153,9 @@ const Referrals: React.FC = () => {
         borderRadius: '16px', padding: '24px', backdropFilter: 'blur(20px)'
       }}>
         <h2 style={{ margin: '0 0 20px', fontSize: '18px', fontWeight: '700' }}>
-          Your Referrals ({referrals.length})
+          Your Referrals ({referrals?.length ?? 0})
         </h2>
-        {referrals.length === 0 ? (
+        {(referrals?.length ?? 0) === 0 ? (
           <div style={{ padding: '30px', textAlign: 'center', color: theme.colors.textSecondary, fontSize: '14px' }}>
             No referrals yet. Share your link to get started!
           </div>
@@ -174,7 +174,7 @@ const Referrals: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {referrals.map(r => (
+              {(referrals ?? []).map(r => (
                 <tr key={r.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                   <td style={{ padding: '12px 8px', fontSize: '13px', fontWeight: '600' }}>{r.email}</td>
                   <td style={{ padding: '12px 8px' }}>
