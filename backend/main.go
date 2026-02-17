@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -154,12 +155,29 @@ func main() {
 	protectedRouter.HandleFunc("/settings/telegram", handlers.UpdateTelegramChatIDHandler).Methods("POST")
 	// --------------------------------------------------------
 
-	// CORS: Allow all origins for development
+	// CORS: dynamic origins from ALLOWED_ORIGINS env var (comma-separated)
+	allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
+	var origins []string
+	if allowedOrigins != "" {
+		for _, o := range strings.Split(allowedOrigins, ",") {
+			origins = append(origins, strings.TrimSpace(o))
+		}
+	} else {
+		origins = []string{
+			"http://localhost:3000",
+			"http://localhost:5173",
+			"https://xplr-web-dz00cbt2u-djalbens-projects.vercel.app",
+			"https://xplr-web.vercel.app",
+		}
+	}
+	log.Printf("CORS allowed origins: %v", origins)
+
 	corsHandler := cors.New(cors.Options{
-		AllowedOrigins:   []string{"*"},
+		AllowedOrigins:   origins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"*"},
-		AllowCredentials: false,
+		AllowedHeaders:   []string{"Authorization", "Content-Type", "Accept"},
+		AllowCredentials: true,
+		MaxAge:           300,
 	}).Handler(router)
 
 	// 3. Запуск сервера
