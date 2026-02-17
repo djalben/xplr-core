@@ -71,7 +71,7 @@ const Referrals: React.FC = () => {
   const revShareRate = '5%';
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: theme.colors.background, color: theme.colors.textPrimary, padding: '30px' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: 'rgba(10, 10, 11, 0.92)', color: theme.colors.textPrimary, padding: '30px', position: 'relative', zIndex: 10 }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
         <div>
@@ -86,7 +86,7 @@ const Referrals: React.FC = () => {
           padding: '10px 20px', backgroundColor: 'rgba(255,255,255,0.05)',
           border: `1px solid ${theme.colors.border}`, borderRadius: '8px',
           color: theme.colors.textSecondary, fontSize: '13px', cursor: 'pointer', fontWeight: '600'
-        }}>← Dashboard</button>
+        }}>← Назад</button>
       </div>
 
       {/* Stats Cards */}

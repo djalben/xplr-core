@@ -34,7 +34,7 @@ const Teams: React.FC = () => {
         return;
       }
       const data = await getUserTeams();
-      setTeams(data);
+      setTeams(Array.isArray(data) ? data : []);
       setIsLoading(false);
     } catch (error) {
       console.error('Error fetching teams:', error);
@@ -126,9 +126,11 @@ const Teams: React.FC = () => {
   return (
     <div style={{
       minHeight: '100vh',
-      backgroundColor: '#000',
+      backgroundColor: 'rgba(10, 10, 11, 0.92)',
       color: '#ffffff',
-      padding: '30px'
+      padding: '30px',
+      position: 'relative',
+      zIndex: 10
     }}>
       {/* Header */}
       <div style={{
@@ -137,7 +139,16 @@ const Teams: React.FC = () => {
         alignItems: 'center',
         marginBottom: '30px'
       }}>
-        <h1 style={{ margin: 0, fontSize: '24px', fontWeight: '700' }}>Команды</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <button
+            onClick={() => navigate('/dashboard')}
+            style={{
+              padding: '8px 16px', backgroundColor: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px',
+              color: '#888c95', fontSize: '13px', cursor: 'pointer', fontWeight: '600'
+            }}>← Назад</button>
+          <h1 style={{ margin: 0, fontSize: '24px', fontWeight: '700' }}>Команды</h1>
+        </div>
         <button
           onClick={() => setShowCreateModal(true)}
           style={{
@@ -168,13 +179,13 @@ const Teams: React.FC = () => {
           border: '1px solid rgba(255, 255, 255, 0.1)'
         }}>
           <h3 style={{ margin: '0 0 20px 0', fontSize: '16px', fontWeight: '600' }}>Мои команды</h3>
-          {teams.length === 0 ? (
+          {(teams ?? []).length === 0 ? (
             <div style={{ color: '#888c95', textAlign: 'center', padding: '40px 0' }}>
               У вас пока нет команд
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {teams.map(team => (
+              {(teams ?? []).map(team => (
                 <div
                   key={team.id}
                   onClick={() => handleSelectTeam(team.id)}
@@ -246,7 +257,7 @@ const Teams: React.FC = () => {
 
             <h3 style={{ margin: '0 0 20px 0', fontSize: '16px', fontWeight: '600' }}>Участники</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {selectedTeam.members.map(member => (
+              {(selectedTeam.members ?? []).map(member => (
                 <div
                   key={member.id}
                   style={{

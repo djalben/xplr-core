@@ -111,6 +111,7 @@ const Dashboard: React.FC = () => {
   
   // Top-up state
   const [isTopingUp, setIsTopingUp] = useState(false);
+  const [topUpWallet, setTopUpWallet] = useState<'arbitrage' | 'personal'>('arbitrage');
 
   // Card details reveal state
   const [revealedCardDetails, setRevealedCardDetails] = useState<Record<number, { full_number: string; cvv: string; expiry: string } | null>>({});
@@ -624,7 +625,7 @@ const Dashboard: React.FC = () => {
     <div style={{
       width: '100vw',
       height: '100vh',
-      backgroundColor: theme.colors.background,
+      backgroundColor: 'rgba(10, 10, 11, 0.88)',
       color: theme.colors.textPrimary,
       display: 'flex',
       overflow: 'hidden',
@@ -633,12 +634,13 @@ const Dashboard: React.FC = () => {
       padding: 0,
       position: 'fixed',
       top: 0,
-      left: 0
+      left: 0,
+      zIndex: 10
     }}>
       {/* Sidebar */}
       <aside style={{
         width: '260px',
-        backgroundColor: theme.colors.backgroundSecondary,
+        backgroundColor: 'rgba(17, 17, 19, 0.95)',
         borderRight: `1px solid ${theme.colors.border}`,
         padding: '20px',
         display: 'flex',
@@ -736,7 +738,7 @@ const Dashboard: React.FC = () => {
         {sidebarMenuItems.map((item) => (
           <div
             key={item}
-            onClick={() => item !== 'team' && setActiveMenu(item)}
+            onClick={() => { if (item === 'team') { navigate('/teams'); } else { setActiveMenu(item); } }}
             style={{
               padding: '12px 15px',
               color: activeMenu === item ? theme.colors.accent : theme.colors.textSecondary,
@@ -767,11 +769,7 @@ const Dashboard: React.FC = () => {
             {item === 'dashboard' && '📊 Dashboard'}
             {item === 'cards' && '💳 Cards'}
             {item === 'finance' && '💸 Finance'}
-            {item === 'team' && (
-              <div onClick={(e) => { e.stopPropagation(); navigate('/teams'); }} style={{ width: '100%' }}>
-                👥 Teams
-              </div>
-            )}
+            {item === 'team' && '👥 Teams'}
             {item === 'api' && '🔌 API & Trackers'}
           </div>
         ))}
@@ -913,7 +911,7 @@ const Dashboard: React.FC = () => {
         flex: 1,
         padding: '30px',
         overflowY: 'auto',
-        backgroundColor: theme.colors.background
+        backgroundColor: 'transparent'
       }}>
         {/* Header */}
         <div style={{
@@ -930,72 +928,85 @@ const Dashboard: React.FC = () => {
               {isProfessional ? `Welcome back, ${userData?.email?.split('@')[0] || 'User'}` : `Hello, ${userData?.email?.split('@')[0] || 'User'}`}
             </p>
           </div>
-          <div style={{
-            background: theme.colors.backgroundCard,
-            backdropFilter: 'blur(20px)',
-            padding: '20px 30px',
-            borderRadius: theme.borderRadius.lg,
-            border: `1px solid ${theme.colors.border}`,
-            minWidth: '200px'
-          }}>
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'stretch' }}>
+            {/* Arbitrage Wallet */}
             <div style={{
-              color: theme.colors.textSecondary,
-              fontSize: '12px',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px'
-            }}>
-              Balance (₽)
-            </div>
-            <div style={{
-              fontSize: '48px',
-              fontWeight: '700',
-              color: theme.colors.textPrimary,
-              marginTop: '5px',
-              letterSpacing: '-1px'
-            }}>
-              {Number(userData?.balance_rub ?? userData?.balance ?? 0).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
-              <span style={{ color: theme.colors.accent, fontSize: '24px' }}>
-                .{(Number(userData?.balance_rub ?? userData?.balance ?? 0).toFixed(2).split('.')[1])}
-              </span>
-            </div>
-            {isProfessional && userGrade && (
-              <div style={{
-                marginTop: '12px',
-                padding: '8px 12px',
-                backgroundColor: theme.colors.accentMuted,
-                borderRadius: theme.borderRadius.sm,
-                border: `1px solid ${theme.colors.accentBorder}`,
-                fontSize: '12px',
-                color: theme.colors.accent,
-                display: 'inline-block'
-              }}>
-                Grade: {userGrade.grade} • Fee: {parseFloat(userGrade.fee_percent).toFixed(1)}%
+              background: 'rgba(30, 58, 95, 0.5)',
+              backdropFilter: 'blur(20px)',
+              padding: '16px 20px',
+              borderRadius: theme.borderRadius.lg,
+              border: topUpWallet === 'arbitrage' ? `1px solid ${theme.colors.accent}` : `1px solid ${theme.colors.border}`,
+              minWidth: '170px',
+              cursor: 'pointer',
+              transition: '0.2s'
+            }} onClick={() => setTopUpWallet('arbitrage')}>
+              <div style={{ color: '#3b82f6', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
+                💳 Арбитраж
               </div>
-            )}
-            <button
-              onClick={handleTopUp}
-              disabled={isTopingUp}
-              style={{
-                display: 'block',
-                marginTop: '12px',
-                padding: '10px 20px',
-                backgroundColor: theme.colors.accent,
-                color: theme.colors.background,
-                border: 'none',
-                borderRadius: theme.borderRadius.sm,
-                fontWeight: '600',
-                fontSize: '13px',
-                cursor: isTopingUp ? 'not-allowed' : 'pointer',
-                opacity: isTopingUp ? 0.6 : 1,
-                transition: '0.2s',
-                width: '100%'
-              }}
-            >
-              {isTopingUp ? 'Processing...' : '+ Top Up $100'}
-            </button>
+              <div style={{ fontSize: '28px', fontWeight: '700', color: theme.colors.textPrimary, letterSpacing: '-1px' }}>
+                ${Number(userData?.balance ?? 0).toFixed(2)}
+              </div>
+            </div>
+            {/* Personal Wallet */}
+            <div style={{
+              background: 'rgba(19, 78, 74, 0.5)',
+              backdropFilter: 'blur(20px)',
+              padding: '16px 20px',
+              borderRadius: theme.borderRadius.lg,
+              border: topUpWallet === 'personal' ? `1px solid #14b8a6` : `1px solid ${theme.colors.border}`,
+              minWidth: '170px',
+              cursor: 'pointer',
+              transition: '0.2s'
+            }} onClick={() => setTopUpWallet('personal')}>
+              <div style={{ color: '#14b8a6', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
+                ✈️ Личный
+              </div>
+              <div style={{ fontSize: '28px', fontWeight: '700', color: theme.colors.textPrimary, letterSpacing: '-1px' }}>
+                {Number(userData?.balance_rub ?? 0).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} ₽
+              </div>
+            </div>
+            {/* Top Up */}
+            <div style={{
+              display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '8px'
+            }}>
+              {isProfessional && userGrade && (
+                <div style={{
+                  padding: '6px 10px',
+                  backgroundColor: theme.colors.accentMuted,
+                  borderRadius: theme.borderRadius.sm,
+                  border: `1px solid ${theme.colors.accentBorder}`,
+                  fontSize: '11px',
+                  color: theme.colors.accent,
+                  whiteSpace: 'nowrap'
+                }}>
+                  {userGrade.grade} • {parseFloat(userGrade.fee_percent).toFixed(1)}%
+                </div>
+              )}
+              <button
+                onClick={handleTopUp}
+                disabled={isTopingUp}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: theme.colors.accent,
+                  color: theme.colors.background,
+                  border: 'none',
+                  borderRadius: theme.borderRadius.sm,
+                  fontWeight: '600',
+                  fontSize: '13px',
+                  cursor: isTopingUp ? 'not-allowed' : 'pointer',
+                  opacity: isTopingUp ? 0.6 : 1,
+                  transition: '0.2s',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {isTopingUp ? '...' : `+ Top Up → ${topUpWallet === 'arbitrage' ? 'Арбитраж' : 'Личный'}`}
+              </button>
+            </div>
           </div>
         </div>
 
+        {/* ============ DASHBOARD VIEW ============ */}
+        {activeMenu === 'dashboard' && <>
         {/* Exchange Rates */}
         {(exchangeRates?.length ?? 0) > 0 && (
           <div style={{
@@ -1144,6 +1155,10 @@ const Dashboard: React.FC = () => {
         </div>
         )}
 
+        </>}
+
+        {/* ============ CARDS VIEW ============ */}
+        {(activeMenu === 'dashboard' || activeMenu === 'cards') && <>
         {/* Cards Section */}
         <div style={{
           display: 'flex',
@@ -1547,6 +1562,10 @@ const Dashboard: React.FC = () => {
           )}
         </div>
 
+        </>}
+
+        {/* ============ FINANCE VIEW ============ */}
+        {(activeMenu === 'dashboard' || activeMenu === 'finance') && <>
         {/* Transactions Table */}
         <div style={{
           display: 'flex',
@@ -1860,6 +1879,41 @@ const Dashboard: React.FC = () => {
             </tbody>
           </table>
         </div>
+        </>}
+
+        {/* ============ API VIEW ============ */}
+        {activeMenu === 'api' && (
+          <div style={{
+            backgroundColor: theme.colors.backgroundCard,
+            borderRadius: theme.borderRadius.lg,
+            border: `1px solid ${theme.colors.border}`,
+            padding: '40px',
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔌</div>
+            <h2 style={{ margin: '0 0 12px', fontSize: '22px', fontWeight: '700' }}>API & Trackers</h2>
+            <p style={{ color: theme.colors.textSecondary, fontSize: '14px', maxWidth: '400px', margin: '0 auto 24px', lineHeight: '1.6' }}>
+              Подключайте трекеры и используйте API для автоматизации управления картами и транзакциями.
+            </p>
+            <div style={{
+              padding: '16px',
+              backgroundColor: 'rgba(255,255,255,0.03)',
+              borderRadius: '12px',
+              border: '1px solid rgba(255,255,255,0.08)',
+              fontFamily: theme.fonts.mono,
+              fontSize: '13px',
+              color: theme.colors.accent,
+              textAlign: 'left'
+            }}>
+              <div style={{ color: theme.colors.textSecondary, fontSize: '11px', marginBottom: '8px' }}>API Base URL</div>
+              <code>https://xplr-web.vercel.app/api/v1/</code>
+            </div>
+            <div style={{ marginTop: '20px', color: theme.colors.textMuted, fontSize: '12px' }}>
+              Документация скоро будет доступна
+            </div>
+          </div>
+        )}
+
       </div>
 
       {/* Limit Edit Modal */}

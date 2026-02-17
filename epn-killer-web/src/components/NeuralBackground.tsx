@@ -20,8 +20,8 @@ const NeuralBackground: React.FC = () => {
 
     let animationId: number;
     let nodes: Node[] = [];
-    const NODE_COUNT = 55;
-    const CONNECTION_DIST = 150;
+    const NODE_COUNT = 70;
+    const CONNECTION_DIST = 170;
 
     const resize = () => {
       canvas.width = window.innerWidth;
@@ -51,7 +51,7 @@ const NeuralBackground: React.FC = () => {
           const dy = nodes[i].y - nodes[j].y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < CONNECTION_DIST) {
-            const opacity = (1 - dist / CONNECTION_DIST) * 0.1;
+            const opacity = (1 - dist / CONNECTION_DIST) * 0.18;
             ctx.beginPath();
             ctx.moveTo(nodes[i].x, nodes[i].y);
             ctx.lineTo(nodes[j].x, nodes[j].y);
@@ -66,7 +66,7 @@ const NeuralBackground: React.FC = () => {
       for (const node of nodes) {
         ctx.beginPath();
         ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(59, 130, 246, 0.15)';
+        ctx.fillStyle = 'rgba(59, 130, 246, 0.25)';
         ctx.fill();
       }
 
