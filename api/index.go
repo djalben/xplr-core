@@ -92,6 +92,9 @@ func ensureDB() {
 			updated_at TIMESTAMP DEFAULT NOW(),
 			UNIQUE(currency_from, currency_to)
 		)`,
+		`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='balance_arbitrage') THEN ALTER TABLE users ADD COLUMN balance_arbitrage NUMERIC(20,4) DEFAULT 0; END IF; END $$`,
+		`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='balance_personal') THEN ALTER TABLE users ADD COLUMN balance_personal NUMERIC(20,4) DEFAULT 0; END IF; END $$`,
+		`UPDATE users SET balance_arbitrage = COALESCE(balance, 0) WHERE balance_arbitrage = 0 AND balance > 0`,
 	}
 	for _, m := range migrations {
 		if _, err := db.Exec(m); err != nil {

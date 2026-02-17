@@ -52,8 +52,12 @@ func TopUpBalanceHandler(w http.ResponseWriter, r *http.Request) {
 
 	var req struct {
 		AmountRub *decimal.Decimal `json:"amount_rub"`
+		Wallet    string           `json:"wallet"` // "arbitrage" or "personal"
 	}
-	json.NewDecoder(r.Body).Decode(&req) // best-effort; if empty body, req.AmountRub stays nil
+	json.NewDecoder(r.Body).Decode(&req) // best-effort; if empty body, defaults apply
+	if req.Wallet == "" {
+		req.Wallet = "arbitrage"
+	}
 
 	// Get current RUB/USD exchange rate
 	rate, err := repository.GetFinalRate("RUB", "USD")
@@ -99,6 +103,18 @@ func TopUpBalanceHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Credit the specific wallet
+	walletCol := "balance_arbitrage"
+	if req.Wallet == "personal" {
+		walletCol = "balance_personal"
+	}
+	if repository.GlobalDB != nil {
+		_, _ = repository.GlobalDB.Exec(
+			"UPDATE users SET "+walletCol+" = COALESCE("+walletCol+", 0) + $1 WHERE id = $2",
+			amountUsd, userID,
+		)
+	}
+
 	user, err := repository.GetUserByID(userID)
 	if err != nil {
 		log.Printf("Error fetching user %d after topup: %v", userID, err)
@@ -108,11 +124,14 @@ func TopUpBalanceHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"message":     "Balance topped up successfully",
-		"amount_usd":  amountUsd.StringFixed(2),
-		"amount_rub":  amountRub.StringFixed(2),
-		"rate":        rate.StringFixed(4),
-		"new_balance": user.BalanceRub.String(),
+		"message":           "Balance topped up successfully",
+		"wallet":            req.Wallet,
+		"amount_usd":        amountUsd.StringFixed(2),
+		"amount_rub":        amountRub.StringFixed(2),
+		"rate":              rate.StringFixed(4),
+		"new_balance":       user.BalanceRub.String(),
+		"balance_arbitrage": user.BalanceArbitrage.String(),
+		"balance_personal":  user.BalancePersonal.String(),
 	})
 }
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { Line, Pie } from 'react-chartjs-2';
 import {
@@ -37,6 +37,8 @@ interface UserData {
   email: string;
   balance: number;
   balance_rub?: number;
+  balance_arbitrage?: number;
+  balance_personal?: number;
   status: string;
   grade?: string;
   fee_percent?: string;
@@ -71,11 +73,20 @@ interface Transaction {
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [userData, setUserData] = useState<UserData | null>(null);
   const [cards, setCards] = useState<Card[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeMenu, setActiveMenu] = useState('dashboard');
+
+  // Derive activeMenu from URL path
+  const activeMenu = (() => {
+    const p = location.pathname;
+    if (p === '/cards') return 'cards';
+    if (p === '/finance') return 'finance';
+    if (p === '/api') return 'api';
+    return 'dashboard';
+  })();
   const [appMode, setAppMode] = useState<AppMode>(() => {
     const stored = localStorage.getItem(XPLR_STORAGE_MODE);
     return (stored === 'personal' || stored === 'professional') ? stored : 'professional';
@@ -479,19 +490,25 @@ const Dashboard: React.FC = () => {
     try {
       const token = localStorage.getItem('token');
       const config = { headers: { Authorization: `Bearer ${token}` } };
-      const response = await axios.post(`${API_BASE_URL}/user/topup`, {}, config);
-      const newBalance = response.data.new_balance;
+      const response = await axios.post(`${API_BASE_URL}/user/topup`, { wallet: topUpWallet }, config);
       const amountUsd = response.data.amount_usd;
       const amountRub = response.data.amount_rub;
       const rate = response.data.rate;
+      const balArb = response.data.balance_arbitrage;
+      const balPers = response.data.balance_personal;
       if (userData) {
-        setUserData({ ...userData, balance: parseFloat(newBalance) });
+        setUserData({
+          ...userData,
+          balance_arbitrage: balArb ? parseFloat(balArb) : userData.balance_arbitrage,
+          balance_personal: balPers ? parseFloat(balPers) : userData.balance_personal,
+        });
       }
-      const rateInfo = rate ? ` (${parseFloat(amountRub).toFixed(0)} ₽ по курсу ${parseFloat(rate).toFixed(2)})` : '';
-      setToast({ message: `На счёт зачислено $${parseFloat(amountUsd || '100').toFixed(2)}${rateInfo}`, type: 'success' });
+      const walletLabel = topUpWallet === 'arbitrage' ? 'Арбитраж' : 'Личный';
+      const rateInfo = rate ? ` (${parseFloat(amountRub).toFixed(0)} ₽ × ${parseFloat(rate).toFixed(2)})` : '';
+      setToast({ message: `${walletLabel}: +$${parseFloat(amountUsd || '100').toFixed(2)}${rateInfo}`, type: 'success' });
     } catch (error) {
       console.error('Error topping up:', error);
-      setToast({ message: 'Failed to top up balance', type: 'error' });
+      setToast({ message: 'Не удалось пополнить баланс', type: 'error' });
     } finally {
       setIsTopingUp(false);
     }
@@ -640,7 +657,8 @@ const Dashboard: React.FC = () => {
       {/* Sidebar */}
       <aside style={{
         width: '260px',
-        backgroundColor: 'rgba(17, 17, 19, 0.95)',
+        backgroundColor: 'rgba(17, 17, 19, 0.85)',
+        backdropFilter: 'blur(16px)',
         borderRight: `1px solid ${theme.colors.border}`,
         padding: '20px',
         display: 'flex',
@@ -738,7 +756,10 @@ const Dashboard: React.FC = () => {
         {sidebarMenuItems.map((item) => (
           <div
             key={item}
-            onClick={() => { if (item === 'team') { navigate('/teams'); } else { setActiveMenu(item); } }}
+            onClick={() => {
+              const routes: Record<string, string> = { dashboard: '/dashboard', cards: '/cards', finance: '/finance', team: '/teams', api: '/api' };
+              navigate(routes[item] || '/dashboard');
+            }}
             style={{
               padding: '12px 15px',
               color: activeMenu === item ? theme.colors.accent : theme.colors.textSecondary,
@@ -911,7 +932,8 @@ const Dashboard: React.FC = () => {
         flex: 1,
         padding: '30px',
         overflowY: 'auto',
-        backgroundColor: 'transparent'
+        backgroundColor: 'rgba(10, 10, 11, 0.6)',
+        backdropFilter: 'blur(12px)'
       }}>
         {/* Header */}
         <div style={{
@@ -944,7 +966,7 @@ const Dashboard: React.FC = () => {
                 💳 Арбитраж
               </div>
               <div style={{ fontSize: '28px', fontWeight: '700', color: theme.colors.textPrimary, letterSpacing: '-1px' }}>
-                ${Number(userData?.balance ?? 0).toFixed(2)}
+                ${Number(userData?.balance_arbitrage ?? userData?.balance ?? 0).toFixed(2)}
               </div>
             </div>
             {/* Personal Wallet */}
@@ -962,7 +984,7 @@ const Dashboard: React.FC = () => {
                 ✈️ Личный
               </div>
               <div style={{ fontSize: '28px', fontWeight: '700', color: theme.colors.textPrimary, letterSpacing: '-1px' }}>
-                {Number(userData?.balance_rub ?? 0).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} ₽
+                ${Number(userData?.balance_personal ?? 0).toFixed(2)}
               </div>
             </div>
             {/* Top Up */}
@@ -1566,6 +1588,27 @@ const Dashboard: React.FC = () => {
 
         {/* ============ FINANCE VIEW ============ */}
         {(activeMenu === 'dashboard' || activeMenu === 'finance') && <>
+
+        {/* Finance Wallet Toggle (only on dedicated finance page) */}
+        {activeMenu === 'finance' && (
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+            {(['arbitrage', 'personal'] as const).map(w => (
+              <button key={w} onClick={() => setTopUpWallet(w)} style={{
+                padding: '10px 20px',
+                backgroundColor: topUpWallet === w ? (w === 'arbitrage' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(20, 184, 166, 0.2)') : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${topUpWallet === w ? (w === 'arbitrage' ? '#3b82f6' : '#14b8a6') : theme.colors.border}`,
+                borderRadius: '10px', color: topUpWallet === w ? (w === 'arbitrage' ? '#3b82f6' : '#14b8a6') : theme.colors.textSecondary,
+                fontSize: '13px', fontWeight: '600', cursor: 'pointer', transition: '0.2s'
+              }}>
+                {w === 'arbitrage' ? '💳 Арбитраж' : '✈️ Личный'}
+                <span style={{ marginLeft: '8px', fontWeight: '800' }}>
+                  ${Number(w === 'arbitrage' ? (userData?.balance_arbitrage ?? 0) : (userData?.balance_personal ?? 0)).toFixed(2)}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Transactions Table */}
         <div style={{
           display: 'flex',

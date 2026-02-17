@@ -40,18 +40,20 @@ type AuthRequest struct {
 // В Supabase: id (UUID), email, password_hash, balance_rub (numeric), active_mode
 // Для совместимости с кодом используем int для ID (конвертация UUID -> int при необходимости)
 type User struct {
-	ID             int             `json:"id"` // В Supabase: UUID (конвертируется)
-	Email          string          `json:"email"`
-	PasswordHash   string          `json:"-"`           // password_hash в Supabase
-	Balance        decimal.Decimal `json:"balance"`     // Legacy поле
-	BalanceRub     decimal.Decimal `json:"balance_rub"` // Основной баланс в рублях (XPLR) - соответствует Supabase
-	KYCStatus      string          `json:"kyc_status"`  // Статус верификации (например: pending, verified, rejected)
-	ActiveMode     string          `json:"active_mode"` // Режим работы: по умолчанию 'personal' - соответствует Supabase
-	CreatedAt      time.Time       `json:"created_at"`
-	Status         string          `json:"status"`
-	TeamID         sql.NullInt64   `json:"team_id"`
-	TelegramChatID sql.NullInt64   `json:"telegram_chat_id"`
-	IsAdmin        bool            `json:"is_admin"`
+	ID               int             `json:"id"` // В Supabase: UUID (конвертируется)
+	Email            string          `json:"email"`
+	PasswordHash     string          `json:"-"`                 // password_hash в Supabase
+	Balance          decimal.Decimal `json:"balance"`           // Legacy поле (суммарный USD)
+	BalanceRub       decimal.Decimal `json:"balance_rub"`       // Основной баланс в рублях
+	BalanceArbitrage decimal.Decimal `json:"balance_arbitrage"` // Арбитражный кошелёк (USD)
+	BalancePersonal  decimal.Decimal `json:"balance_personal"`  // Личный кошелёк (USD)
+	KYCStatus        string          `json:"kyc_status"`        // Статус верификации
+	ActiveMode       string          `json:"active_mode"`       // Режим работы: 'personal' | 'professional'
+	CreatedAt        time.Time       `json:"created_at"`
+	Status           string          `json:"status"`
+	TeamID           sql.NullInt64   `json:"team_id"`
+	TelegramChatID   sql.NullInt64   `json:"telegram_chat_id"`
+	IsAdmin          bool            `json:"is_admin"`
 }
 
 // APIKey - Структура для ключей
