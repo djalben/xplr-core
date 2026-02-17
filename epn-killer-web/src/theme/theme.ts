@@ -1,11 +1,11 @@
 // XPLR Premium — тёмная премиальная схема с акцентами в стиле "X"
 export const theme = {
   colors: {
-    // Фоны (глубокие тёмные тона)
-    background: '#0a0a0b',
-    backgroundSecondary: '#111113',
-    backgroundCard: '#161619',
-    backgroundElevated: '#1c1c21',
+    // Фоны (Deep Navy)
+    background: 'rgb(10, 10, 14)',
+    backgroundSecondary: 'rgb(14, 15, 22)',
+    backgroundCard: 'rgb(20, 21, 30)',
+    backgroundElevated: 'rgb(26, 27, 38)',
 
     // Акценты X (острый контраст: бирюза/циан + мягкий золотой)
     accent: '#06b6d4',

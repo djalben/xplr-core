@@ -3,6 +3,9 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import LoginForm from './components/auth/LoginForm';
 import RegisterForm from './components/auth/RegisterForm';
 import Dashboard from './pages/Dashboard';
+import CardsPage from './pages/CardsPage';
+import HistoryPage from './pages/HistoryPage';
+import ApiPage from './pages/ApiPage';
 import Teams from './pages/Teams';
 import Referrals from './pages/Referrals';
 import AdminPanel from './pages/AdminPanel';
@@ -65,15 +68,15 @@ const App: React.FC = () => {
         path="/cards"
         element={
           <ProtectedRoute>
-            <Dashboard />
+            <CardsPage />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/finance"
+        path="/history"
         element={
           <ProtectedRoute>
-            <Dashboard />
+            <HistoryPage />
           </ProtectedRoute>
         }
       />
@@ -81,7 +84,7 @@ const App: React.FC = () => {
         path="/api"
         element={
           <ProtectedRoute>
-            <Dashboard />
+            <ApiPage />
           </ProtectedRoute>
         }
       />
