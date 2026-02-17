@@ -120,6 +120,11 @@ const Dashboard: React.FC = () => {
   const [autoReplenishAmount, setAutoReplenishAmount] = useState('');
   const [isSettingAutoReplenish, setIsSettingAutoReplenish] = useState(false);
 
+  // Telegram connect state
+  const [telegramChatId, setTelegramChatId] = useState('');
+  const [isSavingTelegram, setIsSavingTelegram] = useState(false);
+  const [showTelegramInput, setShowTelegramInput] = useState(false);
+
   // Spend stats for pie chart
   const [spendStats, setSpendStats] = useState<{ category: string; total_spent: string; tx_count: number }[]>([]);
 
@@ -407,6 +412,24 @@ const Dashboard: React.FC = () => {
     } catch (error) {
       console.error('Error disabling auto-replenish:', error);
       setToast({ message: 'Не удалось отключить автопополнение', type: 'error' });
+    }
+  };
+
+  // Save Telegram Chat ID
+  const handleSaveTelegram = async () => {
+    if (!telegramChatId.trim()) return;
+    setIsSavingTelegram(true);
+    try {
+      const token = localStorage.getItem('token');
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+      await axios.post(`${API_BASE_URL}/user/settings/telegram`, { chat_id: parseInt(telegramChatId) }, config);
+      setToast({ message: 'Telegram connected successfully!', type: 'success' });
+      setShowTelegramInput(false);
+    } catch (error) {
+      console.error('Error saving Telegram chat ID:', error);
+      setToast({ message: 'Failed to connect Telegram', type: 'error' });
+    } finally {
+      setIsSavingTelegram(false);
     }
   };
 
@@ -728,6 +751,84 @@ const Dashboard: React.FC = () => {
           </div>
         ))}
 
+        {/* Telegram Connect */}
+        <div style={{
+          marginTop: 'auto',
+          marginBottom: '8px',
+          padding: '12px',
+          backgroundColor: theme.colors.backgroundCard,
+          borderRadius: theme.borderRadius.md,
+          border: `1px solid ${theme.colors.border}`
+        }}>
+          {!showTelegramInput ? (
+            <button
+              onClick={() => setShowTelegramInput(true)}
+              style={{
+                width: '100%',
+                padding: '10px',
+                backgroundColor: 'rgba(0, 136, 204, 0.15)',
+                border: '1px solid rgba(0, 136, 204, 0.3)',
+                borderRadius: '8px',
+                color: '#0088cc',
+                fontSize: '12px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px'
+              }}
+            >
+              ✈️ Connect Telegram
+            </button>
+          ) : (
+            <div>
+              <div style={{ fontSize: '11px', color: theme.colors.textSecondary, marginBottom: '8px' }}>
+                Enter your Telegram Chat ID:
+              </div>
+              <input
+                type="text"
+                placeholder="e.g. 123456789"
+                value={telegramChatId}
+                onChange={(e) => setTelegramChatId(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 10px',
+                  backgroundColor: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '6px',
+                  color: '#fff',
+                  fontSize: '13px',
+                  outline: 'none',
+                  marginBottom: '8px',
+                  boxSizing: 'border-box'
+                }}
+              />
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  onClick={() => setShowTelegramInput(false)}
+                  style={{
+                    flex: 1, padding: '7px', fontSize: '11px',
+                    backgroundColor: 'transparent', border: `1px solid ${theme.colors.border}`,
+                    borderRadius: '6px', color: theme.colors.textSecondary, cursor: 'pointer'
+                  }}
+                >Cancel</button>
+                <button
+                  onClick={handleSaveTelegram}
+                  disabled={isSavingTelegram || !telegramChatId.trim()}
+                  style={{
+                    flex: 1, padding: '7px', fontSize: '11px',
+                    backgroundColor: '#0088cc', border: 'none',
+                    borderRadius: '6px', color: '#fff', fontWeight: '600',
+                    cursor: isSavingTelegram ? 'not-allowed' : 'pointer',
+                    opacity: isSavingTelegram || !telegramChatId.trim() ? 0.5 : 1
+                  }}
+                >{isSavingTelegram ? '...' : 'Save'}</button>
+              </div>
+            </div>
+          )}
+        </div>
+
         <div
           onClick={handleLogout}
           style={{
@@ -735,7 +836,6 @@ const Dashboard: React.FC = () => {
             color: theme.colors.textSecondary,
             cursor: 'pointer',
             borderRadius: theme.borderRadius.sm,
-            marginTop: 'auto',
             fontSize: '14px',
             display: 'flex',
             alignItems: 'center',

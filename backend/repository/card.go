@@ -281,6 +281,19 @@ func UpdateCardSpendLimit(cardID int, userID int, limit decimal.Decimal) error {
 		return fmt.Errorf("card not found or access denied")
 	}
 	log.Printf("✅ Card %d spend_limit updated to %s (user %d)", cardID, limit.String(), userID)
+
+	// Telegram notification (graceful - won't fail if bot token not set)
+	user, err := GetUserByID(userID)
+	if err == nil && user.TelegramChatID.Valid {
+		card, cerr := GetCardByID(cardID)
+		last4 := "????"
+		if cerr == nil {
+			last4 = card.Last4Digits
+		}
+		notification.SendTelegramMessage(user.TelegramChatID.Int64,
+			fmt.Sprintf("⚡ Лимит карты обновлён\n\nКарта: •••• %s\nНовый лимит: $%s/день", last4, limit.String()))
+	}
+
 	return nil
 }
 
