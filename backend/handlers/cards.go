@@ -157,21 +157,29 @@ func PatchCardStatusHandler(w http.ResponseWriter, r *http.Request) {
 	s := strings.TrimSpace(strings.ToUpper(req.Status))
 	var status string
 	switch s {
-	case "BLOCKED", "ACTIVE":
+	case "BLOCKED", "ACTIVE", "FROZEN", "CLOSED":
 		status = s
 	case "BLOCK":
 		status = "BLOCKED"
 	case "UNBLOCK", "ACTIVATE":
 		status = "ACTIVE"
+	case "FREEZE":
+		status = "FROZEN"
+	case "CLOSE", "DELETE":
+		status = "CLOSED"
 	default:
-		// support lowercase "blocked" / "active"
 		lower := strings.ToLower(req.Status)
-		if lower == "blocked" {
+		switch lower {
+		case "blocked":
 			status = "BLOCKED"
-		} else if lower == "active" {
+		case "active":
 			status = "ACTIVE"
-		} else {
-			http.Error(w, "invalid status: use blocked or active", http.StatusBadRequest)
+		case "frozen", "freeze":
+			status = "FROZEN"
+		case "closed", "close", "delete":
+			status = "CLOSED"
+		default:
+			http.Error(w, "invalid status: use active, blocked, frozen or closed", http.StatusBadRequest)
 			return
 		}
 	}

@@ -236,13 +236,15 @@ func BlockCard(cardID int) error {
 	return nil
 }
 
-// UpdateCardStatus sets card_status to "BLOCKED" or "ACTIVE" for a card owned by userID.
+// UpdateCardStatus sets card_status for a card owned by userID.
+// Supported statuses: ACTIVE, BLOCKED, FROZEN, CLOSED.
 func UpdateCardStatus(cardID int, userID int, status string) error {
 	if GlobalDB == nil {
 		return fmt.Errorf("database connection not initialized")
 	}
-	if status != "BLOCKED" && status != "ACTIVE" {
-		return fmt.Errorf("invalid status: must be BLOCKED or ACTIVE")
+	validStatuses := map[string]bool{"ACTIVE": true, "BLOCKED": true, "FROZEN": true, "CLOSED": true}
+	if !validStatuses[status] {
+		return fmt.Errorf("invalid status: must be ACTIVE, BLOCKED, FROZEN or CLOSED")
 	}
 	res, err := GlobalDB.Exec(
 		"UPDATE cards SET card_status = $1 WHERE id = $2 AND user_id = $3",
@@ -342,6 +344,18 @@ func IssueCards(userID int, req models.MassIssueRequest) (interface{}, error) {
 				Message:   fmt.Sprintf("Failed to issue card: %v", err),
 			})
 			continue
+		}
+
+		// Record transaction for card issuance
+		_, txErr := GlobalDB.Exec(
+			`INSERT INTO transactions (user_id, card_id, amount, fee, transaction_type, status, details, executed_at)
+			 VALUES ($1, $2, $3, $4, 'ISSUE', 'APPROVED', $5, $6)`,
+			userID, cardID, decimal.Zero, decimal.Zero,
+			fmt.Sprintf("Card issued: %s •••• %s (%s)", cardType, last4, category),
+			time.Now(),
+		)
+		if txErr != nil {
+			log.Printf("Warning: failed to record issue transaction for card %d: %v", cardID, txErr)
 		}
 
 		// Успешно создана карта

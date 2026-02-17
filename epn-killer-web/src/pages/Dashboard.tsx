@@ -275,9 +275,20 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  // Block/Unblock card
+  // Change card status (block/unblock/freeze/unfreeze/close)
   const handleToggleCardBlock = async (cardId: number, currentStatus: string) => {
-    const newStatus = currentStatus === 'BLOCKED' ? 'ACTIVE' : 'BLOCKED';
+    let newStatus: string;
+    if (currentStatus === 'BLOCKED') {
+      newStatus = 'ACTIVE';
+    } else if (currentStatus === 'FROZEN') {
+      newStatus = 'ACTIVE';
+    } else if (currentStatus === 'ACTIVE_TO_FREEZE') {
+      newStatus = 'FROZEN';
+    } else if (currentStatus === 'CLOSE_CARD') {
+      newStatus = 'CLOSED';
+    } else {
+      newStatus = currentStatus === 'ACTIVE' ? 'BLOCKED' : 'ACTIVE';
+    }
     try {
       const token = localStorage.getItem('token');
       const config = {
@@ -293,15 +304,21 @@ const Dashboard: React.FC = () => {
       setShowConfirmDialog(false);
       setSelectedCardId(null);
 
-      // Instant UI update: flip status in local state so user sees BLOCKED frame immediately
+      // Instant UI update
       setCards((prev) =>
         prev.map((c) =>
           c.id === cardId ? { ...c, card_status: newStatus } : c
         )
       );
 
+      const msgs: Record<string, string> = {
+        BLOCKED: 'Card blocked successfully.',
+        ACTIVE: 'Card activated successfully.',
+        FROZEN: 'Card frozen successfully.',
+        CLOSED: 'Card closed permanently.',
+      };
       setToast({
-        message: newStatus === 'BLOCKED' ? 'Card blocked successfully.' : 'Card unblocked successfully.',
+        message: msgs[newStatus] || `Card status changed to ${newStatus}`,
         type: 'success'
       });
     } catch (error) {
@@ -967,13 +984,18 @@ const Dashboard: React.FC = () => {
             <div
               key={card.id}
               style={{
-                backgroundColor: card.card_status === 'BLOCKED' ? theme.colors.backgroundCard : cc.bg,
+                backgroundColor: card.card_status === 'CLOSED' ? 'rgba(30, 30, 30, 0.6)'
+                  : card.card_status === 'FROZEN' ? 'rgba(30, 60, 90, 0.8)'
+                  : card.card_status === 'BLOCKED' ? theme.colors.backgroundCard : cc.bg,
                 backdropFilter: 'blur(20px)',
-                border: card.card_status === 'BLOCKED' ? `1px solid ${theme.colors.error}` : `1px solid ${cc.border}`,
+                border: card.card_status === 'CLOSED' ? '1px solid rgba(80, 80, 80, 0.4)'
+                  : card.card_status === 'FROZEN' ? '1px solid rgba(59, 130, 246, 0.4)'
+                  : card.card_status === 'BLOCKED' ? `1px solid ${theme.colors.error}` : `1px solid ${cc.border}`,
                 borderRadius: theme.borderRadius.lg,
                 padding: '20px',
                 transition: '0.3s',
-                opacity: card.card_status === 'BLOCKED' ? 0.7 : 1
+                opacity: card.card_status === 'CLOSED' ? 0.5 : card.card_status === 'BLOCKED' ? 0.7 : 1,
+                filter: card.card_status === 'CLOSED' ? 'grayscale(100%)' : 'none'
               }}
               onMouseEnter={(e) => {
                 if (card.card_status !== 'BLOCKED') {
@@ -1013,8 +1035,14 @@ const Dashboard: React.FC = () => {
                     padding: '4px 8px',
                     borderRadius: '4px',
                     fontWeight: '700',
-                    background: card.card_status === 'ACTIVE' ? theme.colors.accentMuted : `${theme.colors.error}30`,
-                    color: card.card_status === 'ACTIVE' ? theme.colors.accent : theme.colors.error
+                    background: card.card_status === 'ACTIVE' ? theme.colors.accentMuted
+                      : card.card_status === 'FROZEN' ? 'rgba(59, 130, 246, 0.2)'
+                      : card.card_status === 'CLOSED' ? 'rgba(100, 100, 100, 0.3)'
+                      : `${theme.colors.error}30`,
+                    color: card.card_status === 'ACTIVE' ? theme.colors.accent
+                      : card.card_status === 'FROZEN' ? '#3b82f6'
+                      : card.card_status === 'CLOSED' ? '#888'
+                      : theme.colors.error
                   }}>
                     {card.card_status}
                   </span>
@@ -1140,14 +1168,42 @@ const Dashboard: React.FC = () => {
                     Disable
                   </button>
                 )}
+                {card.card_status !== 'CLOSED' && (
                 <button
-                onClick={() => openBlockConfirmation(card.id)}
+                onClick={() => handleToggleCardBlock(card.id, card.card_status === 'FROZEN' ? 'FROZEN' : 'ACTIVE_TO_FREEZE')}
+                style={{
+                  background: card.card_status === 'FROZEN' ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                  border: card.card_status === 'FROZEN' ? '1px solid rgba(59, 130, 246, 0.5)' : `1px solid ${theme.colors.border}`,
+                  color: card.card_status === 'FROZEN' ? '#3b82f6' : theme.colors.textSecondary,
+                  padding: '5px 10px',
+                  borderRadius: '8px',
+                  fontSize: '11px',
+                  cursor: 'pointer'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = '#3b82f6';
+                  e.currentTarget.style.color = '#3b82f6';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = card.card_status === 'FROZEN' ? 'rgba(59, 130, 246, 0.5)' : theme.colors.border;
+                  e.currentTarget.style.color = card.card_status === 'FROZEN' ? '#3b82f6' : theme.colors.textSecondary;
+                }}>
+                  {card.card_status === 'FROZEN' ? '☀️ Unfreeze' : '❄️ Freeze'}
+                </button>
+                )}
+                {card.card_status !== 'CLOSED' && (
+                <button
+                onClick={() => {
+                  if (window.confirm('Are you sure you want to close this card? This action cannot be undone.')) {
+                    handleToggleCardBlock(card.id, 'CLOSE_CARD');
+                  }
+                }}
                 style={{
                   background: 'transparent',
                   border: `1px solid ${theme.colors.border}`,
                   color: theme.colors.textSecondary,
                   padding: '5px 10px',
-                  borderRadius: theme.borderRadius.sm,
+                  borderRadius: '8px',
                   fontSize: '11px',
                   cursor: 'pointer'
                 }}
@@ -1159,8 +1215,12 @@ const Dashboard: React.FC = () => {
                   e.currentTarget.style.borderColor = theme.colors.border;
                   e.currentTarget.style.color = theme.colors.textSecondary;
                 }}>
-                  {card.card_status === 'BLOCKED' ? 'Unblock' : 'Block'}
+                  ✕ Close
                 </button>
+                )}
+                {card.card_status === 'CLOSED' && (
+                  <span style={{ fontSize: '11px', color: '#666', fontStyle: 'italic' }}>Card closed</span>
+                )}
               </div>
             </div>
               );
@@ -1426,7 +1486,8 @@ const Dashboard: React.FC = () => {
                 transactions.slice(0, 10).map((tx, index) => {
                   const txDate = new Date(tx.executed_at);
                   const timeStr = txDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-                  const statusColor = tx.status === 'SUCCESS' ? '#00e096' : '#ff3b3b';
+                  const statusColor = tx.status === 'APPROVED' || tx.status === 'SUCCESS' ? '#00e096' : '#ff3b3b';
+                  const isIncoming = tx.transaction_type === 'FUND' || tx.transaction_type === 'ISSUE';
 
                   return (
                 <tr key={tx.transaction_id || index}>
@@ -1443,15 +1504,15 @@ const Dashboard: React.FC = () => {
                     <span style={{
                       width: '24px',
                       height: '24px',
-                      background: 'rgba(255, 255, 255, 0.1)',
+                      background: isIncoming ? 'rgba(0, 224, 150, 0.15)' : 'rgba(255, 59, 59, 0.15)',
                       borderRadius: '50%',
                       display: 'inline-flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '10px',
+                      fontSize: '12px',
                       marginRight: '10px'
                     }}>
-                      {(tx.merchant || tx.transaction_type || 'T').charAt(0).toUpperCase()}
+                      {isIncoming ? '↑' : '↓'}
                     </span>
                     {tx.merchant || tx.transaction_type || 'Transaction'}
                   </td>
@@ -1464,8 +1525,9 @@ const Dashboard: React.FC = () => {
                     padding: '15px 0',
                     fontSize: '14px',
                     borderBottom: '1px solid rgba(255,255,255,0.05)',
-                    color: '#ffffff'
-                  }}>-$ {Number(tx.amount || 0).toFixed(2)}</td>
+                    color: isIncoming ? '#00e096' : '#ff6b6b',
+                    fontWeight: '600'
+                  }}>{isIncoming ? '+' : '-'}$ {Number(tx.amount || 0).toFixed(2)}</td>
                   <td style={{
                     padding: '15px 0',
                     fontSize: '14px',
