@@ -118,7 +118,12 @@ const Dashboard: React.FC = () => {
   const [newCardNickname, setNewCardNickname] = useState('');
   const [isCreatingCard, setIsCreatingCard] = useState(false);
   const [newCardCount, setNewCardCount] = useState(1);
-  const [activeSection, setActiveSection] = useState<'arbitrage' | 'personal'>('arbitrage');
+
+  // activeSection derived from appMode
+  const activeSection: 'arbitrage' | 'personal' = isProfessional ? 'arbitrage' : 'personal';
+
+  // Mobile sidebar
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   
   // Top-up state
   const [isTopingUp, setIsTopingUp] = useState(false);
@@ -638,11 +643,19 @@ const Dashboard: React.FC = () => {
     ? ['dashboard', 'cards', 'finance', 'team', 'api']
     : ['dashboard', 'cards', 'finance'];
 
+  // BIN options for arbitrage mass issue
+  const arbBins = [
+    { bin: '487013', label: 'VISA 487013', fee: 5.00, topup: 2.5 },
+    { bin: '539453', label: 'MC 539453', fee: 4.50, topup: 2.0 },
+    { bin: '414720', label: 'VISA 414720', fee: 6.00, topup: 3.0 },
+  ];
+  const [selectedBin, setSelectedBin] = useState(arbBins[0].bin);
+
   return (
     <div style={{
       width: '100vw',
       height: '100vh',
-      backgroundColor: 'rgba(10, 10, 11, 0.88)',
+      backgroundColor: 'rgba(255, 255, 255, 0.03)',
       color: theme.colors.textPrimary,
       display: 'flex',
       overflow: 'hidden',
@@ -654,15 +667,47 @@ const Dashboard: React.FC = () => {
       left: 0,
       zIndex: 10
     }}>
+      {/* Mobile burger button */}
+      <button
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        style={{
+          display: 'none',
+          position: 'fixed',
+          top: '12px',
+          left: '12px',
+          zIndex: 10002,
+          padding: '10px 12px',
+          backgroundColor: 'rgba(255,255,255,0.08)',
+          backdropFilter: 'blur(12px)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: '10px',
+          color: '#fff',
+          fontSize: '18px',
+          cursor: 'pointer',
+          ...(typeof window !== 'undefined' && window.innerWidth < 768 ? { display: 'block' } : {})
+        }}
+      >
+        {sidebarOpen ? '✕' : '☰'}
+      </button>
       {/* Sidebar */}
       <aside style={{
         width: '260px',
-        backgroundColor: 'rgba(17, 17, 19, 0.85)',
+        minWidth: '260px',
+        backgroundColor: 'rgba(255, 255, 255, 0.04)',
         backdropFilter: 'blur(16px)',
         borderRight: `1px solid ${theme.colors.border}`,
         padding: '20px',
         display: 'flex',
-        flexDirection: 'column'
+        flexDirection: 'column',
+        ...(typeof window !== 'undefined' && window.innerWidth < 768 ? {
+          position: 'fixed' as const,
+          top: 0,
+          left: sidebarOpen ? 0 : -280,
+          height: '100vh',
+          zIndex: 10001,
+          transition: 'left 0.3s ease',
+          boxShadow: sidebarOpen ? '4px 0 20px rgba(0,0,0,0.5)' : 'none'
+        } : {})
       }}>
         <div style={{
           fontSize: '20px',
@@ -717,7 +762,7 @@ const Dashboard: React.FC = () => {
               }
             }}
           >
-            Professional
+            ARBITRAGE
           </button>
           <button
             type="button"
@@ -749,7 +794,7 @@ const Dashboard: React.FC = () => {
               }
             }}
           >
-            Personal
+            PERSONAL
           </button>
         </div>
 
@@ -932,7 +977,7 @@ const Dashboard: React.FC = () => {
         flex: 1,
         padding: '30px',
         overflowY: 'auto',
-        backgroundColor: 'rgba(10, 10, 11, 0.6)',
+        backgroundColor: 'rgba(255, 255, 255, 0.02)',
         backdropFilter: 'blur(12px)'
       }}>
         {/* Header */}
@@ -1190,7 +1235,7 @@ const Dashboard: React.FC = () => {
         }}>
           <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: theme.colors.textPrimary }}>My Cards</h3>
           <button
-          onClick={() => { setNewCardCategory(activeSection === 'arbitrage' ? 'arbitrage' : 'travel'); setNewCardCount(1); setShowCreateCardModal(true); }}
+          onClick={() => { setNewCardCategory(activeSection === 'arbitrage' ? 'arbitrage' : 'travel'); setNewCardCount(activeSection === 'arbitrage' ? 1 : 1); setShowCreateCardModal(true); }}
           style={{
             backgroundColor: theme.colors.accent,
             color: theme.colors.background,
@@ -1210,53 +1255,56 @@ const Dashboard: React.FC = () => {
             e.currentTarget.style.opacity = '1';
             e.currentTarget.style.backgroundColor = theme.colors.accent;
           }}>
-            {activeSection === 'arbitrage' ? '+ Массовый выпуск' : '+ Выпустить карту'}
+            {isProfessional ? '+ Массовый выпуск' : '+ Выпустить карту'}
           </button>
         </div>
 
-        {/* Section Tabs: Арбитраж | Личные карты */}
+        {/* Mode indicator badge */}
         <div style={{
-          display: 'flex',
+          display: 'inline-flex',
+          alignItems: 'center',
           gap: '8px',
-          marginBottom: '20px',
-          position: 'relative',
-          zIndex: 2
+          padding: '8px 16px',
+          backgroundColor: isProfessional ? 'rgba(59, 130, 246, 0.12)' : 'rgba(20, 184, 166, 0.12)',
+          border: `1px solid ${isProfessional ? 'rgba(59, 130, 246, 0.3)' : 'rgba(20, 184, 166, 0.3)'}`,
+          borderRadius: '8px',
+          marginBottom: '16px',
+          fontSize: '13px',
+          color: isProfessional ? '#3b82f6' : '#14b8a6',
+          fontWeight: '600'
         }}>
-          {([
-            { key: 'arbitrage' as const, label: 'Арбитраж', icon: '💳', count: (cards ?? []).filter(c => (c.category || 'arbitrage') === 'arbitrage').length },
-            { key: 'personal' as const, label: 'Личные карты', icon: '✈️', count: (cards ?? []).filter(c => { const cat = c.category || 'arbitrage'; return cat === 'travel' || cat === 'services'; }).length },
-          ]).map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveSection(tab.key)}
-              style={{
-                padding: '10px 24px',
-                borderRadius: theme.borderRadius.sm,
-                border: activeSection === tab.key
-                  ? `1px solid ${theme.colors.accent}`
-                  : `1px solid ${theme.colors.border}`,
-                backgroundColor: activeSection === tab.key
-                  ? theme.colors.accentMuted
-                  : 'transparent',
-                color: activeSection === tab.key
-                  ? theme.colors.accent
-                  : theme.colors.textSecondary,
-                fontSize: '14px',
-                fontWeight: activeSection === tab.key ? '700' : '400',
-                cursor: 'pointer',
-                transition: '0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-            >
-              {tab.icon} {tab.label}
-              <span style={{ marginLeft: '4px', opacity: 0.6, fontSize: '12px' }}>
-                {tab.count}
-              </span>
-            </button>
-          ))}
+          {isProfessional ? '💳 Арбитраж' : '✈️ Личные карты'}
+          <span style={{ opacity: 0.6, fontWeight: '400' }}>
+            {(activeSection === 'arbitrage'
+              ? (cards ?? []).filter(c => (c.category || 'arbitrage') === 'arbitrage')
+              : (cards ?? []).filter(c => { const cat = c.category || 'arbitrage'; return cat === 'travel' || cat === 'services'; })
+            ).length} карт
+          </span>
         </div>
+
+        {/* Fee info for arbitrage */}
+        {isProfessional && (
+          <div style={{
+            display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap'
+          }}>
+            {arbBins.map(b => (
+              <div key={b.bin} style={{
+                padding: '8px 14px',
+                backgroundColor: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: '8px',
+                fontSize: '11px',
+                color: theme.colors.textSecondary
+              }}>
+                <span style={{ color: '#fff', fontWeight: '600' }}>{b.label}</span>
+                <span style={{ margin: '0 6px', opacity: 0.4 }}>|</span>
+                Выпуск: ${b.fee.toFixed(2)}
+                <span style={{ margin: '0 6px', opacity: 0.4 }}>|</span>
+                Пополнение: {b.topup}%
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Cards Grid */}
         <div style={{
@@ -1326,9 +1374,16 @@ const Dashboard: React.FC = () => {
                 justifyContent: 'space-between',
                 marginBottom: '20px'
               }}>
-                <span style={{ fontWeight: '700', fontStyle: 'italic', color: '#fff' }}>
-                  {card.bin?.startsWith('4') ? 'VISA' : 'MasterCard'}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontWeight: '700', fontStyle: 'italic', color: '#fff' }}>
+                    {card.bin?.startsWith('4') ? 'VISA' : 'MasterCard'}
+                  </span>
+                  {isProfessional && card.bin && (
+                    <span style={{ fontSize: '10px', padding: '3px 6px', borderRadius: '4px', background: 'rgba(59,130,246,0.15)', color: '#3b82f6', fontFamily: theme.fonts.mono }}>
+                      BIN {card.bin}
+                    </span>
+                  )}
+                </div>
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                   <span style={{
                     fontSize: '10px',
@@ -2391,14 +2446,23 @@ const Dashboard: React.FC = () => {
                 {activeSection === 'arbitrage' ? 'Категория' : 'Тип карты'}
               </label>
               {activeSection === 'arbitrage' ? (
-                <div style={{
-                  padding: '14px 16px',
-                  backgroundColor: 'rgba(59, 130, 246, 0.15)',
-                  border: '2px solid rgba(59, 130, 246, 0.4)',
-                  borderRadius: '12px',
-                }}>
-                  <div style={{ color: '#3b82f6', fontWeight: '600', fontSize: '14px' }}>Для рекламы</div>
-                  <div style={{ color: '#888c95', fontSize: '12px', marginTop: '2px' }}>Facebook, Google, TikTok • Лимит: до 100 карт</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {arbBins.map(b => (
+                    <button key={b.bin} onClick={() => { setSelectedBin(b.bin); setNewCardType(b.bin.startsWith('4') ? 'VISA' : 'MasterCard'); }}
+                      style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        padding: '14px 16px',
+                        backgroundColor: selectedBin === b.bin ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255,255,255,0.05)',
+                        border: selectedBin === b.bin ? '2px solid #3b82f6' : '2px solid rgba(255,255,255,0.1)',
+                        borderRadius: '12px', cursor: 'pointer', transition: '0.2s', textAlign: 'left'
+                      }}>
+                      <div>
+                        <div style={{ color: selectedBin === b.bin ? '#3b82f6' : '#fff', fontWeight: '600', fontSize: '14px' }}>{b.label}</div>
+                        <div style={{ color: '#888c95', fontSize: '11px', marginTop: '2px' }}>Пополнение: {b.topup}% • Facebook, Google, TikTok</div>
+                      </div>
+                      <div style={{ color: selectedBin === b.bin ? '#3b82f6' : '#888c95', fontSize: '15px', fontWeight: '700' }}>${b.fee.toFixed(2)}</div>
+                    </button>
+                  ))}
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -2522,7 +2586,7 @@ const Dashboard: React.FC = () => {
                     ))}
                   </div>
                   <div style={{ fontSize: '11px', color: '#888c95', marginTop: '8px' }}>
-                    Итого: ${(5 * newCardCount).toFixed(2)} ({newCardCount} × $5.00)
+                    Итого: ${((arbBins.find(b => b.bin === selectedBin)?.fee ?? 5) * newCardCount).toFixed(2)} ({newCardCount} × ${(arbBins.find(b => b.bin === selectedBin)?.fee ?? 5).toFixed(2)})
                   </div>
                 </div>
               )}
@@ -2593,7 +2657,10 @@ const Dashboard: React.FC = () => {
                   }} />
                 )}
                 {isCreatingCard ? 'Создание...' : activeSection === 'arbitrage'
-                  ? (newCardCount > 1 ? `Выпустить ${newCardCount} карт — $${(5 * newCardCount).toFixed(0)}` : 'Выпустить карту — $5')
+                  ? (() => {
+                      const binFee = arbBins.find(b => b.bin === selectedBin)?.fee ?? 5;
+                      return newCardCount > 1 ? `Выпустить ${newCardCount} карт — $${(binFee * newCardCount).toFixed(2)}` : `Выпустить карту — $${binFee.toFixed(2)}`;
+                    })()
                   : (() => {
                       const rubRate = (exchangeRates ?? []).find(r => r.currency_to === 'USD');
                       const rate = rubRate ? parseFloat(rubRate.final_rate) : 99;

@@ -126,7 +126,7 @@ const Teams: React.FC = () => {
   return (
     <div style={{
       minHeight: '100vh',
-      backgroundColor: 'rgba(10, 10, 11, 0.75)',
+      backgroundColor: 'rgba(255, 255, 255, 0.03)',
       backdropFilter: 'blur(12px)',
       color: '#ffffff',
       padding: '30px',
