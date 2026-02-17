@@ -1,0 +1,65 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: xplr-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: xplr_user
+      POSTGRES_PASSWORD: Arina961.
+      POSTGRES_DB: xplr_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    networks:
+      - xplr-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U xplr_user -d xplr_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend (Go API)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: xplr-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "postgresql://xplr_user:Arina961.@postgres:5432/xplr_db?sslmode=disable"
+      JWT_SECRET: "${JWT_SECRET:-your_highly_secret_and_long_jwt_key_here}"
+      TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN}"
+      TELEGRAM_ADMIN_ID: "${TELEGRAM_ADMIN_ID}"
+      TELEGRAM_CHAT_ID: "${TELEGRAM_CHAT_ID}"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - xplr-network
+
+  # Frontend (React + NGINX)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: xplr-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - xplr-network
+
+networks:
+  xplr-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local

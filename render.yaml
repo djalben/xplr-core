@@ -1,0 +1,41 @@
+databases:
+  # PostgreSQL Database
+  - name: xplr-db
+    databaseName: xplr
+    user: xplr_user
+    plan: free
+
+services:
+  # Backend API (Go)
+  - type: web
+    name: xplr-backend
+    env: go
+    plan: free
+    rootDir: backend
+    buildCommand: go build -mod=vendor -o main .
+    startCommand: ./main
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: xplr-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: PORT
+        value: 8080
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+
+  # Frontend Web (Expo)
+  - type: web
+    name: xplr-frontend
+    env: node
+    plan: free
+    rootDir: frontend
+    buildCommand: rm -rf dist_v3 dist .expo node_modules/.cache && npm install && npx expo export --platform web --clear --output-dir dist_v3 && node check-build.js
+    startCommand: npx serve -s dist_v3 -l 3000
+    envVars:
+      - key: REACT_APP_API_URL
+        sync: false
+
