@@ -91,3 +91,5 @@ epn-killer-mvp/
 # ============ Keep These Files ============
 !.env.example
 !.gitignore
+
+.vercel
