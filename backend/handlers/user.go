@@ -11,11 +11,40 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// GetUserProfileHandler - Возвращает профиль пользователя: email, user_id, balance
+func GetUserProfileHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	user, err := repository.GetUserByID(userID)
+	if err != nil {
+		log.Printf("Error fetching user %d profile: %v", userID, err)
+		http.Error(w, "Failed to fetch user profile", http.StatusInternalServerError)
+		return
+	}
+
+	response := struct {
+		UserID  int    `json:"user_id"`
+		Email   string `json:"email"`
+		Balance string `json:"balance"`
+	}{
+		UserID:  user.ID,
+		Email:   user.Email,
+		Balance: user.BalanceRub.String(),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
 // GetMeHandler - Возвращает данные о текущем пользователе (Задача 3.1)
 func GetMeHandler(w http.ResponseWriter, r *http.Request) {
 	// 1. Извлечение UserID из контекста JWT/API Key
 	// Используем UserIDKey, который устанавливает AuthMiddleware
-	userID, ok := r.Context().Value(middleware.UserIDKey).(int) 
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
 	if !ok || userID == 0 {
 		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
 		return
@@ -28,7 +57,7 @@ func GetMeHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to fetch user data", http.StatusInternalServerError)
 		return
 	}
-	
+
 	// 3. Получение API Key (для отображения в профиле)
 	apiKey, err := repository.GetAPIKeyByUserID(userID)
 	// Игнорируем ошибку, если у пользователя еще нет ключа.
@@ -50,20 +79,20 @@ func GetMeHandler(w http.ResponseWriter, r *http.Request) {
 
 	// 5. Формирование ответа
 	response := struct {
-		ID        int    `json:"id"`
-		Email     string `json:"email"`
-		Balance   string `json:"balance"`
-		Status    string `json:"status"`
-		APIKey    string `json:"api_key"`
-		Grade     string `json:"grade"`
+		ID         int    `json:"id"`
+		Email      string `json:"email"`
+		Balance    string `json:"balance"`
+		Status     string `json:"status"`
+		APIKey     string `json:"api_key"`
+		Grade      string `json:"grade"`
 		FeePercent string `json:"fee_percent"`
 	}{
-		ID:        user.ID,
-		Email:     user.Email,
-		Balance:   user.BalanceRub.String(),
-		Status:    user.Status,
-		APIKey:    apiKey,
-		Grade:     gradeInfo.Grade,
+		ID:         user.ID,
+		Email:      user.Email,
+		Balance:    user.BalanceRub.String(),
+		Status:     user.Status,
+		APIKey:     apiKey,
+		Grade:      gradeInfo.Grade,
 		FeePercent: gradeInfo.FeePercent.String(),
 	}
 

@@ -98,6 +98,7 @@ func buildRouter() *mux.Router {
 	protected.Use(middleware.JWTAuthMiddleware)
 
 	protected.HandleFunc("/me", handlers.GetMeHandler).Methods("GET")
+	protected.HandleFunc("/profile", handlers.GetUserProfileHandler).Methods("GET")
 	protected.HandleFunc("/grade", handlers.GetUserGradeHandler).Methods("GET")
 	protected.HandleFunc("/deposit", handlers.ProcessDepositHandler).Methods("POST")
 	protected.HandleFunc("/cards", handlers.GetUserCardsHandler).Methods("GET")

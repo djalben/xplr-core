@@ -69,11 +69,16 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) => {
 
       // Accept both 200 and 201 as success
       if (response.status === 200 || response.status === 201) {
+        // Save token if returned by the server
+        if (response.data.token) {
+          localStorage.setItem('token', response.data.token);
+        }
+
         setSuccess('Success! Account created');
 
-        // Navigate to login page after a brief delay
+        // Navigate to dashboard after a brief delay
         setTimeout(() => {
-          navigate('/login');
+          navigate('/dashboard');
         }, 1500);
       }
     } catch (error: any) {
