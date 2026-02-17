@@ -31,10 +31,65 @@ const AdminPanel: React.FC = () => {
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // Balance modal
+  const [balanceModal, setBalanceModal] = useState<{ userId: number; email: string } | null>(null);
+  const [balanceAmount, setBalanceAmount] = useState('');
+  const [isSavingBalance, setIsSavingBalance] = useState(false);
 
   useEffect(() => {
     fetchAdminData();
   }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  const getConfig = () => {
+    const token = localStorage.getItem('token');
+    return { headers: { Authorization: `Bearer ${token}` } };
+  };
+
+  const handleAdjustBalance = async () => {
+    if (!balanceModal || !balanceAmount.trim()) return;
+    setIsSavingBalance(true);
+    try {
+      const res = await axios.patch(`${API_BASE_URL}/admin/users/${balanceModal.userId}/balance`, { amount: parseFloat(balanceAmount) }, getConfig());
+      setUsers(prev => prev.map(u => u.id === balanceModal.userId ? { ...u, balance_rub: res.data.new_balance } : u));
+      setToast({ message: `Balance adjusted: ${balanceAmount} for ${balanceModal.email}`, type: 'success' });
+      setBalanceModal(null);
+      setBalanceAmount('');
+    } catch (err) {
+      setToast({ message: 'Failed to adjust balance', type: 'error' });
+    } finally {
+      setIsSavingBalance(false);
+    }
+  };
+
+  const handleToggleRole = async (userId: number, email: string) => {
+    try {
+      const res = await axios.patch(`${API_BASE_URL}/admin/users/${userId}/role`, {}, getConfig());
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_admin: res.data.is_admin } : u));
+      setToast({ message: `${email}: is_admin = ${res.data.is_admin}`, type: 'success' });
+    } catch (err) {
+      setToast({ message: 'Failed to toggle role', type: 'error' });
+    }
+  };
+
+  const handleToggleBan = async (userId: number, email: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'BANNED' ? 'ACTIVE' : 'BANNED';
+    if (newStatus === 'BANNED' && !window.confirm(`Ban user ${email}?`)) return;
+    try {
+      await axios.patch(`${API_BASE_URL}/admin/users/${userId}/status`, { status: newStatus }, getConfig());
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: newStatus } : u));
+      setToast({ message: `${email}: status = ${newStatus}`, type: 'success' });
+    } catch (err) {
+      setToast({ message: 'Failed to update status', type: 'error' });
+    }
+  };
 
   const fetchAdminData = async () => {
     try {
@@ -185,7 +240,7 @@ const AdminPanel: React.FC = () => {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              {['ID', 'Email', 'Balance', 'Cards', 'Status', 'Admin', 'Created'].map(h => (
+              {['ID', 'Email', 'Balance', 'Cards', 'Status', 'Admin', 'Created', 'Actions'].map(h => (
                 <th key={h} style={{
                   textAlign: 'left', padding: '12px 8px', fontSize: '11px',
                   color: theme.colors.textSecondary, fontWeight: '600',
@@ -198,7 +253,7 @@ const AdminPanel: React.FC = () => {
           <tbody>
             {filteredUsers.length === 0 ? (
               <tr>
-                <td colSpan={7} style={{ padding: '30px', textAlign: 'center', color: theme.colors.textSecondary }}>
+                <td colSpan={8} style={{ padding: '30px', textAlign: 'center', color: theme.colors.textSecondary }}>
                   {search ? 'No users match your search' : 'No users found'}
                 </td>
               </tr>
@@ -224,14 +279,103 @@ const AdminPanel: React.FC = () => {
                   <td style={{ padding: '12px 8px', fontSize: '12px', color: theme.colors.textSecondary }}>
                     {u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}
                   </td>
+                  <td style={{ padding: '12px 8px' }}>
+                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                      <button onClick={() => { setBalanceModal({ userId: u.id, email: u.email }); setBalanceAmount(''); }} style={actionBtnStyle}>
+                        💰
+                      </button>
+                      <button onClick={() => handleToggleRole(u.id, u.email)} style={{ ...actionBtnStyle, borderColor: u.is_admin ? '#f59e0b' : undefined, color: u.is_admin ? '#f59e0b' : undefined }}>
+                        👑
+                      </button>
+                      <button onClick={() => handleToggleBan(u.id, u.email, u.status)} style={{ ...actionBtnStyle, borderColor: u.status === 'BANNED' ? '#00e096' : '#ff6b6b', color: u.status === 'BANNED' ? '#00e096' : '#ff6b6b' }}>
+                        {u.status === 'BANNED' ? '✅' : '🚫'}
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
       </div>
+
+      {/* Balance Adjustment Modal */}
+      {balanceModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+          backgroundColor: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000
+        }} onClick={() => setBalanceModal(null)}>
+          <div style={{
+            backgroundColor: 'rgba(18,18,18,0.95)', backdropFilter: 'blur(40px)',
+            borderRadius: '24px', padding: '40px', width: '90%', maxWidth: '400px',
+            border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)'
+          }} onClick={e => e.stopPropagation()}>
+            <h2 style={{ margin: '0 0 8px', fontSize: '20px', fontWeight: '700', color: '#fff' }}>
+              Adjust Balance
+            </h2>
+            <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#888' }}>
+              User: <strong style={{ color: '#fff' }}>{balanceModal.email}</strong> (#{balanceModal.userId})
+            </p>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#888c95', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>
+              Amount (+ to add, - to deduct)
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              value={balanceAmount}
+              onChange={e => setBalanceAmount(e.target.value)}
+              placeholder="e.g. 100 or -50"
+              style={{
+                width: '100%', padding: '14px', backgroundColor: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px',
+                color: '#fff', fontSize: '18px', fontWeight: '600', outline: 'none', marginBottom: '20px',
+                boxSizing: 'border-box'
+              }}
+            />
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button onClick={() => setBalanceModal(null)} style={{
+                flex: 1, padding: '12px', backgroundColor: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px',
+                color: '#888', fontWeight: '600', fontSize: '14px', cursor: 'pointer'
+              }}>Cancel</button>
+              <button onClick={handleAdjustBalance} disabled={isSavingBalance || !balanceAmount.trim()} style={{
+                flex: 1, padding: '12px', backgroundColor: '#00e096',
+                border: 'none', borderRadius: '12px',
+                color: '#0a0a0a', fontWeight: '700', fontSize: '14px',
+                cursor: isSavingBalance ? 'not-allowed' : 'pointer',
+                opacity: isSavingBalance || !balanceAmount.trim() ? 0.5 : 1
+              }}>{isSavingBalance ? 'Saving...' : 'Apply'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
+          padding: '12px 24px', borderRadius: '12px',
+          backgroundColor: toast.type === 'success' ? 'rgba(0,224,150,0.15)' : 'rgba(255,59,59,0.15)',
+          color: toast.type === 'success' ? '#00e096' : '#ff3b3b',
+          border: `1px solid ${toast.type === 'success' ? 'rgba(0,224,150,0.3)' : 'rgba(255,59,59,0.3)'}`,
+          fontSize: '14px', fontWeight: '600', zIndex: 10001, backdropFilter: 'blur(20px)'
+        }}>{toast.message}</div>
+      )}
     </div>
   );
+};
+
+const actionBtnStyle: React.CSSProperties = {
+  padding: '5px 8px',
+  fontSize: '13px',
+  backgroundColor: 'transparent',
+  border: '1px solid rgba(255,255,255,0.1)',
+  borderRadius: '6px',
+  cursor: 'pointer',
+  color: '#aaa',
+  transition: '0.15s',
+  lineHeight: 1,
 };
 
 export default AdminPanel;

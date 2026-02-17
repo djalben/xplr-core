@@ -150,6 +150,9 @@ func buildRouter() *mux.Router {
 	admin.Use(middleware.AdminOnlyMiddleware)
 	admin.HandleFunc("/stats", handlers.AdminStatsHandler).Methods("GET")
 	admin.HandleFunc("/users", handlers.AdminUsersHandler).Methods("GET")
+	admin.HandleFunc("/users/{id}/balance", handlers.AdminAdjustBalanceHandler).Methods("PATCH")
+	admin.HandleFunc("/users/{id}/role", handlers.AdminToggleRoleHandler).Methods("PATCH")
+	admin.HandleFunc("/users/{id}/status", handlers.AdminSetUserStatusHandler).Methods("PATCH")
 
 	return r
 }
