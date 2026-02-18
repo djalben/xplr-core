@@ -1,7 +1,7 @@
 {
-  "name": "XPLR — Virtual Cards Platform",
+  "name": "XPLR — Виртуальные карты",
   "short_name": "XPLR",
-  "description": "Issue virtual Visa & Mastercard instantly. Built for arbitrage, travel, and online services.",
+  "description": "XPLR — финтех-платформа для управления виртуальными картами Visa и Mastercard",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",

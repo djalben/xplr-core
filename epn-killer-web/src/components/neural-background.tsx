@@ -9,7 +9,11 @@ interface Node {
   glowIntensity: number;
 }
 
-export const NeuralBackground = () => {
+interface NeuralBackgroundProps {
+  reducedDensity?: boolean;
+}
+
+export const NeuralBackground = ({ reducedDensity = false }: NeuralBackgroundProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const nodesRef = useRef<Node[]>([]);
   const animationRef = useRef<number>(0);
@@ -29,7 +33,8 @@ export const NeuralBackground = () => {
 
     const initNodes = () => {
       // More nodes for richer neural network effect
-      const nodeCount = Math.floor((canvas.width * canvas.height) / 12000);
+      const divisor = reducedDensity ? 18000 : 12000;
+      const nodeCount = Math.floor((canvas.width * canvas.height) / divisor);
       nodesRef.current = [];
       
       for (let i = 0; i < nodeCount; i++) {
@@ -148,7 +153,7 @@ export const NeuralBackground = () => {
       <canvas
         ref={canvasRef}
         className="absolute inset-0 w-full h-full"
-        style={{ opacity: 0.85 }}
+        style={{ opacity: 0.85, willChange: 'transform', transform: 'translate3d(0,0,0)' }}
       />
     </div>
   );

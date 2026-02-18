@@ -327,6 +327,7 @@
 .stagger-fade-in > * {
   opacity: 0;
   animation: fadeSlideIn 0.5s ease-out forwards;
+  will-change: transform, opacity;
 }
 
 .stagger-fade-in > *:nth-child(1) { animation-delay: 0.05s; }
@@ -749,6 +750,7 @@ select option:focus,
 
 .nfc-waves {
   animation: nfcWaves 1.5s infinite;
+  will-change: transform, opacity;
 }
 
 /* Welcome message styles - Dark */
@@ -811,6 +813,8 @@ select option:focus,
 
 .marquee-content {
   animation: marquee 30s linear infinite;
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
 }
 
 /* Landing page specific styles */
