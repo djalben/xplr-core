@@ -88,6 +88,9 @@ backend/xplr-backend
 epn-killer-docs/
 epn-killer-mvp/
 
+# ============ Temp UI Reference (not part of build) ============
+temp_new_ui/
+
 # ============ Keep These Files ============
 !.env.example
 !.gitignore

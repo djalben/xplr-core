@@ -1,10 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-import App from './App';
-import './index.css';
+import App from './app';
+import './styles.css';
 
-// Error Boundary to prevent white screen
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { hasError: boolean; error: Error | null }
@@ -21,13 +20,13 @@ class ErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ padding: 40, fontFamily: 'monospace', color: '#ef4444', background: '#0a0a0b', minHeight: '100vh' }}>
-          <h1 style={{ color: '#fafafa' }}>XPLR — Application Error</h1>
+        <div style={{ padding: 40, fontFamily: 'monospace', color: '#ef4444', background: '#0a0a0f', minHeight: '100vh' }}>
+          <h1 style={{ color: '#fafafa' }}>XPLR — Ошибка приложения</h1>
           <pre style={{ whiteSpace: 'pre-wrap', marginTop: 16 }}>
             {this.state.error?.message}
           </pre>
           <p style={{ color: '#71717a', marginTop: 24 }}>
-            Check browser console (F12) for details.
+            Откройте консоль браузера (F12) для деталей.
           </p>
         </div>
       );
@@ -40,7 +39,7 @@ const root = document.getElementById('root');
 
 if (!root) {
   document.body.innerHTML =
-    '<div style="padding:40px;font-family:monospace;color:#ef4444">Fatal: #root element not found in DOM</div>';
+    '<div style="padding:40px;font-family:monospace;color:#ef4444">Fatal: #root element not found</div>';
 } else {
   ReactDOM.createRoot(root).render(
     <React.StrictMode>

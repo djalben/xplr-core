@@ -1,299 +1,301 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { Line, Pie } from 'react-chartjs-2';
+import { useMode } from '../store/mode-context';
+import { DashboardLayout } from '../components/dashboard-layout';
 import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-} from 'chart.js';
+  TrendingUp,
+  TrendingDown,
+  CreditCard,
+  DollarSign,
+  ArrowUpRight,
+  ArrowDownRight,
+  Wallet,
+  Sparkles,
+  Target,
+  Zap
+} from 'lucide-react';
+import apiClient, { API_BASE_URL } from '../api/axios';
+import { getUserGrade, type GradeInfo } from '../api/grade';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Title, Tooltip, Legend, Filler);
-
-import { API_BASE_URL } from '../api/axios';
-import { theme, XPLR_STORAGE_MODE } from '../theme/theme';
-import SidebarLayout from '../components/SidebarLayout';
-
-interface UserData {
-  id: number;
-  email: string;
-  balance: number;
-  balance_rub?: number;
-  balance_arbitrage?: number;
-  balance_personal?: number;
-  status: string;
-  grade?: string;
-  fee_percent?: string;
+interface StatCardProps {
+  title: string;
+  value: string;
+  subValue?: React.ReactNode;
+  change?: number;
+  icon: React.ReactNode;
+  iconClass?: string;
+  accent?: boolean;
+  onClick?: () => void;
 }
 
-const Dashboard: React.FC = () => {
+const StatCard = ({ title, value, subValue, change, icon, iconClass = 'stat-icon-blue', accent, onClick }: StatCardProps) => (
+  <div className={`glass-card p-6 card-hover ${accent ? 'border-blue-500/30' : ''} ${onClick ? 'cursor-pointer' : ''}`} onClick={onClick}>
+    <div className="flex items-start justify-between mb-4">
+      <div className={`p-3 rounded-xl ${iconClass}`}>{icon}</div>
+      {change !== undefined && (
+        <div className={`flex items-center gap-1 text-sm font-medium ${change >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+          {change >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+          <span>{Math.abs(change)}%</span>
+        </div>
+      )}
+    </div>
+    <p className="text-slate-400 text-sm mb-1">{title}</p>
+    <p className="text-2xl font-bold text-white balance-display">{value}</p>
+    {subValue && <div className="text-sm text-slate-500 mt-1">{subValue}</div>}
+  </div>
+);
+
+interface Transaction {
+  id: string;
+  description: string;
+  amount: number;
+  currency: string;
+  type: 'income' | 'expense';
+  date: string;
+  card: string;
+}
+
+const TransactionRow = ({ transaction }: { transaction: Transaction }) => (
+  <div className="flex items-center justify-between py-4 border-b border-white/5 last:border-0 hover:bg-white/[0.02] px-4 -mx-4 transition-colors rounded-lg">
+    <div className="flex items-center gap-4">
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+        transaction.type === 'income' ? 'bg-emerald-500/20' : 'bg-white/5'
+      }`}>
+        {transaction.type === 'income' ? (
+          <ArrowDownRight className="w-5 h-5 text-emerald-400" />
+        ) : (
+          <ArrowUpRight className="w-5 h-5 text-slate-400" />
+        )}
+      </div>
+      <div>
+        <p className="text-white font-medium">{transaction.description}</p>
+        <p className="text-sm text-slate-500">{transaction.card} • {transaction.date}</p>
+      </div>
+    </div>
+    <p className={`font-semibold balance-display ${transaction.type === 'income' ? 'text-emerald-400' : 'text-white'}`}>
+      {transaction.type === 'income' ? '+' : '-'}{transaction.currency}{Math.abs(transaction.amount).toLocaleString()}
+    </p>
+  </div>
+);
+
+const SpendingChart = () => {
+  const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+  const values = [340, 520, 280, 680, 420, 250, 580];
+  const maxValue = Math.max(...values);
+
+  return (
+    <div className="glass-card p-6">
+      <h3 className="block-title">Расходы за неделю</h3>
+      <div className="flex items-end justify-between gap-2 h-48">
+        {days.map((day, i) => (
+          <div key={day} className="flex-1 flex flex-col items-center gap-2">
+            <div className="w-full flex flex-col items-center justify-end h-36">
+              <div
+                className="w-full max-w-[40px] bg-gradient-to-t from-blue-600 to-blue-400 rounded-lg transition-all duration-500 hover:from-blue-500 hover:to-blue-300 cursor-pointer shadow-lg shadow-blue-500/20"
+                style={{ height: `${(values[i] / maxValue) * 100}%` }}
+              />
+            </div>
+            <span className="text-xs text-slate-500">{day}</span>
+            <span className="text-xs text-slate-300 font-medium">${values[i]}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const GradeIndicator = ({ grade }: { grade: string }) => {
+  const gradeConfig: Record<string, { color: string; label: string }> = {
+    'Standard': { color: 'grade-standard', label: 'Стандарт' },
+    'Silver': { color: 'grade-silver', label: 'Серебро' },
+    'Gold': { color: 'grade-gold', label: 'Золото' },
+    'Platinum': { color: 'grade-platinum', label: 'Платина' },
+    'Black': { color: 'grade-black', label: 'Блэк' }
+  };
+  const config = gradeConfig[grade] || gradeConfig['Standard'];
+  return <span className={`grade-badge ${config.color}`}>{config.label}</span>;
+};
+
+const GradeProgressCard = ({ gradeInfo }: { gradeInfo: GradeInfo | null }) => {
+  const grades = [
+    { name: 'Стандарт', commission: '6.7%', color: 'bg-slate-500' },
+    { name: 'Серебро', commission: '6.0%', color: 'bg-slate-400' },
+    { name: 'Золото', commission: '5.0%', color: 'bg-amber-500' },
+    { name: 'Платина', commission: '4.0%', color: 'bg-blue-500' },
+    { name: 'Блэк', commission: '3.0%', color: 'bg-slate-900' },
+  ];
+
+  const gradeIndex = grades.findIndex(g => g.name === (gradeInfo?.grade || 'Стандарт'));
+  const currentIdx = gradeIndex >= 0 ? gradeIndex : 0;
+  const totalSpent = parseFloat(gradeInfo?.total_spent || '0');
+  const nextSpend = parseFloat(gradeInfo?.next_spend || '1000000');
+  const progress = nextSpend > 0 ? Math.min((totalSpent / nextSpend) * 100, 100) : 0;
+
+  return (
+    <div className="glass-card p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="block-title mb-0">Прогресс грейда</h3>
+        <div className="flex items-center gap-2">
+          <Zap className="w-4 h-4 text-amber-400" />
+          <span className="text-sm text-slate-400">Комиссия: <span className="text-blue-400 font-semibold">{gradeInfo?.fee_percent || '6.7'}%</span></span>
+        </div>
+      </div>
+      <div className="flex items-center gap-4">
+        <div className="flex-1">
+          <div className="flex justify-between text-sm mb-2">
+            <GradeIndicator grade={gradeInfo?.grade || 'Standard'} />
+            {gradeInfo?.next_grade && <span className="text-slate-500">→ {gradeInfo.next_grade}</span>}
+          </div>
+          <div className="progress-bar-container">
+            <div className="progress-bar-fill progress-bar-blue" style={{ width: `${progress}%` }} />
+          </div>
+          <p className="text-xs text-slate-500 mt-2">
+            Оборот: ${(totalSpent / 1000).toFixed(0)}K
+          </p>
+        </div>
+      </div>
+      <div className="mt-6 pt-4 border-t border-white/10">
+        <p className="text-xs text-slate-500 mb-3">Шкала комиссий</p>
+        <div className="flex items-center gap-1">
+          {grades.map((grade, i) => (
+            <div key={grade.name} className="flex-1 text-center">
+              <div className={`h-1.5 ${grade.color} ${i === 0 ? 'rounded-l-full' : ''} ${i === grades.length - 1 ? 'rounded-r-full' : ''} ${i <= currentIdx ? 'opacity-100' : 'opacity-30'}`} />
+              <p className={`text-[10px] mt-1 ${i <= currentIdx ? 'text-slate-300' : 'text-slate-600'}`}>{grade.commission}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const DashboardPage = () => {
+  const { mode } = useMode();
   const navigate = useNavigate();
-  const [userData, setUserData] = useState<UserData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-
-  const appMode = localStorage.getItem(XPLR_STORAGE_MODE) || 'professional';
-  const isProfessional = appMode === 'professional';
-
-  // Top-up
-  const [isTopingUp, setIsTopingUp] = useState(false);
-  const [topUpWallet, setTopUpWallet] = useState<'arbitrage' | 'personal'>('arbitrage');
-
-  // Stats
-  const [userGrade, setUserGrade] = useState<{ grade: string; fee_percent: string } | null>(null);
-  const [spendStats, setSpendStats] = useState<{ category: string; total_spent: string; tx_count: number }[]>([]);
-  const [exchangeRates, setExchangeRates] = useState<{ currency_from: string; currency_to: string; final_rate: string }[]>([]);
+  const [userData, setUserData] = useState<any>(null);
+  const [gradeInfo, setGradeInfo] = useState<GradeInfo | null>(null);
   const [cardCount, setCardCount] = useState(0);
-  const [txCount, setTxCount] = useState(0);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const getConfig = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
-
-  useEffect(() => { fetchData(); }, []);
-  useEffect(() => { if (toast) { const t = setTimeout(() => setToast(null), 3500); return () => clearTimeout(t); } }, [toast]);
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const fetchData = async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) { navigate('/login'); return; }
-      const config = getConfig();
-
-      const userRes = await axios.get(`${API_BASE_URL}/user/me`, config);
+      const [userRes] = await Promise.all([
+        apiClient.get(`${API_BASE_URL}/user/me`),
+      ]);
       setUserData(userRes.data);
 
-      try { const g = await axios.get(`${API_BASE_URL}/user/grade`, config); setUserGrade({ grade: g.data.grade, fee_percent: g.data.fee_percent }); } catch {}
-      try { const c = await axios.get(`${API_BASE_URL}/user/cards`, config); setCardCount(Array.isArray(c.data) ? c.data.length : 0); } catch {}
-      try { const s = await axios.get(`${API_BASE_URL}/user/stats`, config); setSpendStats(Array.isArray(s.data?.categories) ? s.data.categories : []); } catch {}
-      try { const r = await axios.get(`${API_BASE_URL}/exchange-rates`, config); setExchangeRates(Array.isArray(r.data) ? r.data : []); } catch {}
+      // Non-critical fetches
+      try { const g = await getUserGrade(); setGradeInfo(g); } catch {}
+      try { const c = await apiClient.get(`${API_BASE_URL}/user/cards`); setCardCount(Array.isArray(c.data) ? c.data.length : 0); } catch {}
       try {
-        const t = await axios.get(`${API_BASE_URL}/user/report`, config);
-        setTxCount(Array.isArray(t.data?.transactions) ? t.data.transactions.length : 0);
+        const t = await apiClient.get(`${API_BASE_URL}/user/report`);
+        const txs = t.data?.transactions ?? [];
+        setTransactions((txs as any[]).slice(0, 5).map((tx: any, i: number) => ({
+          id: String(i),
+          description: tx.description || tx.type || 'Операция',
+          amount: parseFloat(tx.amount_usd || tx.amount || '0'),
+          currency: '$',
+          type: parseFloat(tx.amount_usd || tx.amount || '0') >= 0 ? 'income' as const : 'expense' as const,
+          date: tx.created_at ? new Date(tx.created_at).toLocaleDateString('ru-RU') : '',
+          card: tx.card_last4 ? `•••• ${tx.card_last4}` : 'Кошелёк',
+        })));
       } catch {}
-    } catch (err) { console.error('Dashboard fetch error:', err); }
-    finally { setIsLoading(false); }
-  };
-
-  const handleTopUp = async () => {
-    setIsTopingUp(true);
-    try {
-      const res = await axios.post(`${API_BASE_URL}/user/topup`, { wallet: topUpWallet }, getConfig());
-      const balArb = res.data.balance_arbitrage;
-      const balPers = res.data.balance_personal;
-      if (userData) {
-        setUserData({
-          ...userData,
-          balance_arbitrage: balArb ? parseFloat(balArb) : userData.balance_arbitrage,
-          balance_personal: balPers ? parseFloat(balPers) : userData.balance_personal,
-        });
-      }
-      const label = topUpWallet === 'arbitrage' ? 'Арбитраж' : 'Личный';
-      setToast({ message: `${label}: +$${parseFloat(res.data.amount_usd || '100').toFixed(2)}`, type: 'success' });
-    } catch { setToast({ message: 'Не удалось пополнить', type: 'error' }); }
-    finally { setIsTopingUp(false); }
-  };
-
-  // Chart data
-  const pieData = {
-    labels: (spendStats ?? []).map(s => s.category),
-    datasets: [{
-      data: (spendStats ?? []).map(s => parseFloat(s.total_spent)),
-      backgroundColor: ['#3b82f6', '#14b8a6', '#8b5cf6', '#f59e0b'],
-      borderWidth: 0
-    }]
-  };
-
-  const lineData = {
-    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-    datasets: [{
-      label: 'Spend',
-      data: [120, 230, 180, 340, 280, 190, 310],
-      borderColor: theme.colors.accent,
-      backgroundColor: theme.colors.accentMuted,
-      fill: true,
-      tension: 0.4,
-      pointRadius: 0
-    }]
-  };
-
-  const chartOptions: any = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
-    scales: {
-      x: { grid: { display: false }, ticks: { color: theme.colors.textSecondary, font: { size: 11 } }, border: { display: false } },
-      y: { grid: { color: theme.colors.border }, ticks: { color: theme.colors.textSecondary, font: { size: 11 }, callback: (v: any) => `$${v}` }, border: { display: false } }
+    } catch (err) {
+      console.error('Dashboard fetch error:', err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   if (isLoading) {
-    return <SidebarLayout><div style={{ padding: 60, textAlign: 'center', color: theme.colors.textSecondary, fontSize: 16 }}>Загрузка...</div></SidebarLayout>;
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+        </div>
+      </DashboardLayout>
+    );
   }
 
+  const balanceArb = Number(userData?.balance_arbitrage ?? userData?.balance ?? 0);
+  const balancePers = Number(userData?.balance_personal ?? 0);
+  const userName = userData?.email?.split('@')[0] || 'Пользователь';
+
   return (
-    <SidebarLayout>
-      {/* Toast */}
-      {toast && (
-        <div style={{
-          position: 'fixed', top: 20, right: 20, zIndex: 99999,
-          padding: '14px 24px', borderRadius: 12,
-          backgroundColor: toast.type === 'success' ? 'rgba(16, 185, 129, 0.9)' : 'rgba(239, 68, 68, 0.9)',
-          color: '#fff', fontWeight: 600, fontSize: 14, backdropFilter: 'blur(12px)'
-        }}>{toast.message}</div>
-      )}
-
-      {/* Header */}
-      <div style={{ marginBottom: 32 }}>
-        <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, letterSpacing: '-0.5px' }}>
-          {isProfessional ? 'Account Overview' : 'Мой кабинет'}
-        </h1>
-        <p style={{ margin: '6px 0 0', color: theme.colors.textSecondary, fontSize: 14 }}>
-          Добро пожаловать, {userData?.email?.split('@')[0] || 'User'}
-        </p>
-      </div>
-
-      {/* Wallets + Quick Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16, marginBottom: 32 }}>
-        {/* Arbitrage Wallet */}
-        <div onClick={() => setTopUpWallet('arbitrage')} style={{
-          padding: 20, borderRadius: 14, cursor: 'pointer', transition: '0.2s',
-          backgroundColor: topUpWallet === 'arbitrage' ? 'rgba(59, 130, 246, 0.12)' : theme.colors.backgroundCard,
-          border: topUpWallet === 'arbitrage' ? '1px solid rgba(59, 130, 246, 0.4)' : `1px solid ${theme.colors.border}`
-        }}>
-          <div style={{ fontSize: 11, color: '#3b82f6', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6, fontWeight: 600 }}>💳 Арбитраж</div>
-          <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-1px' }}>${Number(userData?.balance_arbitrage ?? userData?.balance ?? 0).toFixed(2)}</div>
-        </div>
-
-        {/* Personal Wallet */}
-        <div onClick={() => setTopUpWallet('personal')} style={{
-          padding: 20, borderRadius: 14, cursor: 'pointer', transition: '0.2s',
-          backgroundColor: topUpWallet === 'personal' ? 'rgba(20, 184, 166, 0.12)' : theme.colors.backgroundCard,
-          border: topUpWallet === 'personal' ? '1px solid rgba(20, 184, 166, 0.4)' : `1px solid ${theme.colors.border}`
-        }}>
-          <div style={{ fontSize: 11, color: '#14b8a6', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6, fontWeight: 600 }}>✈️ Личный</div>
-          <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-1px' }}>${Number(userData?.balance_personal ?? 0).toFixed(2)}</div>
-        </div>
-
-        {/* Cards count */}
-        <div onClick={() => navigate('/cards')} style={{
-          padding: 20, borderRadius: 14, cursor: 'pointer',
-          backgroundColor: theme.colors.backgroundCard, border: `1px solid ${theme.colors.border}`, transition: '0.2s'
-        }}>
-          <div style={{ fontSize: 11, color: theme.colors.textSecondary, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6, fontWeight: 600 }}>Активные карты</div>
-          <div style={{ fontSize: 32, fontWeight: 800 }}>{cardCount}</div>
-        </div>
-
-        {/* Transactions count */}
-        <div onClick={() => navigate('/history')} style={{
-          padding: 20, borderRadius: 14, cursor: 'pointer',
-          backgroundColor: theme.colors.backgroundCard, border: `1px solid ${theme.colors.border}`, transition: '0.2s'
-        }}>
-          <div style={{ fontSize: 11, color: theme.colors.textSecondary, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6, fontWeight: 600 }}>Транзакции</div>
-          <div style={{ fontSize: 32, fontWeight: 800 }}>{txCount}</div>
-        </div>
-      </div>
-
-      {/* Top Up */}
-      <div style={{ marginBottom: 32, display: 'flex', gap: 12, alignItems: 'center' }}>
-        <button onClick={handleTopUp} disabled={isTopingUp} style={{
-          padding: '12px 28px', backgroundColor: theme.colors.accent,
-          color: theme.colors.background, border: 'none', borderRadius: 10,
-          fontWeight: 700, fontSize: 14, cursor: isTopingUp ? 'not-allowed' : 'pointer',
-          opacity: isTopingUp ? 0.6 : 1, transition: '0.2s'
-        }}>
-          {isTopingUp ? '...' : `+ Top Up → ${topUpWallet === 'arbitrage' ? 'Арбитраж' : 'Личный'}`}
-        </button>
-        {isProfessional && userGrade && (
-          <span style={{
-            padding: '8px 14px', backgroundColor: theme.colors.accentMuted,
-            border: `1px solid ${theme.colors.accentBorder}`, borderRadius: 8,
-            fontSize: 12, color: theme.colors.accent, fontWeight: 600
-          }}>
-            {userGrade.grade} · {parseFloat(userGrade.fee_percent).toFixed(1)}%
-          </span>
-        )}
-      </div>
-
-      {/* Exchange Rates */}
-      {(exchangeRates ?? []).length > 0 && (
-        <div style={{ display: 'flex', gap: 12, marginBottom: 32, flexWrap: 'wrap' }}>
-          {(exchangeRates ?? []).map((r, i) => (
-            <div key={i} style={{
-              backgroundColor: theme.colors.backgroundCard, border: `1px solid ${theme.colors.border}`,
-              borderRadius: 10, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10
-            }}>
-              <span style={{ fontWeight: 700, fontSize: 13 }}>{r.currency_from}/{r.currency_to}</span>
-              <span style={{ color: theme.colors.accent, fontWeight: 800, fontSize: 15 }}>
-                {parseFloat(r.final_rate).toFixed(2)}
-              </span>
+    <DashboardLayout>
+      <div className="stagger-fade-in">
+        {/* Welcome Card */}
+        <div className="glass-card p-6 mb-6 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+          <div className="relative z-10 flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Sparkles className="w-5 h-5 text-amber-400" />
+                <span className="text-sm text-slate-400">Добро пожаловать!</span>
+              </div>
+              <h2 className="text-2xl md:text-3xl font-bold welcome-gradient mb-2">
+                Привет, {userName}!
+              </h2>
+              <p className="text-slate-400">
+                {mode === 'PERSONAL'
+                  ? 'Отличный день для управления финансами'
+                  : 'Ваш арбитражный кабинет готов к работе'}
+              </p>
             </div>
-          ))}
-        </div>
-      )}
-
-      {/* Charts */}
-      {isProfessional && (
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20, marginBottom: 32 }}>
-          {/* Spend Line Chart */}
-          <div style={{
-            backgroundColor: theme.colors.backgroundCard, border: `1px solid ${theme.colors.border}`,
-            borderRadius: 14, padding: 24
-          }}>
-            <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700 }}>Расходы за неделю</h3>
-            <div style={{ height: 240 }}>
-              <Line data={lineData} options={chartOptions} />
+            <div className="hidden md:block">
+              <div className="w-16 h-16 rounded-2xl gradient-accent flex items-center justify-center shadow-lg shadow-blue-500/25">
+                {mode === 'PERSONAL' ? <Wallet className="w-8 h-8 text-white" /> : <Target className="w-8 h-8 text-white" />}
+              </div>
             </div>
           </div>
+        </div>
 
-          {/* Spend Pie Chart */}
-          <div style={{
-            backgroundColor: theme.colors.backgroundCard, border: `1px solid ${theme.colors.border}`,
-            borderRadius: 14, padding: 24
-          }}>
-            <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700 }}>По категориям</h3>
-            <div style={{ height: 240, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {(spendStats ?? []).length > 0 ? (
-                <Pie data={pieData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' as const, labels: { color: theme.colors.textSecondary, boxWidth: 12, padding: 12 } } } }} />
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          {mode === 'PERSONAL' ? (
+            <>
+              <StatCard title="Баланс" value={`$${balancePers.toFixed(2)}`} icon={<Wallet className="w-6 h-6 text-blue-400" />} iconClass="stat-icon-blue" accent />
+              <StatCard title="Активные карты" value={String(cardCount)} icon={<CreditCard className="w-6 h-6 text-purple-400" />} iconClass="stat-icon-purple" onClick={() => navigate('/cards')} />
+              <StatCard title="Транзакции" value={String(transactions.length)} icon={<DollarSign className="w-6 h-6 text-emerald-400" />} iconClass="stat-icon-green" onClick={() => navigate('/finance')} />
+            </>
+          ) : (
+            <>
+              <StatCard title="Баланс" value={`$${balanceArb.toFixed(2)}`} subValue={gradeInfo ? <GradeIndicator grade={gradeInfo.grade} /> : undefined} icon={<Wallet className="w-6 h-6 text-blue-400" />} iconClass="stat-icon-blue" accent />
+              <StatCard title="Активные карты" value={String(cardCount)} icon={<CreditCard className="w-6 h-6 text-purple-400" />} iconClass="stat-icon-purple" onClick={() => navigate('/cards')} />
+              <StatCard title="Транзакции" value={String(transactions.length)} icon={<DollarSign className="w-6 h-6 text-amber-400" />} iconClass="stat-icon-yellow" onClick={() => navigate('/finance')} />
+            </>
+          )}
+        </div>
+
+        {/* Charts and Transactions */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <SpendingChart />
+
+          <div className="glass-card p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="block-title mb-0">Последние операции</h3>
+              <button onClick={() => navigate('/finance')} className="text-sm text-blue-400 hover:text-blue-300 transition-colors font-medium">
+                Смотреть все →
+              </button>
+            </div>
+            <div>
+              {(transactions ?? []).length > 0 ? (
+                transactions.map(tx => <TransactionRow key={tx.id} transaction={tx} />)
               ) : (
-                <div style={{ color: theme.colors.textSecondary, fontSize: 13 }}>Нет данных</div>
+                <p className="text-slate-500 text-sm text-center py-8">Нет операций</p>
               )}
             </div>
           </div>
         </div>
-      )}
 
-      {/* Quick Links */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
-        {[
-          { label: 'Мои карты', desc: 'Управление картами', icon: '💳', path: '/cards' },
-          { label: 'Транзакции', desc: 'История операций', icon: '💸', path: '/history' },
-          ...(isProfessional ? [
-            { label: 'Команды', desc: 'Управление командой', icon: '👥', path: '/teams' },
-            { label: 'API', desc: 'Документация и ключи', icon: '🔌', path: '/api' },
-          ] : []),
-          { label: 'Рефералы', desc: 'Пригласи друзей', icon: '🎁', path: '/referrals' },
-        ].map(link => (
-          <div key={link.path} onClick={() => navigate(link.path)} style={{
-            padding: 20, borderRadius: 14, cursor: 'pointer',
-            backgroundColor: theme.colors.backgroundCard, border: `1px solid ${theme.colors.border}`,
-            transition: '0.2s'
-          }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = theme.colors.accent; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = theme.colors.border; e.currentTarget.style.transform = 'translateY(0)'; }}
-          >
-            <div style={{ fontSize: 28, marginBottom: 10 }}>{link.icon}</div>
-            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>{link.label}</div>
-            <div style={{ fontSize: 12, color: theme.colors.textSecondary }}>{link.desc}</div>
-          </div>
-        ))}
+        {/* Grade Progress - Only for Arbitrage */}
+        {mode === 'ARBITRAGE' && <GradeProgressCard gradeInfo={gradeInfo} />}
       </div>
-    </SidebarLayout>
+    </DashboardLayout>
   );
 };
-
-export default Dashboard;

@@ -1,120 +1,61 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import LoginForm from './components/auth/LoginForm';
-import RegisterForm from './components/auth/RegisterForm';
-import Dashboard from './pages/Dashboard';
-import CardsPage from './pages/CardsPage';
-import HistoryPage from './pages/HistoryPage';
-import ApiPage from './pages/ApiPage';
-import Teams from './pages/Teams';
-import Referrals from './pages/Referrals';
-import AdminPanel from './pages/AdminPanel';
-import LandingPage from './pages/LandingPage';
-import NeuralBackground from './components/NeuralBackground';
+import { ModeProvider } from './store/mode-context';
+import { AuthPage } from './pages/auth';
+import { DashboardPage } from './pages/dashboard';
+import { CardsPage } from './pages/cards';
+import { CardIssuePage } from './pages/card-issue';
+import { FinancePage } from './pages/finance';
+import { TeamsPage } from './pages/teams';
+import { ReferralsPage } from './pages/referrals';
+import { ApiPage } from './pages/api';
+import { SettingsPage } from './pages/settings';
+import { SupportPage } from './pages/support';
+import { LandingPage } from './pages/landing';
 
-// ProtectedRoute component - checks for token in localStorage
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const token = localStorage.getItem('token');
-
   if (!token) {
-    // No token found, redirect to login
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/auth" replace />;
   }
-
-  // Token exists, render the protected component
   return <>{children}</>;
 };
 
-// Root redirect component - checks if user is logged in
 const RootRedirect: React.FC = () => {
   const token = localStorage.getItem('token');
-
   if (token) {
-    // User is logged in, redirect to dashboard
     return <Navigate to="/dashboard" replace />;
   }
-
-  // User is not logged in, show landing page
   return <Navigate to="/landing" replace />;
 };
 
-const App: React.FC = () => {
+function App() {
   return (
-    <>
-    <NeuralBackground />
-    <Routes>
-      {/* Root route - redirect based on auth status */}
-      <Route path="/" element={<RootRedirect />} />
+    <ModeProvider>
+      <Routes>
+        <Route path="/" element={<RootRedirect />} />
+        <Route path="/landing" element={<LandingPage />} />
+        <Route path="/auth" element={<AuthPage />} />
+        {/* Keep old routes working */}
+        <Route path="/login" element={<Navigate to="/auth" replace />} />
+        <Route path="/register" element={<Navigate to="/auth" replace />} />
 
-      {/* Public routes */}
-      <Route path="/landing" element={<LandingPage />} />
-      <Route path="/login" element={<LoginForm />} />
-      <Route path="/register" element={<RegisterForm />} />
-
-      {/* Protected routes */}
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/cards"
-        element={
-          <ProtectedRoute>
-            <CardsPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/history"
-        element={
-          <ProtectedRoute>
-            <HistoryPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/api"
-        element={
-          <ProtectedRoute>
-            <ApiPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/teams"
-        element={
-          <ProtectedRoute>
-            <Teams />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/referrals"
-        element={
-          <ProtectedRoute>
-            <Referrals />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin"
-        element={
-          <ProtectedRoute>
-            <AdminPanel />
-          </ProtectedRoute>
-        }
-      />
-    </Routes>
-    </>
+        <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+        <Route path="/cards" element={<ProtectedRoute><CardsPage /></ProtectedRoute>} />
+        <Route path="/card-issue" element={<ProtectedRoute><CardIssuePage /></ProtectedRoute>} />
+        <Route path="/finance" element={<ProtectedRoute><FinancePage /></ProtectedRoute>} />
+        <Route path="/teams" element={<ProtectedRoute><TeamsPage /></ProtectedRoute>} />
+        <Route path="/referrals" element={<ProtectedRoute><ReferralsPage /></ProtectedRoute>} />
+        <Route path="/api" element={<ProtectedRoute><ApiPage /></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+        <Route path="/support" element={<ProtectedRoute><SupportPage /></ProtectedRoute>} />
+      </Routes>
+    </ModeProvider>
   );
-};
+}
 
 export default App;

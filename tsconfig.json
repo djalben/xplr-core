@@ -15,7 +15,11 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["epn-killer-web/src/*"]
+    }
   },
   "include": ["epn-killer-web/src", "vite-env.d.ts"]
 }

@@ -1,235 +1,434 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { API_BASE_URL } from '../api/axios';
-import { theme } from '../theme/theme';
-import SidebarLayout from '../components/SidebarLayout';
+import React, { useState, useEffect, useRef } from 'react';
+import { useMode } from '../store/mode-context';
+import { DashboardLayout } from '../components/dashboard-layout';
+import { BackButton } from '../components/back-button';
+import { 
+  Copy,
+  Gift,
+  Users,
+  DollarSign,
+  Check,
+  ArrowRight,
+  Trophy,
+  Share2,
+  QrCode,
+  ExternalLink
+} from 'lucide-react';
 
-interface ReferralStats {
-  total_referrals: number;
-  active_referrals: number;
-  total_commission: string;
-  referral_code: string;
-}
-
-interface ReferralUser {
-  id: number;
+interface Referral {
+  id: string;
+  name: string;
   email: string;
-  status: string;
-  commission: string;
-  created_at: string;
+  joinedDate: string;
+  status: 'active' | 'pending' | 'expired';
+  earnings: number;
 }
 
-const REFERRAL_BASE = 'https://xplr-web.vercel.app/register?ref=';
+const StatCard = ({ icon, label, value, accent, iconClass = 'stat-icon-blue' }: { 
+  icon: React.ReactNode; 
+  label: string; 
+  value: string; 
+  accent?: boolean;
+  iconClass?: string;
+}) => (
+  <div className={`glass-card p-5 ${accent ? 'border-blue-300' : ''}`}>
+    <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 ${iconClass}`}>
+      {icon}
+    </div>
+    <p className="text-slate-500 text-sm mb-1">{label}</p>
+    <p className="text-2xl font-bold text-white balance-display">{value}</p>
+  </div>
+);
 
-const Referrals: React.FC = () => {
-  const navigate = useNavigate();
-  const [stats, setStats] = useState<ReferralStats | null>(null);
-  const [referrals, setReferrals] = useState<ReferralUser[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
+const TierCard = ({ tier, reward, volume, current }: { tier: string; reward: string; volume: string; current: boolean }) => (
+  <div className={`p-4 rounded-xl border transition-all ${
+    current 
+      ? 'bg-gradient-to-br from-blue-500/10 to-purple-500/10 border-blue-500/30' 
+      : 'bg-white/[0.02] border-white/10 opacity-60'
+  }`}>
+    <div className="flex items-center justify-between mb-2">
+      <span className={`text-sm font-semibold ${current ? 'text-blue-400' : 'text-gray-400'}`}>{tier}</span>
+      {current && <Check className="w-4 h-4 text-blue-400" />}
+    </div>
+    <p className="text-white font-bold text-lg mb-1">{reward}</p>
+    <p className="text-xs text-gray-500">{volume}</p>
+  </div>
+);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) { navigate('/login'); return; }
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-      const res = await axios.get(`${API_BASE_URL}/user/referrals`, config);
-      setStats(res.data);
-      // referrals list is optional, may not exist yet
-      try {
-        const listRes = await axios.get(`${API_BASE_URL}/user/referrals/list`, config);
-        setReferrals(Array.isArray(listRes.data) ? listRes.data : []);
-      } catch { /* endpoint might not exist yet */ }
-      setIsLoading(false);
-    } catch (error) {
-      console.error('Error fetching referral stats:', error);
-      setIsLoading(false);
+// Simple QR Code component using SVG
+const QRCodeDisplay = ({ value, size = 120 }: { value: string; size?: number }) => {
+  // This is a simplified QR-like pattern generator
+  // In production, you'd use a library like qrcode.react
+  const generatePattern = () => {
+    const seed = value.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const pattern: boolean[][] = [];
+    const gridSize = 21;
+    
+    for (let i = 0; i < gridSize; i++) {
+      pattern[i] = [];
+      for (let j = 0; j < gridSize; j++) {
+        // Corner patterns (fixed for all QR codes)
+        if ((i < 7 && j < 7) || (i < 7 && j >= gridSize - 7) || (i >= gridSize - 7 && j < 7)) {
+          const cornerI = i < 7 ? i : i - (gridSize - 7);
+          const cornerJ = j < 7 ? j : j - (gridSize - 7);
+          if (cornerI === 0 || cornerI === 6 || cornerJ === 0 || cornerJ === 6 ||
+              (cornerI >= 2 && cornerI <= 4 && cornerJ >= 2 && cornerJ <= 4)) {
+            pattern[i][j] = true;
+          } else {
+            pattern[i][j] = false;
+          }
+        } else {
+          // Random-ish pattern based on seed
+          const hash = ((seed * (i + 1) * (j + 1)) % 17);
+          pattern[i][j] = hash < 8;
+        }
+      }
     }
+    return pattern;
   };
 
-  const referralLink = stats?.referral_code ? `${REFERRAL_BASE}${stats.referral_code}` : '';
+  const pattern = generatePattern();
+  const cellSize = size / 21;
 
-  const copyLink = () => {
-    if (!referralLink) return;
+  return (
+    <div className="qr-code-container">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        {pattern.map((row, i) =>
+          row.map((cell, j) =>
+            cell && (
+              <rect
+                key={`${i}-${j}`}
+                x={j * cellSize}
+                y={i * cellSize}
+                width={cellSize}
+                height={cellSize}
+                fill="#111114"
+              />
+            )
+          )
+        )}
+      </svg>
+    </div>
+  );
+};
+
+export const ReferralsPage = () => {
+  const { mode } = useMode();
+  const [copied, setCopied] = useState(false);
+  const [showQR, setShowQR] = useState(false);
+
+  const referralCode = 'XPLR-AT8K2M';
+  const referralLink = `https://xplr.io/r/${referralCode}`;
+
+  const handleCopy = () => {
     navigator.clipboard.writeText(referralLink);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  if (isLoading) {
-    return (
-      <SidebarLayout>
-        <div style={{ padding: 40, textAlign: 'center', color: theme.colors.textSecondary }}>Loading...</div>
-      </SidebarLayout>
-    );
-  }
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'XPLR - Присоединяйся!',
+          text: 'Присоединяйся к XPLR и получи бонус!',
+          url: referralLink,
+        });
+      } catch (err) {
+        console.log('Share cancelled');
+      }
+    } else {
+      handleCopy();
+    }
+  };
 
-  const revShareRate = '5%';
+  const referrals: Referral[] = [
+    { id: '1', name: 'Иван Смирнов', email: 'i***@gmail.com', joinedDate: '2024-12-15', status: 'active', earnings: 10 },
+    { id: '2', name: 'Мария Козлова', email: 'm***@yahoo.com', joinedDate: '2024-12-10', status: 'active', earnings: 10 },
+    { id: '3', name: 'Дмитрий Попов', email: 'd***@outlook.com', joinedDate: '2024-12-05', status: 'pending', earnings: 0 },
+    { id: '4', name: 'Анна Новикова', email: 'a***@icloud.com', joinedDate: '2024-11-28', status: 'active', earnings: 10 },
+    { id: '5', name: 'Сергей Волков', email: 's***@gmail.com', joinedDate: '2024-11-20', status: 'expired', earnings: 0 },
+  ];
+
+  const personalStats = {
+    totalReferrals: 12,
+    earnings: 120,
+    pending: 30,
+    rewardPerReferral: 10,
+    bonusForNew: 5
+  };
+
+  const arbitrageStats = {
+    totalReferrals: 47,
+    earnings: 4250,
+    pending: 850,
+    currentTier: 'Золото'
+  };
+
+  const stats = mode === 'PERSONAL' ? personalStats : arbitrageStats;
+
+  const tiers = [
+    { tier: 'Бронза', reward: '$5/реферал', volume: '0-10 рефералов', current: false },
+    { tier: 'Серебро', reward: '$10/реферал', volume: '11-25 рефералов', current: false },
+    { tier: 'Золото', reward: '$25/реферал', volume: '26-50 рефералов', current: true },
+    { tier: 'Платина', reward: '$50/реферал', volume: '51-100 рефералов', current: false },
+    { tier: 'Бриллиант', reward: '$100/реферал', volume: '100+ рефералов', current: false },
+  ];
+
+  const statusLabels: Record<string, string> = {
+    active: 'Активен',
+    pending: 'Ожидание',
+    expired: 'Истёк'
+  };
 
   return (
-    <SidebarLayout>
-    <div style={{ color: theme.colors.textPrimary }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: '28px', fontWeight: '800', letterSpacing: '-0.5px' }}>
-            Referral Program
-          </h1>
-          <p style={{ margin: '5px 0 0', color: theme.colors.textSecondary, fontSize: '14px' }}>
-            Invite friends & earn together
+    <DashboardLayout>
+      <div className="stagger-fade-in">
+        <BackButton />
+        
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-white mb-2">Партнёрская программа</h1>
+          <p className="text-slate-500">
+            {mode === 'PERSONAL' 
+              ? `Приглашайте друзей и получайте $${personalStats.rewardPerReferral} за каждого. Ваш друг тоже получит $${personalStats.bonusForNew}!` 
+              : 'Зарабатывайте больше с каждым новым уровнем партнёрства'}
           </p>
         </div>
-        <button onClick={() => navigate('/dashboard')} style={{
-          padding: '10px 20px', backgroundColor: 'rgba(255,255,255,0.05)',
-          border: `1px solid ${theme.colors.border}`, borderRadius: '8px',
-          color: theme.colors.textSecondary, fontSize: '13px', cursor: 'pointer', fontWeight: '600'
-        }}>← Назад</button>
-      </div>
 
-      {/* Stats Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '30px' }}>
-        {[
-          { label: 'Total Referrals', value: stats?.total_referrals || 0, icon: '👥', color: '#3b82f6' },
-          { label: 'Earned Bonuses', value: `$${parseFloat(stats?.total_commission || '0').toFixed(2)}`, icon: '💰', color: '#00e096' },
-          { label: `RevShare (${revShareRate})`, value: revShareRate, icon: '📈', color: '#8b5cf6' },
-        ].map(c => (
-          <div key={c.label} style={{
-            backgroundColor: theme.colors.backgroundCard,
-            border: `1px solid ${theme.colors.border}`,
-            borderRadius: '16px', padding: '24px', backdropFilter: 'blur(20px)'
-          }}>
-            <div style={{ fontSize: '12px', color: theme.colors.textSecondary, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>
-              {c.icon} {c.label}
+        {/* Referral Link Card */}
+        <div className="glass-card p-6 mb-8 relative overflow-hidden">
+          {/* Background decoration */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+          
+          <div className="relative z-10">
+            <div className="flex flex-col lg:flex-row lg:items-start gap-6">
+              {/* Link section */}
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 rounded-xl gradient-accent flex items-center justify-center shadow-lg shadow-blue-500/30">
+                    <Share2 className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">Ваша реферальная ссылка</h3>
+                    <p className="text-sm text-gray-400">Поделитесь и зарабатывайте вместе</p>
+                  </div>
+                </div>
+                
+                <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                  <div className="flex-1 flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3 border border-white/10">
+                    <span className="text-white font-mono text-sm truncate">{referralLink}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={handleCopy}
+                      className={`px-5 py-3 rounded-xl font-medium transition-all flex items-center gap-2 min-w-[130px] justify-center ${
+                        copied 
+                          ? 'bg-green-500 text-white' 
+                          : 'gradient-accent text-white hover:opacity-90'
+                      }`}
+                    >
+                      {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
+                      {copied ? 'Скопировано!' : 'Копировать'}
+                    </button>
+                    <button 
+                      onClick={() => setShowQR(!showQR)}
+                      className={`p-3 rounded-xl transition-colors ${
+                        showQR ? 'bg-blue-500/20 text-blue-400' : 'glass-card hover:bg-white/10 text-gray-400'
+                      }`}
+                      title="QR-код"
+                    >
+                      <QrCode className="w-5 h-5" />
+                    </button>
+                    <button 
+                      onClick={handleShare}
+                      className="p-3 glass-card hover:bg-white/10 text-gray-400 rounded-xl transition-colors"
+                      title="Поделиться"
+                    >
+                      <ExternalLink className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 text-sm">
+                  <p className="text-gray-400">
+                    Код: <span className="text-white font-mono font-semibold">{referralCode}</span>
+                  </p>
+                  {mode === 'PERSONAL' && (
+                    <div className="flex items-center gap-2 text-green-400">
+                      <Gift className="w-4 h-4" />
+                      <span>+${personalStats.bonusForNew} новому пользователю</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* QR Code section */}
+              {showQR && (
+                <div className="flex flex-col items-center p-4 glass-card animate-fade-in">
+                  <QRCodeDisplay value={referralLink} size={140} />
+                  <p className="text-xs text-gray-400 mt-3">Сканируйте для перехода</p>
+                </div>
+              )}
             </div>
-            <div style={{ fontSize: '28px', fontWeight: '800', color: c.color }}>
-              {c.value}
-            </div>
           </div>
-        ))}
-      </div>
-
-      {/* Referral Link */}
-      <div style={{
-        backgroundColor: theme.colors.backgroundCard,
-        border: `1px solid ${theme.colors.border}`,
-        borderRadius: '16px', padding: '28px', marginBottom: '30px', backdropFilter: 'blur(20px)'
-      }}>
-        <h2 style={{ margin: '0 0 16px', fontSize: '18px', fontWeight: '700' }}>Your Referral Link</h2>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <div style={{
-            flex: 1, padding: '14px 16px',
-            backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '10px',
-            border: '1px solid rgba(255,255,255,0.1)', fontFamily: 'monospace',
-            fontSize: '13px', color: '#00e096', fontWeight: '600',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-          }}>
-            {referralLink || 'Generating...'}
-          </div>
-          <button onClick={copyLink} style={{
-            padding: '14px 24px', backgroundColor: copied ? '#14b8a6' : '#00e096',
-            color: '#0a0a0a', border: 'none', borderRadius: '10px',
-            fontWeight: '700', cursor: 'pointer', fontSize: '13px',
-            whiteSpace: 'nowrap', transition: '0.2s'
-          }}>
-            {copied ? '✅ Copied!' : 'Copy Link'}
-          </button>
         </div>
-        <div style={{
-          marginTop: '14px', padding: '12px 16px',
-          backgroundColor: 'rgba(0, 224, 150, 0.08)', borderRadius: '10px',
-          fontSize: '13px', color: theme.colors.textSecondary, lineHeight: '1.6'
-        }}>
-          🎁 New users who register via your link get a <strong style={{ color: '#00e096' }}>$5 bonus</strong>. You earn {revShareRate} RevShare from their transactions.
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <StatCard 
+            icon={<Users className="w-5 h-5 text-blue-400" />}
+            label="Всего рефералов"
+            value={stats.totalReferrals.toString()}
+            iconClass="stat-icon-blue"
+            accent
+          />
+          <StatCard 
+            icon={<DollarSign className="w-5 h-5 text-green-400" />}
+            label="Заработано"
+            value={`$${stats.earnings}`}
+            iconClass="stat-icon-green"
+          />
+          <StatCard 
+            icon={<Gift className="w-5 h-5 text-yellow-400" />}
+            label="На выводе"
+            value={`$${stats.pending}`}
+            iconClass="stat-icon-yellow"
+          />
+          {mode === 'PERSONAL' ? (
+            <StatCard 
+              icon={<Trophy className="w-5 h-5 text-purple-400" />}
+              label="За реферала"
+              value={`$${personalStats.rewardPerReferral}`}
+              iconClass="stat-icon-purple"
+            />
+          ) : (
+            <StatCard 
+              icon={<Trophy className="w-5 h-5 text-purple-400" />}
+              label="Текущий тир"
+              value={arbitrageStats.currentTier}
+              iconClass="stat-icon-purple"
+            />
+          )}
         </div>
-      </div>
 
-      {/* Referral List */}
-      <div style={{
-        backgroundColor: theme.colors.backgroundCard,
-        border: `1px solid ${theme.colors.border}`,
-        borderRadius: '16px', padding: '24px', backdropFilter: 'blur(20px)'
-      }}>
-        <h2 style={{ margin: '0 0 20px', fontSize: '18px', fontWeight: '700' }}>
-          Your Referrals ({referrals?.length ?? 0})
-        </h2>
-        {(referrals?.length ?? 0) === 0 ? (
-          <div style={{ padding: '30px', textAlign: 'center', color: theme.colors.textSecondary, fontSize: '14px' }}>
-            No referrals yet. Share your link to get started!
-          </div>
-        ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                {['Email', 'Status', 'Commission', 'Joined'].map(h => (
-                  <th key={h} style={{
-                    textAlign: 'left', padding: '12px 8px', fontSize: '11px',
-                    color: theme.colors.textSecondary, fontWeight: '600',
-                    textTransform: 'uppercase', letterSpacing: '0.5px',
-                    borderBottom: `1px solid ${theme.colors.border}`
-                  }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {(referrals ?? []).map(r => (
-                <tr key={r.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                  <td style={{ padding: '12px 8px', fontSize: '13px', fontWeight: '600' }}>{r.email}</td>
-                  <td style={{ padding: '12px 8px' }}>
-                    <span style={{
-                      fontSize: '10px', padding: '3px 8px', borderRadius: '4px', fontWeight: '700',
-                      backgroundColor: r.status === 'ACTIVE' ? 'rgba(0,224,150,0.15)' : 'rgba(255,107,107,0.15)',
-                      color: r.status === 'ACTIVE' ? '#00e096' : '#ff6b6b'
-                    }}>{r.status}</span>
-                  </td>
-                  <td style={{ padding: '12px 8px', fontSize: '13px', color: '#00e096', fontWeight: '600' }}>
-                    ${parseFloat(r.commission || '0').toFixed(2)}
-                  </td>
-                  <td style={{ padding: '12px 8px', fontSize: '12px', color: theme.colors.textSecondary }}>
-                    {r.created_at || '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* How it works */}
-      <div style={{
-        backgroundColor: theme.colors.backgroundCard,
-        border: `1px solid ${theme.colors.border}`,
-        borderRadius: '16px', padding: '28px', marginTop: '30px', backdropFilter: 'blur(20px)'
-      }}>
-        <h2 style={{ margin: '0 0 20px', fontSize: '18px', fontWeight: '700' }}>How it works</h2>
-        <div style={{ display: 'flex', gap: '24px' }}>
-          {[
-            { step: '1', title: 'Share your link', desc: 'Send your unique referral link to friends or post it on social media.' },
-            { step: '2', title: 'Friend registers', desc: 'They sign up via your link and instantly receive a $5 welcome bonus.' },
-            { step: '3', title: 'Earn commission', desc: `You earn ${revShareRate} from all their card transactions — forever.` },
-          ].map(s => (
-            <div key={s.step} style={{ flex: 1, display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-              <div style={{
-                width: '32px', height: '32px', borderRadius: '50%',
-                backgroundColor: 'rgba(0, 224, 150, 0.15)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                flexShrink: 0, fontSize: '14px', fontWeight: '700', color: '#00e096'
-              }}>{s.step}</div>
-              <div>
-                <div style={{ fontWeight: '600', marginBottom: '4px', fontSize: '14px' }}>{s.title}</div>
-                <div style={{ fontSize: '13px', color: theme.colors.textSecondary, lineHeight: '1.5' }}>{s.desc}</div>
+        {/* How it works - Personal only */}
+        {mode === 'PERSONAL' && (
+          <div className="glass-card p-6 mb-8">
+            <h3 className="block-title flex items-center gap-2">
+              <Gift className="w-5 h-5 text-blue-400" />
+              Как это работает
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-white/[0.02]">
+                <div className="w-8 h-8 rounded-full gradient-accent flex items-center justify-center text-white font-bold text-sm shrink-0">1</div>
+                <div>
+                  <p className="text-white font-medium mb-1">Поделитесь ссылкой</p>
+                  <p className="text-sm text-gray-400">Отправьте ссылку друзьям</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-white/[0.02]">
+                <div className="w-8 h-8 rounded-full gradient-accent flex items-center justify-center text-white font-bold text-sm shrink-0">2</div>
+                <div>
+                  <p className="text-white font-medium mb-1">Друг регистрируется</p>
+                  <p className="text-sm text-gray-400">И получает бонус ${personalStats.bonusForNew}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-white/[0.02]">
+                <div className="w-8 h-8 rounded-full gradient-accent flex items-center justify-center text-white font-bold text-sm shrink-0">3</div>
+                <div>
+                  <p className="text-white font-medium mb-1">Вы получаете ${personalStats.rewardPerReferral}</p>
+                  <p className="text-sm text-gray-400">Сразу после активации</p>
+                </div>
               </div>
             </div>
-          ))}
+          </div>
+        )}
+
+        {/* Tier System - Arbitrage Only */}
+        {mode === 'ARBITRAGE' && (
+          <div className="glass-card p-6 mb-8">
+            <h3 className="block-title flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-yellow-400" />
+              Уровни наград
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              {tiers.map(tier => (
+                <TierCard key={tier.tier} {...tier} />
+              ))}
+            </div>
+            <p className="text-sm text-gray-400 mt-4">
+              Поднимайтесь по уровням и увеличивайте вознаграждение за каждого нового реферала
+            </p>
+          </div>
+        )}
+
+        {/* Referral List */}
+        <div className="glass-card overflow-hidden mb-6">
+          <div className="p-6 border-b border-white/10 flex items-center justify-between">
+            <h3 className="block-title mb-0">Последние рефералы</h3>
+            <span className="text-sm text-gray-400">{referrals.length} всего</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="xplr-table min-w-[500px]">
+              <thead>
+                <tr>
+                  <th>Пользователь</th>
+                  <th>Присоединился</th>
+                  <th>Статус</th>
+                  <th>Заработок</th>
+                </tr>
+              </thead>
+              <tbody>
+                {referrals.map(ref => (
+                  <tr key={ref.id}>
+                    <td className="py-4 px-4">
+                      <div>
+                        <p className="text-white font-medium">{ref.name}</p>
+                        <p className="text-sm text-gray-500">{ref.email}</p>
+                      </div>
+                    </td>
+                    <td className="py-4 px-4">
+                      <span className="text-gray-400">{ref.joinedDate}</span>
+                    </td>
+                    <td className="py-4 px-4">
+                      <span className={`badge ${
+                        ref.status === 'active' ? 'badge-success' :
+                        ref.status === 'pending' ? 'badge-warning' : 'badge-error'
+                      }`}>
+                        {statusLabels[ref.status]}
+                      </span>
+                    </td>
+                    <td className="py-4 px-4">
+                      <span className={`font-semibold ${ref.earnings > 0 ? 'text-green-400' : 'text-gray-500'}`}>
+                        {ref.earnings > 0 ? `+$${ref.earnings}` : '-'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Withdraw Button */}
+        <div className="flex justify-end">
+          <button className="flex items-center gap-2 px-6 py-3 gradient-accent text-white font-medium rounded-xl transition-all shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:opacity-90">
+            Вывести на баланс
+            <ArrowRight className="w-5 h-5" />
+          </button>
         </div>
       </div>
-    </div>
-    </SidebarLayout>
+
+      <style>{`
+        @keyframes fade-in {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.3s ease-out forwards;
+        }
+      `}</style>
+    </DashboardLayout>
   );
 };
-
-export default Referrals;

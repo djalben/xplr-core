@@ -1,506 +1,381 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { API_BASE_URL } from '../api/axios';
-import { getUserTeams, createTeam, getTeam, inviteTeamMember, removeTeamMember, updateTeamMemberRole, Team, TeamDetail } from '../api/teams';
-import SidebarLayout from '../components/SidebarLayout';
+import React, { useState } from 'react';
+import { DashboardLayout } from '../components/dashboard-layout';
+import { BackButton } from '../components/back-button';
+import { 
+  UserPlus,
+  MoreVertical,
+  Crown,
+  Shield,
+  User,
+  Mail,
+  Trash2,
+  Edit,
+  BarChart3,
+  Copy,
+  Check,
+  X,
+  Link
+} from 'lucide-react';
 
-const Teams: React.FC = () => {
-  const navigate = useNavigate();
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [selectedTeam, setSelectedTeam] = useState<TeamDetail | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showInviteModal, setShowInviteModal] = useState(false);
-  const [newTeamName, setNewTeamName] = useState('');
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<'admin' | 'member'>('member');
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+interface TeamMember {
+  id: string;
+  name: string;
+  email: string;
+  role: 'owner' | 'admin' | 'member';
+  avatar: string;
+  cardsIssued: number;
+  volumeThisMonth: number;
+  lastActive: string;
+  status: 'online' | 'offline' | 'away';
+}
 
-  useEffect(() => {
-    fetchTeams();
-  }, []);
-
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 3500);
-    return () => clearTimeout(t);
-  }, [toast]);
-
-  const fetchTeams = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        navigate('/login');
-        return;
-      }
-      const data = await getUserTeams();
-      setTeams(Array.isArray(data) ? data : []);
-      setIsLoading(false);
-    } catch (error) {
-      console.error('Error fetching teams:', error);
-      setIsLoading(false);
-    }
+const RoleBadge = ({ role }: { role: string }) => {
+  const config: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
+    owner: { 
+      icon: <Crown className="w-3 h-3" />, 
+      color: 'bg-gradient-to-r from-yellow-500/20 to-orange-500/20 text-yellow-400 border-yellow-500/30',
+      label: 'Владелец'
+    },
+    admin: { 
+      icon: <Shield className="w-3 h-3" />, 
+      color: 'bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-blue-400 border-blue-500/30',
+      label: 'Админ'
+    },
+    member: { 
+      icon: <User className="w-3 h-3" />, 
+      color: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+      label: 'Участник'
+    },
   };
 
-  const handleCreateTeam = async () => {
-    if (!newTeamName.trim()) {
-      setToast({ message: 'Введите название команды', type: 'error' });
-      return;
-    }
-
-    try {
-      const team = await createTeam(newTeamName);
-      setToast({ message: 'Команда создана успешно!', type: 'success' });
-      setShowCreateModal(false);
-      setNewTeamName('');
-      await fetchTeams();
-    } catch (error: any) {
-      console.error('Error creating team:', error);
-      setToast({ message: error.response?.data?.message || 'Не удалось создать команду', type: 'error' });
-    }
-  };
-
-  const handleSelectTeam = async (teamId: number) => {
-    try {
-      const teamDetail = await getTeam(teamId);
-      setSelectedTeam(teamDetail);
-    } catch (error) {
-      console.error('Error fetching team details:', error);
-      setToast({ message: 'Не удалось загрузить детали команды', type: 'error' });
-    }
-  };
-
-  const handleInviteMember = async () => {
-    if (!selectedTeam || !inviteEmail.trim()) {
-      setToast({ message: 'Введите email участника', type: 'error' });
-      return;
-    }
-
-    try {
-      await inviteTeamMember(selectedTeam.team.id, inviteEmail, inviteRole);
-      setToast({ message: 'Приглашение отправлено!', type: 'success' });
-      setShowInviteModal(false);
-      setInviteEmail('');
-      await handleSelectTeam(selectedTeam.team.id);
-    } catch (error: any) {
-      console.error('Error inviting member:', error);
-      setToast({ message: error.response?.data?.message || 'Не удалось пригласить участника', type: 'error' });
-    }
-  };
-
-  const handleRemoveMember = async (userId: number) => {
-    if (!selectedTeam) return;
-    if (!confirm('Вы уверены, что хотите удалить этого участника?')) return;
-
-    try {
-      await removeTeamMember(selectedTeam.team.id, userId);
-      setToast({ message: 'Участник удален', type: 'success' });
-      await handleSelectTeam(selectedTeam.team.id);
-    } catch (error: any) {
-      console.error('Error removing member:', error);
-      setToast({ message: error.response?.data?.message || 'Не удалось удалить участника', type: 'error' });
-    }
-  };
-
-  const handleUpdateRole = async (userId: number, newRole: string) => {
-    if (!selectedTeam) return;
-
-    try {
-      await updateTeamMemberRole(selectedTeam.team.id, userId, newRole);
-      setToast({ message: 'Роль обновлена', type: 'success' });
-      await handleSelectTeam(selectedTeam.team.id);
-    } catch (error: any) {
-      console.error('Error updating role:', error);
-      setToast({ message: error.response?.data?.message || 'Не удалось обновить роль', type: 'error' });
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <SidebarLayout>
-        <div style={{ padding: '40px', textAlign: 'center', color: '#888c95' }}>Загрузка...</div>
-      </SidebarLayout>
-    );
-  }
+  const { icon, color, label } = config[role] || config.member;
 
   return (
-    <SidebarLayout>
-    <div style={{ color: '#ffffff' }}>
-      {/* Header */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '30px'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <button
-            onClick={() => navigate('/dashboard')}
-            style={{
-              padding: '8px 16px', backgroundColor: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px',
-              color: '#888c95', fontSize: '13px', cursor: 'pointer', fontWeight: '600'
-            }}>← Назад</button>
-          <h1 style={{ margin: 0, fontSize: '24px', fontWeight: '700' }}>Команды</h1>
-        </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          style={{
-            backgroundColor: '#00e096',
-            color: '#000',
-            border: 'none',
-            padding: '12px 24px',
-            borderRadius: '8px',
-            fontWeight: '600',
-            cursor: 'pointer',
-            fontSize: '14px'
-          }}>
-          + Создать команду
-        </button>
-      </div>
-
-      {/* Teams List */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: selectedTeam ? '1fr 2fr' : '1fr',
-        gap: '20px'
-      }}>
-        {/* Teams Sidebar */}
-        <div style={{
-          backgroundColor: 'rgba(255, 255, 255, 0.03)',
-          borderRadius: '12px',
-          padding: '20px',
-          border: '1px solid rgba(255, 255, 255, 0.1)'
-        }}>
-          <h3 style={{ margin: '0 0 20px 0', fontSize: '16px', fontWeight: '600' }}>Мои команды</h3>
-          {(teams ?? []).length === 0 ? (
-            <div style={{ color: '#888c95', textAlign: 'center', padding: '40px 0' }}>
-              У вас пока нет команд
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {(teams ?? []).map(team => (
-                <div
-                  key={team.id}
-                  onClick={() => handleSelectTeam(team.id)}
-                  style={{
-                    padding: '15px',
-                    backgroundColor: selectedTeam?.team.id === team.id ? 'rgba(0, 224, 150, 0.1)' : 'transparent',
-                    border: `1px solid ${selectedTeam?.team.id === team.id ? '#00e096' : 'rgba(255, 255, 255, 0.1)'}`,
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    transition: '0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (selectedTeam?.team.id !== team.id) {
-                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (selectedTeam?.team.id !== team.id) {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }
-                  }}>
-                  <div style={{ fontWeight: '600', marginBottom: '5px' }}>{team.name}</div>
-                  <div style={{ fontSize: '12px', color: '#888c95' }}>
-                    ID: {team.id}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Team Details */}
-        {selectedTeam && (
-          <div style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.03)',
-            borderRadius: '12px',
-            padding: '30px',
-            border: '1px solid rgba(255, 255, 255, 0.1)'
-          }}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '30px'
-            }}>
-              <div>
-                <h2 style={{ margin: '0 0 5px 0', fontSize: '20px', fontWeight: '700' }}>
-                  {selectedTeam.team.name}
-                </h2>
-                <div style={{ fontSize: '12px', color: '#888c95' }}>
-                  Создана: {new Date(selectedTeam.team.created_at).toLocaleDateString('ru-RU')}
-                </div>
-              </div>
-              <button
-                onClick={() => setShowInviteModal(true)}
-                style={{
-                  backgroundColor: '#00e096',
-                  color: '#000',
-                  border: 'none',
-                  padding: '10px 20px',
-                  borderRadius: '8px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  fontSize: '14px'
-                }}>
-                + Пригласить
-              </button>
-            </div>
-
-            <h3 style={{ margin: '0 0 20px 0', fontSize: '16px', fontWeight: '600' }}>Участники</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {(selectedTeam.members ?? []).map(member => (
-                <div
-                  key={member.id}
-                  style={{
-                    padding: '15px',
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}>
-                  <div>
-                    <div style={{ fontWeight: '600', marginBottom: '5px' }}>
-                      {member.user?.email || `User ${member.user_id}`}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#888c95' }}>
-                      Роль: {member.role === 'owner' ? 'Владелец' : member.role === 'admin' ? 'Администратор' : 'Участник'}
-                    </div>
-                  </div>
-                  {member.role !== 'owner' && (
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                      <select
-                        value={member.role}
-                        onChange={(e) => handleUpdateRole(member.user_id, e.target.value)}
-                        style={{
-                          padding: '5px 10px',
-                          backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                          border: '1px solid rgba(255, 255, 255, 0.1)',
-                          borderRadius: '6px',
-                          color: '#fff',
-                          fontSize: '12px',
-                          cursor: 'pointer'
-                        }}>
-                        <option value="member">Участник</option>
-                        <option value="admin">Администратор</option>
-                      </select>
-                      <button
-                        onClick={() => handleRemoveMember(member.user_id)}
-                        style={{
-                          padding: '5px 10px',
-                          backgroundColor: 'rgba(255, 59, 59, 0.2)',
-                          border: '1px solid rgba(255, 59, 59, 0.3)',
-                          borderRadius: '6px',
-                          color: '#ff3b3b',
-                          fontSize: '12px',
-                          cursor: 'pointer'
-                        }}>
-                        Удалить
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Create Team Modal */}
-      {showCreateModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
-          backdropFilter: 'blur(10px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 10000
-        }}
-        onClick={() => setShowCreateModal(false)}>
-          <div style={{
-            backgroundColor: 'rgba(18, 18, 18, 0.95)',
-            borderRadius: '24px',
-            padding: '40px',
-            width: '90%',
-            maxWidth: '400px',
-            border: '1px solid rgba(255, 255, 255, 0.1)'
-          }}
-          onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ margin: '0 0 24px 0', fontSize: '20px', fontWeight: '700' }}>Создать команду</h2>
-            <input
-              type="text"
-              value={newTeamName}
-              onChange={(e) => setNewTeamName(e.target.value)}
-              placeholder="Название команды"
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '12px',
-                color: '#fff',
-                fontSize: '16px',
-                marginBottom: '20px',
-                outline: 'none'
-              }}
-            />
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                style={{
-                  flex: 1,
-                  padding: '12px',
-                  backgroundColor: 'transparent',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: '8px',
-                  color: '#888c95',
-                  cursor: 'pointer'
-                }}>
-                Отмена
-              </button>
-              <button
-                onClick={handleCreateTeam}
-                style={{
-                  flex: 1,
-                  padding: '12px',
-                  backgroundColor: '#00e096',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: '#000',
-                  fontWeight: '600',
-                  cursor: 'pointer'
-                }}>
-                Создать
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Invite Member Modal */}
-      {showInviteModal && selectedTeam && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
-          backdropFilter: 'blur(10px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 10000
-        }}
-        onClick={() => setShowInviteModal(false)}>
-          <div style={{
-            backgroundColor: 'rgba(18, 18, 18, 0.95)',
-            borderRadius: '24px',
-            padding: '40px',
-            width: '90%',
-            maxWidth: '400px',
-            border: '1px solid rgba(255, 255, 255, 0.1)'
-          }}
-          onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ margin: '0 0 24px 0', fontSize: '20px', fontWeight: '700' }}>Пригласить участника</h2>
-            <input
-              type="email"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              placeholder="email@example.com"
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '12px',
-                color: '#fff',
-                fontSize: '16px',
-                marginBottom: '20px',
-                outline: 'none'
-              }}
-            />
-            <select
-              value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value as 'admin' | 'member')}
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '12px',
-                color: '#fff',
-                fontSize: '16px',
-                marginBottom: '20px',
-                outline: 'none',
-                cursor: 'pointer'
-              }}>
-              <option value="member">Участник</option>
-              <option value="admin">Администратор</option>
-            </select>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button
-                onClick={() => setShowInviteModal(false)}
-                style={{
-                  flex: 1,
-                  padding: '12px',
-                  backgroundColor: 'transparent',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: '8px',
-                  color: '#888c95',
-                  cursor: 'pointer'
-                }}>
-                Отмена
-              </button>
-              <button
-                onClick={handleInviteMember}
-                style={{
-                  flex: 1,
-                  padding: '12px',
-                  backgroundColor: '#00e096',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: '#000',
-                  fontWeight: '600',
-                  cursor: 'pointer'
-                }}>
-                Пригласить
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Toast */}
-      {toast && (
-        <div style={{
-          position: 'fixed',
-          bottom: '20px',
-          right: '20px',
-          padding: '16px 24px',
-          backgroundColor: toast.type === 'success' ? 'rgba(0, 224, 150, 0.2)' : 'rgba(255, 59, 59, 0.2)',
-          border: `1px solid ${toast.type === 'success' ? '#00e096' : '#ff3b3b'}`,
-          borderRadius: '12px',
-          color: toast.type === 'success' ? '#00e096' : '#ff3b3b',
-          fontSize: '14px',
-          zIndex: 10001
-        }}>
-          {toast.message}
-        </div>
-      )}
-    </div>
-    </SidebarLayout>
+    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${color}`}>
+      {icon}
+      {label}
+    </span>
   );
 };
 
-export default Teams;
+const StatusIndicator = ({ status }: { status: string }) => {
+  const colors: Record<string, string> = {
+    online: 'bg-emerald-500',
+    offline: 'bg-slate-400',
+    away: 'bg-amber-500'
+  };
+
+  return (
+    <div className={`w-3 h-3 rounded-full ${colors[status]} ring-2 ring-white animate-pulse`} />
+  );
+};
+
+const InviteModal = ({ onClose }: { onClose: () => void }) => {
+  const [copied, setCopied] = useState(false);
+  const inviteLink = 'https://xplr.io/team/join/abc123xyz';
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(inviteLink);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 modal-backdrop" onClick={onClose} />
+      <div className="relative glass-strong p-6 rounded-2xl w-full max-w-md shadow-2xl animate-scale-in">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-semibold text-white">Пригласить участника</h3>
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+            <X className="w-5 h-5 text-gray-400" />
+          </button>
+        </div>
+        
+        <div className="space-y-5">
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">Email адрес</label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+              <input
+                type="email"
+                placeholder="colleague@company.com"
+                className="xplr-input w-full pl-10"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">Роль</label>
+            <select className="xplr-select w-full">
+              <option value="member">Участник</option>
+              <option value="admin">Админ</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">Лимит карт в месяц</label>
+            <input
+              type="number"
+              placeholder="50"
+              className="xplr-input w-full"
+            />
+          </div>
+          
+          <div className="section-divider" />
+          
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">Или отправьте ссылку-приглашение</label>
+            <div className="flex gap-2">
+              <div className="flex-1 flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2 border border-white/10">
+                <Link className="w-4 h-4 text-gray-500" />
+                <span className="text-sm text-gray-400 truncate">{inviteLink}</span>
+              </div>
+              <button 
+                onClick={handleCopy}
+                className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
+                  copied ? 'bg-green-500/20 text-green-400' : 'glass-card hover:bg-white/10 text-gray-400'
+                }`}
+              >
+                {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex gap-3 mt-6">
+          <button 
+            onClick={onClose}
+            className="flex-1 px-4 py-3 glass-card hover:bg-white/10 text-gray-300 font-medium rounded-xl transition-colors"
+          >
+            Отмена
+          </button>
+          <button className="flex-1 px-4 py-3 gradient-accent text-white font-medium rounded-xl transition-colors">
+            Отправить приглашение
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const TeamsPage = () => {
+  const [showInvite, setShowInvite] = useState(false);
+
+  const teamMembers: TeamMember[] = [
+    { 
+      id: '1', 
+      name: 'Алексей Петров', 
+      email: 'alex@xplr.io', 
+      role: 'owner', 
+      avatar: 'АП',
+      cardsIssued: 127,
+      volumeThisMonth: 245000,
+      lastActive: 'Сейчас',
+      status: 'online'
+    },
+    { 
+      id: '2', 
+      name: 'Мария Иванова', 
+      email: 'maria@xplr.io', 
+      role: 'admin', 
+      avatar: 'МИ',
+      cardsIssued: 84,
+      volumeThisMonth: 156000,
+      lastActive: '5 мин назад',
+      status: 'online'
+    },
+    { 
+      id: '3', 
+      name: 'Дмитрий Козлов', 
+      email: 'dmitry@xplr.io', 
+      role: 'member', 
+      avatar: 'ДК',
+      cardsIssued: 42,
+      volumeThisMonth: 78000,
+      lastActive: '2 часа назад',
+      status: 'away'
+    },
+    { 
+      id: '4', 
+      name: 'Елена Смирнова', 
+      email: 'elena@xplr.io', 
+      role: 'member', 
+      avatar: 'ЕС',
+      cardsIssued: 31,
+      volumeThisMonth: 52000,
+      lastActive: 'Вчера',
+      status: 'offline'
+    },
+  ];
+
+  const totalVolume = teamMembers.reduce((sum, m) => sum + m.volumeThisMonth, 0);
+  const totalCards = teamMembers.reduce((sum, m) => sum + m.cardsIssued, 0);
+
+  return (
+    <DashboardLayout>
+      <div className="stagger-fade-in">
+        <BackButton />
+        
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-white mb-2">Ваша команда</h1>
+            <p className="text-slate-500">Управление участниками и правами доступа</p>
+          </div>
+          <button 
+            onClick={() => setShowInvite(true)}
+            className="flex items-center gap-2 px-5 py-3 gradient-accent text-white font-medium rounded-xl transition-all shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40"
+          >
+            <UserPlus className="w-5 h-5" />
+            Пригласить участника
+          </button>
+        </div>
+
+        {/* Team Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="glass-card p-5">
+            <p className="text-gray-400 text-sm mb-1">Участников</p>
+            <p className="text-2xl font-bold text-white">{teamMembers.length}</p>
+          </div>
+          <div className="glass-card p-5">
+            <p className="text-gray-400 text-sm mb-1">Онлайн сейчас</p>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <p className="text-2xl font-bold text-green-400">
+                {teamMembers.filter(m => m.status === 'online').length}
+              </p>
+            </div>
+          </div>
+          <div className="glass-card p-5">
+            <p className="text-gray-400 text-sm mb-1">Выпущено карт</p>
+            <p className="text-2xl font-bold text-white">{totalCards}</p>
+          </div>
+          <div className="glass-card p-5 border-blue-500/30">
+            <p className="text-gray-400 text-sm mb-1">Оборот команды</p>
+            <p className="text-2xl font-bold text-blue-400 balance-display">${(totalVolume / 1000).toFixed(0)}K</p>
+          </div>
+        </div>
+
+        {/* Shared Limits */}
+        <div className="glass-card p-6 mb-8">
+          <h3 className="block-title">Общие лимиты</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-400">Выпуск карт в день</span>
+                <span className="text-white font-semibold">284 / 500</span>
+              </div>
+              <div className="progress-bar-container">
+                <div className="progress-bar-fill progress-bar-blue" style={{ width: '56.8%' }} />
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-400">Месячный оборот</span>
+                <span className="text-white font-semibold">$531K / $1M</span>
+              </div>
+              <div className="progress-bar-container">
+                <div className="progress-bar-fill progress-bar-green" style={{ width: '53.1%' }} />
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-400">API запросы</span>
+                <span className="text-white font-semibold">8.2K / 50K</span>
+              </div>
+              <div className="progress-bar-container">
+                <div className="progress-bar-fill progress-bar-purple" style={{ width: '16.4%' }} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Members List */}
+        <div className="glass-card overflow-hidden">
+          <div className="p-6 border-b border-white/10">
+            <h3 className="block-title mb-0">Статистика команды</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="xplr-table min-w-[800px]">
+              <thead>
+                <tr>
+                  <th>Участник</th>
+                  <th>Роль</th>
+                  <th>Карт выпущено</th>
+                  <th>Оборот</th>
+                  <th>Активность</th>
+                  <th>Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {teamMembers.map(member => (
+                  <tr key={member.id}>
+                    <td className="py-4 px-4">
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          <div className="w-11 h-11 rounded-xl gradient-accent flex items-center justify-center text-white font-semibold text-sm shadow-lg shadow-blue-500/20">
+                            {member.avatar}
+                          </div>
+                          <div className="absolute -bottom-0.5 -right-0.5">
+                            <StatusIndicator status={member.status} />
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-white font-medium">{member.name}</p>
+                          <p className="text-sm text-gray-500">{member.email}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-4 px-4">
+                      <RoleBadge role={member.role} />
+                    </td>
+                    <td className="py-4 px-4">
+                      <span className="text-white font-semibold">{member.cardsIssued}</span>
+                    </td>
+                    <td className="py-4 px-4">
+                      <span className="text-white font-semibold balance-display">${member.volumeThisMonth.toLocaleString()}</span>
+                    </td>
+                    <td className="py-4 px-4">
+                      <span className={`text-sm ${member.status === 'online' ? 'text-green-400' : 'text-gray-500'}`}>
+                        {member.lastActive}
+                      </span>
+                    </td>
+                    <td className="py-4 px-4">
+                      <div className="flex items-center gap-1">
+                        <button className="p-2.5 hover:bg-white/10 rounded-lg transition-colors" title="Статистика">
+                          <BarChart3 className="w-4 h-4 text-gray-400" />
+                        </button>
+                        <button className="p-2.5 hover:bg-white/10 rounded-lg transition-colors" title="Редактировать">
+                          <Edit className="w-4 h-4 text-gray-400" />
+                        </button>
+                        {member.role !== 'owner' && (
+                          <button className="p-2.5 hover:bg-red-500/20 rounded-lg transition-colors" title="Удалить">
+                            <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-400" />
+                          </button>
+                        )}
+                        <button className="p-2.5 hover:bg-white/10 rounded-lg transition-colors">
+                          <MoreVertical className="w-4 h-4 text-gray-400" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Invite Modal */}
+        {showInvite && <InviteModal onClose={() => setShowInvite(false)} />}
+      </div>
+      
+      <style>{`
+        @keyframes scale-in {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        .animate-scale-in {
+          animation: scale-in 0.2s ease-out forwards;
+        }
+      `}</style>
+    </DashboardLayout>
+  );
+};
