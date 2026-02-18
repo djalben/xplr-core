@@ -85,7 +85,7 @@ const MastercardLogo = ({ className = "h-8 w-auto" }: { className?: string }) =>
   </svg>
 );
 
-// Card Issue Modal (like platipomiru)
+// Card Issue Modal
 const CardIssueModal = ({ 
   card, 
   onClose 
@@ -110,8 +110,8 @@ const CardIssueModal = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-[#0f0f18] border border-white/10 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto animate-scale-in">
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
+      <div className="relative bg-[#050507]/95 backdrop-blur-3xl border border-white/10 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto animate-scale-in shadow-2xl shadow-black/60">
         {/* Card Preview */}
         <div className="p-6 pb-4">
           <div className="flex justify-center mb-4">
@@ -231,7 +231,7 @@ const CardIssueModal = ({
 // Subscriptions Card Visual - colorful with service icons (realistic bank card style)
 const SubscriptionsCardVisual = ({ mini = true }: { mini?: boolean }) => (
   <div className={`relative ${mini ? 'w-full aspect-[1.586/1]' : 'w-72 h-44'} rounded-2xl overflow-hidden shadow-2xl`}>
-    {/* Realistic gradient background like platipomiru */}
+    {/* Realistic gradient background */}
     <div className="absolute inset-0">
       {/* Base gradient - pink/purple/blue like the screenshot */}
       <div className="absolute inset-0 bg-gradient-to-br from-pink-500 via-purple-500 to-blue-600" />
@@ -264,7 +264,7 @@ const SubscriptionsCardVisual = ({ mini = true }: { mini?: boolean }) => (
           <div className="w-6 h-6 rounded-full bg-white/25 backdrop-blur-sm flex items-center justify-center">
             <span className="text-[10px]">🌍</span>
           </div>
-          <span className="text-white/90 text-xs font-medium tracking-wide">Плати по миру</span>
+          <span className="text-white/90 text-xs font-medium tracking-wide">Без границ.</span>
         </div>
         <div className="w-8 h-8 rounded-full bg-white/25 backdrop-blur-sm flex items-center justify-center border border-white/20">
           <span className="text-white text-sm font-bold">€</span>
@@ -288,7 +288,7 @@ const SubscriptionsCardVisual = ({ mini = true }: { mini?: boolean }) => (
 // Travel Card Visual - blue gradient (realistic bank card style)
 const TravelCardVisual = ({ mini = true }: { mini?: boolean }) => (
   <div className={`relative ${mini ? 'w-full aspect-[1.586/1]' : 'w-72 h-44'} rounded-2xl overflow-hidden shadow-2xl`}>
-    {/* Blue gradient background like platipomiru travel card */}
+    {/* Blue gradient background */}
     <div className="absolute inset-0">
       <div className="absolute inset-0 bg-gradient-to-br from-blue-400 via-blue-500 to-blue-700" />
       
@@ -317,7 +317,7 @@ const TravelCardVisual = ({ mini = true }: { mini?: boolean }) => (
           <div className="w-6 h-6 rounded-full bg-white/25 backdrop-blur-sm flex items-center justify-center">
             <Plane className="w-3 h-3 text-white" />
           </div>
-          <span className="text-white/90 text-xs font-medium tracking-wide">Плати по миру</span>
+          <span className="text-white/90 text-xs font-medium tracking-wide">Без границ.</span>
         </div>
         <div className="w-8 h-8 rounded-full bg-white/25 backdrop-blur-sm flex items-center justify-center border border-white/20">
           <span className="text-white text-sm font-bold">$</span>
@@ -338,71 +338,71 @@ const TravelCardVisual = ({ mini = true }: { mini?: boolean }) => (
   </div>
 );
 
-// Premium Card Visual - KOKO style black with wireframe head and red accent
+// Premium Card Visual - XPLR PRIME: deep black matte, neural texture, platinum chip, Power Beam
 const PremiumCardVisual = ({ mini = true }: { mini?: boolean }) => (
   <div className={`relative ${mini ? 'w-full aspect-[1.586/1]' : 'w-72 h-44'} rounded-2xl overflow-hidden shadow-2xl`}>
-    {/* Dark gradient background */}
-    <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-[#1a1a1a] to-black">
-      {/* 3D Wireframe head pattern - like KOKO card */}
-      <div className="absolute inset-0 opacity-40">
+    {/* Deep matte black background */}
+    <div className="absolute inset-0 bg-gradient-to-br from-[#0a0a0a] via-[#111111] to-[#080808]">
+      {/* Subtle neural/geometric mesh texture */}
+      <div className="absolute inset-0 opacity-[0.12]">
         <svg viewBox="0 0 200 120" className="w-full h-full" preserveAspectRatio="xMidYMid slice">
           <defs>
-            <pattern id="mesh-premium" width="12" height="12" patternUnits="userSpaceOnUse">
-              <path d="M 12 0 L 0 0 0 12" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="0.3"/>
+            <pattern id="neural-mesh" width="16" height="16" patternUnits="userSpaceOnUse">
+              <path d="M 16 0 L 0 0 0 16" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="0.25"/>
+              <circle cx="0" cy="0" r="0.6" fill="rgba(255,255,255,0.2)" />
+              <circle cx="16" cy="16" r="0.6" fill="rgba(255,255,255,0.2)" />
             </pattern>
           </defs>
-          <rect width="100%" height="100%" fill="url(#mesh-premium)" />
-          
-          {/* Wireframe head - skull-like 3D mesh */}
-          <ellipse cx="130" cy="55" rx="38" ry="45" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="0.5" />
-          <ellipse cx="130" cy="50" rx="30" ry="32" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="0.5" />
-          <ellipse cx="130" cy="45" rx="22" ry="22" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="0.5" />
-          {/* Horizontal lines on head */}
-          <ellipse cx="130" cy="40" rx="32" ry="6" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="0.3" />
-          <ellipse cx="130" cy="55" rx="35" ry="8" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="0.3" />
-          <ellipse cx="130" cy="70" rx="30" ry="6" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="0.3" />
-          {/* Vertical meridian lines */}
-          <path d="M130 10 Q 130 55 130 100" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="0.3" />
-          <path d="M110 20 Q 100 55 110 90" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="0.3" />
-          <path d="M150 20 Q 160 55 150 90" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="0.3" />
+          <rect width="100%" height="100%" fill="url(#neural-mesh)" />
+          {/* Neural connection lines */}
+          <line x1="20" y1="20" x2="60" y2="40" stroke="rgba(255,255,255,0.06)" strokeWidth="0.3" />
+          <line x1="60" y1="40" x2="100" y2="25" stroke="rgba(255,255,255,0.06)" strokeWidth="0.3" />
+          <line x1="100" y1="25" x2="140" y2="50" stroke="rgba(255,255,255,0.06)" strokeWidth="0.3" />
+          <line x1="140" y1="50" x2="180" y2="35" stroke="rgba(255,255,255,0.06)" strokeWidth="0.3" />
+          <line x1="30" y1="70" x2="70" y2="90" stroke="rgba(255,255,255,0.05)" strokeWidth="0.3" />
+          <line x1="70" y1="90" x2="120" y2="75" stroke="rgba(255,255,255,0.05)" strokeWidth="0.3" />
+          <line x1="120" y1="75" x2="170" y2="95" stroke="rgba(255,255,255,0.05)" strokeWidth="0.3" />
         </svg>
       </div>
-      
-      {/* Red accent strip - like a tie */}
-      <div className="absolute top-0 right-8 w-1.5 h-16 bg-gradient-to-b from-red-600 to-red-700 rounded-b-full" />
+
+      {/* ── Power Beam — vertical red energy line ── */}
+      <div className="absolute top-0 bottom-0 right-10 w-[3px] bg-gradient-to-b from-transparent via-red-600 to-transparent" />
+      {/* Glow layer around the beam */}
+      <div className="absolute top-0 bottom-0 right-[38px] w-[7px] bg-gradient-to-b from-transparent via-red-500/40 to-transparent blur-sm" />
+      <div className="absolute top-0 bottom-0 right-[36px] w-[15px] bg-gradient-to-b from-transparent via-red-500/15 to-transparent blur-md" />
     </div>
-    
+
     {/* Card content */}
     <div className="relative h-full p-4 flex flex-col justify-between">
-      {/* Top row - KOKO branding and currency */}
+      {/* Top row — XPLR PRIME branding and currency */}
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-white font-bold text-xl tracking-widest">KOKO</p>
-          <p className="text-white/30 text-[9px] tracking-[0.2em] uppercase">Platinum Business</p>
+          <p className="text-white font-bold text-lg tracking-[0.25em]">XPLR PRIME</p>
+          <p className="text-white/25 text-[8px] tracking-[0.3em] uppercase">Platinum Edition</p>
         </div>
-        <div className="w-8 h-8 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/10">
+        <div className="w-8 h-8 rounded-full bg-white/[0.06] backdrop-blur-sm flex items-center justify-center border border-white/[0.08]">
           <span className="text-white text-sm font-bold">$</span>
         </div>
       </div>
-      
-      {/* EMV Chip */}
-      <div className="w-10 h-7 rounded-md bg-gradient-to-br from-amber-300 via-amber-400 to-amber-600 mt-1 shadow-lg">
+
+      {/* Platinum / Silver EMV Chip */}
+      <div className="w-10 h-7 rounded-md bg-gradient-to-br from-slate-300 via-slate-200 to-slate-400 mt-1 shadow-lg shadow-white/10">
         <div className="w-full h-full flex">
-          <div className="w-1/3 border-r border-amber-700/40" />
-          <div className="w-1/3 border-r border-amber-700/40 flex flex-col">
-            <div className="h-1/2 border-b border-amber-700/40" />
+          <div className="w-1/3 border-r border-slate-400/50" />
+          <div className="w-1/3 border-r border-slate-400/50 flex flex-col">
+            <div className="h-1/2 border-b border-slate-400/50" />
             <div className="h-1/2" />
           </div>
           <div className="w-1/3" />
         </div>
       </div>
-      
+
       {/* Card number at bottom */}
       <div className="mt-auto">
-        <p className="text-white/30 text-[10px] mb-0.5">Номер карты</p>
-        <p className="text-white font-mono text-sm tracking-widest">**** **** **** 1234</p>
+        <p className="text-white/25 text-[10px] mb-0.5">Номер карты</p>
+        <p className="text-white/90 font-mono text-sm tracking-widest">**** **** **** 1234</p>
       </div>
-      
+
       {/* Mastercard logo at bottom right */}
       <div className="absolute bottom-4 right-4">
         <MastercardLogo className="h-7 w-auto" />
@@ -773,8 +773,8 @@ const RealisticCreditCard = ({
 // Close Card Modal
 const CloseCardModal = ({ card, onClose, onConfirm }: { card: PersonalCard; onClose: () => void; onConfirm: () => void }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-    <div className="relative glass-strong p-6 rounded-2xl w-full max-w-md animate-scale-in">
+    <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
+    <div className="relative bg-[#050507]/95 backdrop-blur-3xl border border-white/10 p-6 rounded-2xl w-full max-w-md animate-scale-in shadow-2xl shadow-black/60">
       <div className="flex items-center gap-3 mb-4">
         <div className="w-12 h-12 rounded-xl bg-red-500/20 flex items-center justify-center">
           <Trash2 className="w-6 h-6 text-red-400" />
@@ -796,8 +796,8 @@ const CloseCardModal = ({ card, onClose, onConfirm }: { card: PersonalCard; onCl
 // Payment Method Modal
 const PaymentMethodModal = ({ type, onClose }: { type: 'apple' | 'google'; onClose: () => void }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-    <div className="relative glass-strong p-6 rounded-2xl w-full max-w-md animate-scale-in">
+    <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
+    <div className="relative bg-[#050507]/95 backdrop-blur-3xl border border-white/10 p-6 rounded-2xl w-full max-w-md animate-scale-in shadow-2xl shadow-black/60">
       <div className="flex items-center gap-3 mb-4">
         <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
           {type === 'apple' ? <Apple className="w-6 h-6 text-white" /> : <Smartphone className="w-6 h-6 text-white" />}

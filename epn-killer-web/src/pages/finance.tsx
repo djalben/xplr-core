@@ -120,7 +120,23 @@ export const FinancePage = () => {
             <h1 className="text-3xl font-bold text-white mb-2">История операций</h1>
             <p className="text-slate-400">Полная история транзакций и аналитика</p>
           </div>
-          <button className="flex items-center gap-2 px-5 py-3 glass-card hover:bg-white/10 text-white font-medium rounded-xl transition-all min-h-[48px]">
+          <button
+            onClick={() => {
+              const header = 'Дата,Описание,Сумма,Валюта,Тип,Карта,Кошелёк,Статус';
+              const rows = filteredTransactions.map(t =>
+                [t.date, `"${t.description}"`, t.amount.toFixed(2), t.currency, t.type === 'income' ? 'Доход' : 'Расход', t.card, t.wallet, t.status === 'completed' ? 'Выполнено' : t.status === 'pending' ? 'В обработке' : 'Ошибка'].join(',')
+              );
+              const csv = '\uFEFF' + [header, ...rows].join('\n');
+              const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'xplr_transactions.csv';
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            className="flex items-center gap-2 px-5 py-3 glass-card hover:bg-white/10 text-white font-medium rounded-xl transition-all min-h-[48px]"
+          >
             <FileSpreadsheet className="w-5 h-5" />
             Экспорт CSV
           </button>
@@ -158,13 +174,13 @@ export const FinancePage = () => {
           <div className="flex flex-col md:flex-row gap-4">
             {/* Search */}
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Поиск операций..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="xplr-input w-full pl-10"
+                className="xplr-input w-full pl-12"
               />
             </div>
             

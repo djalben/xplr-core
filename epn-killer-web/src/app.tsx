@@ -12,6 +12,7 @@ import { ApiPage } from './pages/api';
 import { SettingsPage } from './pages/settings';
 import { SupportPage } from './pages/support';
 import { LandingPage } from './pages/landing';
+import { PWAInstallPrompt } from './components/pwa-install-prompt';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -36,6 +37,7 @@ const RootRedirect: React.FC = () => {
 function App() {
   return (
     <ModeProvider>
+      <PWAInstallPrompt />
       <Routes>
         <Route path="/" element={<RootRedirect />} />
         <Route path="/landing" element={<LandingPage />} />

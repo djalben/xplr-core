@@ -902,6 +902,16 @@ select option:focus,
   border: 2px solid #0a0a0f;
 }
 
+/* Slide up animation for PWA install prompt */
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.35s ease-out forwards;
+}
+
 /* Fade in animation */
 @keyframes fade-in {
   from { opacity: 0; }
