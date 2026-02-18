@@ -114,7 +114,7 @@
 /* ========== DARK BACKGROUND ========== */
 .dark-bg {
   background: linear-gradient(180deg, var(--xplr-bg-start) 0%, var(--xplr-bg-end) 100%);
-  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 /* ========== GLASSMORPHISM CARDS - Dark Theme ========== */
@@ -323,29 +323,38 @@
   color: #60a5fa;
 }
 
-/* Staggered animation for page content */
+/* Staggered animation for page content — fast + GPU-accelerated */
 .stagger-fade-in > * {
   opacity: 0;
-  animation: fadeSlideIn 0.5s ease-out forwards;
+  animation: fadeSlideIn 0.18s cubic-bezier(0.32, 0.72, 0, 1) forwards;
   will-change: transform, opacity;
+  transform: translate3d(0, 0, 0);
 }
 
-.stagger-fade-in > *:nth-child(1) { animation-delay: 0.05s; }
-.stagger-fade-in > *:nth-child(2) { animation-delay: 0.1s; }
-.stagger-fade-in > *:nth-child(3) { animation-delay: 0.15s; }
-.stagger-fade-in > *:nth-child(4) { animation-delay: 0.2s; }
-.stagger-fade-in > *:nth-child(5) { animation-delay: 0.25s; }
-.stagger-fade-in > *:nth-child(6) { animation-delay: 0.3s; }
+.stagger-fade-in > *:nth-child(1) { animation-delay: 0.02s; }
+.stagger-fade-in > *:nth-child(2) { animation-delay: 0.05s; }
+.stagger-fade-in > *:nth-child(3) { animation-delay: 0.08s; }
+.stagger-fade-in > *:nth-child(4) { animation-delay: 0.11s; }
+.stagger-fade-in > *:nth-child(5) { animation-delay: 0.14s; }
+.stagger-fade-in > *:nth-child(6) { animation-delay: 0.17s; }
 
 @keyframes fadeSlideIn {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translate3d(0, 8px, 0);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate3d(0, 0, 0);
   }
+}
+
+/* GPU-accelerated page container */
+.gpu-accelerated {
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
 
 /* Chart container */
@@ -489,14 +498,17 @@ select option:focus,
   a, 
   [role="button"] {
     min-height: 44px;
+    min-width: 44px;
   }
   
   html {
     font-size: 16px;
+    height: 100dvh;
   }
   
   body {
     overflow-x: hidden;
+    min-height: 100dvh;
   }
   
   * {
@@ -505,6 +517,24 @@ select option:focus,
   
   .xplr-table td {
     padding: 12px;
+  }
+
+  /* Adaptive text for small screens */
+  h1 { font-size: clamp(1.25rem, 5vw, 1.875rem); }
+  h2 { font-size: clamp(1.125rem, 4vw, 1.5rem); }
+  h3 { font-size: clamp(1rem, 3.5vw, 1.25rem); }
+}
+
+/* iPhone SE and very narrow screens */
+@media (max-width: 375px) {
+  .glass-card {
+    padding: 12px;
+    border-radius: 12px;
+  }
+  
+  .badge {
+    padding: 3px 8px;
+    font-size: 10px;
   }
 }
 
@@ -792,20 +822,21 @@ select option:focus,
   100% { background-position: -200% 0; }
 }
 
-/* Modal animations */
+/* Modal animations — fast GPU-accelerated */
 @keyframes scale-in {
   from {
     opacity: 0;
-    transform: scale(0.95);
+    transform: scale(0.97) translate3d(0, 0, 0);
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: scale(1) translate3d(0, 0, 0);
   }
 }
 
 .animate-scale-in {
-  animation: scale-in 0.2s ease-out forwards;
+  animation: scale-in 0.18s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+  will-change: transform, opacity;
 }
 
 /* Hero section floating animation */
@@ -915,14 +946,15 @@ select option:focus,
   border: 2px solid #0a0a0f;
 }
 
-/* Slide up animation for PWA install prompt */
+/* Slide up animation — fast GPU-accelerated */
 @keyframes slide-up {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translate3d(0, 16px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
 .animate-slide-up {
-  animation: slide-up 0.35s ease-out forwards;
+  animation: slide-up 0.18s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+  will-change: transform, opacity;
 }
 
 /* Fade in animation */

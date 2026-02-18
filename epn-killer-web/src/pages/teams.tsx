@@ -82,8 +82,8 @@ const InviteModal = ({ onClose }: { onClose: () => void }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 modal-backdrop" onClick={onClose} />
-      <div className="relative glass-strong p-6 rounded-2xl w-full max-w-md shadow-2xl animate-scale-in">
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
+      <div className="relative bg-[#050507]/95 backdrop-blur-3xl border border-white/10 p-6 rounded-2xl w-full max-w-md shadow-2xl shadow-black/60 animate-scale-in">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-xl font-semibold text-white">Пригласить участника</h3>
           <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
