@@ -32,17 +32,35 @@ export const AuthPage = () => {
 
     setIsLoading(true);
     try {
+      console.log('[Auth] Submitting:', { mode, email, password: '***' });
       if (mode === 'login') {
         const res = await login({ email, password });
-        localStorage.setItem('token', res.token);
+        console.log('[Auth] Login response:', res);
       } else {
         const res = await register({ email, password });
-        localStorage.setItem('token', res.token);
+        console.log('[Auth] Register response:', res);
+      }
+      // Token is saved by auth.ts, verify it's there
+      const savedToken = localStorage.getItem('token');
+      console.log('[Auth] Token saved:', savedToken ? 'yes' : 'NO');
+      if (!savedToken) {
+        setError('Сервер не вернул токен');
+        return;
       }
       navigate('/dashboard');
     } catch (err: any) {
-      const msg = err.response?.data?.message || err.response?.data || err.message || 'Ошибка';
-      setError(typeof msg === 'string' ? msg : 'Ошибка авторизации');
+      console.error('[Auth] Error:', err.response?.status, err.response?.data, err.message);
+      // Backend returns plain text errors via http.Error(), not JSON
+      const data = err.response?.data;
+      let msg: string;
+      if (typeof data === 'string' && data.trim().length > 0) {
+        msg = data.trim();
+      } else if (data?.message) {
+        msg = data.message;
+      } else {
+        msg = err.message || 'Ошибка авторизации';
+      }
+      setError(msg);
     } finally {
       setIsLoading(false);
     }

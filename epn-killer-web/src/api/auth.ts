@@ -25,7 +25,7 @@ export const register = async (data: RegisterRequest): Promise<AuthResponse> => 
   const response = await apiClient.post<AuthResponse>('/auth/register', data);
 
   if (response.data.token) {
-    localStorage.setItem('jwt_token', response.data.token);
+    localStorage.setItem('token', response.data.token);
   }
 
   return response.data;
@@ -36,7 +36,7 @@ export const login = async (data: LoginRequest): Promise<AuthResponse> => {
   const response = await apiClient.post<AuthResponse>('/auth/login', data);
 
   if (response.data.token) {
-    localStorage.setItem('jwt_token', response.data.token);
+    localStorage.setItem('token', response.data.token);
   }
 
   return response.data;
@@ -44,5 +44,5 @@ export const login = async (data: LoginRequest): Promise<AuthResponse> => {
 
 // Выход из системы
 export const logout = (): void => {
-  localStorage.removeItem('jwt_token');
+  localStorage.removeItem('token');
 };
