@@ -465,30 +465,75 @@ const PersonalCardTypeCard = ({
   );
 };
 
-// Bank Logo Component
-const BankLogoButton = ({ 
-  bank, 
-  selected, 
-  onClick 
-}: { 
-  bank: { id: string; name: string; logo: string; bgColor: string }; 
-  selected: boolean; 
+// Inline SVG bank logos — crisp at any resolution
+const BankLogos: Record<string, React.ReactNode> = {
+  sbp: (
+    <svg viewBox="0 0 40 40" className="w-8 h-8">
+      <defs>
+        <linearGradient id="sbp-g" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#5B57A2" />
+          <stop offset="35%" stopColor="#D90751" />
+          <stop offset="65%" stopColor="#FAB718" />
+          <stop offset="100%" stopColor="#0FA8D6" />
+        </linearGradient>
+      </defs>
+      <rect rx="8" width="40" height="40" fill="url(#sbp-g)" />
+      <text x="20" y="26" textAnchor="middle" fill="white" fontSize="14" fontWeight="700" fontFamily="system-ui">СБП</text>
+    </svg>
+  ),
+  sber: (
+    <svg viewBox="0 0 40 40" className="w-8 h-8">
+      <circle cx="20" cy="20" r="20" fill="#21A038" />
+      <path d="M20 8 L20 20 L30 20" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <circle cx="20" cy="20" r="11" stroke="white" strokeWidth="2.5" fill="none" />
+    </svg>
+  ),
+  tbank: (
+    <svg viewBox="0 0 40 40" className="w-8 h-8">
+      <rect rx="8" width="40" height="40" fill="#FFDD2D" />
+      <text x="20" y="27" textAnchor="middle" fill="#333" fontSize="20" fontWeight="800" fontFamily="system-ui">T</text>
+    </svg>
+  ),
+  alfa: (
+    <svg viewBox="0 0 40 40" className="w-8 h-8">
+      <rect rx="8" width="40" height="40" fill="#EF3124" />
+      <text x="20" y="28" textAnchor="middle" fill="white" fontSize="22" fontWeight="800" fontFamily="system-ui">A</text>
+    </svg>
+  ),
+  vtb: (
+    <svg viewBox="0 0 40 40" className="w-8 h-8">
+      <rect rx="8" width="40" height="40" fill="#002882" />
+      <rect x="8" y="12" width="24" height="3.5" rx="1.5" fill="white" />
+      <rect x="8" y="18.5" width="24" height="3.5" rx="1.5" fill="white" />
+      <rect x="8" y="25" width="24" height="3.5" rx="1.5" fill="white" />
+    </svg>
+  ),
+};
+
+// Bank Logo Button — inline SVG, unified size, hover/active
+const BankLogoButton = ({
+  bank,
+  selected,
+  onClick,
+}: {
+  bank: { id: string; name: string };
+  selected: boolean;
   onClick: () => void;
 }) => (
   <button
     onClick={onClick}
     className={`
-      flex flex-col items-center gap-2 p-3 rounded-xl transition-all duration-200
-      ${selected 
-        ? 'bg-white/15 border-2 border-blue-500 scale-105 shadow-lg shadow-blue-500/20' 
-        : 'bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20'
+      flex flex-col items-center gap-2 p-3 rounded-xl transition-all duration-200 cursor-pointer
+      ${selected
+        ? 'bg-blue-500/10 border-2 border-blue-500 scale-105 shadow-lg shadow-blue-500/20'
+        : 'bg-white/[0.03] border border-white/[0.08] hover:bg-white/[0.06] hover:border-white/15 active:scale-95'
       }
     `}
   >
-    <div className={`w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden ${bank.bgColor}`}>
-      <img src={bank.logo} alt={bank.name} className="w-10 h-10 object-contain" />
+    <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden shrink-0">
+      {BankLogos[bank.id] ?? <span className="text-white font-bold text-sm">{bank.name[0]}</span>}
     </div>
-    <span className={`text-xs font-medium ${selected ? 'text-white' : 'text-slate-400'}`}>
+    <span className={`text-[11px] font-medium leading-tight ${selected ? 'text-white' : 'text-slate-400'}`}>
       {bank.name}
     </span>
   </button>
@@ -505,11 +550,11 @@ const TopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () => void
   const exchangeRate = card.currency === '€' ? 97.20 : 89.50;
 
   const banks = [
-    { id: 'sbp', name: 'СБП', logo: './sbp-logo.png', bgColor: 'bg-gradient-to-br from-blue-600 via-purple-600 to-orange-500' },
-    { id: 'sber', name: 'Сбер', logo: './sber-logo.png', bgColor: 'bg-white' },
-    { id: 'tbank', name: 'Т-Банк', logo: './tbank-logo.png', bgColor: 'bg-yellow-400' },
-    { id: 'alfa', name: 'Альфа', logo: './alfa-logo.png', bgColor: 'bg-white' },
-    { id: 'vtb', name: 'ВТБ', logo: './vtb-logo.png', bgColor: 'bg-white' },
+    { id: 'sbp', name: 'СБП' },
+    { id: 'sber', name: 'Сбер' },
+    { id: 'tbank', name: 'Т-Банк' },
+    { id: 'alfa', name: 'Альфа' },
+    { id: 'vtb', name: 'ВТБ' },
   ];
 
   const handleRubChange = (value: string) => {
@@ -532,8 +577,11 @@ const TopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () => void
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative glass-strong p-6 rounded-2xl w-full max-w-md animate-scale-in max-h-[90vh] overflow-y-auto">
+      {/* Dense dark overlay — 80% black + heavy blur */}
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
+
+      {/* Modal panel — deep opaque glass */}
+      <div className="relative bg-[#0d0d0f]/95 backdrop-blur-3xl border border-white/10 p-6 rounded-2xl w-full max-w-md animate-scale-in max-h-[90vh] overflow-y-auto shadow-2xl shadow-black/60">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500/20 to-blue-500/20 border border-emerald-500/30 flex items-center justify-center">
@@ -562,50 +610,54 @@ const TopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () => void
           <div>
             <label className="block text-sm text-slate-400 mb-2">Сумма в рублях</label>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 text-lg font-medium">₽</span>
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 text-lg font-bold">₽</span>
               <input
                 type="number"
                 placeholder="10 000"
                 value={rubAmount}
                 onChange={(e) => handleRubChange(e.target.value)}
-                className="w-full h-14 pl-12 pr-4 bg-white/5 border border-white/10 rounded-xl text-white text-xl font-semibold focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-600"
+                className="w-full h-14 pl-12 pr-4 bg-white/[0.04] border border-white/10 rounded-xl text-white text-xl font-semibold focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-600"
               />
             </div>
           </div>
           
           <div className="flex items-center justify-center py-2">
-            <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
-              <ArrowUpDown className="w-4 h-4 text-slate-500" />
+            <div className="flex items-center gap-3">
+              <div className="h-px w-12 bg-white/10" />
+              <div className="w-10 h-10 rounded-full bg-white/[0.04] border border-white/10 flex items-center justify-center">
+                <span className="text-sm font-bold text-slate-300">₽→{currencySymbol}</span>
+              </div>
+              <div className="h-px w-12 bg-white/10" />
             </div>
           </div>
 
           <div>
             <label className="block text-sm text-slate-400 mb-2">Получите на карту</label>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400 text-lg font-medium">{currencySymbol}</span>
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400 text-lg font-bold">{currencySymbol}</span>
               <input
                 type="number"
                 placeholder="0.00"
                 value={foreignAmount}
                 onChange={(e) => handleForeignChange(e.target.value)}
-                className="w-full h-14 pl-12 pr-4 bg-emerald-500/5 border border-emerald-500/20 rounded-xl text-emerald-400 text-xl font-semibold focus:outline-none focus:border-emerald-500/50 transition-all placeholder:text-emerald-900"
+                className="w-full h-14 pl-12 pr-4 bg-emerald-500/[0.04] border border-emerald-500/20 rounded-xl text-emerald-400 text-xl font-semibold focus:outline-none focus:border-emerald-500/50 transition-all placeholder:text-emerald-900"
               />
             </div>
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white/5 border border-white/10 mb-6">
+        <div className="p-4 rounded-xl bg-white/[0.04] border border-white/10 mb-6">
           <div className="flex items-center justify-between text-sm">
             <span className="text-slate-400">Курс:</span>
-            <span className="text-white font-medium">1 {currencyCode} = {exchangeRate.toFixed(2)} ₽</span>
+            <span className="text-white font-bold">1 {currencyCode} = {exchangeRate.toFixed(2)} ₽</span>
           </div>
         </div>
         
         <div className="flex gap-3">
-          <button onClick={onClose} className="flex-1 px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 font-medium rounded-xl transition-colors">
+          <button onClick={onClose} className="flex-1 px-4 py-3 bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-slate-300 font-medium rounded-xl transition-colors">
             Отмена
           </button>
-          <button className="flex-1 px-4 py-3 bg-gradient-to-r from-emerald-500 to-blue-500 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2">
+          <button className="flex-1 px-4 py-3 bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-400 hover:to-blue-400 text-white font-semibold rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2">
             <Banknote className="w-4 h-4" />
             Пополнить
           </button>
