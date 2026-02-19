@@ -21,9 +21,9 @@ import {
   Clock,
   GripVertical,
   Plus,
-  ChevronLeft,
-  ChevronRight,
-  Trash2
+  Trash2,
+  Play,
+  CheckCircle2
 } from 'lucide-react';
 
 const LS_TASKS_KEY = 'xplr_kanban_tasks';
@@ -47,6 +47,7 @@ interface ChatMessage {
   text: string;
   time: string;
   read: boolean;
+  isSystem?: boolean;
 }
 
 interface KanbanTask {
@@ -245,6 +246,21 @@ const ChatPanel = ({ messages, members, onSend }: {
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.map(msg => {
+          if (msg.isSystem) {
+            const isComplete = msg.text.startsWith('\u2705');
+            return (
+              <div key={msg.id} className="flex justify-center my-2">
+                <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium border ${
+                  isComplete
+                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
+                    : 'bg-amber-500/10 border-amber-500/20 text-amber-300'
+                }`}>
+                  <span>{msg.text}</span>
+                  <span className="text-[10px] opacity-60 ml-1">{msg.time}</span>
+                </div>
+              </div>
+            );
+          }
           const isOwner = msg.senderId === ownerId;
           const sender = getMember(msg.senderId);
           return (
@@ -302,9 +318,7 @@ const ChatPanel = ({ messages, members, onSend }: {
 
 /* ──────────────────────────── Kanban Board ───────────────────────────── */
 
-const columnOrder: KanbanTask['column'][] = ['backlog', 'progress', 'done'];
-
-const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, onAddTask, onMoveTask, onDeleteTask }: {
+const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, onAddTask, onChangeStatus, onDeleteTask }: {
   title: string;
   icon: React.ReactNode;
   color: string;
@@ -312,22 +326,33 @@ const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, onAddTask
   tasks: KanbanTask[];
   members: TeamMember[];
   onAddTask: (column: KanbanTask['column']) => void;
-  onMoveTask: (taskId: string, direction: 'left' | 'right') => void;
+  onChangeStatus: (taskId: string, newStatus: KanbanTask['column']) => void;
   onDeleteTask: (taskId: string) => void;
 }) => {
   const getMember = (id: string) => members.find(m => m.id === id);
-  const colIdx = columnOrder.indexOf(columnKey);
-  const canLeft = colIdx > 0;
-  const canRight = colIdx < columnOrder.length - 1;
 
   return (
-    <div className="flex-1 min-w-[260px]">
-      <div className="flex items-center gap-2 mb-3 px-1">
-        {icon}
-        <span className={`text-sm font-semibold ${color}`}>{title}</span>
-        <span className="ml-auto text-xs text-slate-600 bg-white/[0.04] px-2 py-0.5 rounded-full">{tasks.length}</span>
+    <div className="flex-1 min-w-[260px] flex flex-col">
+      {/* Sticky header */}
+      <div className="sticky top-0 z-10 bg-[#0a0a0f]/95 backdrop-blur-sm pb-2">
+        <div className="flex items-center gap-2 px-1 py-1">
+          {icon}
+          <span className={`text-sm font-semibold ${color}`}>{title}</span>
+          <span className="ml-auto text-xs text-slate-600 bg-white/[0.04] px-2 py-0.5 rounded-full">{tasks.length}</span>
+        </div>
+        {columnKey === 'backlog' && (
+          <button
+            onClick={() => onAddTask('backlog')}
+            className="w-full py-3 mt-1 flex items-center justify-center gap-1.5 text-sm text-gray-400 bg-white/5 border border-dashed border-white/20 rounded-xl hover:bg-white/10 hover:text-white transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            Добавить задачу
+          </button>
+        )}
       </div>
-      <div className="space-y-2 pb-16">
+
+      {/* Scrollable task list */}
+      <div className="flex-1 overflow-y-auto max-h-[600px] space-y-2 pb-4 pr-1">
         {tasks.map(task => {
           const assignee = getMember(task.assigneeId);
           return (
@@ -345,14 +370,24 @@ const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, onAddTask
                       </div>
                     ) : <div />}
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {canLeft && (
-                        <button onClick={() => onMoveTask(task.id, 'left')} className="p-1 hover:bg-white/10 rounded transition-colors" title="Влево">
-                          <ChevronLeft className="w-3.5 h-3.5 text-slate-400" />
+                      {columnKey === 'backlog' && (
+                        <button
+                          onClick={() => onChangeStatus(task.id, 'progress')}
+                          className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-lg transition-colors"
+                          title="Принять в работу"
+                        >
+                          <Play className="w-3 h-3" />
+                          В работу
                         </button>
                       )}
-                      {canRight && (
-                        <button onClick={() => onMoveTask(task.id, 'right')} className="p-1 hover:bg-white/10 rounded transition-colors" title="Вправо">
-                          <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                      {columnKey === 'progress' && (
+                        <button
+                          onClick={() => onChangeStatus(task.id, 'done')}
+                          className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-lg transition-colors"
+                          title="Завершить"
+                        >
+                          <CheckCircle2 className="w-3 h-3" />
+                          Готово
                         </button>
                       )}
                       <button onClick={() => onDeleteTask(task.id)} className="p-1 hover:bg-red-500/20 rounded transition-colors" title="Удалить">
@@ -365,26 +400,22 @@ const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, onAddTask
             </div>
           );
         })}
-        <button
-          onClick={() => onAddTask(columnKey)}
-          className="w-full py-3 mt-2 flex items-center justify-center gap-1.5 text-sm text-gray-400 bg-white/5 border border-dashed border-white/20 rounded-xl hover:bg-white/10 hover:text-white transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          Добавить задачу
-        </button>
+        {tasks.length === 0 && (
+          <div className="text-center py-8 text-xs text-slate-600">Нет задач</div>
+        )}
       </div>
     </div>
   );
 };
 
-const KanbanBoard = ({ tasks, members, onAddTask, onMoveTask, onDeleteTask }: {
+const KanbanBoard = ({ tasks, members, onAddTask, onChangeStatus, onDeleteTask }: {
   tasks: KanbanTask[];
   members: TeamMember[];
   onAddTask: (column: KanbanTask['column']) => void;
-  onMoveTask: (taskId: string, direction: 'left' | 'right') => void;
+  onChangeStatus: (taskId: string, newStatus: KanbanTask['column']) => void;
   onDeleteTask: (taskId: string) => void;
 }) => (
-  <div className="flex-1 overflow-x-auto overflow-y-auto p-4">
+  <div className="flex-1 overflow-x-auto p-4">
     <div className="flex gap-4 min-w-[820px]">
       <KanbanColumn
         title="В очереди"
@@ -394,7 +425,7 @@ const KanbanBoard = ({ tasks, members, onAddTask, onMoveTask, onDeleteTask }: {
         tasks={tasks.filter(t => t.column === 'backlog')}
         members={members}
         onAddTask={onAddTask}
-        onMoveTask={onMoveTask}
+        onChangeStatus={onChangeStatus}
         onDeleteTask={onDeleteTask}
       />
       <KanbanColumn
@@ -405,7 +436,7 @@ const KanbanBoard = ({ tasks, members, onAddTask, onMoveTask, onDeleteTask }: {
         tasks={tasks.filter(t => t.column === 'progress')}
         members={members}
         onAddTask={onAddTask}
-        onMoveTask={onMoveTask}
+        onChangeStatus={onChangeStatus}
         onDeleteTask={onDeleteTask}
       />
       <KanbanColumn
@@ -416,7 +447,7 @@ const KanbanBoard = ({ tasks, members, onAddTask, onMoveTask, onDeleteTask }: {
         tasks={tasks.filter(t => t.column === 'done')}
         members={members}
         onAddTask={onAddTask}
-        onMoveTask={onMoveTask}
+        onChangeStatus={onChangeStatus}
         onDeleteTask={onDeleteTask}
       />
     </div>
@@ -550,13 +581,29 @@ export const TeamsPage = () => {
     setTasks(prev => [...prev, { ...data, id: `k${Date.now()}` }]);
   }, []);
 
-  const handleMoveTask = useCallback((taskId: string, direction: 'left' | 'right') => {
+  const handleChangeStatus = useCallback((taskId: string, newStatus: KanbanTask['column']) => {
+    let taskTitle = '';
+    let assigneeName = '';
     setTasks(prev => prev.map(t => {
       if (t.id !== taskId) return t;
-      const idx = columnOrder.indexOf(t.column);
-      const newIdx = direction === 'right' ? Math.min(idx + 1, columnOrder.length - 1) : Math.max(idx - 1, 0);
-      return { ...t, column: columnOrder[newIdx] };
+      taskTitle = t.title;
+      const member = teamMembers.find(m => m.id === t.assigneeId);
+      assigneeName = member?.name || 'Система';
+      return { ...t, column: newStatus };
     }));
+
+    const now = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    const sysMsg: ChatMessage = {
+      id: `sys${Date.now()}`,
+      senderId: 'system',
+      time: now,
+      read: true,
+      isSystem: true,
+      text: newStatus === 'progress'
+        ? `\u{1F4E2} @${assigneeName} принял в работу задачу: "${taskTitle}" (Статус: В процессе)`
+        : `\u2705 @${assigneeName} выполнил задачу: "${taskTitle}" (Статус: Готово)`,
+    };
+    setMessages(prev => [...prev, sysMsg]);
   }, []);
 
   const handleDeleteTask = useCallback((taskId: string) => {
@@ -663,7 +710,7 @@ export const TeamsPage = () => {
               tasks={tasks}
               members={teamMembers}
               onAddTask={(col) => setAddTaskColumn(col)}
-              onMoveTask={handleMoveTask}
+              onChangeStatus={handleChangeStatus}
               onDeleteTask={handleDeleteTask}
             />
           )}
