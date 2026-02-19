@@ -23,7 +23,10 @@ import {
   Plus,
   Trash2,
   Play,
-  CheckCircle2
+  CheckCircle2,
+  Pencil,
+  FileText,
+  Upload
 } from 'lucide-react';
 
 const LS_TASKS_KEY = 'xplr_kanban_tasks';
@@ -50,12 +53,21 @@ interface ChatMessage {
   isSystem?: boolean;
 }
 
+interface TaskFile {
+  id: string;
+  name: string;
+  uploaderId: string;
+  uploadedAt: string;
+}
+
 interface KanbanTask {
   id: string;
   title: string;
   description: string;
   assigneeId: string;
+  creatorId: string;
   column: 'backlog' | 'progress' | 'done';
+  files: TaskFile[];
 }
 
 /* ──────────────────────────────── Data ──────────────────────────────── */
@@ -78,13 +90,13 @@ const initialMessages: ChatMessage[] = [
 ];
 
 const initialTasks: KanbanTask[] = [
-  { id: 'k1', title: 'Протестировать оффер DE', description: 'Запустить тестовый трафик $2K', assigneeId: '3', column: 'progress' },
-  { id: 'k2', title: 'Подготовить крео v2', description: 'Новые баннеры для FR гео', assigneeId: '2', column: 'progress' },
-  { id: 'k3', title: 'Масштабировать ES', description: 'Увеличить бюджет до $10K/день', assigneeId: '4', column: 'backlog' },
-  { id: 'k4', title: 'Анализ ROI за неделю', description: 'Сводная таблица по всем гео', assigneeId: '1', column: 'backlog' },
-  { id: 'k5', title: 'Настроить API трекер', description: 'Интегрировать postback для конверсий', assigneeId: '2', column: 'backlog' },
-  { id: 'k6', title: 'Выпустить 50 карт EUR', description: 'Для нового потока FR', assigneeId: '3', column: 'done' },
-  { id: 'k7', title: 'Закрыть старый оффер UK', description: 'Стоп трафик, архивировать данные', assigneeId: '1', column: 'done' },
+  { id: 'k1', title: 'Протестировать оффер DE', description: 'Запустить тестовый трафик $2K', assigneeId: '3', creatorId: '1', column: 'progress', files: [] },
+  { id: 'k2', title: 'Подготовить крео v2', description: 'Новые баннеры для FR гео', assigneeId: '2', creatorId: '1', column: 'progress', files: [] },
+  { id: 'k3', title: 'Масштабировать ES', description: 'Увеличить бюджет до $10K/день', assigneeId: '4', creatorId: '1', column: 'backlog', files: [] },
+  { id: 'k4', title: 'Анализ ROI за неделю', description: 'Сводная таблица по всем гео', assigneeId: '1', creatorId: '1', column: 'backlog', files: [] },
+  { id: 'k5', title: 'Настроить API трекер', description: 'Интегрировать postback для конверсий', assigneeId: '2', creatorId: '1', column: 'backlog', files: [] },
+  { id: 'k6', title: 'Выпустить 50 карт EUR', description: 'Для нового потока FR', assigneeId: '3', creatorId: '1', column: 'done', files: [] },
+  { id: 'k7', title: 'Закрыть старый оффер UK', description: 'Стоп трафик, архивировать данные', assigneeId: '1', creatorId: '1', column: 'done', files: [] },
 ];
 
 /* ──────────────────────────── Small Components ───────────────────────── */
@@ -318,7 +330,7 @@ const ChatPanel = ({ messages, members, onSend }: {
 
 /* ──────────────────────────── Kanban Board ───────────────────────────── */
 
-const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, onAddTask, onChangeStatus, onDeleteTask }: {
+const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, onAddTask, onChangeStatus, onDeleteTask, onEditTask, onAttachFile }: {
   title: string;
   icon: React.ReactNode;
   color: string;
@@ -328,11 +340,14 @@ const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, onAddTask
   onAddTask: (column: KanbanTask['column']) => void;
   onChangeStatus: (taskId: string, newStatus: KanbanTask['column']) => void;
   onDeleteTask: (taskId: string) => void;
+  onEditTask: (task: KanbanTask) => void;
+  onAttachFile: (taskId: string) => void;
 }) => {
   const getMember = (id: string) => members.find(m => m.id === id);
+  const isBacklog = columnKey === 'backlog';
 
   return (
-    <div className="flex-1 min-w-[260px] flex flex-col">
+    <div className="flex-1 min-w-[260px]">
       {/* Sticky header */}
       <div className="sticky top-0 z-10 bg-[#0a0a0f]/95 backdrop-blur-sm pb-2">
         <div className="flex items-center gap-2 px-1 py-1">
@@ -340,7 +355,7 @@ const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, onAddTask
           <span className={`text-sm font-semibold ${color}`}>{title}</span>
           <span className="ml-auto text-xs text-slate-600 bg-white/[0.04] px-2 py-0.5 rounded-full">{tasks.length}</span>
         </div>
-        {columnKey === 'backlog' && (
+        {isBacklog && (
           <button
             onClick={() => onAddTask('backlog')}
             className="w-full py-3 mt-1 flex items-center justify-center gap-1.5 text-sm text-gray-400 bg-white/5 border border-dashed border-white/20 rounded-xl hover:bg-white/10 hover:text-white transition-all"
@@ -351,10 +366,11 @@ const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, onAddTask
         )}
       </div>
 
-      {/* Scrollable task list */}
-      <div className="flex-1 overflow-y-auto max-h-[600px] space-y-2 pb-4 pr-1">
+      {/* Task list (no individual scroll) */}
+      <div className="space-y-2 pb-4">
         {tasks.map(task => {
           const assignee = getMember(task.assigneeId);
+          const creator = getMember(task.creatorId);
           return (
             <div key={task.id} className="glass-card p-3 group hover:border-white/20 transition-all duration-150">
               <div className="flex items-start gap-2">
@@ -362,15 +378,64 @@ const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, onAddTask
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-white mb-1">{task.title}</p>
                   <p className="text-xs text-slate-500 mb-2">{task.description}</p>
-                  <div className="flex items-center justify-between">
-                    {assignee ? (
-                      <div className="flex items-center gap-2">
+
+                  {/* Attached files */}
+                  {task.files.length > 0 && (
+                    <div className="mb-2 space-y-1">
+                      {task.files.map(f => {
+                        const uploader = getMember(f.uploaderId);
+                        return (
+                          <div key={f.id} className="flex items-center gap-2 px-2 py-1.5 bg-white/[0.03] border border-white/[0.06] rounded-lg">
+                            <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                            <span className="text-[11px] text-slate-300 truncate flex-1">{f.name}</span>
+                            {uploader && (
+                              <div className="flex items-center gap-1 shrink-0" title={`Прикрепил: ${uploader.name}`}>
+                                <div className={`w-4 h-4 rounded text-[7px] flex items-center justify-center text-white font-semibold ${uploader.role === 'owner' ? 'bg-gradient-to-br from-red-500 to-orange-600' : 'bg-gradient-to-br from-blue-500 to-purple-600'}`}>
+                                  {uploader.avatar}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Creator + Assignee row */}
+                  <div className="flex items-center gap-3 mb-2">
+                    {creator && (
+                      <div className="flex items-center gap-1" title={`Поручил: ${creator.name}`}>
+                        <span className="text-[9px] text-slate-600 uppercase">от</span>
+                        <Avatar member={creator} size="sm" />
+                      </div>
+                    )}
+                    {assignee && (
+                      <div className="flex items-center gap-1" title={`Исполнитель: ${assignee.name}`}>
+                        <span className="text-[9px] text-slate-600 uppercase">\u2192</span>
                         <Avatar member={assignee} size="sm" />
                         <span className="text-[11px] text-slate-400">{assignee.name.split(' ')[0]}</span>
                       </div>
-                    ) : <div />}
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {columnKey === 'backlog' && (
+                    )}
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {isBacklog && (
+                      <>
+                        <button
+                          onClick={() => onEditTask(task)}
+                          className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                          title="Редактировать"
+                        >
+                          <Pencil className="w-3.5 h-3.5 text-slate-400" />
+                        </button>
+                        <button
+                          onClick={() => onAttachFile(task.id)}
+                          className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                          title="Прикрепить файл"
+                        >
+                          <Upload className="w-3.5 h-3.5 text-slate-400" />
+                        </button>
                         <button
                           onClick={() => onChangeStatus(task.id, 'progress')}
                           className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-lg transition-colors"
@@ -379,21 +444,21 @@ const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, onAddTask
                           <Play className="w-3 h-3" />
                           В работу
                         </button>
-                      )}
-                      {columnKey === 'progress' && (
-                        <button
-                          onClick={() => onChangeStatus(task.id, 'done')}
-                          className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-lg transition-colors"
-                          title="Завершить"
-                        >
-                          <CheckCircle2 className="w-3 h-3" />
-                          Готово
-                        </button>
-                      )}
-                      <button onClick={() => onDeleteTask(task.id)} className="p-1 hover:bg-red-500/20 rounded transition-colors" title="Удалить">
-                        <Trash2 className="w-3.5 h-3.5 text-slate-500 hover:text-red-400" />
+                      </>
+                    )}
+                    {columnKey === 'progress' && (
+                      <button
+                        onClick={() => onChangeStatus(task.id, 'done')}
+                        className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-lg transition-colors"
+                        title="Завершить"
+                      >
+                        <CheckCircle2 className="w-3 h-3" />
+                        Готово
                       </button>
-                    </div>
+                    )}
+                    <button onClick={() => onDeleteTask(task.id)} className="p-1 hover:bg-red-500/20 rounded transition-colors ml-auto" title="Удалить">
+                      <Trash2 className="w-3.5 h-3.5 text-slate-500 hover:text-red-400" />
+                    </button>
                   </div>
                 </div>
               </div>
@@ -408,14 +473,16 @@ const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, onAddTask
   );
 };
 
-const KanbanBoard = ({ tasks, members, onAddTask, onChangeStatus, onDeleteTask }: {
+const KanbanBoard = ({ tasks, members, onAddTask, onChangeStatus, onDeleteTask, onEditTask, onAttachFile }: {
   tasks: KanbanTask[];
   members: TeamMember[];
   onAddTask: (column: KanbanTask['column']) => void;
   onChangeStatus: (taskId: string, newStatus: KanbanTask['column']) => void;
   onDeleteTask: (taskId: string) => void;
+  onEditTask: (task: KanbanTask) => void;
+  onAttachFile: (taskId: string) => void;
 }) => (
-  <div className="flex-1 overflow-x-auto p-4">
+  <div className="flex-1 overflow-y-auto overflow-x-auto p-4">
     <div className="flex gap-4 min-w-[820px]">
       <KanbanColumn
         title="В очереди"
@@ -427,6 +494,8 @@ const KanbanBoard = ({ tasks, members, onAddTask, onChangeStatus, onDeleteTask }
         onAddTask={onAddTask}
         onChangeStatus={onChangeStatus}
         onDeleteTask={onDeleteTask}
+        onEditTask={onEditTask}
+        onAttachFile={onAttachFile}
       />
       <KanbanColumn
         title="В процессе"
@@ -438,6 +507,8 @@ const KanbanBoard = ({ tasks, members, onAddTask, onChangeStatus, onDeleteTask }
         onAddTask={onAddTask}
         onChangeStatus={onChangeStatus}
         onDeleteTask={onDeleteTask}
+        onEditTask={onEditTask}
+        onAttachFile={onAttachFile}
       />
       <KanbanColumn
         title="Готово"
@@ -449,6 +520,8 @@ const KanbanBoard = ({ tasks, members, onAddTask, onChangeStatus, onDeleteTask }
         onAddTask={onAddTask}
         onChangeStatus={onChangeStatus}
         onDeleteTask={onDeleteTask}
+        onEditTask={onEditTask}
+        onAttachFile={onAttachFile}
       />
     </div>
   </div>
@@ -469,7 +542,7 @@ const AddTaskModal = ({ column, members, onClose, onSave }: {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
-    onSave({ title: title.trim(), description: description.trim(), assigneeId, column });
+    onSave({ title: title.trim(), description: description.trim(), assigneeId, column, creatorId: '', files: [] });
     onClose();
   };
 
@@ -543,6 +616,125 @@ const AddTaskModal = ({ column, members, onClose, onSave }: {
   );
 };
 
+/* ──────────────────────────── Edit Task Modal ─────────────────────────── */
+
+const EditTaskModal = ({ task, members, onClose, onSave }: {
+  task: KanbanTask;
+  members: TeamMember[];
+  onClose: () => void;
+  onSave: (taskId: string, updates: { title: string; description: string; assigneeId: string }) => void;
+}) => {
+  const [title, setTitle] = useState(task.title);
+  const [description, setDescription] = useState(task.description);
+  const [assigneeId, setAssigneeId] = useState(task.assigneeId);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+    onSave(task.id, { title: title.trim(), description: description.trim(), assigneeId });
+    onClose();
+  };
+
+  return (
+    <ModalPortal>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
+        <div className="relative bg-[#050507]/95 backdrop-blur-3xl border border-white/10 p-6 rounded-2xl w-full max-w-[440px] shadow-2xl shadow-black/60 animate-scale-in">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-lg font-semibold text-white">Редактировать задачу</h3>
+            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+              <X className="w-5 h-5 text-slate-400" />
+            </button>
+          </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm text-slate-400 mb-1.5">Название *</label>
+              <input value={title} onChange={e => setTitle(e.target.value)} className="xplr-input w-full" autoFocus />
+            </div>
+            <div>
+              <label className="block text-sm text-slate-400 mb-1.5">Описание</label>
+              <input value={description} onChange={e => setDescription(e.target.value)} className="xplr-input w-full" />
+            </div>
+            <div>
+              <label className="block text-sm text-slate-400 mb-1.5">Исполнитель</label>
+              <select value={assigneeId} onChange={e => setAssigneeId(e.target.value)} className="xplr-select w-full">
+                {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button type="button" onClick={onClose} className="flex-1 px-4 py-3 glass-card hover:bg-white/10 text-slate-300 font-medium rounded-xl transition-colors">Отмена</button>
+              <button type="submit" disabled={!title.trim()} className="flex-1 px-4 py-3 gradient-accent text-white font-medium rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed">Сохранить</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </ModalPortal>
+  );
+};
+
+/* ──────────────────────────── Attach File Modal ──────────────────────── */
+
+const AttachFileModal = ({ taskTitle, onClose, onAttach }: {
+  taskTitle: string;
+  onClose: () => void;
+  onAttach: (fileName: string) => void;
+}) => {
+  const [fileName, setFileName] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setFileName(file.name);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fileName.trim()) return;
+    onAttach(fileName.trim());
+    onClose();
+  };
+
+  return (
+    <ModalPortal>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
+        <div className="relative bg-[#050507]/95 backdrop-blur-3xl border border-white/10 p-6 rounded-2xl w-full max-w-[440px] shadow-2xl shadow-black/60 animate-scale-in">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-lg font-semibold text-white">Прикрепить файл</h3>
+            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+              <X className="w-5 h-5 text-slate-400" />
+            </button>
+          </div>
+          <p className="text-xs text-slate-500 mb-4">К задаче: «{taskTitle}»</p>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full py-8 flex flex-col items-center justify-center gap-2 border-2 border-dashed border-white/15 rounded-xl hover:border-white/30 hover:bg-white/[0.03] transition-all"
+            >
+              <Upload className="w-8 h-8 text-slate-500" />
+              <span className="text-sm text-slate-400">{fileName || 'Нажмите для выбора файла'}</span>
+            </button>
+            {!fileName && (
+              <div>
+                <label className="block text-sm text-slate-400 mb-1.5">Или введите имя файла</label>
+                <input value={fileName} onChange={e => setFileName(e.target.value)} placeholder="report.pdf" className="xplr-input w-full" />
+              </div>
+            )}
+            <div className="flex gap-3 pt-2">
+              <button type="button" onClick={onClose} className="flex-1 px-4 py-3 glass-card hover:bg-white/10 text-slate-300 font-medium rounded-xl transition-colors">Отмена</button>
+              <button type="submit" disabled={!fileName.trim()} className="flex-1 px-4 py-3 gradient-accent text-white font-medium rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed">Прикрепить</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </ModalPortal>
+  );
+};
+
 /* ──────────────────────────── Main Page ──────────────────────────────── */
 
 /* ── localStorage helpers ── */
@@ -568,7 +760,41 @@ export const TeamsPage = () => {
   const [selectedMember, setSelectedMember] = useState<string | null>(null);
   const [showMobileMembers, setShowMobileMembers] = useState(false);
   const [addTaskColumn, setAddTaskColumn] = useState<KanbanTask['column'] | null>(null);
+  const [editingTask, setEditingTask] = useState<KanbanTask | null>(null);
+  const [attachingTaskId, setAttachingTaskId] = useState<string | null>(null);
   const { user } = useAuth();
+
+  const currentUserId = user?.id || '1';
+  const now = () => new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  const getUserName = () => teamMembers.find(m => m.id === currentUserId)?.name || 'Система';
+
+  // ── Chat state with localStorage persistence (declare first, used by task handlers) ──
+  const [messages, setMessages] = useState<ChatMessage[]>(loadMessages);
+
+  useEffect(() => {
+    localStorage.setItem(LS_CHAT_KEY, JSON.stringify(messages));
+  }, [messages]);
+
+  const addSystemMsg = useCallback((text: string) => {
+    setMessages(prev => [...prev, {
+      id: `sys${Date.now()}`,
+      senderId: 'system',
+      time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+      read: true,
+      isSystem: true,
+      text,
+    }]);
+  }, []);
+
+  const handleSendMessage = useCallback((text: string) => {
+    setMessages(prev => [...prev, {
+      id: `m${Date.now()}`,
+      senderId: currentUserId,
+      text,
+      time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+      read: false,
+    }]);
+  }, [currentUserId]);
 
   // ── Tasks state with localStorage persistence ──
   const [tasks, setTasks] = useState<KanbanTask[]>(loadTasks);
@@ -578,8 +804,10 @@ export const TeamsPage = () => {
   }, [tasks]);
 
   const handleAddTask = useCallback((data: Omit<KanbanTask, 'id'>) => {
-    setTasks(prev => [...prev, { ...data, id: `k${Date.now()}` }]);
-  }, []);
+    const newTask: KanbanTask = { ...data, id: `k${Date.now()}`, creatorId: currentUserId, files: data.files || [] };
+    setTasks(prev => [...prev, newTask]);
+    addSystemMsg(`\u{1F514} @${getUserName()} поручил задачу: "${data.title}"`);
+  }, [currentUserId, addSystemMsg]);
 
   const handleChangeStatus = useCallback((taskId: string, newStatus: KanbanTask['column']) => {
     let taskTitle = '';
@@ -587,46 +815,41 @@ export const TeamsPage = () => {
     setTasks(prev => prev.map(t => {
       if (t.id !== taskId) return t;
       taskTitle = t.title;
-      const member = teamMembers.find(m => m.id === t.assigneeId);
-      assigneeName = member?.name || 'Система';
+      assigneeName = teamMembers.find(m => m.id === t.assigneeId)?.name || 'Система';
       return { ...t, column: newStatus };
     }));
-
-    const now = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-    const sysMsg: ChatMessage = {
-      id: `sys${Date.now()}`,
-      senderId: 'system',
-      time: now,
-      read: true,
-      isSystem: true,
-      text: newStatus === 'progress'
-        ? `\u{1F4E2} @${assigneeName} принял в работу задачу: "${taskTitle}" (Статус: В процессе)`
-        : `\u2705 @${assigneeName} выполнил задачу: "${taskTitle}" (Статус: Готово)`,
-    };
-    setMessages(prev => [...prev, sysMsg]);
-  }, []);
+    if (newStatus === 'progress') {
+      addSystemMsg(`\u{1F4E2} @${assigneeName} принял в работу задачу: "${taskTitle}" (Статус: В процессе)`);
+    } else {
+      addSystemMsg(`\u2705 @${assigneeName} выполнил задачу: "${taskTitle}" (Статус: Готово)`);
+    }
+  }, [addSystemMsg]);
 
   const handleDeleteTask = useCallback((taskId: string) => {
     setTasks(prev => prev.filter(t => t.id !== taskId));
   }, []);
 
-  // ── Chat state with localStorage persistence ──
-  const [messages, setMessages] = useState<ChatMessage[]>(loadMessages);
+  const handleEditTask = useCallback((taskId: string, updates: { title: string; description: string; assigneeId: string }) => {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
+  }, []);
 
-  useEffect(() => {
-    localStorage.setItem(LS_CHAT_KEY, JSON.stringify(messages));
-  }, [messages]);
-
-  const handleSendMessage = useCallback((text: string) => {
-    const newMsg: ChatMessage = {
-      id: `m${Date.now()}`,
-      senderId: user?.id || '1',
-      text,
-      time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
-      read: false,
+  const handleAttachFile = useCallback((taskId: string, fileName: string) => {
+    const file: TaskFile = {
+      id: `f${Date.now()}`,
+      name: fileName,
+      uploaderId: currentUserId,
+      uploadedAt: now(),
     };
-    setMessages(prev => [...prev, newMsg]);
-  }, [user?.id]);
+    let taskTitle = '';
+    setTasks(prev => prev.map(t => {
+      if (t.id !== taskId) return t;
+      taskTitle = t.title;
+      return { ...t, files: [...t.files, file] };
+    }));
+    addSystemMsg(`\u{1F514} @${getUserName()} прикрепил файл: ${fileName} к задаче: "${taskTitle}"`);
+  }, [currentUserId, addSystemMsg]);
+
+  const attachingTask = attachingTaskId ? tasks.find(t => t.id === attachingTaskId) : null;
 
   return (
     <DashboardLayout>
@@ -712,11 +935,13 @@ export const TeamsPage = () => {
               onAddTask={(col) => setAddTaskColumn(col)}
               onChangeStatus={handleChangeStatus}
               onDeleteTask={handleDeleteTask}
+              onEditTask={(task) => setEditingTask(task)}
+              onAttachFile={(taskId) => setAttachingTaskId(taskId)}
             />
           )}
         </div>
 
-        {/* Invite Modal */}
+        {/* Modals */}
         {showInvite && <InviteModal onClose={() => setShowInvite(false)} />}
         {addTaskColumn && (
           <AddTaskModal
@@ -724,6 +949,21 @@ export const TeamsPage = () => {
             members={teamMembers}
             onClose={() => setAddTaskColumn(null)}
             onSave={handleAddTask}
+          />
+        )}
+        {editingTask && (
+          <EditTaskModal
+            task={editingTask}
+            members={teamMembers}
+            onClose={() => setEditingTask(null)}
+            onSave={handleEditTask}
+          />
+        )}
+        {attachingTask && (
+          <AttachFileModal
+            taskTitle={attachingTask.title}
+            onClose={() => setAttachingTaskId(null)}
+            onAttach={(fileName) => handleAttachFile(attachingTask.id, fileName)}
           />
         )}
       </div>
