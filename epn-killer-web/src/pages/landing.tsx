@@ -971,7 +971,7 @@ export const LandingPage = () => {
           to { opacity: 1; transform: translateY(0); }
         }
         .animate-fade-in {
-          animation: fade-in 0.3s ease-out forwards;
+          animation: fade-in 0.15s ease-out forwards;
         }
       `}</style>
     </div>

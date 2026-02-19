@@ -44,9 +44,12 @@ const CurrencyRates = () => {
 
 const ModeToggle = () => {
   const { mode, setMode } = useMode();
-  const { isOwner } = useAuth();
+  const { isOwner, userMode } = useAuth();
 
-  // MEMBER users are locked to ARBITRAGE mode
+  // In personal userMode — no toggle at all, everything is personal
+  if (userMode === 'personal') return null;
+
+  // MEMBER users in business mode — locked to ARBITRAGE
   if (!isOwner) {
     return (
       <div className="glass-card p-1.5 flex relative">
@@ -58,15 +61,16 @@ const ModeToggle = () => {
     );
   }
 
+  // OWNER in business mode — can toggle
   return (
     <div className="glass-card p-1.5 flex relative">
       <div
-        className="absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] gradient-accent rounded-xl transition-all duration-300 ease-out shadow-lg shadow-blue-500/25"
+        className="absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] gradient-accent rounded-xl transition-all duration-150 ease-out shadow-lg shadow-blue-500/25"
         style={{ left: mode === 'PERSONAL' ? '6px' : 'calc(50%)' }}
       />
       <button
         onClick={() => setMode('PERSONAL')}
-        className={`relative z-10 flex-1 px-4 py-2.5 text-xs font-bold tracking-wide rounded-xl transition-colors duration-300 ${
+        className={`relative z-10 flex-1 px-4 py-2.5 text-xs font-bold tracking-wide rounded-xl transition-colors duration-150 ${
           mode === 'PERSONAL' ? 'text-white' : 'text-slate-500 hover:text-slate-300'
         }`}
       >
@@ -74,7 +78,7 @@ const ModeToggle = () => {
       </button>
       <button
         onClick={() => setMode('ARBITRAGE')}
-        className={`relative z-10 flex-1 px-4 py-2.5 text-xs font-bold tracking-wide rounded-xl transition-colors duration-300 ${
+        className={`relative z-10 flex-1 px-4 py-2.5 text-xs font-bold tracking-wide rounded-xl transition-colors duration-150 ${
           mode === 'ARBITRAGE' ? 'text-white' : 'text-slate-500 hover:text-slate-300'
         }`}
       >
@@ -95,7 +99,7 @@ interface NavItemProps {
 const NavItem = ({ href, icon, label, isActive, onClick }: NavItemProps) => (
   <Link to={href} onClick={onClick}>
     <div
-      className={`group flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all duration-200 ${
+      className={`group flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all duration-150 ${
         isActive
           ? 'bg-gradient-to-r from-blue-500/20 to-purple-500/10 text-blue-400 border border-blue-500/30 shadow-lg shadow-blue-500/10'
           : 'text-slate-400 hover:text-white hover:bg-white/5'
@@ -166,19 +170,26 @@ const BottomNavItem = ({ href, icon, label, isActive }: { href: string; icon: Re
 export const Sidebar = () => {
   const location = useLocation();
   const { mode } = useMode();
+  const { userMode, isMember } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navItems = [
-    { href: '/dashboard', icon: <LayoutDashboard className="w-5 h-5" />, label: 'Главная', showIn: ['PERSONAL', 'ARBITRAGE'] },
-    { href: '/cards', icon: <CreditCard className="w-5 h-5" />, label: 'Карты', showIn: ['PERSONAL', 'ARBITRAGE'] },
-    { href: '/finance', icon: <Receipt className="w-5 h-5" />, label: 'Финансы', showIn: ['PERSONAL', 'ARBITRAGE'] },
-    { href: '/teams', icon: <Users className="w-5 h-5" />, label: 'Команды', showIn: ['ARBITRAGE'] },
-    { href: '/referrals', icon: <Gift className="w-5 h-5" />, label: 'Партнёрка', showIn: ['PERSONAL', 'ARBITRAGE'] },
-    { href: '/api', icon: <Code className="w-5 h-5" />, label: 'API', showIn: ['ARBITRAGE'] },
-    { href: '/support', icon: <HelpCircle className="w-5 h-5" />, label: 'Поддержка', showIn: ['PERSONAL', 'ARBITRAGE'] },
+    { href: '/dashboard', icon: <LayoutDashboard className="w-5 h-5" />, label: 'Главная', showIn: ['PERSONAL', 'ARBITRAGE'], modes: ['personal', 'business'] as const },
+    { href: '/cards', icon: <CreditCard className="w-5 h-5" />, label: 'Карты', showIn: ['PERSONAL', 'ARBITRAGE'], modes: ['personal', 'business'] as const },
+    { href: '/finance', icon: <Receipt className="w-5 h-5" />, label: 'Финансы', showIn: ['PERSONAL', 'ARBITRAGE'], modes: ['personal', 'business'] as const },
+    { href: '/teams', icon: <Users className="w-5 h-5" />, label: 'Команды', showIn: ['ARBITRAGE'], modes: ['business'] as const },
+    { href: '/referrals', icon: <Gift className="w-5 h-5" />, label: 'Партнёрка', showIn: ['PERSONAL', 'ARBITRAGE'], modes: ['personal', 'business'] as const },
+    { href: '/api', icon: <Code className="w-5 h-5" />, label: 'API', showIn: ['ARBITRAGE'], modes: ['business'] as const },
+    { href: '/support', icon: <HelpCircle className="w-5 h-5" />, label: 'Поддержка', showIn: ['PERSONAL', 'ARBITRAGE'], modes: ['personal', 'business'] as const },
   ];
 
-  const filteredNavItems = navItems.filter(item => item.showIn.includes(mode));
+  // Step 1: filter by userMode (personal vs business)
+  // Step 2: in business mode, also filter by PERSONAL/ARBITRAGE toggle
+  const filteredNavItems = navItems.filter(item => {
+    if (!(item.modes as readonly string[]).includes(userMode)) return false;
+    if (userMode === 'personal') return true; // personal mode shows all its items
+    return item.showIn.includes(mode); // business mode respects PERSONAL/ARBITRAGE toggle
+  });
   const bottomNavItems = filteredNavItems.slice(0, 5);
 
   return (
@@ -195,9 +206,11 @@ export const Sidebar = () => {
           <div className="mb-4">
             <CurrencyRates />
           </div>
-          <div className="mb-6">
-            <ModeToggle />
-          </div>
+          {userMode === 'business' && (
+            <div className="mb-6">
+              <ModeToggle />
+            </div>
+          )}
           <nav className="flex-1 space-y-1">
             {filteredNavItems.map(item => (
               <NavItem
@@ -228,9 +241,11 @@ export const Sidebar = () => {
             </button>
           </div>
         </div>
-        <div className="px-4 pb-3">
-          <ModeToggle />
-        </div>
+        {userMode === 'business' && (
+          <div className="px-4 pb-3">
+            <ModeToggle />
+          </div>
+        )}
       </header>
 
       {/* Mobile Menu Overlay */}

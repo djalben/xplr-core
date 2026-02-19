@@ -87,7 +87,9 @@ export const AuthPage = () => {
         setError('Сервер не вернул токен. Попробуйте ещё раз.');
         return;
       }
-      navigate('/dashboard');
+      // Redirect to onboarding if not completed yet, otherwise dashboard
+      const onboarded = localStorage.getItem('xplr_onboarding_complete') === 'true';
+      navigate(onboarded ? '/dashboard' : '/onboarding');
     } catch (err: any) {
       console.error('[Auth] Registration error details:', err.response);
       console.error('[Auth] Status:', err.response?.status, 'Data:', err.response?.data, 'Msg:', err.message);

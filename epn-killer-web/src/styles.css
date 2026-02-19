@@ -688,7 +688,7 @@ select option:focus,
 }
 
 .reveal-animation {
-  animation: revealNumber 0.3s ease-out forwards;
+  animation: revealNumber 0.15s ease-out forwards;
 }
 
 /* Enhanced input focus states */
@@ -734,7 +734,7 @@ select option:focus,
 }
 
 .copy-success {
-  animation: copySuccess 0.3s ease-out;
+  animation: copySuccess 0.15s ease-out;
 }
 
 /* Stat card icon backgrounds with gradient - Dark */
