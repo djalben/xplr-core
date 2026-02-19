@@ -957,6 +957,21 @@ select option:focus,
   will-change: transform, opacity;
 }
 
+/* Thin scrollbar for sidebar nav */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 3px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
 /* Fade in animation */
 @keyframes fade-in {
   from { opacity: 0; }

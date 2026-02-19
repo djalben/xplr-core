@@ -143,7 +143,7 @@ const UserProfile = () => {
       <div className="flex gap-2">
         <Link to="/settings" className="flex-1">
           <button className="w-full flex items-center justify-center gap-2 py-2 text-xs text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors">
-            <Settings className="w-4 h-4" />
+            <Settings className="w-6 h-6 text-blue-400 animate-[spin_6s_linear_infinite]" />
             {t('nav.settings')}
           </button>
         </Link>
@@ -200,7 +200,7 @@ export const Sidebar = () => {
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="fixed left-0 top-0 bottom-0 w-64 hidden lg:flex flex-col z-50">
+      <aside className="fixed left-0 top-0 w-64 h-screen hidden lg:flex flex-col z-50">
         <div className="absolute inset-0 bg-[#0a0a0f]/80 backdrop-blur-xl border-r border-white/[0.08]" />
         <div className="absolute inset-0 bg-gradient-to-b from-blue-500/[0.03] via-transparent to-purple-500/[0.02]" />
 
@@ -216,7 +216,7 @@ export const Sidebar = () => {
               <ModeToggle />
             </div>
           )}
-          <nav className="flex-1 space-y-1">
+          <nav className="flex-1 min-h-0 overflow-y-auto space-y-1 scrollbar-thin">
             {filteredNavItems.map(item => (
               <NavItem
                 key={item.href}
