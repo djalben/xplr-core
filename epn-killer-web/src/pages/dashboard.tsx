@@ -233,7 +233,7 @@ export const DashboardPage = () => {
         {/* Welcome Card */}
         <div className="glass-card p-6 mb-6 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-          <div className="relative z-10 flex items-center justify-between">
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <Sparkles className="w-5 h-5 text-amber-400" />
@@ -248,15 +248,10 @@ export const DashboardPage = () => {
                   : 'Ваш арбитражный кабинет готов к работе'}
               </p>
             </div>
-            <div className="hidden md:block">
-              <div className="w-16 h-16 rounded-2xl gradient-accent flex items-center justify-center shadow-lg shadow-blue-500/25">
-                {mode === 'PERSONAL' ? <Wallet className="w-8 h-8 text-white" /> : <Target className="w-8 h-8 text-white" />}
-              </div>
+            {/* World Clocks — inline with greeting */}
+            <div className="shrink-0">
+              <WorldClocks />
             </div>
-          </div>
-          {/* World Clocks */}
-          <div className="mt-5 pt-5 border-t border-white/[0.06]">
-            <WorldClocks />
           </div>
         </div>
 

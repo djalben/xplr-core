@@ -553,17 +553,17 @@ const BankLogoButton = ({
   <button
     onClick={onClick}
     className={`
-      flex flex-col items-center gap-2 p-3 rounded-xl transition-all duration-200 cursor-pointer
+      flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all duration-200 cursor-pointer
       ${selected
         ? 'bg-blue-500/10 border-2 border-blue-500 scale-105 shadow-lg shadow-blue-500/20'
         : 'bg-white/[0.03] border border-white/[0.08] hover:bg-white/[0.06] hover:border-white/15 active:scale-95'
       }
     `}
   >
-    <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden shrink-0">
-      {BankLogos[bank.id] ?? <span className="text-white font-bold text-sm">{bank.name[0]}</span>}
+    <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden shrink-0">
+      {BankLogos[bank.id] ?? <span className="text-white font-bold text-xs">{bank.name[0]}</span>}
     </div>
-    <span className={`text-[11px] font-medium leading-tight ${selected ? 'text-white' : 'text-slate-400'}`}>
+    <span className={`text-[10px] font-medium leading-tight ${selected ? 'text-white' : 'text-slate-400'}`}>
       {bank.name}
     </span>
   </button>
@@ -612,15 +612,15 @@ const TopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () => void
       <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
 
       {/* Modal panel — deep opaque glass */}
-      <div className="relative bg-[#0d0d0f]/95 backdrop-blur-3xl border border-white/10 p-6 rounded-2xl w-full max-w-md animate-scale-in max-h-[90dvh] overflow-y-auto shadow-2xl shadow-black/60">
-        <div className="flex items-center justify-between mb-6">
+      <div className="relative bg-[#0d0d0f]/95 backdrop-blur-3xl border border-white/10 p-5 rounded-2xl w-full max-w-md animate-scale-in max-h-[90dvh] overflow-y-auto shadow-2xl shadow-black/60">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500/20 to-blue-500/20 border border-emerald-500/30 flex items-center justify-center">
-              <Banknote className="w-6 h-6 text-emerald-400" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-blue-500/20 border border-emerald-500/30 flex items-center justify-center">
+              <Banknote className="w-5 h-5 text-emerald-400" />
             </div>
             <div>
-              <h3 className="text-xl font-semibold text-white">Пополнить карту</h3>
-              <p className="text-sm text-slate-400">{card.name}</p>
+              <h3 className="text-lg font-semibold text-white">Пополнить карту</h3>
+              <p className="text-xs text-slate-400">{card.name}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
@@ -628,8 +628,8 @@ const TopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () => void
           </button>
         </div>
         
-        <div className="mb-6">
-          <label className="block text-sm text-slate-400 mb-3">Способ оплаты</label>
+        <div className="mb-4">
+          <label className="block text-sm text-slate-400 mb-2">Способ оплаты</label>
           <div className="grid grid-cols-5 gap-2">
             {banks.map((bank) => (
               <BankLogoButton key={bank.id} bank={bank} selected={selectedBank === bank.id} onClick={() => setSelectedBank(bank.id)} />
@@ -637,9 +637,9 @@ const TopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () => void
           </div>
         </div>
 
-        <div className="space-y-4 mb-6">
+        <div className="space-y-3 mb-4">
           <div>
-            <label className="block text-sm text-slate-400 mb-2">Сумма в рублях</label>
+            <label className="block text-sm text-slate-400 mb-1.5">Сумма в рублях</label>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 text-lg font-bold">₽</span>
               <input
@@ -647,23 +647,23 @@ const TopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () => void
                 placeholder="10 000"
                 value={rubAmount}
                 onChange={(e) => handleRubChange(e.target.value)}
-                className="w-full h-14 pl-12 pr-4 bg-white/[0.04] border border-white/10 rounded-xl text-white text-xl font-semibold focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-600"
+                className="w-full h-12 pl-12 pr-4 bg-white/[0.04] border border-white/10 rounded-xl text-white text-lg font-semibold focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-600"
               />
             </div>
           </div>
           
-          <div className="flex items-center justify-center py-2">
+          <div className="flex items-center justify-center py-1">
             <div className="flex items-center gap-3">
-              <div className="h-px w-12 bg-white/10" />
-              <div className="w-10 h-10 rounded-full bg-white/[0.04] border border-white/10 flex items-center justify-center">
-                <span className="text-sm font-bold text-slate-300">₽→{currencySymbol}</span>
+              <div className="h-px w-10 bg-white/10" />
+              <div className="w-8 h-8 rounded-full bg-white/[0.04] border border-white/10 flex items-center justify-center">
+                <span className="text-xs font-bold text-slate-300">₽→{currencySymbol}</span>
               </div>
-              <div className="h-px w-12 bg-white/10" />
+              <div className="h-px w-10 bg-white/10" />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm text-slate-400 mb-2">Получите на карту</label>
+            <label className="block text-sm text-slate-400 mb-1.5">Получите на карту</label>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400 text-lg font-bold">{currencySymbol}</span>
               <input
@@ -671,13 +671,13 @@ const TopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () => void
                 placeholder="0.00"
                 value={foreignAmount}
                 onChange={(e) => handleForeignChange(e.target.value)}
-                className="w-full h-14 pl-12 pr-4 bg-emerald-500/[0.04] border border-emerald-500/20 rounded-xl text-emerald-400 text-xl font-semibold focus:outline-none focus:border-emerald-500/50 transition-all placeholder:text-emerald-900"
+                className="w-full h-12 pl-12 pr-4 bg-emerald-500/[0.04] border border-emerald-500/20 rounded-xl text-emerald-400 text-lg font-semibold focus:outline-none focus:border-emerald-500/50 transition-all placeholder:text-emerald-900"
               />
             </div>
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white/[0.04] border border-white/10 mb-6">
+        <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10 mb-4">
           <div className="flex items-center justify-between text-sm">
             <span className="text-slate-400">Курс:</span>
             <span className="text-white font-bold">1 {currencyCode} = {exchangeRate.toFixed(2)} ₽</span>
@@ -987,6 +987,7 @@ const GradeDisplay = () => {
 
 export const CardsPage = () => {
   const { mode } = useMode();
+  const { rates } = useRates();
   const navigate = useNavigate();
   const [closeCardModal, setCloseCardModal] = useState<PersonalCard | null>(null);
   const [topUpModal, setTopUpModal] = useState<PersonalCard | null>(null);
@@ -1013,7 +1014,7 @@ export const CardsPage = () => {
       currency: 'EUR',
       currencySymbol: '€',
       price: '2 990 ₽',
-      exchangeRate: '€1 = 100.36 ₽',
+      exchangeRate: `USD: ${rates.usd.toFixed(2)}₽ | EUR: ${rates.eur.toFixed(2)}₽`,
       features: [
         { title: 'Онлайн сервисы', items: 'Netflix, Patreon, Apple Music, Disney+' },
         { title: 'Нейросети', items: 'ChatGPT, Grok, DeepL, Midjourney, Gemini, DeepSeek, Veo 3' },
@@ -1040,7 +1041,7 @@ export const CardsPage = () => {
       currency: 'USD',
       currencySymbol: '$',
       price: '3 990 ₽',
-      exchangeRate: '$1 = 84.41 ₽',
+      exchangeRate: `USD: ${rates.usd.toFixed(2)}₽ | EUR: ${rates.eur.toFixed(2)}₽`,
       features: [
         { title: 'Бронирование и оплата отелей', items: 'Booking, AirBnb, Trip.com и другие' },
         { title: 'Покупка авиабилетов', items: 'Google Flights, Skyscanner, Kayak, Momondo' },
@@ -1066,7 +1067,7 @@ export const CardsPage = () => {
       currency: 'USD',
       currencySymbol: '$',
       price: '14 990 ₽',
-      exchangeRate: '$1 = 81.34 ₽',
+      exchangeRate: `USD: ${rates.usd.toFixed(2)}₽ | EUR: ${rates.eur.toFixed(2)}₽`,
       features: [
         { title: 'Для покупок и подписок', items: 'Booking, Grab, Uber, Trip.com и любые другие сервисы' },
         { title: 'Покупка авиабилетов', items: 'Google Flights, Skyscanner, Kayak, Momondo' },

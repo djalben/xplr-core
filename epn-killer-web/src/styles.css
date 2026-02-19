@@ -326,17 +326,17 @@
 /* Staggered animation for page content — fast + GPU-accelerated */
 .stagger-fade-in > * {
   opacity: 0;
-  animation: fadeSlideIn 0.18s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+  animation: fadeSlideIn 0.15s cubic-bezier(0.32, 0.72, 0, 1) forwards;
   will-change: transform, opacity;
   transform: translate3d(0, 0, 0);
 }
 
-.stagger-fade-in > *:nth-child(1) { animation-delay: 0.02s; }
-.stagger-fade-in > *:nth-child(2) { animation-delay: 0.05s; }
-.stagger-fade-in > *:nth-child(3) { animation-delay: 0.08s; }
-.stagger-fade-in > *:nth-child(4) { animation-delay: 0.11s; }
-.stagger-fade-in > *:nth-child(5) { animation-delay: 0.14s; }
-.stagger-fade-in > *:nth-child(6) { animation-delay: 0.17s; }
+.stagger-fade-in > *:nth-child(1) { animation-delay: 0s; }
+.stagger-fade-in > *:nth-child(2) { animation-delay: 0.03s; }
+.stagger-fade-in > *:nth-child(3) { animation-delay: 0.06s; }
+.stagger-fade-in > *:nth-child(4) { animation-delay: 0.09s; }
+.stagger-fade-in > *:nth-child(5) { animation-delay: 0.12s; }
+.stagger-fade-in > *:nth-child(6) { animation-delay: 0.15s; }
 
 @keyframes fadeSlideIn {
   from {
@@ -835,7 +835,7 @@ select option:focus,
 }
 
 .animate-scale-in {
-  animation: scale-in 0.18s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+  animation: scale-in 0.15s cubic-bezier(0.32, 0.72, 0, 1) forwards;
   will-change: transform, opacity;
 }
 
@@ -953,7 +953,7 @@ select option:focus,
 }
 
 .animate-slide-up {
-  animation: slide-up 0.18s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+  animation: slide-up 0.15s cubic-bezier(0.32, 0.72, 0, 1) forwards;
   will-change: transform, opacity;
 }
 
@@ -964,5 +964,5 @@ select option:focus,
 }
 
 .animate-fade-in {
-  animation: fade-in 0.3s ease-out forwards;
+  animation: fade-in 0.15s ease-out forwards;
 }
