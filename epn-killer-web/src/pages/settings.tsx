@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { LANG_KEY } from '../i18n';
 import { DashboardLayout } from '../components/dashboard-layout';
 import { BackButton } from '../components/back-button';
 import { 
@@ -516,26 +518,36 @@ const NotificationsTab = () => {
 
 // Language Tab
 const LanguageTab = () => {
-  const [language, setLanguage] = useState('ru');
+  const { t, i18n } = useTranslation();
+  const currentLang = i18n.language;
 
   const languages = [
-    { code: 'ru', name: 'Русский', flag: '🇷🇺' },
-    { code: 'en', name: 'English', flag: '🇺🇸' },
+    { code: 'ru', name: 'Русский (RU)', flag: '🇷🇺' },
+    { code: 'en', name: 'English (EN)', flag: '🇺🇸' },
+    { code: 'es', name: 'Español (ES)', flag: '🇪🇸' },
+    { code: 'pt', name: 'Português (PT)', flag: '🇧🇷' },
+    { code: 'tr', name: 'Türkçe (TR)', flag: '🇹🇷' },
+    { code: 'zh', name: '中文 (ZH)', flag: '🇨🇳' },
   ];
+
+  const handleChange = (code: string) => {
+    i18n.changeLanguage(code);
+    localStorage.setItem(LANG_KEY, code);
+  };
 
   return (
     <div className="glass-card p-6">
       <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
         <Globe className="w-5 h-5 text-blue-400" />
-        Язык интерфейса
+        {t('settings.languageTitle')}
       </h3>
       <div className="space-y-3">
         {languages.map((lang) => (
           <button
             key={lang.code}
-            onClick={() => setLanguage(lang.code)}
-            className={`w-full flex items-center justify-between p-4 rounded-xl transition-colors ${
-              language === lang.code
+            onClick={() => handleChange(lang.code)}
+            className={`w-full flex items-center justify-between p-4 rounded-xl transition-all duration-150 ${
+              currentLang === lang.code
                 ? 'bg-blue-500/20 border border-blue-500/50'
                 : 'bg-white/[0.03] border border-white/5 hover:border-white/10'
             }`}
@@ -544,7 +556,7 @@ const LanguageTab = () => {
               <span className="text-2xl">{lang.flag}</span>
               <span className="text-white font-medium">{lang.name}</span>
             </div>
-            {language === lang.code && (
+            {currentLang === lang.code && (
               <CheckCircle className="w-5 h-5 text-blue-400" />
             )}
           </button>
@@ -555,14 +567,15 @@ const LanguageTab = () => {
 };
 
 export const SettingsPage = () => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<SettingsTab>('security');
   const [saved, setSaved] = useState(false);
   
   const tabs = [
-    { id: 'security', label: 'Безопасность', icon: Shield },
-    { id: 'kyc', label: 'Верификация', icon: FileText },
-    { id: 'notifications', label: 'Уведомления', icon: Bell },
-    { id: 'language', label: 'Язык', icon: Globe },
+    { id: 'security', label: t('settings.security'), icon: Shield },
+    { id: 'kyc', label: t('settings.kyc'), icon: FileText },
+    { id: 'notifications', label: t('settings.notifications'), icon: Bell },
+    { id: 'language', label: t('settings.language'), icon: Globe },
   ];
 
   const handleSave = () => {
@@ -577,8 +590,8 @@ export const SettingsPage = () => {
         
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Настройки</h1>
-          <p className="text-slate-400">Управление аккаунтом и безопасностью</p>
+          <h1 className="text-3xl font-bold text-white mb-2">{t('settings.title')}</h1>
+          <p className="text-slate-400">{t('settings.subtitle')}</p>
         </div>
 
         {/* Tabs */}
@@ -615,7 +628,7 @@ export const SettingsPage = () => {
           }`}
         >
           {saved ? <Check className="w-5 h-5" /> : <Save className="w-5 h-5" />}
-          {saved ? 'Сохранено!' : 'Сохранить изменения'}
+          {saved ? t('settings.saved') : t('settings.save')}
         </button>
       </div>
     </DashboardLayout>

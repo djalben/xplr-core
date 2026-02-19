@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { DashboardLayout } from '../components/dashboard-layout';
 import { BackButton } from '../components/back-button';
 import { 
@@ -28,6 +29,7 @@ interface Transaction {
 }
 
 const StatusBadge = ({ status }: { status: string }) => {
+  const { t } = useTranslation();
   const colors: Record<string, string> = {
     completed: 'badge-success',
     pending: 'badge-warning',
@@ -35,9 +37,9 @@ const StatusBadge = ({ status }: { status: string }) => {
   };
 
   const labels: Record<string, string> = {
-    completed: 'Выполнено',
-    pending: 'В обработке',
-    failed: 'Ошибка'
+    completed: t('finance.completed'),
+    pending: t('finance.pending'),
+    failed: t('finance.failed')
   };
 
   return (
@@ -73,6 +75,7 @@ const FilterDropdown = ({
 );
 
 export const FinancePage = () => {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [cardFilter, setCardFilter] = useState('');
   const [walletFilter, setWalletFilter] = useState('');
@@ -119,8 +122,8 @@ export const FinancePage = () => {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-white mb-2">История операций</h1>
-            <p className="text-slate-400">Полная история транзакций и аналитика</p>
+            <h1 className="text-3xl font-bold text-white mb-2">{t('finance.title')}</h1>
+            <p className="text-slate-400">{t('finance.search')}</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {[
@@ -165,21 +168,21 @@ export const FinancePage = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="glass-card p-5">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-slate-400 text-sm">Доходы</p>
+              <p className="text-slate-400 text-sm">{t('finance.income')}</p>
               <TrendingUp className="w-4 h-4 text-emerald-400" />
             </div>
             <p className="text-2xl font-bold text-emerald-400 balance-display">+${totalIncome.toLocaleString()}</p>
           </div>
           <div className="glass-card p-5">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-slate-400 text-sm">Расходы</p>
+              <p className="text-slate-400 text-sm">{t('finance.expenses')}</p>
               <TrendingDown className="w-4 h-4 text-red-400" />
             </div>
             <p className="text-2xl font-bold text-white balance-display">-${totalExpense.toLocaleString()}</p>
           </div>
           <div className="glass-card p-5 border-blue-500/30">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-slate-400 text-sm">Итого</p>
+              <p className="text-slate-400 text-sm">{t('finance.net')}</p>
               {netAmount >= 0 ? <TrendingUp className="w-4 h-4 text-blue-400" /> : <TrendingDown className="w-4 h-4 text-red-400" />}
             </div>
             <p className={`text-2xl font-bold balance-display ${netAmount >= 0 ? 'text-blue-400' : 'text-red-400'}`}>
@@ -196,10 +199,10 @@ export const FinancePage = () => {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
               <input
                 type="text"
-                placeholder="Поиск операций..."
+                placeholder={t('common.search')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="xplr-input w-full !pl-14"
+                className="xplr-input w-full !pl-12"
               />
             </div>
             
@@ -211,7 +214,7 @@ export const FinancePage = () => {
               }`}
             >
               <Filter className="w-4 h-4" />
-              Фильтры
+              {t('finance.allCards')}
               <ChevronDown className={`w-4 h-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
             </button>
           </div>
@@ -226,13 +229,13 @@ export const FinancePage = () => {
                 <input type="date" className="xplr-input" />
               </div>
               <FilterDropdown
-                label="Все карты"
+                label={t('finance.allCards')}
                 options={cards}
                 value={cardFilter}
                 onChange={setCardFilter}
               />
               <FilterDropdown
-                label="Все кошельки"
+                label={t('finance.allWallets')}
                 options={wallets}
                 value={walletFilter}
                 onChange={setWalletFilter}
@@ -306,7 +309,7 @@ export const FinancePage = () => {
           {(filteredTransactions ?? []).length === 0 && (
             <div className="py-12 text-center">
               <Search className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-              <p className="text-slate-400">Операции не найдены</p>
+              <p className="text-slate-400">{t('finance.noTransactions')}</p>
               <p className="text-sm text-slate-500">Попробуйте изменить параметры поиска</p>
             </div>
           )}

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useMode } from '../store/mode-context';
 import { DashboardLayout } from '../components/dashboard-layout';
 import {
@@ -80,19 +81,20 @@ const TransactionRow = ({ transaction }: { transaction: Transaction }) => (
 );
 
 const SpendingChart = () => {
+  const { t } = useTranslation();
   const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
   const values = [340, 520, 280, 680, 420, 250, 580];
   const maxValue = Math.max(...values);
 
   return (
     <div className="glass-card p-6">
-      <h3 className="block-title">Расходы за неделю</h3>
+      <h3 className="block-title">{t('dashboard.weekExpenses')}</h3>
       <div className="flex items-end justify-between gap-2 h-48">
         {days.map((day, i) => (
           <div key={day} className="flex-1 flex flex-col items-center gap-2">
             <div className="w-full flex flex-col items-center justify-end h-36">
               <div
-                className="w-full max-w-[40px] bg-gradient-to-t from-blue-600 to-blue-400 rounded-lg transition-all duration-500 hover:from-blue-500 hover:to-blue-300 cursor-pointer shadow-lg shadow-blue-500/20"
+                className="w-full max-w-[40px] bg-gradient-to-t from-blue-600 to-blue-400 rounded-lg transition-all duration-150 hover:from-blue-500 hover:to-blue-300 cursor-pointer shadow-lg shadow-blue-500/20"
                 style={{ height: `${(values[i] / maxValue) * 100}%` }}
               />
             </div>
@@ -173,6 +175,7 @@ const GradeProgressCard = ({ gradeInfo }: { gradeInfo: GradeInfo | null }) => {
 export const DashboardPage = () => {
   const { mode } = useMode();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [userData, setUserData] = useState<any>(null);
   const [gradeInfo, setGradeInfo] = useState<GradeInfo | null>(null);
   const [cardCount, setCardCount] = useState(0);
@@ -237,15 +240,15 @@ export const DashboardPage = () => {
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <Sparkles className="w-5 h-5 text-amber-400" />
-                <span className="text-sm text-slate-400">Добро пожаловать!</span>
+                <span className="text-sm text-slate-400">{t('dashboard.welcome')}</span>
               </div>
               <h2 className="text-2xl md:text-3xl font-bold welcome-gradient mb-2">
-                Привет, {userName}!
+                {t('dashboard.hello', { name: userName })}
               </h2>
               <p className="text-slate-400">
                 {mode === 'PERSONAL'
-                  ? 'Отличный день для управления финансами'
-                  : 'Ваш арбитражный кабинет готов к работе'}
+                  ? t('dashboard.personalSubtitle')
+                  : t('dashboard.arbitrageSubtitle')}
               </p>
             </div>
             {/* World Clocks — inline with greeting */}
@@ -259,15 +262,15 @@ export const DashboardPage = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           {mode === 'PERSONAL' ? (
             <>
-              <StatCard title="Баланс" value={`$${balancePers.toFixed(2)}`} icon={<Wallet className="w-6 h-6 text-blue-400" />} iconClass="stat-icon-blue" accent />
-              <StatCard title="Активные карты" value={String(cardCount)} icon={<CreditCard className="w-6 h-6 text-purple-400" />} iconClass="stat-icon-purple" onClick={() => navigate('/cards?filter=active')} />
-              <StatCard title="Транзакции" value={String(transactions.length)} icon={<DollarSign className="w-6 h-6 text-emerald-400" />} iconClass="stat-icon-green" onClick={() => navigate('/finance?from=dashboard')} />
+              <StatCard title={t('dashboard.balance')} value={`$${balancePers.toFixed(2)}`} icon={<Wallet className="w-6 h-6 text-blue-400" />} iconClass="stat-icon-blue" accent />
+              <StatCard title={t('dashboard.activeCards')} value={String(cardCount)} icon={<CreditCard className="w-6 h-6 text-purple-400" />} iconClass="stat-icon-purple" onClick={() => navigate('/cards?filter=active')} />
+              <StatCard title={t('dashboard.transactions')} value={String(transactions.length)} icon={<DollarSign className="w-6 h-6 text-emerald-400" />} iconClass="stat-icon-green" onClick={() => navigate('/finance?from=dashboard')} />
             </>
           ) : (
             <>
-              <StatCard title="Баланс" value={`$${balanceArb.toFixed(2)}`} subValue={gradeInfo ? <GradeIndicator grade={gradeInfo.grade} /> : undefined} icon={<Wallet className="w-6 h-6 text-blue-400" />} iconClass="stat-icon-blue" accent />
-              <StatCard title="Активные карты" value={String(cardCount)} icon={<CreditCard className="w-6 h-6 text-purple-400" />} iconClass="stat-icon-purple" onClick={() => navigate('/cards?filter=active')} />
-              <StatCard title="Транзакции" value={String(transactions.length)} icon={<DollarSign className="w-6 h-6 text-amber-400" />} iconClass="stat-icon-yellow" onClick={() => navigate('/finance?from=dashboard')} />
+              <StatCard title={t('dashboard.balance')} value={`$${balanceArb.toFixed(2)}`} subValue={gradeInfo ? <GradeIndicator grade={gradeInfo.grade} /> : undefined} icon={<Wallet className="w-6 h-6 text-blue-400" />} iconClass="stat-icon-blue" accent />
+              <StatCard title={t('dashboard.activeCards')} value={String(cardCount)} icon={<CreditCard className="w-6 h-6 text-purple-400" />} iconClass="stat-icon-purple" onClick={() => navigate('/cards?filter=active')} />
+              <StatCard title={t('dashboard.transactions')} value={String(transactions.length)} icon={<DollarSign className="w-6 h-6 text-amber-400" />} iconClass="stat-icon-yellow" onClick={() => navigate('/finance?from=dashboard')} />
             </>
           )}
         </div>
@@ -278,16 +281,16 @@ export const DashboardPage = () => {
 
           <div className="glass-card p-6">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="block-title mb-0">Последние операции</h3>
+              <h3 className="block-title mb-0">{t('dashboard.recentOps')}</h3>
               <button onClick={() => navigate('/finance')} className="text-sm text-blue-400 hover:text-blue-300 transition-colors font-medium">
-                Смотреть все →
+                {t('dashboard.viewAll')}
               </button>
             </div>
             <div>
               {(transactions ?? []).length > 0 ? (
                 transactions.map(tx => <TransactionRow key={tx.id} transaction={tx} />)
               ) : (
-                <p className="text-slate-500 text-sm text-center py-8">Нет операций</p>
+                <p className="text-slate-500 text-sm text-center py-8">{t('dashboard.noOps')}</p>
               )}
             </div>
           </div>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useMode } from '../store/mode-context';
 import { useRates } from '../store/rates-context';
 import { useAuth } from '../store/auth-context';
@@ -45,6 +46,7 @@ const CurrencyRates = () => {
 const ModeToggle = () => {
   const { mode, setMode } = useMode();
   const { isOwner, userMode } = useAuth();
+  const { t } = useTranslation();
 
   // In personal userMode — no toggle at all, everything is personal
   if (userMode === 'personal') return null;
@@ -55,7 +57,7 @@ const ModeToggle = () => {
       <div className="glass-card p-1.5 flex relative">
         <div className="absolute top-1.5 bottom-1.5 left-1.5 right-1.5 gradient-accent rounded-xl shadow-lg shadow-blue-500/25" />
         <div className="relative z-10 flex-1 px-4 py-2.5 text-xs font-bold tracking-wide rounded-xl text-white text-center">
-          АРБИТРАЖ
+          {t('nav.arbitrage')}
         </div>
       </div>
     );
@@ -74,7 +76,7 @@ const ModeToggle = () => {
           mode === 'PERSONAL' ? 'text-white' : 'text-slate-500 hover:text-slate-300'
         }`}
       >
-        ЛИЧНЫЙ
+        {t('nav.personal')}
       </button>
       <button
         onClick={() => setMode('ARBITRAGE')}
@@ -82,7 +84,7 @@ const ModeToggle = () => {
           mode === 'ARBITRAGE' ? 'text-white' : 'text-slate-500 hover:text-slate-300'
         }`}
       >
-        АРБИТРАЖ
+        {t('nav.arbitrage')}
       </button>
     </div>
   );
@@ -117,6 +119,7 @@ const NavItem = ({ href, icon, label, isActive, onClick }: NavItemProps) => (
 const UserProfile = () => {
   const navigate = useNavigate();
   const { user, logout: authLogout } = useAuth();
+  const { t } = useTranslation();
 
   const handleLogout = () => {
     authLogout();
@@ -130,8 +133,8 @@ const UserProfile = () => {
           <span className="text-white font-semibold text-sm">{user?.avatar || 'U'}</span>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-white truncate">{user?.name || 'Пользователь'}</p>
-          <p className="text-xs text-slate-500 truncate">{user?.role === 'OWNER' ? 'Владелец' : 'Участник'}</p>
+          <p className="text-sm font-semibold text-white truncate">{user?.name || 'User'}</p>
+          <p className="text-xs text-slate-500 truncate">{user?.role === 'OWNER' ? t('nav.owner') : t('nav.member')}</p>
         </div>
         <div className="relative">
           <Bell className="w-5 h-5 text-slate-500 hover:text-slate-300 cursor-pointer transition-colors" />
@@ -141,7 +144,7 @@ const UserProfile = () => {
         <Link to="/settings" className="flex-1">
           <button className="w-full flex items-center justify-center gap-2 py-2 text-xs text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors">
             <Settings className="w-4 h-4" />
-            Настройки
+            {t('nav.settings')}
           </button>
         </Link>
         <button
@@ -149,7 +152,7 @@ const UserProfile = () => {
           className="flex-1 flex items-center justify-center gap-2 py-2 text-xs text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
         >
           <LogOut className="w-4 h-4" />
-          Выйти
+          {t('nav.logout')}
         </button>
       </div>
     </div>
@@ -173,14 +176,16 @@ export const Sidebar = () => {
   const { userMode, isMember } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  const { t } = useTranslation();
+
   const navItems = [
-    { href: '/dashboard', icon: <LayoutDashboard className="w-5 h-5" />, label: 'Главная', showIn: ['PERSONAL', 'ARBITRAGE'], modes: ['personal', 'business'] as const },
-    { href: '/cards', icon: <CreditCard className="w-5 h-5" />, label: 'Карты', showIn: ['PERSONAL', 'ARBITRAGE'], modes: ['personal', 'business'] as const },
-    { href: '/finance', icon: <Receipt className="w-5 h-5" />, label: 'Финансы', showIn: ['PERSONAL', 'ARBITRAGE'], modes: ['personal', 'business'] as const },
-    { href: '/teams', icon: <Users className="w-5 h-5" />, label: 'Команды', showIn: ['ARBITRAGE'], modes: ['business'] as const },
-    { href: '/referrals', icon: <Gift className="w-5 h-5" />, label: 'Партнёрка', showIn: ['PERSONAL', 'ARBITRAGE'], modes: ['personal', 'business'] as const },
-    { href: '/api', icon: <Code className="w-5 h-5" />, label: 'API', showIn: ['ARBITRAGE'], modes: ['business'] as const },
-    { href: '/support', icon: <HelpCircle className="w-5 h-5" />, label: 'Поддержка', showIn: ['PERSONAL', 'ARBITRAGE'], modes: ['personal', 'business'] as const },
+    { href: '/dashboard', icon: <LayoutDashboard className="w-5 h-5" />, label: t('nav.home'), showIn: ['PERSONAL', 'ARBITRAGE'], modes: ['personal', 'business'] as const },
+    { href: '/cards', icon: <CreditCard className="w-5 h-5" />, label: t('nav.cards'), showIn: ['PERSONAL', 'ARBITRAGE'], modes: ['personal', 'business'] as const },
+    { href: '/finance', icon: <Receipt className="w-5 h-5" />, label: t('nav.finance'), showIn: ['PERSONAL', 'ARBITRAGE'], modes: ['personal', 'business'] as const },
+    { href: '/teams', icon: <Users className="w-5 h-5" />, label: t('nav.teams'), showIn: ['ARBITRAGE'], modes: ['business'] as const },
+    { href: '/referrals', icon: <Gift className="w-5 h-5" />, label: t('nav.referrals'), showIn: ['PERSONAL', 'ARBITRAGE'], modes: ['personal', 'business'] as const },
+    { href: '/api', icon: <Code className="w-5 h-5" />, label: t('nav.api'), showIn: ['ARBITRAGE'], modes: ['business'] as const },
+    { href: '/support', icon: <HelpCircle className="w-5 h-5" />, label: t('nav.support'), showIn: ['PERSONAL', 'ARBITRAGE'], modes: ['personal', 'business'] as const },
   ];
 
   // Step 1: filter by userMode (personal vs business)
@@ -223,6 +228,7 @@ export const Sidebar = () => {
             ))}
           </nav>
           <div className="mt-auto pt-4">
+            <p className="text-[10px] text-slate-600 text-center mb-3 tracking-wide">{t('brand.tagline')}</p>
             <UserProfile />
           </div>
         </div>

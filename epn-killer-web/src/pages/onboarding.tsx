@@ -1,10 +1,12 @@
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../store/auth-context';
 import { NeuralBackground } from '../components/neural-background';
 import { User, Users, CreditCard, MessageCircle, BarChart3, Zap, Shield, ArrowRight } from 'lucide-react';
 
 export const OnboardingPage = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { completeOnboarding } = useAuth();
 
   const handleSelect = (mode: 'personal' | 'business') => {
@@ -30,8 +32,8 @@ export const OnboardingPage = () => {
           </div>
         </div>
 
-        <h1 className="text-2xl md:text-3xl font-bold text-white text-center mb-2">Выберите режим использования</h1>
-        <p className="text-slate-500 text-center mb-10 text-sm md:text-base">Вы сможете изменить это позже в настройках</p>
+        <h1 className="text-2xl md:text-3xl font-bold text-white text-center mb-2">{t('onboarding.title')}</h1>
+        <p className="text-slate-500 text-center mb-10 text-sm md:text-base">{t('onboarding.subtitle')}</p>
 
         {/* Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -50,21 +52,20 @@ export const OnboardingPage = () => {
                 <User className="w-6 h-6 text-blue-400" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-white">XPLR SOLO</h2>
-                <p className="text-[11px] text-slate-500 uppercase tracking-wider">Личное использование</p>
+                <h2 className="text-lg font-bold text-white">{t('onboarding.solo')}</h2>
+                <p className="text-[11px] text-slate-500 uppercase tracking-wider">{t('onboarding.soloLabel')}</p>
               </div>
             </div>
 
             <p className="text-sm text-slate-400 leading-relaxed mb-6">
-              Идеально для оплаты подписок (Netflix, Spotify, ChatGPT), покупок в играх и путешествий. 
-              Только вы, ваши карты и быстрое пополнение через СБП. Максимально простой и чистый интерфейс.
+              {t('onboarding.soloDesc')}
             </p>
 
             <div className="space-y-2.5 mb-6">
               {[
-                { icon: <CreditCard className="w-4 h-4 text-blue-400" />, text: 'Виртуальные карты Visa / Mastercard' },
-                { icon: <Zap className="w-4 h-4 text-amber-400" />, text: 'Мгновенное пополнение через СБП' },
-                { icon: <Shield className="w-4 h-4 text-emerald-400" />, text: 'Чистый интерфейс без лишнего' },
+                { icon: <CreditCard className="w-4 h-4 text-blue-400" />, text: t('onboarding.soloFeature1') },
+                { icon: <Zap className="w-4 h-4 text-amber-400" />, text: t('onboarding.soloFeature2') },
+                { icon: <Shield className="w-4 h-4 text-emerald-400" />, text: t('onboarding.soloFeature3') },
               ].map((f, i) => (
                 <div key={i} className="flex items-center gap-2.5">
                   {f.icon}
@@ -74,7 +75,7 @@ export const OnboardingPage = () => {
             </div>
 
             <div className="flex items-center gap-2 text-blue-400 text-sm font-semibold group-hover:gap-3 transition-all duration-150">
-              Выбрать <ArrowRight className="w-4 h-4" />
+              {t('onboarding.select')} <ArrowRight className="w-4 h-4" />
             </div>
           </button>
 
@@ -93,21 +94,20 @@ export const OnboardingPage = () => {
                 <Users className="w-6 h-6 text-red-400" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-white">XPLR TEAM PRIME</h2>
-                <p className="text-[11px] text-slate-500 uppercase tracking-wider">Бизнес и Арбитраж</p>
+                <h2 className="text-lg font-bold text-white">{t('onboarding.teamPrime')}</h2>
+                <p className="text-[11px] text-slate-500 uppercase tracking-wider">{t('onboarding.teamLabel')}</p>
               </div>
             </div>
 
             <p className="text-sm text-slate-400 leading-relaxed mb-6">
-              Полноценный командный центр. Управление байерами, общие балансы, встроенный Telegram-чат 
-              и менеджер задач. Детальная аналитика спенда и защита личных данных владельца.
+              {t('onboarding.teamDesc')}
             </p>
 
             <div className="space-y-2.5 mb-6">
               {[
-                { icon: <Users className="w-4 h-4 text-red-400" />, text: 'Командное управление и роли' },
-                { icon: <MessageCircle className="w-4 h-4 text-orange-400" />, text: 'Встроенный чат и менеджер задач' },
-                { icon: <BarChart3 className="w-4 h-4 text-purple-400" />, text: 'Детальная аналитика и грейды' },
+                { icon: <Users className="w-4 h-4 text-red-400" />, text: t('onboarding.teamFeature1') },
+                { icon: <MessageCircle className="w-4 h-4 text-orange-400" />, text: t('onboarding.teamFeature2') },
+                { icon: <BarChart3 className="w-4 h-4 text-purple-400" />, text: t('onboarding.teamFeature3') },
               ].map((f, i) => (
                 <div key={i} className="flex items-center gap-2.5">
                   {f.icon}
@@ -117,7 +117,7 @@ export const OnboardingPage = () => {
             </div>
 
             <div className="flex items-center gap-2 text-red-400 text-sm font-semibold group-hover:gap-3 transition-all duration-150">
-              Выбрать <ArrowRight className="w-4 h-4" />
+              {t('onboarding.select')} <ArrowRight className="w-4 h-4" />
             </div>
           </button>
         </div>

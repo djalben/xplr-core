@@ -71,7 +71,7 @@ export const ShareModal = ({ url, title = 'Поделиться', text, onClose 
           <div className="px-5 pb-4">
             <button
               onClick={handleCopy}
-              className={`w-full flex items-center gap-3 p-3.5 rounded-xl border transition-all duration-200 ${
+              className={`w-full flex items-center gap-3 p-3.5 rounded-xl border transition-all duration-150 ${
                 copied
                   ? 'bg-emerald-500/10 border-emerald-500/30'
                   : 'bg-white/[0.03] border-white/[0.08] hover:bg-white/[0.06] hover:border-white/15 active:scale-[0.98]'

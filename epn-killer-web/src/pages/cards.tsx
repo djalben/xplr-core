@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useMode } from '../store/mode-context';
 import { useRates } from '../store/rates-context';
 import { DashboardLayout } from '../components/dashboard-layout';
@@ -102,13 +103,14 @@ const CardIssueModal = ({
   const currentRate = selectedCurrency === 'USD' ? rates.usd : rates.eur;
   const currencySymbol = selectedCurrency === 'USD' ? '$' : '€';
   
+  const { t } = useTranslation();
   const prohibitedOperations = [
-    'Финансовые инвестиции и управление активами',
-    'Покупка виртуальных валют',
-    'Азартные игры',
-    'Транзакции, связанные с продуктами для взрослых',
-    'Покупка подарочных карт',
-    'Оплата российских сервисов и покупок на территории РФ'
+    t('cards.prohibitedList.finance'),
+    t('cards.prohibitedList.crypto'),
+    t('cards.prohibitedList.gambling'),
+    t('cards.prohibitedList.adult'),
+    t('cards.prohibitedList.giftCards'),
+    t('cards.prohibitedList.russian'),
   ];
 
   // Determine which payment methods are available
@@ -174,7 +176,7 @@ const CardIssueModal = ({
 
           {/* Exchange rate - dynamic */}
           <p className="text-center text-xs text-slate-400">
-            {card.type === 'premium' ? 'Лучший курс:' : 'Курс:'} <span className="text-blue-400 font-medium">{currencySymbol}1 = {currentRate.toFixed(2)} ₽</span>
+            {card.type === 'premium' ? t('cards.bestRate') : t('cards.currentRate')} <span className="text-blue-400 font-medium">{currencySymbol}1 = {currentRate.toFixed(2)} ₽</span>
           </p>
         </div>
         
@@ -195,7 +197,7 @@ const CardIssueModal = ({
         
           {/* Conditions */}
           <div>
-            <h3 className="text-white font-semibold text-sm mb-2">Условия выпуска:</h3>
+            <h3 className="text-white font-semibold text-sm mb-2">{t('cards.issueConditions')}</h3>
             <ul className="space-y-1.5">
               {card.conditions.map((cond, i) => (
                 <li key={i} className="flex items-center gap-2 text-xs">
@@ -208,7 +210,7 @@ const CardIssueModal = ({
         
           {/* Capabilities */}
           <div>
-            <h3 className="text-white font-semibold text-sm mb-2">Возможности:</h3>
+            <h3 className="text-white font-semibold text-sm mb-2">{t('cards.capabilities')}</h3>
             <ul className="space-y-1.5">
               {card.capabilities.map((cap, i) => (
                 <li key={i} className="flex items-center gap-2 text-xs">
@@ -229,7 +231,7 @@ const CardIssueModal = ({
               onClick={() => setShowProhibited(!showProhibited)}
               className="flex items-center justify-between w-full py-2 border-t border-white/10"
             >
-              <span className="text-white font-semibold text-sm">Запрещенные операции</span>
+              <span className="text-white font-semibold text-sm">{t('cards.prohibitedOps')}</span>
               <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showProhibited ? 'rotate-180' : ''}`} />
             </button>
             {showProhibited && (
@@ -251,7 +253,7 @@ const CardIssueModal = ({
             onClick={onClose}
             className="w-full py-3.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold rounded-xl transition-all shadow-lg shadow-blue-500/20"
           >
-            Выпустить карту {card.price}
+            {t('cards.issueCard')} {card.price}
           </button>
         </div>
       </div>
@@ -267,18 +269,47 @@ const SubscriptionsCardVisual = ({ mini = true, currencySymbol }: { mini?: boole
     <div className="absolute inset-0">
       <div className="absolute inset-0 bg-gradient-to-br from-pink-500 via-purple-500 to-blue-600" />
     </div>
-    
+
+    {/* Digital service icons overlay — thin contour watermark */}
+    <div className="absolute inset-0 opacity-[0.10] pointer-events-none">
+      <svg viewBox="0 0 280 170" className="w-full h-full" preserveAspectRatio="xMidYMid slice">
+        {/* Play triangle */}
+        <polygon points="30,25 30,50 50,37.5" fill="none" stroke="white" strokeWidth="0.8" />
+        {/* Pause bars */}
+        <rect x="220" y="20" width="4" height="18" rx="1" fill="none" stroke="white" strokeWidth="0.7" />
+        <rect x="228" y="20" width="4" height="18" rx="1" fill="none" stroke="white" strokeWidth="0.7" />
+        {/* Cloud */}
+        <path d="M140,35 a12,12 0 0,1 24,0 a10,10 0 0,1 10,10 h-44 a10,10 0 0,1 10,-10z" fill="none" stroke="white" strokeWidth="0.7" />
+        {/* Music note */}
+        <path d="M70,90 v-22 l16,-5 v22" fill="none" stroke="white" strokeWidth="0.7" />
+        <circle cx="70" cy="90" r="4" fill="none" stroke="white" strokeWidth="0.7" />
+        <circle cx="86" cy="85" r="4" fill="none" stroke="white" strokeWidth="0.7" />
+        {/* Wi-Fi arcs */}
+        <path d="M200,120 a8,8 0 0,1 16,0" fill="none" stroke="white" strokeWidth="0.6" />
+        <path d="M196,115 a14,14 0 0,1 24,0" fill="none" stroke="white" strokeWidth="0.6" />
+        <circle cx="208" cy="123" r="1.5" fill="white" />
+        {/* Code brackets */}
+        <path d="M250,80 l-8,12 l8,12" fill="none" stroke="white" strokeWidth="0.7" />
+        <path d="M262,80 l8,12 l-8,12" fill="none" stroke="white" strokeWidth="0.7" />
+        {/* Small play */}
+        <polygon points="120,120 120,140 135,130" fill="none" stroke="white" strokeWidth="0.6" />
+        {/* Gear */}
+        <circle cx="40" cy="130" r="7" fill="none" stroke="white" strokeWidth="0.6" />
+        <circle cx="40" cy="130" r="3" fill="none" stroke="white" strokeWidth="0.5" />
+      </svg>
+    </div>
+
     {/* Card content */}
     <div className="relative h-full p-4 flex flex-col justify-between">
       {/* Top row - branding and currency */}
       <div className="flex items-start justify-between">
-        <span className="text-white/90 text-xs font-medium tracking-wide">Без границ.</span>
+        <span className="text-white/90 text-xs font-medium tracking-wide">No Borders</span>
         <span className="text-white text-sm font-bold">{currencySymbol ?? '€'}</span>
       </div>
       
       {/* Card number at bottom */}
       <div className="mt-auto">
-        <p className="text-white/50 text-[10px] mb-0.5">Номер карты</p>
+        <p className="text-white/50 text-[10px] mb-0.5">Card number</p>
         <p className="text-white font-mono text-sm tracking-widest">**** **** **** 1234</p>
       </div>
       
@@ -297,18 +328,49 @@ const TravelCardVisual = ({ mini = true, currencySymbol }: { mini?: boolean; cur
     <div className="absolute inset-0">
       <div className="absolute inset-0 bg-gradient-to-br from-blue-400 via-blue-500 to-blue-700" />
     </div>
-    
+
+    {/* Travel silhouettes overlay — thin contour watermark */}
+    <div className="absolute inset-0 opacity-[0.10] pointer-events-none">
+      <svg viewBox="0 0 280 170" className="w-full h-full" preserveAspectRatio="xMidYMid slice">
+        {/* Suitcase */}
+        <rect x="30" y="55" width="28" height="22" rx="3" fill="none" stroke="white" strokeWidth="0.8" />
+        <rect x="38" y="48" width="12" height="8" rx="2" fill="none" stroke="white" strokeWidth="0.7" />
+        {/* Palm tree */}
+        <line x1="220" y1="130" x2="220" y2="85" stroke="white" strokeWidth="0.8" />
+        <path d="M220,85 q-18,-5 -22,-20" fill="none" stroke="white" strokeWidth="0.7" />
+        <path d="M220,85 q18,-5 22,-20" fill="none" stroke="white" strokeWidth="0.7" />
+        <path d="M220,88 q-20,2 -26,-12" fill="none" stroke="white" strokeWidth="0.6" />
+        <path d="M220,88 q20,2 26,-12" fill="none" stroke="white" strokeWidth="0.6" />
+        {/* Sun */}
+        <circle cx="130" cy="35" r="12" fill="none" stroke="white" strokeWidth="0.8" />
+        <line x1="130" y1="18" x2="130" y2="13" stroke="white" strokeWidth="0.6" />
+        <line x1="130" y1="52" x2="130" y2="57" stroke="white" strokeWidth="0.6" />
+        <line x1="113" y1="35" x2="108" y2="35" stroke="white" strokeWidth="0.6" />
+        <line x1="147" y1="35" x2="152" y2="35" stroke="white" strokeWidth="0.6" />
+        <line x1="118" y1="23" x2="115" y2="20" stroke="white" strokeWidth="0.5" />
+        <line x1="142" y1="23" x2="145" y2="20" stroke="white" strokeWidth="0.5" />
+        <line x1="118" y1="47" x2="115" y2="50" stroke="white" strokeWidth="0.5" />
+        <line x1="142" y1="47" x2="145" y2="50" stroke="white" strokeWidth="0.5" />
+        {/* Airplane */}
+        <path d="M60,120 l30,-15 l-5,5 l15,0 l-30,15 l5,-5 l-15,0z" fill="none" stroke="white" strokeWidth="0.7" />
+        {/* Compass circle */}
+        <circle cx="250" cy="45" r="10" fill="none" stroke="white" strokeWidth="0.6" />
+        <line x1="250" y1="37" x2="250" y2="53" stroke="white" strokeWidth="0.5" />
+        <line x1="242" y1="45" x2="258" y2="45" stroke="white" strokeWidth="0.5" />
+      </svg>
+    </div>
+
     {/* Card content */}
     <div className="relative h-full p-4 flex flex-col justify-between">
       {/* Top row - branding and currency */}
       <div className="flex items-start justify-between">
-        <span className="text-white/90 text-xs font-medium tracking-wide">Без границ.</span>
+        <span className="text-white/90 text-xs font-medium tracking-wide">No Borders</span>
         <span className="text-white text-sm font-bold">{currencySymbol ?? '$'}</span>
       </div>
       
       {/* Card number at bottom */}
       <div className="mt-auto">
-        <p className="text-white/50 text-[10px] mb-0.5">Номер карты</p>
+        <p className="text-white/50 text-[10px] mb-0.5">Card number</p>
         <p className="text-white font-mono text-sm tracking-widest">**** **** **** 1234</p>
       </div>
       
@@ -381,7 +443,7 @@ const PremiumCardVisual = ({ mini = true, currencySymbol }: { mini?: boolean; cu
 
       {/* Card number at bottom */}
       <div className="mt-auto">
-        <p className="text-white/25 text-[10px] mb-0.5">Номер карты</p>
+        <p className="text-white/25 text-[10px] mb-0.5">Card number</p>
         <p className="text-white/90 font-mono text-sm tracking-widest">**** **** **** 1234</p>
       </div>
 
@@ -415,6 +477,7 @@ const PersonalCardTypeCard = ({
   eurRate: number;
   onSelect: () => void;
 }) => {
+  const { t } = useTranslation();
   return (
     <div className="glass-card p-4 card-hover">
       {/* Card preview */}
@@ -431,12 +494,12 @@ const PersonalCardTypeCard = ({
       <div className="grid grid-cols-2 gap-2 mb-4">
         <div className="p-2 bg-white/5 rounded-lg text-center">
           <p className="text-blue-400 font-bold text-lg">{price}</p>
-          <p className="text-slate-500 text-[10px]">Стоимость</p>
+          <p className="text-slate-500 text-[10px]">{t('cards.cost')}</p>
         </div>
         <div className="p-2 bg-white/5 rounded-lg text-center flex flex-col items-center justify-center">
           <p className="text-white font-medium text-[11px]">USD: {usdRate.toFixed(2)} ₽</p>
           <p className="text-white font-medium text-[11px]">EUR: {eurRate.toFixed(2)} ₽</p>
-          <p className="text-slate-500 text-[10px] mt-0.5">Курс</p>
+          <p className="text-slate-500 text-[10px] mt-0.5">{t('cards.rate')}</p>
         </div>
       </div>
       
@@ -444,7 +507,7 @@ const PersonalCardTypeCard = ({
         onClick={onSelect}
         className="w-full py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium rounded-xl transition-all text-sm"
       >
-        Выпустить карту {price}
+        {t('cards.issueCard')} {price}
       </button>
     </div>
   );
@@ -508,7 +571,7 @@ const BankLogoButton = ({
   <button
     onClick={onClick}
     className={`
-      flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all duration-200 cursor-pointer
+      flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all duration-150 cursor-pointer
       ${selected
         ? 'bg-blue-500/10 border-2 border-blue-500 scale-105 shadow-lg shadow-blue-500/20'
         : 'bg-white/[0.03] border border-white/[0.08] hover:bg-white/[0.06] hover:border-white/15 active:scale-95'
@@ -526,6 +589,7 @@ const BankLogoButton = ({
 
 // Top-up Modal with bidirectional conversion
 const TopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () => void }) => {
+  const { t } = useTranslation();
   const [rubAmount, setRubAmount] = useState('');
   const [foreignAmount, setForeignAmount] = useState('');
   const [selectedBank, setSelectedBank] = useState('sbp');
@@ -577,7 +641,7 @@ const TopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () => void
                 <Banknote className="w-5 h-5 text-emerald-400" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-white">Пополнить карту</h3>
+                <h3 className="text-lg font-semibold text-white">{t('cards.topUpModal.title')}</h3>
                 <p className="text-xs text-slate-400">{card.name}</p>
               </div>
             </div>
@@ -600,7 +664,7 @@ const TopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () => void
 
           <div className="space-y-3">
             <div>
-              <label className="block text-sm text-slate-400 mb-1.5">Сумма в рублях</label>
+              <label className="block text-sm text-slate-400 mb-1.5">{t('cards.topUpModal.amountRub')}</label>
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 text-lg font-bold">₽</span>
                 <input
@@ -624,7 +688,7 @@ const TopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () => void
             </div>
 
             <div>
-              <label className="block text-sm text-slate-400 mb-1.5">Получите на карту</label>
+              <label className="block text-sm text-slate-400 mb-1.5">{t('cards.topUpModal.amountForeign')}</label>
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400 text-lg font-bold">{currencySymbol}</span>
                 <input
@@ -649,11 +713,11 @@ const TopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () => void
         {/* Fixed footer */}
         <div className="shrink-0 p-5 pt-4 border-t border-white/[0.06] flex gap-3">
           <button onClick={onClose} className="flex-1 px-4 py-3 bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-slate-300 font-medium rounded-xl transition-colors">
-            Отмена
+            {t('cards.topUpModal.cancel')}
           </button>
           <button className="flex-1 px-4 py-3 bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-400 hover:to-blue-400 text-white font-semibold rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2">
             <Banknote className="w-4 h-4" />
-            Пополнить
+            {t('cards.topUpModal.topUp')}
           </button>
         </div>
       </div>
@@ -676,6 +740,7 @@ const RealisticCreditCard = ({
   onApplePay: () => void;
   onGooglePay: () => void;
 }) => {
+  const { t } = useTranslation();
   const [showDetails, setShowDetails] = useState(false);
   const [copied, setCopied] = useState(false);
   
@@ -739,7 +804,7 @@ const RealisticCreditCard = ({
           className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-xl transition-colors text-sm border border-emerald-500/30"
         >
           <Banknote className="w-4 h-4" />
-          Пополнить
+          {t('cards.topUp')}
         </button>
         <button 
           onClick={onClose}
@@ -766,7 +831,9 @@ const RealisticCreditCard = ({
 };
 
 // Close Card Modal
-const CloseCardModal = ({ card, onClose, onConfirm }: { card: PersonalCard; onClose: () => void; onConfirm: () => void }) => (
+const CloseCardModal = ({ card, onClose, onConfirm }: { card: PersonalCard; onClose: () => void; onConfirm: () => void }) => {
+  const { t } = useTranslation();
+  return (
   <ModalPortal>
   <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
     <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
@@ -776,19 +843,20 @@ const CloseCardModal = ({ card, onClose, onConfirm }: { card: PersonalCard; onCl
           <Trash2 className="w-6 h-6 text-red-400" />
         </div>
         <div>
-          <h3 className="text-xl font-semibold text-white">Закрыть карту?</h3>
+          <h3 className="text-xl font-semibold text-white">{t('cards.closeModal.title')}</h3>
           <p className="text-sm text-slate-400">{card.name}</p>
         </div>
       </div>
-      <p className="text-slate-300 mb-6">Это действие нельзя отменить. Остаток средств будет возвращён.</p>
+      <p className="text-slate-300 mb-6">{t('cards.closeModal.warning')}</p>
       <div className="flex gap-3">
-        <button onClick={onClose} className="flex-1 px-4 py-3 glass-card hover:bg-white/10 text-slate-300 font-medium rounded-xl">Отмена</button>
-        <button onClick={onConfirm} className="flex-1 px-4 py-3 bg-red-500 hover:bg-red-600 text-white font-medium rounded-xl">Закрыть</button>
+        <button onClick={onClose} className="flex-1 px-4 py-3 glass-card hover:bg-white/10 text-slate-300 font-medium rounded-xl">{t('cards.closeModal.cancel')}</button>
+        <button onClick={onConfirm} className="flex-1 px-4 py-3 bg-red-500 hover:bg-red-600 text-white font-medium rounded-xl">{t('cards.closeModal.close')}</button>
       </div>
     </div>
   </div>
   </ModalPortal>
-);
+  );
+};
 
 // Payment Method Modal
 const PaymentMethodModal = ({ type, onClose }: { type: 'apple' | 'google'; onClose: () => void }) => (
@@ -877,6 +945,7 @@ const ArbitrageCardTypeRow = ({ cardType, bin, network, price, topUpFee, fees, o
 
 // Arbitrage Card display
 const ArbitrageCardRow = ({ card }: { card: ArbitrageCard }) => {
+  const { t } = useTranslation();
   const [showDetails, setShowDetails] = useState(false);
   const [copied, setCopied] = useState(false);
   const usagePercent = (card.spent / card.budget) * 100;
@@ -905,7 +974,7 @@ const ArbitrageCardRow = ({ card }: { card: ArbitrageCard }) => {
       </td>
       <td className="py-4 px-4">
         <span className={`badge ${card.status === 'active' ? 'badge-success' : card.status === 'paused' ? 'badge-warning' : 'badge-error'}`}>
-          {card.status === 'active' ? 'Активна' : card.status === 'paused' ? 'Пауза' : 'Исчерпана'}
+          {card.status === 'active' ? t('cards.active') : card.status === 'paused' ? t('cards.paused') : t('cards.depleted')}
         </span>
       </td>
       <td className="py-4 px-4">
@@ -957,6 +1026,7 @@ export const CardsPage = () => {
   const { mode } = useMode();
   const { rates } = useRates();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [closeCardModal, setCloseCardModal] = useState<PersonalCard | null>(null);
   const [topUpModal, setTopUpModal] = useState<PersonalCard | null>(null);
   const [paymentModal, setPaymentModal] = useState<{ type: 'apple' | 'google' } | null>(null);
@@ -1076,9 +1146,9 @@ export const CardsPage = () => {
         
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">Карты</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">{t('cards.title')}</h1>
             <p className="text-slate-400 text-sm">
-              {mode === 'PERSONAL' ? 'Виртуальные карты для личных нужд' : 'Карты для арбитража'}
+              {mode === 'PERSONAL' ? t('cards.myCards') : t('cards.arbCards')}
             </p>
           </div>
           {mode === 'ARBITRAGE' && (
@@ -1098,7 +1168,7 @@ export const CardsPage = () => {
         {mode === 'PERSONAL' && (
           <>
             <div className="mb-8">
-              <h3 className="section-header flex items-center gap-2"><Plus className="w-4 h-4" />Выпустить новую карту</h3>
+              <h3 className="section-header flex items-center gap-2"><Plus className="w-4 h-4" />{t('cards.issueNewCard')}</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {cardTypesForIssue.map(ct => (
                   <PersonalCardTypeCard
@@ -1118,7 +1188,7 @@ export const CardsPage = () => {
             </div>
 
             <div>
-              <h3 className="section-header flex items-center gap-2"><CardIcon className="w-4 h-4" />Ваши карты</h3>
+              <h3 className="section-header flex items-center gap-2"><CardIcon className="w-4 h-4" />{t('cards.myCards')}</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {personalCards.map(card => (
                   <RealisticCreditCard 
@@ -1139,7 +1209,7 @@ export const CardsPage = () => {
           <>
             <GradeDisplay />
             <div className="mb-8">
-              <h3 className="section-header flex items-center gap-2"><Plus className="w-4 h-4" />Выпустить карту</h3>
+              <h3 className="section-header flex items-center gap-2"><Plus className="w-4 h-4" />{t('cards.issueCard')}</h3>
               <div className="space-y-3">
                 {availableCardTypes.map(ct => (
                   <ArbitrageCardTypeRow
@@ -1156,7 +1226,7 @@ export const CardsPage = () => {
               </div>
             </div>
 
-            <h3 className="section-header flex items-center gap-2"><CardIcon className="w-4 h-4" />Активные карты</h3>
+            <h3 className="section-header flex items-center gap-2"><CardIcon className="w-4 h-4" />{t('cards.active')}</h3>
             <div className="glass-card overflow-x-auto">
               <table className="xplr-table min-w-[800px]">
                 <thead><tr><th>BIN</th><th>Карта</th><th>Бюджет</th><th>Статус</th><th>Действия</th></tr></thead>

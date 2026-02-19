@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface ClockProps {
   timezone: string;
@@ -93,10 +94,13 @@ const AnalogClock = ({ timezone, label }: ClockProps) => {
   );
 };
 
-export const WorldClocks = () => (
-  <div className="flex items-center gap-6 md:gap-8">
-    <AnalogClock timezone="Europe/Moscow" label="Москва" />
-    <AnalogClock timezone="Europe/London" label="Лондон" />
-    <AnalogClock timezone="America/New_York" label="Нью-Йорк" />
-  </div>
-);
+export const WorldClocks = () => {
+  const { t } = useTranslation();
+  return (
+    <div className="flex items-center gap-6 md:gap-8">
+      <AnalogClock timezone="Europe/Moscow" label={t('clocks.moscow')} />
+      <AnalogClock timezone="Europe/London" label={t('clocks.london')} />
+      <AnalogClock timezone="America/New_York" label={t('clocks.newYork')} />
+    </div>
+  );
+};

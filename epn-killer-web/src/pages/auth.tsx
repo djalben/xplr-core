@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { NeuralBackground } from '../components/neural-background';
 import { Wifi, Eye, EyeOff, Lock, Mail, ChevronRight, ArrowLeft, Check, X } from 'lucide-react';
 import { login, register } from '../api/auth';
@@ -7,11 +8,11 @@ import { login, register } from '../api/auth';
 type AuthMode = 'login' | 'register';
 
 /* ── Password strength rules ── */
-const passwordRules = [
-  { key: 'length', label: 'Минимум 8 символов', test: (p: string) => p.length >= 8 },
-  { key: 'upper', label: 'Заглавная буква (A-Z)', test: (p: string) => /[A-Z]/.test(p) },
-  { key: 'digit', label: 'Цифра (0-9)', test: (p: string) => /\d/.test(p) },
-  { key: 'special', label: 'Спецсимвол (!@#$%^&*)', test: (p: string) => /[!@#$%^&*]/.test(p) },
+const getPasswordRules = (t: (k: string) => string) => [
+  { key: 'length', label: t('auth.pwRules.length'), test: (p: string) => p.length >= 8 },
+  { key: 'upper', label: t('auth.pwRules.upper'), test: (p: string) => /[A-Z]/.test(p) },
+  { key: 'digit', label: t('auth.pwRules.digit'), test: (p: string) => /\d/.test(p) },
+  { key: 'special', label: t('auth.pwRules.special'), test: (p: string) => /[!@#$%^&*]/.test(p) },
 ] as const;
 
 /* ── Translate common backend errors ── */
@@ -33,6 +34,7 @@ const translateError = (raw: string): string => {
 
 export const AuthPage = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [mode, setMode] = useState<AuthMode>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
@@ -42,9 +44,10 @@ export const AuthPage = () => {
   const [error, setError] = useState('');
 
   /* Live password validation (register only) */
+  const passwordRules = useMemo(() => getPasswordRules(t), [t]);
   const pwChecks = useMemo(
     () => passwordRules.map((r) => ({ ...r, pass: r.test(password) })),
-    [password],
+    [password, passwordRules],
   );
   const allPwValid = pwChecks.every((c) => c.pass);
 
@@ -53,17 +56,17 @@ export const AuthPage = () => {
     setError('');
 
     if (!email || !password) {
-      setError('Заполните все поля');
+      setError(t('auth.fillAll'));
       return;
     }
 
     if (mode === 'register') {
       if (!allPwValid) {
-        setError('Пароль не соответствует требованиям безопасности');
+        setError(t('auth.pwRequirements'));
         return;
       }
       if (password !== confirmPassword) {
-        setError('Пароли не совпадают');
+        setError(t('auth.pwMismatch'));
         return;
       }
     }
@@ -84,7 +87,7 @@ export const AuthPage = () => {
       const savedToken = localStorage.getItem('token');
       console.log('[Auth] Token saved:', savedToken ? 'yes' : 'NO');
       if (!savedToken) {
-        setError('Сервер не вернул токен. Попробуйте ещё раз.');
+        setError(t('auth.noToken'));
         return;
       }
       // Redirect to onboarding if not completed yet, otherwise dashboard
@@ -125,7 +128,7 @@ export const AuthPage = () => {
         <Link to="/">
           <button className="flex items-center gap-2 text-slate-500 hover:text-slate-300 transition-colors mb-6 text-sm font-medium">
             <ArrowLeft className="w-4 h-4" />
-            На главную
+            {t('auth.backToHome')}
           </button>
         </Link>
 
@@ -146,24 +149,24 @@ export const AuthPage = () => {
             <button
               type="button"
               onClick={() => { setMode('login'); setError(''); }}
-              className={`px-8 py-3 text-sm font-semibold rounded-xl transition-all duration-300 ${
+              className={`px-8 py-3 text-sm font-semibold rounded-xl transition-all duration-150 ${
                 mode === 'login'
                   ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/25'
                   : 'text-slate-500 hover:text-slate-300'
               }`}
             >
-              Вход
+              {t('auth.login')}
             </button>
             <button
               type="button"
               onClick={() => { setMode('register'); setError(''); }}
-              className={`px-8 py-3 text-sm font-semibold rounded-xl transition-all duration-300 ${
+              className={`px-8 py-3 text-sm font-semibold rounded-xl transition-all duration-150 ${
                 mode === 'register'
                   ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/25'
                   : 'text-slate-500 hover:text-slate-300'
               }`}
             >
-              Регистрация
+              {t('auth.register')}
             </button>
           </div>
         </div>
@@ -184,7 +187,7 @@ export const AuthPage = () => {
               backdrop-blur-2xl
               shadow-[0_8px_60px_-12px_rgba(30,64,175,0.25)]
               border border-white/[0.08]
-              transition-transform duration-500 hover:scale-[1.005]"
+              transition-transform duration-150 hover:scale-[1.005]"
           >
             {/* Glass shine overlay */}
             <div className="absolute inset-0 bg-gradient-to-br from-white/[0.06] via-transparent to-transparent pointer-events-none rounded-[22px]" />
@@ -213,7 +216,7 @@ export const AuthPage = () => {
                   </div>
                   <div>
                     <span className="text-lg font-bold text-white/90 block tracking-wide">XPLR</span>
-                    <span className="text-[10px] text-white/30 uppercase tracking-widest">Финтех платформа</span>
+                    <span className="text-[10px] text-white/30 uppercase tracking-widest">{t('auth.fintech')}</span>
                   </div>
                 </div>
 
@@ -252,7 +255,7 @@ export const AuthPage = () => {
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 group-focus-within:text-blue-400 transition-colors z-10" />
                   <input
                     type={showPassword ? 'text' : 'password'}
-                    placeholder="Пароль"
+                    placeholder={t('auth.password')}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl py-4 pl-12 pr-14
@@ -293,7 +296,7 @@ export const AuthPage = () => {
                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 group-focus-within:text-blue-400 transition-colors z-10" />
                     <input
                       type={showPassword ? 'text' : 'password'}
-                      placeholder="Подтвердите пароль"
+                      placeholder={t('auth.confirmPassword')}
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl py-4 pl-12 pr-4
@@ -315,14 +318,14 @@ export const AuthPage = () => {
                   bg-gradient-to-r from-blue-500 to-indigo-600 text-white
                   hover:from-blue-400 hover:to-indigo-500
                   disabled:opacity-50 disabled:cursor-not-allowed
-                  transition-all duration-300
+                  transition-all duration-150
                   shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30
                   flex items-center justify-center gap-2 group
                   relative overflow-hidden"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
                 <span className="relative z-10">
-                  {isLoading ? 'Загрузка...' : mode === 'login' ? 'Войти в аккаунт' : 'Создать аккаунт'}
+                  {isLoading ? t('auth.loading') : mode === 'login' ? t('auth.loginBtn') : t('auth.registerBtn')}
                 </span>
                 {!isLoading && <ChevronRight className="w-5 h-5 relative z-10 group-hover:translate-x-1 transition-transform" />}
               </button>
@@ -331,7 +334,7 @@ export const AuthPage = () => {
               <div className="mt-6 pt-4 border-t border-white/[0.06] flex items-center justify-between text-[11px] text-white/25">
                 <div className="flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/60 animate-pulse" />
-                  <span>Безопасное соединение</span>
+                  <span>{t('auth.secureConnection')}</span>
                 </div>
                 <span className="font-mono tracking-widest">**** **** **** XPLR</span>
               </div>
@@ -343,8 +346,8 @@ export const AuthPage = () => {
         <div className="mt-5 text-center">
           {mode === 'register' && (
             <p className="text-xs text-slate-600">
-              Регистрируясь, вы соглашаетесь с{' '}
-              <a href="#" className="text-blue-500/70 hover:text-blue-400 transition-colors">условиями использования</a>
+              {t('auth.terms')}{' '}
+              <a href="#" className="text-blue-500/70 hover:text-blue-400 transition-colors">{t('auth.termsLink')}</a>
             </p>
           )}
         </div>
@@ -352,9 +355,9 @@ export const AuthPage = () => {
         {/* Features */}
         <div className="mt-6 grid grid-cols-3 gap-3 text-center">
           {[
-            { icon: '🔒', label: 'Безопасность' },
-            { icon: '💳', label: 'Виртуальные карты' },
-            { icon: '⚡', label: 'Мгновенно' },
+            { icon: '🔒', label: t('auth.security') },
+            { icon: '💳', label: t('auth.virtualCards') },
+            { icon: '⚡', label: t('auth.instant') },
           ].map((f) => (
             <div key={f.label} className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.05] rounded-xl p-4">
               <div className="text-xl mb-1">{f.icon}</div>
