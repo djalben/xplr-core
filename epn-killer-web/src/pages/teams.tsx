@@ -327,7 +327,7 @@ const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, onAddTask
         <span className={`text-sm font-semibold ${color}`}>{title}</span>
         <span className="ml-auto text-xs text-slate-600 bg-white/[0.04] px-2 py-0.5 rounded-full">{tasks.length}</span>
       </div>
-      <div className="space-y-2 pb-10">
+      <div className="space-y-2 pb-16">
         {tasks.map(task => {
           const assignee = getMember(task.assigneeId);
           return (
@@ -367,9 +367,9 @@ const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, onAddTask
         })}
         <button
           onClick={() => onAddTask(columnKey)}
-          className="relative z-10 w-full py-2.5 flex items-center justify-center gap-1.5 text-xs font-medium text-slate-300 bg-white/10 hover:bg-red-500/20 hover:text-white rounded-lg border border-white/20 hover:border-red-500/40 transition-all duration-150"
+          className="w-full py-3 mt-2 flex items-center justify-center gap-1.5 text-sm text-gray-400 bg-white/5 border border-dashed border-white/20 rounded-xl hover:bg-white/10 hover:text-white transition-all"
         >
-          <Plus className="w-3.5 h-3.5" />
+          <Plus className="w-4 h-4" />
           Добавить задачу
         </button>
       </div>
