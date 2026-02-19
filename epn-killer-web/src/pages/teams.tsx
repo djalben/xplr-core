@@ -484,7 +484,7 @@ const KanbanBoard = ({ tasks, members, currentUserId, onAddTask, onChangeStatus,
   onVerifyTask: (taskId: string) => void;
   onOpenTask: (task: KanbanTask) => void;
 }) => (
-  <div className="flex-1 overflow-y-auto overflow-x-auto p-4">
+  <div className="h-full overflow-y-auto overflow-x-auto p-4">
     <div className="flex gap-4 min-w-[820px] items-start">
       <KanbanColumn
         title="В очереди"
@@ -1054,6 +1054,7 @@ export const TeamsPage = () => {
               </div>
             </div>
           ) : (
+            <div className="flex flex-col h-full">
             <KanbanBoard
               tasks={tasks}
               members={teamMembers}
@@ -1064,6 +1065,7 @@ export const TeamsPage = () => {
               onVerifyTask={handleVerifyTask}
               onOpenTask={(task) => setOpenTaskId(task.id)}
             />
+            </div>
           )}
         </div>
 
