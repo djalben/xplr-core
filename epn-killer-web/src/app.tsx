@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ModeProvider } from './store/mode-context';
 import { RatesProvider } from './store/rates-context';
+import { AuthProvider, useAuth } from './store/auth-context';
 import { AuthPage } from './pages/auth';
 import { DashboardPage } from './pages/dashboard';
 import { CardsPage } from './pages/cards';
@@ -14,6 +15,7 @@ import { SettingsPage } from './pages/settings';
 import { SupportPage } from './pages/support';
 import { LandingPage } from './pages/landing';
 import { AdminRatesPage } from './pages/admin-rates';
+import { ForbiddenPage } from './pages/forbidden';
 import { PWAInstallPrompt } from './components/pwa-install-prompt';
 
 interface ProtectedRouteProps {
@@ -28,6 +30,14 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   return <>{children}</>;
 };
 
+const OwnerRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+  const token = localStorage.getItem('token');
+  if (!token) return <Navigate to="/auth" replace />;
+  const { isOwner } = useAuth();
+  if (!isOwner) return <Navigate to="/forbidden" replace />;
+  return <>{children}</>;
+};
+
 const RootRedirect: React.FC = () => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -38,6 +48,7 @@ const RootRedirect: React.FC = () => {
 
 function App() {
   return (
+    <AuthProvider>
     <ModeProvider>
     <RatesProvider>
       <PWAInstallPrompt />
@@ -59,9 +70,11 @@ function App() {
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="/support" element={<ProtectedRoute><SupportPage /></ProtectedRoute>} />
         <Route path="/admin/rates" element={<ProtectedRoute><AdminRatesPage /></ProtectedRoute>} />
+        <Route path="/forbidden" element={<ProtectedRoute><ForbiddenPage /></ProtectedRoute>} />
       </Routes>
     </RatesProvider>
     </ModeProvider>
+    </AuthProvider>
   );
 }
 

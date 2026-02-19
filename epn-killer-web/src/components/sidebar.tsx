@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { useMode } from '../store/mode-context';
 import { useRates } from '../store/rates-context';
+import { useAuth } from '../store/auth-context';
 import {
   LayoutDashboard,
   CreditCard,
@@ -43,6 +44,19 @@ const CurrencyRates = () => {
 
 const ModeToggle = () => {
   const { mode, setMode } = useMode();
+  const { isOwner } = useAuth();
+
+  // MEMBER users are locked to ARBITRAGE mode
+  if (!isOwner) {
+    return (
+      <div className="glass-card p-1.5 flex relative">
+        <div className="absolute top-1.5 bottom-1.5 left-1.5 right-1.5 gradient-accent rounded-xl shadow-lg shadow-blue-500/25" />
+        <div className="relative z-10 flex-1 px-4 py-2.5 text-xs font-bold tracking-wide rounded-xl text-white text-center">
+          АРБИТРАЖ
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="glass-card p-1.5 flex relative">
@@ -98,9 +112,10 @@ const NavItem = ({ href, icon, label, isActive, onClick }: NavItemProps) => (
 
 const UserProfile = () => {
   const navigate = useNavigate();
+  const { user, logout: authLogout } = useAuth();
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
+    authLogout();
     navigate('/login');
   };
 
@@ -108,11 +123,11 @@ const UserProfile = () => {
     <div className="glass-card p-4">
       <div className="flex items-center gap-3 mb-3">
         <div className="w-11 h-11 rounded-xl gradient-accent flex items-center justify-center shadow-lg shadow-blue-500/25">
-          <User className="w-5 h-5 text-white" />
+          <span className="text-white font-semibold text-sm">{user?.avatar || 'U'}</span>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-white truncate">Пользователь</p>
-          <p className="text-xs text-slate-500 truncate">XPLR</p>
+          <p className="text-sm font-semibold text-white truncate">{user?.name || 'Пользователь'}</p>
+          <p className="text-xs text-slate-500 truncate">{user?.role === 'OWNER' ? 'Владелец' : 'Участник'}</p>
         </div>
         <div className="relative">
           <Bell className="w-5 h-5 text-slate-500 hover:text-slate-300 cursor-pointer transition-colors" />
