@@ -69,6 +69,7 @@ interface KanbanTask {
   creatorId: string;
   column: 'backlog' | 'progress' | 'done';
   files: TaskFile[];
+  verified: boolean;
 }
 
 /* ──────────────────────────────── Data ──────────────────────────────── */
@@ -91,13 +92,13 @@ const initialMessages: ChatMessage[] = [
 ];
 
 const initialTasks: KanbanTask[] = [
-  { id: 'k1', title: 'Протестировать оффер DE', description: 'Запустить тестовый трафик $2K', assigneeId: '3', creatorId: '1', column: 'progress', files: [] },
-  { id: 'k2', title: 'Подготовить крео v2', description: 'Новые баннеры для FR гео', assigneeId: '2', creatorId: '1', column: 'progress', files: [] },
-  { id: 'k3', title: 'Масштабировать ES', description: 'Увеличить бюджет до $10K/день', assigneeId: '4', creatorId: '1', column: 'backlog', files: [] },
-  { id: 'k4', title: 'Анализ ROI за неделю', description: 'Сводная таблица по всем гео', assigneeId: '1', creatorId: '1', column: 'backlog', files: [] },
-  { id: 'k5', title: 'Настроить API трекер', description: 'Интегрировать postback для конверсий', assigneeId: '2', creatorId: '1', column: 'backlog', files: [] },
-  { id: 'k6', title: 'Выпустить 50 карт EUR', description: 'Для нового потока FR', assigneeId: '3', creatorId: '1', column: 'done', files: [] },
-  { id: 'k7', title: 'Закрыть старый оффер UK', description: 'Стоп трафик, архивировать данные', assigneeId: '1', creatorId: '1', column: 'done', files: [] },
+  { id: 'k1', title: 'Протестировать оффер DE', description: 'Запустить тестовый трафик $2K', assigneeId: '3', creatorId: '1', column: 'progress', files: [], verified: false },
+  { id: 'k2', title: 'Подготовить крео v2', description: 'Новые баннеры для FR гео', assigneeId: '2', creatorId: '1', column: 'progress', files: [], verified: false },
+  { id: 'k3', title: 'Масштабировать ES', description: 'Увеличить бюджет до $10K/день', assigneeId: '4', creatorId: '1', column: 'backlog', files: [], verified: false },
+  { id: 'k4', title: 'Анализ ROI за неделю', description: 'Сводная таблица по всем гео', assigneeId: '1', creatorId: '1', column: 'backlog', files: [], verified: false },
+  { id: 'k5', title: 'Настроить API трекер', description: 'Интегрировать postback для конверсий', assigneeId: '2', creatorId: '1', column: 'backlog', files: [], verified: false },
+  { id: 'k6', title: 'Выпустить 50 карт EUR', description: 'Для нового потока FR', assigneeId: '3', creatorId: '1', column: 'done', files: [], verified: false },
+  { id: 'k7', title: 'Закрыть старый оффер UK', description: 'Стоп трафик, архивировать данные', assigneeId: '1', creatorId: '1', column: 'done', files: [], verified: false },
 ];
 
 /* ──────────────────────────── Small Components ───────────────────────── */
@@ -331,20 +332,23 @@ const ChatPanel = ({ messages, members, onSend }: {
 
 /* ──────────────────────────── Kanban Board ───────────────────────────── */
 
-const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, onAddTask, onChangeStatus, onDeleteTask, onOpenTask }: {
+const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, currentUserId, onAddTask, onChangeStatus, onDeleteTask, onVerifyTask, onOpenTask }: {
   title: string;
   icon: React.ReactNode;
   color: string;
   columnKey: KanbanTask['column'];
   tasks: KanbanTask[];
   members: TeamMember[];
+  currentUserId: string;
   onAddTask: (column: KanbanTask['column']) => void;
   onChangeStatus: (taskId: string, newStatus: KanbanTask['column']) => void;
   onDeleteTask: (taskId: string) => void;
+  onVerifyTask: (taskId: string) => void;
   onOpenTask: (task: KanbanTask) => void;
 }) => {
   const getMember = (id: string) => members.find(m => m.id === id);
   const isBacklog = columnKey === 'backlog';
+  const isDone = columnKey === 'done';
 
   return (
     <div className="flex-1 min-w-[260px]">
@@ -371,6 +375,7 @@ const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, onAddTask
         {tasks.map(task => {
           const creator = getMember(task.creatorId);
           const assignee = getMember(task.assigneeId);
+          const isCreator = task.creatorId === currentUserId;
           return (
             <div
               key={task.id}
@@ -378,7 +383,6 @@ const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, onAddTask
               onClick={() => onOpenTask(task)}
             >
               <div className="flex items-start gap-2">
-                <GripVertical className="w-4 h-4 text-slate-700 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-white mb-0.5">{task.title}</p>
                   <p className="text-xs text-slate-500 mb-2 line-clamp-2">{task.description}</p>
@@ -391,22 +395,13 @@ const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, onAddTask
                     </div>
                   )}
 
-                  {/* Creator + Assignee row */}
-                  <div className="flex items-center gap-3 mb-2">
-                    {creator && (
-                      <div className="flex items-center gap-1" title={`Поручил: ${creator.name}`}>
-                        <span className="text-[9px] text-slate-600 uppercase">от</span>
-                        <Avatar member={creator} size="sm" />
-                      </div>
-                    )}
-                    {assignee && (
-                      <div className="flex items-center gap-1" title={`Исполнитель: ${assignee.name}`}>
-                        <span className="text-[9px] text-slate-600 uppercase">\u2192</span>
-                        <Avatar member={assignee} size="sm" />
-                        <span className="text-[11px] text-slate-400">{assignee.name.split(' ')[0]}</span>
-                      </div>
-                    )}
-                  </div>
+                  {/* Verified badge for done tasks */}
+                  {isDone && task.verified && (
+                    <div className="flex items-center gap-1 mb-2">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                      <span className="text-[10px] text-emerald-400 font-medium">Проверено</span>
+                    </div>
+                  )}
 
                   {/* Quick action buttons */}
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
@@ -430,10 +425,42 @@ const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, onAddTask
                         Готово
                       </button>
                     )}
-                    <button onClick={() => onDeleteTask(task.id)} className="p-1 hover:bg-red-500/20 rounded transition-colors ml-auto" title="Удалить">
-                      <Trash2 className="w-3.5 h-3.5 text-slate-500 hover:text-red-400" />
-                    </button>
+                    {isDone && isCreator && !task.verified && (
+                      <button
+                        onClick={() => onVerifyTask(task.id)}
+                        className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 rounded-lg transition-colors"
+                        title="Подтвердить выполнение"
+                      >
+                        <Check className="w-3 h-3" />
+                        Проверено
+                      </button>
+                    )}
+                    {isDone && task.verified && (
+                      <button
+                        onClick={() => onDeleteTask(task.id)}
+                        className="p-1 hover:bg-red-500/20 rounded transition-colors"
+                        title="Удалить"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-slate-500 hover:text-red-400" />
+                      </button>
+                    )}
                   </div>
+                </div>
+
+                {/* Creator + Assignee — right side, vertical */}
+                <div className="flex flex-col items-center gap-1.5 shrink-0 ml-2 pt-0.5">
+                  {creator && (
+                    <div className="flex flex-col items-center" title={`Поручил: ${creator.name}`}>
+                      <Avatar member={creator} size="sm" />
+                      <span className="text-[8px] text-slate-500 mt-0.5 leading-none">поручил</span>
+                    </div>
+                  )}
+                  {assignee && (
+                    <div className="flex flex-col items-center" title={`Исполнитель: ${assignee.name}`}>
+                      <Avatar member={assignee} size="sm" />
+                      <span className="text-[8px] text-slate-500 mt-0.5 leading-none">исполнит.</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -447,12 +474,14 @@ const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, onAddTask
   );
 };
 
-const KanbanBoard = ({ tasks, members, onAddTask, onChangeStatus, onDeleteTask, onOpenTask }: {
+const KanbanBoard = ({ tasks, members, currentUserId, onAddTask, onChangeStatus, onDeleteTask, onVerifyTask, onOpenTask }: {
   tasks: KanbanTask[];
   members: TeamMember[];
+  currentUserId: string;
   onAddTask: (column: KanbanTask['column']) => void;
   onChangeStatus: (taskId: string, newStatus: KanbanTask['column']) => void;
   onDeleteTask: (taskId: string) => void;
+  onVerifyTask: (taskId: string) => void;
   onOpenTask: (task: KanbanTask) => void;
 }) => (
   <div className="flex-1 overflow-y-auto overflow-x-auto p-4">
@@ -464,9 +493,11 @@ const KanbanBoard = ({ tasks, members, onAddTask, onChangeStatus, onDeleteTask, 
         columnKey="backlog"
         tasks={tasks.filter(t => t.column === 'backlog')}
         members={members}
+        currentUserId={currentUserId}
         onAddTask={onAddTask}
         onChangeStatus={onChangeStatus}
         onDeleteTask={onDeleteTask}
+        onVerifyTask={onVerifyTask}
         onOpenTask={onOpenTask}
       />
       <KanbanColumn
@@ -476,9 +507,11 @@ const KanbanBoard = ({ tasks, members, onAddTask, onChangeStatus, onDeleteTask, 
         columnKey="progress"
         tasks={tasks.filter(t => t.column === 'progress')}
         members={members}
+        currentUserId={currentUserId}
         onAddTask={onAddTask}
         onChangeStatus={onChangeStatus}
         onDeleteTask={onDeleteTask}
+        onVerifyTask={onVerifyTask}
         onOpenTask={onOpenTask}
       />
       <KanbanColumn
@@ -488,9 +521,11 @@ const KanbanBoard = ({ tasks, members, onAddTask, onChangeStatus, onDeleteTask, 
         columnKey="done"
         tasks={tasks.filter(t => t.column === 'done')}
         members={members}
+        currentUserId={currentUserId}
         onAddTask={onAddTask}
         onChangeStatus={onChangeStatus}
         onDeleteTask={onDeleteTask}
+        onVerifyTask={onVerifyTask}
         onOpenTask={onOpenTask}
       />
     </div>
@@ -512,7 +547,7 @@ const AddTaskModal = ({ column, members, onClose, onSave }: {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
-    onSave({ title: title.trim(), description: description.trim(), assigneeId, column, creatorId: '', files: [] });
+    onSave({ title: title.trim(), description: description.trim(), assigneeId, column, creatorId: '', files: [], verified: false });
     onClose();
   };
 
@@ -588,14 +623,19 @@ const AddTaskModal = ({ column, members, onClose, onSave }: {
 
 /* ──────────────────────────── Task Detail Modal ──────────────────────── */
 
-const TaskDetailModal = ({ task, members, onClose, onSave, onAttachFile }: {
+const TaskDetailModal = ({ task, members, currentUserId, onClose, onSave, onAttachFile, onVerifyTask, onDeleteTask }: {
   task: KanbanTask;
   members: TeamMember[];
+  currentUserId: string;
   onClose: () => void;
   onSave: (taskId: string, updates: { title: string; description: string; assigneeId: string }) => void;
   onAttachFile: (taskId: string, fileName: string) => void;
+  onVerifyTask: (taskId: string) => void;
+  onDeleteTask: (taskId: string) => void;
 }) => {
   const isEditable = task.column === 'backlog';
+  const isDone = task.column === 'done';
+  const isCreator = task.creatorId === currentUserId;
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description);
   const [assigneeId, setAssigneeId] = useState(task.assigneeId);
@@ -756,6 +796,31 @@ const TaskDetailModal = ({ task, members, onClose, onSave, onAttachFile }: {
             )}
           </div>
 
+          {/* Verification section — Done column only */}
+          {isDone && (
+            <div className="mb-4 p-3 bg-white/[0.03] rounded-xl border border-white/[0.06]">
+              {task.verified ? (
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span className="text-sm text-emerald-400 font-medium">Задача проверена и подтверждена</span>
+                </div>
+              ) : isCreator ? (
+                <button
+                  onClick={() => onVerifyTask(task.id)}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 rounded-xl transition-colors"
+                >
+                  <Check className="w-4 h-4" />
+                  Подтвердить выполнение
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-slate-500" />
+                  <span className="text-sm text-slate-500">Ожидает проверки постановщика</span>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Footer */}
           <div className="flex gap-3 pt-2">
             <button onClick={onClose} className="flex-1 px-4 py-3 glass-card hover:bg-white/10 text-slate-300 font-medium rounded-xl transition-colors">
@@ -768,6 +833,15 @@ const TaskDetailModal = ({ task, members, onClose, onSave, onAttachFile }: {
                 className="flex-1 px-4 py-3 gradient-accent text-white font-medium rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Сохранить
+              </button>
+            )}
+            {isDone && task.verified && (
+              <button
+                onClick={() => { onDeleteTask(task.id); onClose(); }}
+                className="flex-1 px-4 py-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                Удалить
               </button>
             )}
           </div>
@@ -845,7 +919,7 @@ export const TeamsPage = () => {
   }, [tasks]);
 
   const handleAddTask = useCallback((data: Omit<KanbanTask, 'id'>) => {
-    const newTask: KanbanTask = { ...data, id: `k${Date.now()}`, creatorId: currentUserId, files: data.files || [] };
+    const newTask: KanbanTask = { ...data, id: `k${Date.now()}`, creatorId: currentUserId, files: data.files || [], verified: false };
     setTasks(prev => [...prev, newTask]);
     addSystemMsg(`\u{1F514} @${getUserName()} поручил задачу: "${data.title}"`);
   }, [currentUserId, addSystemMsg]);
@@ -873,6 +947,16 @@ export const TeamsPage = () => {
   const handleEditTask = useCallback((taskId: string, updates: { title: string; description: string; assigneeId: string }) => {
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
   }, []);
+
+  const handleVerifyTask = useCallback((taskId: string) => {
+    let taskTitle = '';
+    setTasks(prev => prev.map(t => {
+      if (t.id !== taskId) return t;
+      taskTitle = t.title;
+      return { ...t, verified: true };
+    }));
+    addSystemMsg(`\u2705 @${getUserName()} подтвердил выполнение задачи: "${taskTitle}"`);
+  }, [addSystemMsg]);
 
   const handleAttachFile = useCallback((taskId: string, fileName: string) => {
     const file: TaskFile = {
@@ -973,9 +1057,11 @@ export const TeamsPage = () => {
             <KanbanBoard
               tasks={tasks}
               members={teamMembers}
+              currentUserId={currentUserId}
               onAddTask={(col) => setAddTaskColumn(col)}
               onChangeStatus={handleChangeStatus}
               onDeleteTask={handleDeleteTask}
+              onVerifyTask={handleVerifyTask}
               onOpenTask={(task) => setOpenTaskId(task.id)}
             />
           )}
@@ -995,9 +1081,12 @@ export const TeamsPage = () => {
           <TaskDetailModal
             task={openTask}
             members={teamMembers}
+            currentUserId={currentUserId}
             onClose={() => setOpenTaskId(null)}
             onSave={handleEditTask}
             onAttachFile={handleAttachFile}
+            onVerifyTask={handleVerifyTask}
+            onDeleteTask={handleDeleteTask}
           />
         )}
       </div>
