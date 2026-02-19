@@ -26,7 +26,8 @@ import {
   CheckCircle2,
   Pencil,
   FileText,
-  Upload
+  Upload,
+  Download
 } from 'lucide-react';
 
 const LS_TASKS_KEY = 'xplr_kanban_tasks';
@@ -330,7 +331,7 @@ const ChatPanel = ({ messages, members, onSend }: {
 
 /* ──────────────────────────── Kanban Board ───────────────────────────── */
 
-const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, onAddTask, onChangeStatus, onDeleteTask, onEditTask, onAttachFile }: {
+const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, onAddTask, onChangeStatus, onDeleteTask, onOpenTask }: {
   title: string;
   icon: React.ReactNode;
   color: string;
@@ -340,8 +341,7 @@ const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, onAddTask
   onAddTask: (column: KanbanTask['column']) => void;
   onChangeStatus: (taskId: string, newStatus: KanbanTask['column']) => void;
   onDeleteTask: (taskId: string) => void;
-  onEditTask: (task: KanbanTask) => void;
-  onAttachFile: (taskId: string) => void;
+  onOpenTask: (task: KanbanTask) => void;
 }) => {
   const getMember = (id: string) => members.find(m => m.id === id);
   const isBacklog = columnKey === 'backlog';
@@ -369,35 +369,25 @@ const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, onAddTask
       {/* Task list (no individual scroll) */}
       <div className="space-y-2 pb-4">
         {tasks.map(task => {
-          const assignee = getMember(task.assigneeId);
           const creator = getMember(task.creatorId);
+          const assignee = getMember(task.assigneeId);
           return (
-            <div key={task.id} className="glass-card p-3 group hover:border-white/20 transition-all duration-150">
+            <div
+              key={task.id}
+              className="glass-card p-3 group hover:border-white/20 transition-all duration-150 cursor-pointer"
+              onClick={() => onOpenTask(task)}
+            >
               <div className="flex items-start gap-2">
                 <GripVertical className="w-4 h-4 text-slate-700 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white mb-1">{task.title}</p>
-                  <p className="text-xs text-slate-500 mb-2">{task.description}</p>
+                  <p className="text-sm font-medium text-white mb-0.5">{task.title}</p>
+                  <p className="text-xs text-slate-500 mb-2 line-clamp-2">{task.description}</p>
 
-                  {/* Attached files */}
+                  {/* Files count badge */}
                   {task.files.length > 0 && (
-                    <div className="mb-2 space-y-1">
-                      {task.files.map(f => {
-                        const uploader = getMember(f.uploaderId);
-                        return (
-                          <div key={f.id} className="flex items-center gap-2 px-2 py-1.5 bg-white/[0.03] border border-white/[0.06] rounded-lg">
-                            <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                            <span className="text-[11px] text-slate-300 truncate flex-1">{f.name}</span>
-                            {uploader && (
-                              <div className="flex items-center gap-1 shrink-0" title={`Прикрепил: ${uploader.name}`}>
-                                <div className={`w-4 h-4 rounded text-[7px] flex items-center justify-center text-white font-semibold ${uploader.role === 'owner' ? 'bg-gradient-to-br from-red-500 to-orange-600' : 'bg-gradient-to-br from-blue-500 to-purple-600'}`}>
-                                  {uploader.avatar}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
+                    <div className="flex items-center gap-1 mb-2">
+                      <FileText className="w-3 h-3 text-blue-400" />
+                      <span className="text-[10px] text-slate-400">{task.files.length} файл(ов)</span>
                     </div>
                   )}
 
@@ -418,33 +408,17 @@ const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, onAddTask
                     )}
                   </div>
 
-                  {/* Action buttons */}
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {/* Quick action buttons */}
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
                     {isBacklog && (
-                      <>
-                        <button
-                          onClick={() => onEditTask(task)}
-                          className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
-                          title="Редактировать"
-                        >
-                          <Pencil className="w-3.5 h-3.5 text-slate-400" />
-                        </button>
-                        <button
-                          onClick={() => onAttachFile(task.id)}
-                          className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
-                          title="Прикрепить файл"
-                        >
-                          <Upload className="w-3.5 h-3.5 text-slate-400" />
-                        </button>
-                        <button
-                          onClick={() => onChangeStatus(task.id, 'progress')}
-                          className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-lg transition-colors"
-                          title="Принять в работу"
-                        >
-                          <Play className="w-3 h-3" />
-                          В работу
-                        </button>
-                      </>
+                      <button
+                        onClick={() => onChangeStatus(task.id, 'progress')}
+                        className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-lg transition-colors"
+                        title="Принять в работу"
+                      >
+                        <Play className="w-3 h-3" />
+                        В работу
+                      </button>
                     )}
                     {columnKey === 'progress' && (
                       <button
@@ -473,17 +447,16 @@ const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, onAddTask
   );
 };
 
-const KanbanBoard = ({ tasks, members, onAddTask, onChangeStatus, onDeleteTask, onEditTask, onAttachFile }: {
+const KanbanBoard = ({ tasks, members, onAddTask, onChangeStatus, onDeleteTask, onOpenTask }: {
   tasks: KanbanTask[];
   members: TeamMember[];
   onAddTask: (column: KanbanTask['column']) => void;
   onChangeStatus: (taskId: string, newStatus: KanbanTask['column']) => void;
   onDeleteTask: (taskId: string) => void;
-  onEditTask: (task: KanbanTask) => void;
-  onAttachFile: (taskId: string) => void;
+  onOpenTask: (task: KanbanTask) => void;
 }) => (
   <div className="flex-1 overflow-y-auto overflow-x-auto p-4">
-    <div className="flex gap-4 min-w-[820px]">
+    <div className="flex gap-4 min-w-[820px] items-start">
       <KanbanColumn
         title="В очереди"
         icon={<Clock className="w-4 h-4 text-slate-400" />}
@@ -494,8 +467,7 @@ const KanbanBoard = ({ tasks, members, onAddTask, onChangeStatus, onDeleteTask, 
         onAddTask={onAddTask}
         onChangeStatus={onChangeStatus}
         onDeleteTask={onDeleteTask}
-        onEditTask={onEditTask}
-        onAttachFile={onAttachFile}
+        onOpenTask={onOpenTask}
       />
       <KanbanColumn
         title="В процессе"
@@ -507,8 +479,7 @@ const KanbanBoard = ({ tasks, members, onAddTask, onChangeStatus, onDeleteTask, 
         onAddTask={onAddTask}
         onChangeStatus={onChangeStatus}
         onDeleteTask={onDeleteTask}
-        onEditTask={onEditTask}
-        onAttachFile={onAttachFile}
+        onOpenTask={onOpenTask}
       />
       <KanbanColumn
         title="Готово"
@@ -520,8 +491,7 @@ const KanbanBoard = ({ tasks, members, onAddTask, onChangeStatus, onDeleteTask, 
         onAddTask={onAddTask}
         onChangeStatus={onChangeStatus}
         onDeleteTask={onDeleteTask}
-        onEditTask={onEditTask}
-        onAttachFile={onAttachFile}
+        onOpenTask={onOpenTask}
       />
     </div>
   </div>
@@ -616,119 +586,191 @@ const AddTaskModal = ({ column, members, onClose, onSave }: {
   );
 };
 
-/* ──────────────────────────── Edit Task Modal ─────────────────────────── */
+/* ──────────────────────────── Task Detail Modal ──────────────────────── */
 
-const EditTaskModal = ({ task, members, onClose, onSave }: {
+const TaskDetailModal = ({ task, members, onClose, onSave, onAttachFile }: {
   task: KanbanTask;
   members: TeamMember[];
   onClose: () => void;
   onSave: (taskId: string, updates: { title: string; description: string; assigneeId: string }) => void;
+  onAttachFile: (taskId: string, fileName: string) => void;
 }) => {
+  const isEditable = task.column === 'backlog';
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description);
   const [assigneeId, setAssigneeId] = useState(task.assigneeId);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const getMember = (id: string) => members.find(m => m.id === id);
+  const creator = getMember(task.creatorId);
+  const assignee = getMember(task.assigneeId);
+  const columnLabels: Record<string, { label: string; color: string }> = {
+    backlog: { label: 'В очереди', color: 'text-slate-300' },
+    progress: { label: 'В процессе', color: 'text-blue-400' },
+    done: { label: 'Готово', color: 'text-emerald-400' },
+  };
+  const col = columnLabels[task.column];
+
+  const handleSave = () => {
     if (!title.trim()) return;
     onSave(task.id, { title: title.trim(), description: description.trim(), assigneeId });
     onClose();
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      onAttachFile(task.id, file.name);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleDownload = (fileName: string) => {
+    const blob = new Blob([''], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <ModalPortal>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
-        <div className="relative bg-[#050507]/95 backdrop-blur-3xl border border-white/10 p-6 rounded-2xl w-full max-w-[440px] shadow-2xl shadow-black/60 animate-scale-in">
+        <div className="relative bg-[#050507]/95 backdrop-blur-3xl border border-white/10 p-6 rounded-2xl w-full max-w-[520px] max-h-[85dvh] overflow-y-auto shadow-2xl shadow-black/60 animate-scale-in">
+          {/* Header */}
           <div className="flex items-center justify-between mb-5">
-            <h3 className="text-lg font-semibold text-white">Редактировать задачу</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-white">
+                {isEditable ? 'Редактировать задачу' : 'Просмотр задачи'}
+              </h3>
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white/[0.06] ${col.color}`}>{col.label}</span>
+            </div>
             <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
               <X className="w-5 h-5 text-slate-400" />
             </button>
           </div>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm text-slate-400 mb-1.5">Название *</label>
-              <input value={title} onChange={e => setTitle(e.target.value)} className="xplr-input w-full" autoFocus />
-            </div>
-            <div>
-              <label className="block text-sm text-slate-400 mb-1.5">Описание</label>
-              <input value={description} onChange={e => setDescription(e.target.value)} className="xplr-input w-full" />
-            </div>
-            <div>
+
+          {/* Creator & Assignee info */}
+          <div className="flex items-center gap-4 mb-5 p-3 bg-white/[0.03] rounded-xl border border-white/[0.06]">
+            {creator && (
+              <div className="flex items-center gap-2">
+                <Avatar member={creator} size="sm" />
+                <div>
+                  <p className="text-[9px] text-slate-500 uppercase">Поручил</p>
+                  <p className="text-xs text-white font-medium">{creator.name}</p>
+                </div>
+              </div>
+            )}
+            <div className="w-px h-8 bg-white/10" />
+            {assignee && (
+              <div className="flex items-center gap-2">
+                <Avatar member={assignee} size="sm" />
+                <div>
+                  <p className="text-[9px] text-slate-500 uppercase">Исполнитель</p>
+                  <p className="text-xs text-white font-medium">{assignee.name}</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Title */}
+          <div className="mb-4">
+            <label className="block text-sm text-slate-400 mb-1.5">Название</label>
+            {isEditable ? (
+              <input value={title} onChange={e => setTitle(e.target.value)} className="xplr-input w-full" />
+            ) : (
+              <div className="px-3 py-2.5 bg-white/[0.04] border border-white/10 rounded-xl text-sm text-white">{task.title}</div>
+            )}
+          </div>
+
+          {/* Description */}
+          <div className="mb-4">
+            <label className="block text-sm text-slate-400 mb-1.5">Описание</label>
+            {isEditable ? (
+              <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} className="xplr-input w-full resize-none" />
+            ) : (
+              <div className="px-3 py-2.5 bg-white/[0.04] border border-white/10 rounded-xl text-sm text-slate-300 min-h-[60px]">
+                {task.description || <span className="text-slate-600 italic">Нет описания</span>}
+              </div>
+            )}
+          </div>
+
+          {/* Assignee (editable only in backlog) */}
+          {isEditable && (
+            <div className="mb-4">
               <label className="block text-sm text-slate-400 mb-1.5">Исполнитель</label>
               <select value={assigneeId} onChange={e => setAssigneeId(e.target.value)} className="xplr-select w-full">
                 {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
             </div>
-            <div className="flex gap-3 pt-2">
-              <button type="button" onClick={onClose} className="flex-1 px-4 py-3 glass-card hover:bg-white/10 text-slate-300 font-medium rounded-xl transition-colors">Отмена</button>
-              <button type="submit" disabled={!title.trim()} className="flex-1 px-4 py-3 gradient-accent text-white font-medium rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed">Сохранить</button>
+          )}
+
+          {/* Files section */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm text-slate-400">Прикреплённые файлы</label>
+              {isEditable && (
+                <>
+                  <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-300 bg-white/[0.06] hover:bg-white/10 border border-white/10 rounded-lg transition-colors"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    Прикрепить
+                  </button>
+                </>
+              )}
             </div>
-          </form>
-        </div>
-      </div>
-    </ModalPortal>
-  );
-};
-
-/* ──────────────────────────── Attach File Modal ──────────────────────── */
-
-const AttachFileModal = ({ taskTitle, onClose, onAttach }: {
-  taskTitle: string;
-  onClose: () => void;
-  onAttach: (fileName: string) => void;
-}) => {
-  const [fileName, setFileName] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setFileName(file.name);
-    }
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!fileName.trim()) return;
-    onAttach(fileName.trim());
-    onClose();
-  };
-
-  return (
-    <ModalPortal>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
-        <div className="relative bg-[#050507]/95 backdrop-blur-3xl border border-white/10 p-6 rounded-2xl w-full max-w-[440px] shadow-2xl shadow-black/60 animate-scale-in">
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="text-lg font-semibold text-white">Прикрепить файл</h3>
-            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
-              <X className="w-5 h-5 text-slate-400" />
-            </button>
-          </div>
-          <p className="text-xs text-slate-500 mb-4">К задаче: «{taskTitle}»</p>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full py-8 flex flex-col items-center justify-center gap-2 border-2 border-dashed border-white/15 rounded-xl hover:border-white/30 hover:bg-white/[0.03] transition-all"
-            >
-              <Upload className="w-8 h-8 text-slate-500" />
-              <span className="text-sm text-slate-400">{fileName || 'Нажмите для выбора файла'}</span>
-            </button>
-            {!fileName && (
-              <div>
-                <label className="block text-sm text-slate-400 mb-1.5">Или введите имя файла</label>
-                <input value={fileName} onChange={e => setFileName(e.target.value)} placeholder="report.pdf" className="xplr-input w-full" />
+            {task.files.length > 0 ? (
+              <div className="space-y-1.5">
+                {task.files.map(f => {
+                  const uploader = getMember(f.uploaderId);
+                  return (
+                    <div key={f.id} className="flex items-center gap-2 px-3 py-2 bg-white/[0.03] border border-white/[0.06] rounded-lg">
+                      <FileText className="w-4 h-4 text-blue-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-white truncate">{f.name}</p>
+                        {uploader && (
+                          <p className="text-[10px] text-slate-500">Прикрепил: {uploader.name} · {f.uploadedAt}</p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => handleDownload(f.name)}
+                        className="p-1.5 hover:bg-white/10 rounded-lg transition-colors shrink-0"
+                        title="Скачать"
+                      >
+                        <Download className="w-3.5 h-3.5 text-slate-400" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-4 text-xs text-slate-600 bg-white/[0.02] rounded-xl border border-dashed border-white/[0.08]">
+                Нет прикреплённых файлов
               </div>
             )}
-            <div className="flex gap-3 pt-2">
-              <button type="button" onClick={onClose} className="flex-1 px-4 py-3 glass-card hover:bg-white/10 text-slate-300 font-medium rounded-xl transition-colors">Отмена</button>
-              <button type="submit" disabled={!fileName.trim()} className="flex-1 px-4 py-3 gradient-accent text-white font-medium rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed">Прикрепить</button>
-            </div>
-          </form>
+          </div>
+
+          {/* Footer */}
+          <div className="flex gap-3 pt-2">
+            <button onClick={onClose} className="flex-1 px-4 py-3 glass-card hover:bg-white/10 text-slate-300 font-medium rounded-xl transition-colors">
+              {isEditable ? 'Отмена' : 'Закрыть'}
+            </button>
+            {isEditable && (
+              <button
+                onClick={handleSave}
+                disabled={!title.trim()}
+                className="flex-1 px-4 py-3 gradient-accent text-white font-medium rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Сохранить
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </ModalPortal>
@@ -760,8 +802,7 @@ export const TeamsPage = () => {
   const [selectedMember, setSelectedMember] = useState<string | null>(null);
   const [showMobileMembers, setShowMobileMembers] = useState(false);
   const [addTaskColumn, setAddTaskColumn] = useState<KanbanTask['column'] | null>(null);
-  const [editingTask, setEditingTask] = useState<KanbanTask | null>(null);
-  const [attachingTaskId, setAttachingTaskId] = useState<string | null>(null);
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const { user } = useAuth();
 
   const currentUserId = user?.id || '1';
@@ -849,7 +890,7 @@ export const TeamsPage = () => {
     addSystemMsg(`\u{1F514} @${getUserName()} прикрепил файл: ${fileName} к задаче: "${taskTitle}"`);
   }, [currentUserId, addSystemMsg]);
 
-  const attachingTask = attachingTaskId ? tasks.find(t => t.id === attachingTaskId) : null;
+  const openTask = openTaskId ? tasks.find(t => t.id === openTaskId) || null : null;
 
   return (
     <DashboardLayout>
@@ -935,8 +976,7 @@ export const TeamsPage = () => {
               onAddTask={(col) => setAddTaskColumn(col)}
               onChangeStatus={handleChangeStatus}
               onDeleteTask={handleDeleteTask}
-              onEditTask={(task) => setEditingTask(task)}
-              onAttachFile={(taskId) => setAttachingTaskId(taskId)}
+              onOpenTask={(task) => setOpenTaskId(task.id)}
             />
           )}
         </div>
@@ -951,19 +991,13 @@ export const TeamsPage = () => {
             onSave={handleAddTask}
           />
         )}
-        {editingTask && (
-          <EditTaskModal
-            task={editingTask}
+        {openTask && (
+          <TaskDetailModal
+            task={openTask}
             members={teamMembers}
-            onClose={() => setEditingTask(null)}
+            onClose={() => setOpenTaskId(null)}
             onSave={handleEditTask}
-          />
-        )}
-        {attachingTask && (
-          <AttachFileModal
-            taskTitle={attachingTask.title}
-            onClose={() => setAttachingTaskId(null)}
-            onAttach={(fileName) => handleAttachFile(attachingTask.id, fileName)}
+            onAttachFile={handleAttachFile}
           />
         )}
       </div>
