@@ -123,9 +123,9 @@ const CardIssueModal = ({
         {/* Fixed header */}
         <div className="shrink-0 p-5 pb-3 border-b border-white/[0.06]">
           <div className="flex justify-center mb-3">
-            {card.type === 'subscriptions' && <SubscriptionsCardVisual mini={false} />}
-            {card.type === 'travel' && <TravelCardVisual mini={false} />}
-            {card.type === 'premium' && <PremiumCardVisual mini={false} />}
+            {card.type === 'subscriptions' && <SubscriptionsCardVisual mini={false} currencySymbol={currencySymbol} />}
+            {card.type === 'travel' && <TravelCardVisual mini={false} currencySymbol={currencySymbol} />}
+            {card.type === 'premium' && <PremiumCardVisual mini={false} currencySymbol={currencySymbol} />}
           </div>
           
           {/* Payment method badges */}
@@ -261,7 +261,7 @@ const CardIssueModal = ({
 };
 
 // Subscriptions Card Visual - colorful with service icons (realistic bank card style)
-const SubscriptionsCardVisual = ({ mini = true }: { mini?: boolean }) => (
+const SubscriptionsCardVisual = ({ mini = true, currencySymbol }: { mini?: boolean; currencySymbol?: string }) => (
   <div className={`relative ${mini ? 'w-full aspect-[1.586/1]' : 'w-72 h-44'} rounded-2xl overflow-hidden shadow-2xl`}>
     {/* Gradient background */}
     <div className="absolute inset-0">
@@ -273,7 +273,7 @@ const SubscriptionsCardVisual = ({ mini = true }: { mini?: boolean }) => (
       {/* Top row - branding and currency */}
       <div className="flex items-start justify-between">
         <span className="text-white/90 text-xs font-medium tracking-wide">Без границ.</span>
-        <span className="text-white text-sm font-bold">€</span>
+        <span className="text-white text-sm font-bold">{currencySymbol ?? '€'}</span>
       </div>
       
       {/* Card number at bottom */}
@@ -291,7 +291,7 @@ const SubscriptionsCardVisual = ({ mini = true }: { mini?: boolean }) => (
 );
 
 // Travel Card Visual - blue gradient (realistic bank card style)
-const TravelCardVisual = ({ mini = true }: { mini?: boolean }) => (
+const TravelCardVisual = ({ mini = true, currencySymbol }: { mini?: boolean; currencySymbol?: string }) => (
   <div className={`relative ${mini ? 'w-full aspect-[1.586/1]' : 'w-72 h-44'} rounded-2xl overflow-hidden shadow-2xl`}>
     {/* Blue gradient background */}
     <div className="absolute inset-0">
@@ -303,7 +303,7 @@ const TravelCardVisual = ({ mini = true }: { mini?: boolean }) => (
       {/* Top row - branding and currency */}
       <div className="flex items-start justify-between">
         <span className="text-white/90 text-xs font-medium tracking-wide">Без границ.</span>
-        <span className="text-white text-sm font-bold">$</span>
+        <span className="text-white text-sm font-bold">{currencySymbol ?? '$'}</span>
       </div>
       
       {/* Card number at bottom */}
@@ -321,7 +321,7 @@ const TravelCardVisual = ({ mini = true }: { mini?: boolean }) => (
 );
 
 // Premium Card Visual - XPLR PRIME: deep black matte, neural texture, platinum chip, Power Beam
-const PremiumCardVisual = ({ mini = true }: { mini?: boolean }) => (
+const PremiumCardVisual = ({ mini = true, currencySymbol }: { mini?: boolean; currencySymbol?: string }) => (
   <div className={`relative ${mini ? 'w-full aspect-[1.586/1]' : 'w-72 h-44'} rounded-2xl overflow-hidden shadow-2xl`}>
     {/* Deep matte black background */}
     <div className="absolute inset-0 bg-gradient-to-br from-[#0a0a0a] via-[#111111] to-[#080808]">
@@ -363,7 +363,7 @@ const PremiumCardVisual = ({ mini = true }: { mini?: boolean }) => (
           <p className="text-white/25 text-[8px] tracking-[0.3em] uppercase">Platinum Edition</p>
         </div>
         <div className="w-8 h-8 rounded-full bg-white/[0.06] backdrop-blur-sm flex items-center justify-center border border-white/[0.08]">
-          <span className="text-white text-sm font-bold">$</span>
+          <span className="text-white text-sm font-bold">{currencySymbol ?? '$'}</span>
         </div>
       </div>
 

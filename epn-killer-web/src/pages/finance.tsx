@@ -199,7 +199,7 @@ export const FinancePage = () => {
                 placeholder="Поиск операций..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="xplr-input w-full pl-14"
+                className="xplr-input w-full pl-12"
               />
             </div>
             
