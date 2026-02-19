@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { useMode } from '../store/mode-context';
+import { useRates } from '../store/rates-context';
 import {
   LayoutDashboard,
   CreditCard,
@@ -29,13 +30,16 @@ const Logo = () => (
   </div>
 );
 
-const CurrencyRates = () => (
-  <div className="rate-ticker flex items-center gap-3 text-sm">
-    <DollarSign className="w-4 h-4 text-blue-400" />
-    <span className="text-slate-400">USD: <strong className="text-white">89.45₽</strong></span>
-    <span className="text-slate-400">EUR: <strong className="text-white">97.82₽</strong></span>
-  </div>
-);
+const CurrencyRates = () => {
+  const { rates } = useRates();
+  return (
+    <div className="rate-ticker flex items-center gap-3 text-sm">
+      <DollarSign className="w-4 h-4 text-blue-400" />
+      <span className="text-slate-400">USD: <strong className="text-white">{rates.usd.toFixed(2)}₽</strong></span>
+      <span className="text-slate-400">EUR: <strong className="text-white">{rates.eur.toFixed(2)}₽</strong></span>
+    </div>
+  );
+};
 
 const ModeToggle = () => {
   const { mode, setMode } = useMode();

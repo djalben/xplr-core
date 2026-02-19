@@ -30,7 +30,7 @@ export const SupportPage = () => {
         
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-800 mb-2">Поддержка</h1>
+          <h1 className="text-3xl font-bold text-white mb-2">Поддержка</h1>
           <p className="text-slate-500">Мы на связи 24/7. Выберите удобный способ обращения.</p>
         </div>
 
@@ -42,10 +42,10 @@ export const SupportPage = () => {
             rel="noopener noreferrer"
             className="glass-card p-6 card-hover group"
           >
-            <div className="w-14 h-14 rounded-xl bg-blue-100 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <MessageCircle className="w-7 h-7 text-blue-500" />
+            <div className="w-14 h-14 rounded-xl bg-blue-500/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+              <MessageCircle className="w-7 h-7 text-blue-400" />
             </div>
-            <h3 className="text-lg font-semibold text-slate-800 mb-1">Telegram</h3>
+            <h3 className="text-lg font-semibold text-white mb-1">Telegram</h3>
             <p className="text-slate-500 text-sm mb-3">Быстрый ответ в чате</p>
             <div className="flex items-center gap-2 text-blue-500 text-sm font-medium">
               @xplr_support
@@ -57,10 +57,10 @@ export const SupportPage = () => {
             href="mailto:support@xplr.io"
             className="glass-card p-6 card-hover group"
           >
-            <div className="w-14 h-14 rounded-xl bg-emerald-100 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <Mail className="w-7 h-7 text-emerald-500" />
+            <div className="w-14 h-14 rounded-xl bg-emerald-500/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+              <Mail className="w-7 h-7 text-emerald-400" />
             </div>
-            <h3 className="text-lg font-semibold text-slate-800 mb-1">Email</h3>
+            <h3 className="text-lg font-semibold text-white mb-1">Email</h3>
             <p className="text-slate-500 text-sm mb-3">Ответ в течение 2 часов</p>
             <div className="flex items-center gap-2 text-emerald-500 text-sm font-medium">
               support@xplr.io
@@ -73,10 +73,10 @@ export const SupportPage = () => {
             rel="noopener noreferrer"
             className="glass-card p-6 card-hover group"
           >
-            <div className="w-14 h-14 rounded-xl bg-green-100 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <Phone className="w-7 h-7 text-green-500" />
+            <div className="w-14 h-14 rounded-xl bg-green-500/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+              <Phone className="w-7 h-7 text-green-400" />
             </div>
-            <h3 className="text-lg font-semibold text-slate-800 mb-1">WhatsApp</h3>
+            <h3 className="text-lg font-semibold text-white mb-1">WhatsApp</h3>
             <p className="text-slate-500 text-sm mb-3">Для срочных вопросов</p>
             <div className="flex items-center gap-2 text-green-500 text-sm font-medium">
               +7 (999) 123-45-67
@@ -87,14 +87,14 @@ export const SupportPage = () => {
 
         {/* Quick Message Form */}
         <div className="glass-card p-6 mb-8">
-          <h3 className="text-lg font-semibold text-slate-800 mb-4">Быстрое сообщение</h3>
+          <h3 className="text-lg font-semibold text-white mb-4">Быстрое сообщение</h3>
           
           {sent ? (
-            <div className="flex items-center gap-3 p-6 bg-emerald-50 rounded-xl border border-emerald-200">
-              <CheckCircle className="w-8 h-8 text-emerald-500" />
+            <div className="flex items-center gap-3 p-6 bg-emerald-500/10 rounded-xl border border-emerald-500/30">
+              <CheckCircle className="w-8 h-8 text-emerald-400" />
               <div>
-                <p className="font-semibold text-emerald-800">Сообщение отправлено!</p>
-                <p className="text-sm text-emerald-600">Мы ответим в ближайшее время</p>
+                <p className="font-semibold text-emerald-400">Сообщение отправлено!</p>
+                <p className="text-sm text-emerald-500/70">Мы ответим в ближайшее время</p>
               </div>
             </div>
           ) : (
@@ -108,7 +108,7 @@ export const SupportPage = () => {
               />
               <div className="flex items-center justify-between">
                 <p className="text-sm text-slate-400">
-                  Среднее время ответа: <span className="text-slate-600 font-medium">15 минут</span>
+                  Среднее время ответа: <span className="text-white font-medium">15 минут</span>
                 </p>
                 <button 
                   onClick={handleSend}
@@ -127,17 +127,17 @@ export const SupportPage = () => {
         <div className="glass-card p-6">
           <div className="flex items-center gap-3 mb-4">
             <Clock className="w-5 h-5 text-blue-500" />
-            <h3 className="text-lg font-semibold text-slate-800">Время работы</h3>
+            <h3 className="text-lg font-semibold text-white">Время работы</h3>
           </div>
           <div className="grid md:grid-cols-2 gap-4">
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-              <p className="font-medium text-slate-800 mb-1">Telegram & WhatsApp</p>
-              <p className="text-emerald-500 font-semibold">24/7</p>
+            <div className="p-4 bg-white/[0.03] rounded-xl border border-white/10">
+              <p className="font-medium text-white mb-1">Telegram & WhatsApp</p>
+              <p className="text-emerald-400 font-semibold">24/7</p>
               <p className="text-sm text-slate-500 mt-1">Круглосуточно без выходных</p>
             </div>
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-              <p className="font-medium text-slate-800 mb-1">Email поддержка</p>
-              <p className="text-blue-500 font-semibold">09:00 — 21:00 МСК</p>
+            <div className="p-4 bg-white/[0.03] rounded-xl border border-white/10">
+              <p className="font-medium text-white mb-1">Email поддержка</p>
+              <p className="text-blue-400 font-semibold">09:00 — 21:00 МСК</p>
               <p className="text-sm text-slate-500 mt-1">Ответ в течение 2 часов</p>
             </div>
           </div>

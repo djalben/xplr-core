@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMode } from '../store/mode-context';
+import { useRates } from '../store/rates-context';
 import { DashboardLayout } from '../components/dashboard-layout';
 import { BackButton } from '../components/back-button';
 import { 
@@ -94,6 +95,11 @@ const CardIssueModal = ({
   onClose: () => void;
 }) => {
   const [showProhibited, setShowProhibited] = useState(false);
+  const [selectedCurrency, setSelectedCurrency] = useState<'USD' | 'EUR'>(card.currency === 'EUR' ? 'EUR' : 'USD');
+  const { rates } = useRates();
+
+  const currentRate = selectedCurrency === 'USD' ? rates.usd : rates.eur;
+  const currencySymbol = selectedCurrency === 'USD' ? '$' : '€';
   
   const prohibitedOperations = [
     'Финансовые инвестиции и управление активами',
@@ -111,7 +117,7 @@ const CardIssueModal = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
-      <div className="relative bg-[#050507]/95 backdrop-blur-3xl border border-white/10 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto animate-scale-in shadow-2xl shadow-black/60">
+      <div className="relative bg-[#050507]/95 backdrop-blur-3xl border border-white/10 rounded-2xl w-full max-w-md max-h-[90dvh] overflow-y-auto animate-scale-in shadow-2xl shadow-black/60">
         {/* Card Preview */}
         <div className="p-6 pb-4">
           <div className="flex justify-center mb-4">
@@ -140,10 +146,34 @@ const CardIssueModal = ({
           <p className="text-slate-400 text-sm text-center mb-4">{card.description}</p>
           <p className="text-2xl font-bold text-blue-400 text-center mb-2">{card.price}</p>
           
-          {/* Exchange rate - Premium has "Лучший курс" instead of "Актуальный курс" */}
+          {/* Currency selector */}
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <button
+              onClick={() => setSelectedCurrency('USD')}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                selectedCurrency === 'USD'
+                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40'
+                  : 'bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10'
+              }`}
+            >
+              $ USD
+            </button>
+            <button
+              onClick={() => setSelectedCurrency('EUR')}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                selectedCurrency === 'EUR'
+                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40'
+                  : 'bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10'
+              }`}
+            >
+              € EUR
+            </button>
+          </div>
+
+          {/* Exchange rate - dynamic */}
           <div className="text-center text-sm text-slate-400 mb-6">
             {card.type === 'premium' ? 'Лучший курс:' : 'Актуальный курс:'} <span className="text-blue-400">
-              {card.currency === 'EUR' ? '€1 = 100.36 ₽' : card.type === 'premium' ? '$1 = 81.34 ₽' : '$1 = 84.41 ₽'}
+              {currencySymbol}1 = {currentRate.toFixed(2)} ₽
             </span>
           </div>
         </div>
@@ -544,10 +574,11 @@ const TopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () => void
   const [rubAmount, setRubAmount] = useState('');
   const [foreignAmount, setForeignAmount] = useState('');
   const [selectedBank, setSelectedBank] = useState('sbp');
+  const { rates } = useRates();
   
   const currencySymbol = card.currency === '€' ? '€' : '$';
   const currencyCode = card.currency === '€' ? 'EUR' : 'USD';
-  const exchangeRate = card.currency === '€' ? 97.20 : 89.50;
+  const exchangeRate = card.currency === '€' ? rates.eur : rates.usd;
 
   const banks = [
     { id: 'sbp', name: 'СБП' },
@@ -581,7 +612,7 @@ const TopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () => void
       <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
 
       {/* Modal panel — deep opaque glass */}
-      <div className="relative bg-[#0d0d0f]/95 backdrop-blur-3xl border border-white/10 p-6 rounded-2xl w-full max-w-md animate-scale-in max-h-[90vh] overflow-y-auto shadow-2xl shadow-black/60">
+      <div className="relative bg-[#0d0d0f]/95 backdrop-blur-3xl border border-white/10 p-6 rounded-2xl w-full max-w-md animate-scale-in max-h-[90dvh] overflow-y-auto shadow-2xl shadow-black/60">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500/20 to-blue-500/20 border border-emerald-500/30 flex items-center justify-center">
@@ -839,7 +870,7 @@ const ArbitrageCardTypeRow = ({ cardType, bin, network, price, topUpFee, fees, o
   const [showFees, setShowFees] = useState(false);
 
   return (
-    <div className="flex items-center justify-between p-4 bg-white/[0.02] hover:bg-white/[0.04] border border-white/10 rounded-xl transition-all">
+    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-white/[0.02] hover:bg-white/[0.04] border border-white/10 rounded-xl transition-all">
       <div className="flex items-center gap-4">
         <div className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 rounded-lg">
           <span className="text-amber-400 font-mono text-sm">{bin}</span>
@@ -851,7 +882,7 @@ const ArbitrageCardTypeRow = ({ cardType, bin, network, price, topUpFee, fees, o
           <span className="text-white font-medium">{network === 'visa' ? 'Visa' : 'MasterCard'}</span>
         </div>
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3 flex-wrap">
         <div className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg">
           <span className="text-slate-400 text-sm">Карта: </span><span className="text-white">${price}</span>
         </div>

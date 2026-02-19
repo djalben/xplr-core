@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ModeProvider } from './store/mode-context';
+import { RatesProvider } from './store/rates-context';
 import { AuthPage } from './pages/auth';
 import { DashboardPage } from './pages/dashboard';
 import { CardsPage } from './pages/cards';
@@ -12,6 +13,7 @@ import { ApiPage } from './pages/api';
 import { SettingsPage } from './pages/settings';
 import { SupportPage } from './pages/support';
 import { LandingPage } from './pages/landing';
+import { AdminRatesPage } from './pages/admin-rates';
 import { PWAInstallPrompt } from './components/pwa-install-prompt';
 
 interface ProtectedRouteProps {
@@ -37,6 +39,7 @@ const RootRedirect: React.FC = () => {
 function App() {
   return (
     <ModeProvider>
+    <RatesProvider>
       <PWAInstallPrompt />
       <Routes>
         <Route path="/" element={<RootRedirect />} />
@@ -55,7 +58,9 @@ function App() {
         <Route path="/api" element={<ProtectedRoute><ApiPage /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="/support" element={<ProtectedRoute><SupportPage /></ProtectedRoute>} />
+        <Route path="/admin/rates" element={<ProtectedRoute><AdminRatesPage /></ProtectedRoute>} />
       </Routes>
+    </RatesProvider>
     </ModeProvider>
   );
 }

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import apiClient, { API_BASE_URL } from '../api/axios';
 import { getUserGrade, type GradeInfo } from '../api/grade';
+import { WorldClocks } from '../components/world-clocks';
 
 interface StatCardProps {
   title: string;
@@ -253,6 +254,10 @@ export const DashboardPage = () => {
               </div>
             </div>
           </div>
+          {/* World Clocks */}
+          <div className="mt-5 pt-5 border-t border-white/[0.06]">
+            <WorldClocks />
+          </div>
         </div>
 
         {/* Stats Grid */}
@@ -260,14 +265,14 @@ export const DashboardPage = () => {
           {mode === 'PERSONAL' ? (
             <>
               <StatCard title="Баланс" value={`$${balancePers.toFixed(2)}`} icon={<Wallet className="w-6 h-6 text-blue-400" />} iconClass="stat-icon-blue" accent />
-              <StatCard title="Активные карты" value={String(cardCount)} icon={<CreditCard className="w-6 h-6 text-purple-400" />} iconClass="stat-icon-purple" onClick={() => navigate('/cards')} />
-              <StatCard title="Транзакции" value={String(transactions.length)} icon={<DollarSign className="w-6 h-6 text-emerald-400" />} iconClass="stat-icon-green" onClick={() => navigate('/finance')} />
+              <StatCard title="Активные карты" value={String(cardCount)} icon={<CreditCard className="w-6 h-6 text-purple-400" />} iconClass="stat-icon-purple" onClick={() => navigate('/cards?filter=active')} />
+              <StatCard title="Транзакции" value={String(transactions.length)} icon={<DollarSign className="w-6 h-6 text-emerald-400" />} iconClass="stat-icon-green" onClick={() => navigate('/finance?from=dashboard')} />
             </>
           ) : (
             <>
               <StatCard title="Баланс" value={`$${balanceArb.toFixed(2)}`} subValue={gradeInfo ? <GradeIndicator grade={gradeInfo.grade} /> : undefined} icon={<Wallet className="w-6 h-6 text-blue-400" />} iconClass="stat-icon-blue" accent />
-              <StatCard title="Активные карты" value={String(cardCount)} icon={<CreditCard className="w-6 h-6 text-purple-400" />} iconClass="stat-icon-purple" onClick={() => navigate('/cards')} />
-              <StatCard title="Транзакции" value={String(transactions.length)} icon={<DollarSign className="w-6 h-6 text-amber-400" />} iconClass="stat-icon-yellow" onClick={() => navigate('/finance')} />
+              <StatCard title="Активные карты" value={String(cardCount)} icon={<CreditCard className="w-6 h-6 text-purple-400" />} iconClass="stat-icon-purple" onClick={() => navigate('/cards?filter=active')} />
+              <StatCard title="Транзакции" value={String(transactions.length)} icon={<DollarSign className="w-6 h-6 text-amber-400" />} iconClass="stat-icon-yellow" onClick={() => navigate('/finance?from=dashboard')} />
             </>
           )}
         </div>

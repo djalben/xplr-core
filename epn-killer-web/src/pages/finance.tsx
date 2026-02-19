@@ -10,7 +10,8 @@ import {
   ChevronDown,
   FileSpreadsheet,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  Download
 } from 'lucide-react';
 
 interface Transaction {
@@ -22,6 +23,7 @@ interface Transaction {
   type: 'income' | 'expense';
   card: string;
   wallet: string;
+  merchant: string;
   status: 'completed' | 'pending' | 'failed';
 }
 
@@ -77,16 +79,16 @@ export const FinancePage = () => {
   const [showFilters, setShowFilters] = useState(false);
 
   const transactions: Transaction[] = [
-    { id: '1', date: '2024-12-20', description: 'Подписка Netflix', amount: 15.99, currency: '$', type: 'expense', card: '•••• 4521', wallet: 'Личный', status: 'completed' },
-    { id: '2', date: '2024-12-19', description: 'Зачисление зарплаты', amount: 4500.00, currency: '$', type: 'income', card: '•••• 4521', wallet: 'Личный', status: 'completed' },
-    { id: '3', date: '2024-12-19', description: 'Покупка на Amazon', amount: 89.50, currency: '$', type: 'expense', card: '•••• 7832', wallet: 'Покупки', status: 'completed' },
-    { id: '4', date: '2024-12-18', description: 'Поездка Uber', amount: 24.30, currency: '$', type: 'expense', card: '•••• 4521', wallet: 'Личный', status: 'completed' },
-    { id: '5', date: '2024-12-18', description: 'Оплата за фриланс', amount: 850.00, currency: '$', type: 'income', card: '•••• 0923', wallet: 'Бизнес', status: 'pending' },
-    { id: '6', date: '2024-12-17', description: 'Spotify Premium', amount: 9.99, currency: '$', type: 'expense', card: '•••• 4521', wallet: 'Личный', status: 'completed' },
-    { id: '7', date: '2024-12-17', description: 'Продуктовый магазин', amount: 156.80, currency: '$', type: 'expense', card: '•••• 7832', wallet: 'Покупки', status: 'completed' },
-    { id: '8', date: '2024-12-16', description: 'Неудачная транзакция', amount: 200.00, currency: '$', type: 'expense', card: '•••• 0923', wallet: 'Бизнес', status: 'failed' },
-    { id: '9', date: '2024-12-16', description: 'Возврат - Amazon', amount: 45.00, currency: '$', type: 'income', card: '•••• 7832', wallet: 'Покупки', status: 'completed' },
-    { id: '10', date: '2024-12-15', description: 'Покупка в Steam', amount: 59.99, currency: '$', type: 'expense', card: '•••• 4521', wallet: 'Личный', status: 'completed' },
+    { id: '1', date: '2024-12-20', description: 'Подписка Netflix', amount: 15.99, currency: '$', type: 'expense', card: '•••• 4521', wallet: 'Личный', merchant: 'Netflix Inc.', status: 'completed' },
+    { id: '2', date: '2024-12-19', description: 'Зачисление зарплаты', amount: 4500.00, currency: '$', type: 'income', card: '•••• 4521', wallet: 'Личный', merchant: 'Employer LLC', status: 'completed' },
+    { id: '3', date: '2024-12-19', description: 'Покупка на Amazon', amount: 89.50, currency: '$', type: 'expense', card: '•••• 7832', wallet: 'Покупки', merchant: 'Amazon.com', status: 'completed' },
+    { id: '4', date: '2024-12-18', description: 'Поездка Uber', amount: 24.30, currency: '$', type: 'expense', card: '•••• 4521', wallet: 'Личный', merchant: 'Uber BV', status: 'completed' },
+    { id: '5', date: '2024-12-18', description: 'Оплата за фриланс', amount: 850.00, currency: '$', type: 'income', card: '•••• 0923', wallet: 'Бизнес', merchant: 'Upwork Global', status: 'pending' },
+    { id: '6', date: '2024-12-17', description: 'Spotify Premium', amount: 9.99, currency: '$', type: 'expense', card: '•••• 4521', wallet: 'Личный', merchant: 'Spotify AB', status: 'completed' },
+    { id: '7', date: '2024-12-17', description: 'Продуктовый магазин', amount: 156.80, currency: '$', type: 'expense', card: '•••• 7832', wallet: 'Покупки', merchant: 'Whole Foods', status: 'completed' },
+    { id: '8', date: '2024-12-16', description: 'Неудачная транзакция', amount: 200.00, currency: '$', type: 'expense', card: '•••• 0923', wallet: 'Бизнес', merchant: 'Unknown', status: 'failed' },
+    { id: '9', date: '2024-12-16', description: 'Возврат - Amazon', amount: 45.00, currency: '$', type: 'income', card: '•••• 7832', wallet: 'Покупки', merchant: 'Amazon.com', status: 'completed' },
+    { id: '10', date: '2024-12-15', description: 'Покупка в Steam', amount: 59.99, currency: '$', type: 'expense', card: '•••• 4521', wallet: 'Личный', merchant: 'Valve Corp.', status: 'completed' },
   ];
 
   const filteredTransactions = (transactions ?? []).filter(t => {
@@ -120,26 +122,43 @@ export const FinancePage = () => {
             <h1 className="text-3xl font-bold text-white mb-2">История операций</h1>
             <p className="text-slate-400">Полная история транзакций и аналитика</p>
           </div>
-          <button
-            onClick={() => {
-              const header = 'Дата,Описание,Сумма,Валюта,Тип,Карта,Кошелёк,Статус';
-              const rows = filteredTransactions.map(t =>
-                [t.date, `"${t.description}"`, t.amount.toFixed(2), t.currency, t.type === 'income' ? 'Доход' : 'Расход', t.card, t.wallet, t.status === 'completed' ? 'Выполнено' : t.status === 'pending' ? 'В обработке' : 'Ошибка'].join(',')
-              );
-              const csv = '\uFEFF' + [header, ...rows].join('\n');
-              const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = 'xplr_transactions.csv';
-              a.click();
-              URL.revokeObjectURL(url);
-            }}
-            className="flex items-center gap-2 px-5 py-3 glass-card hover:bg-white/10 text-white font-medium rounded-xl transition-all min-h-[48px]"
-          >
-            <FileSpreadsheet className="w-5 h-5" />
-            Экспорт CSV
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {[
+              { label: 'Вчера', days: 1 },
+              { label: 'Неделя', days: 7 },
+              { label: 'Месяц', days: 30 },
+              { label: 'Всё', days: 0 },
+            ].map(period => (
+              <button
+                key={period.label}
+                onClick={() => {
+                  const now = new Date();
+                  const cutoff = period.days > 0
+                    ? new Date(now.getTime() - period.days * 86400000).toISOString().split('T')[0]
+                    : '';
+                  const data = cutoff
+                    ? filteredTransactions.filter(t => t.date >= cutoff)
+                    : filteredTransactions;
+                  const header = 'Дата,Описание,Сумма,Валюта,Тип,Карта,Кошелёк,Мерчант/Получатель,Статус';
+                  const rows = data.map(t =>
+                    [t.date, `"${t.description}"`, t.amount.toFixed(2), t.currency, t.type === 'income' ? 'Поступление' : 'Списание', t.card, t.wallet, `"${t.merchant}"`, t.status === 'completed' ? 'Выполнено' : t.status === 'pending' ? 'В обработке' : 'Ошибка'].join(',')
+                  );
+                  const csv = '\uFEFF' + [header, ...rows].join('\n');
+                  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `xplr_report_${period.label.toLowerCase()}.csv`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="flex items-center gap-2 px-4 py-2.5 glass-card hover:bg-white/10 text-white font-medium rounded-xl transition-all min-h-[44px] text-sm"
+              >
+                <Download className="w-4 h-4" />
+                {period.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Summary Cards */}
@@ -298,7 +317,7 @@ export const FinancePage = () => {
           <p className="text-sm text-slate-500">
             Показано {(filteredTransactions ?? []).length} из {(transactions ?? []).length} операций
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button className="px-4 py-2.5 glass-card hover:bg-white/10 text-slate-400 rounded-lg transition-colors min-h-[44px]">
               ← Назад
             </button>
