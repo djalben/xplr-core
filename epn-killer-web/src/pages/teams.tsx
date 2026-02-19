@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { DashboardLayout } from '../components/dashboard-layout';
 import { ModalPortal } from '../components/modal-portal';
 import { BackButton } from '../components/back-button';
@@ -20,8 +20,14 @@ import {
   CheckCheck,
   Clock,
   GripVertical,
-  Plus
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  Trash2
 } from 'lucide-react';
+
+const LS_TASKS_KEY = 'xplr_kanban_tasks';
+const LS_CHAT_KEY = 'xplr_team_chat';
 
 /* ──────────────────────────────── Types ──────────────────────────────── */
 
@@ -296,14 +302,24 @@ const ChatPanel = ({ messages, members, onSend }: {
 
 /* ──────────────────────────── Kanban Board ───────────────────────────── */
 
-const KanbanColumn = ({ title, icon, color, tasks, members }: {
+const columnOrder: KanbanTask['column'][] = ['backlog', 'progress', 'done'];
+
+const KanbanColumn = ({ title, icon, color, columnKey, tasks, members, onAddTask, onMoveTask, onDeleteTask }: {
   title: string;
   icon: React.ReactNode;
   color: string;
+  columnKey: KanbanTask['column'];
   tasks: KanbanTask[];
   members: TeamMember[];
+  onAddTask: (column: KanbanTask['column']) => void;
+  onMoveTask: (taskId: string, direction: 'left' | 'right') => void;
+  onDeleteTask: (taskId: string) => void;
 }) => {
   const getMember = (id: string) => members.find(m => m.id === id);
+  const colIdx = columnOrder.indexOf(columnKey);
+  const canLeft = colIdx > 0;
+  const canRight = colIdx < columnOrder.length - 1;
+
   return (
     <div className="flex-1 min-w-[260px]">
       <div className="flex items-center gap-2 mb-3 px-1">
@@ -311,28 +327,48 @@ const KanbanColumn = ({ title, icon, color, tasks, members }: {
         <span className={`text-sm font-semibold ${color}`}>{title}</span>
         <span className="ml-auto text-xs text-slate-600 bg-white/[0.04] px-2 py-0.5 rounded-full">{tasks.length}</span>
       </div>
-      <div className="space-y-2">
+      <div className="space-y-2 pb-6">
         {tasks.map(task => {
           const assignee = getMember(task.assigneeId);
           return (
-            <div key={task.id} className="glass-card p-3 group hover:border-white/20 transition-all duration-150 cursor-grab active:cursor-grabbing">
+            <div key={task.id} className="glass-card p-3 group hover:border-white/20 transition-all duration-150">
               <div className="flex items-start gap-2">
                 <GripVertical className="w-4 h-4 text-slate-700 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-white mb-1">{task.title}</p>
                   <p className="text-xs text-slate-500 mb-2">{task.description}</p>
-                  {assignee && (
-                    <div className="flex items-center gap-2">
-                      <Avatar member={assignee} size="sm" />
-                      <span className="text-[11px] text-slate-400">{assignee.name.split(' ')[0]}</span>
+                  <div className="flex items-center justify-between">
+                    {assignee ? (
+                      <div className="flex items-center gap-2">
+                        <Avatar member={assignee} size="sm" />
+                        <span className="text-[11px] text-slate-400">{assignee.name.split(' ')[0]}</span>
+                      </div>
+                    ) : <div />}
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {canLeft && (
+                        <button onClick={() => onMoveTask(task.id, 'left')} className="p-1 hover:bg-white/10 rounded transition-colors" title="Влево">
+                          <ChevronLeft className="w-3.5 h-3.5 text-slate-400" />
+                        </button>
+                      )}
+                      {canRight && (
+                        <button onClick={() => onMoveTask(task.id, 'right')} className="p-1 hover:bg-white/10 rounded transition-colors" title="Вправо">
+                          <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                        </button>
+                      )}
+                      <button onClick={() => onDeleteTask(task.id)} className="p-1 hover:bg-red-500/20 rounded transition-colors" title="Удалить">
+                        <Trash2 className="w-3.5 h-3.5 text-slate-500 hover:text-red-400" />
+                      </button>
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
             </div>
           );
         })}
-        <button className="w-full py-2 flex items-center justify-center gap-1.5 text-xs text-slate-600 hover:text-slate-400 hover:bg-white/[0.03] rounded-xl transition-colors">
+        <button
+          onClick={() => onAddTask(columnKey)}
+          className="w-full py-2.5 flex items-center justify-center gap-1.5 text-xs font-medium text-slate-400 bg-white/[0.04] hover:bg-white/[0.08] hover:text-white rounded-lg border border-dashed border-white/10 hover:border-white/20 transition-all duration-150"
+        >
           <Plus className="w-3.5 h-3.5" />
           Добавить задачу
         </button>
@@ -341,45 +377,200 @@ const KanbanColumn = ({ title, icon, color, tasks, members }: {
   );
 };
 
-const KanbanBoard = ({ tasks, members }: { tasks: KanbanTask[]; members: TeamMember[] }) => (
+const KanbanBoard = ({ tasks, members, onAddTask, onMoveTask, onDeleteTask }: {
+  tasks: KanbanTask[];
+  members: TeamMember[];
+  onAddTask: (column: KanbanTask['column']) => void;
+  onMoveTask: (taskId: string, direction: 'left' | 'right') => void;
+  onDeleteTask: (taskId: string) => void;
+}) => (
   <div className="flex-1 overflow-x-auto overflow-y-auto p-4">
     <div className="flex gap-4 min-w-[820px]">
       <KanbanColumn
         title="В очереди"
         icon={<Clock className="w-4 h-4 text-slate-400" />}
         color="text-slate-300"
+        columnKey="backlog"
         tasks={tasks.filter(t => t.column === 'backlog')}
         members={members}
+        onAddTask={onAddTask}
+        onMoveTask={onMoveTask}
+        onDeleteTask={onDeleteTask}
       />
       <KanbanColumn
         title="В процессе"
         icon={<div className="w-4 h-4 rounded-full bg-blue-500/20 flex items-center justify-center"><div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" /></div>}
         color="text-blue-400"
+        columnKey="progress"
         tasks={tasks.filter(t => t.column === 'progress')}
         members={members}
+        onAddTask={onAddTask}
+        onMoveTask={onMoveTask}
+        onDeleteTask={onDeleteTask}
       />
       <KanbanColumn
         title="Готово"
         icon={<Check className="w-4 h-4 text-emerald-400" />}
         color="text-emerald-400"
+        columnKey="done"
         tasks={tasks.filter(t => t.column === 'done')}
         members={members}
+        onAddTask={onAddTask}
+        onMoveTask={onMoveTask}
+        onDeleteTask={onDeleteTask}
       />
     </div>
   </div>
 );
 
+/* ──────────────────────────── Add Task Modal ──────────────────────────── */
+
+const AddTaskModal = ({ column, members, onClose, onSave }: {
+  column: KanbanTask['column'];
+  members: TeamMember[];
+  onClose: () => void;
+  onSave: (task: Omit<KanbanTask, 'id'>) => void;
+}) => {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [assigneeId, setAssigneeId] = useState(members[0]?.id || '');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+    onSave({ title: title.trim(), description: description.trim(), assigneeId, column });
+    onClose();
+  };
+
+  const columnLabels: Record<string, string> = { backlog: 'В очереди', progress: 'В процессе', done: 'Готово' };
+
+  return (
+    <ModalPortal>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
+        <div className="relative bg-[#050507]/95 backdrop-blur-3xl border border-white/10 p-6 rounded-2xl w-full max-w-[440px] shadow-2xl shadow-black/60 animate-scale-in">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-lg font-semibold text-white">Новая задача</h3>
+            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+              <X className="w-5 h-5 text-slate-400" />
+            </button>
+          </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm text-slate-400 mb-1.5">Название *</label>
+              <input
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                placeholder="Что нужно сделать?"
+                className="xplr-input w-full"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-slate-400 mb-1.5">Описание</label>
+              <input
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                placeholder="Детали задачи..."
+                className="xplr-input w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-slate-400 mb-1.5">Исполнитель</label>
+              <select
+                value={assigneeId}
+                onChange={e => setAssigneeId(e.target.value)}
+                className="xplr-select w-full"
+              >
+                {members.map(m => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm text-slate-400 mb-1.5">Колонка</label>
+              <div className="px-3 py-2.5 bg-white/[0.04] border border-white/10 rounded-xl text-sm text-white">
+                {columnLabels[column]}
+              </div>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button type="button" onClick={onClose} className="flex-1 px-4 py-3 glass-card hover:bg-white/10 text-slate-300 font-medium rounded-xl transition-colors">
+                Отмена
+              </button>
+              <button
+                type="submit"
+                disabled={!title.trim()}
+                className="flex-1 px-4 py-3 gradient-accent text-white font-medium rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Создать
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </ModalPortal>
+  );
+};
+
 /* ──────────────────────────── Main Page ──────────────────────────────── */
+
+/* ── localStorage helpers ── */
+const loadTasks = (): KanbanTask[] => {
+  try {
+    const raw = localStorage.getItem(LS_TASKS_KEY);
+    if (raw) return JSON.parse(raw) as KanbanTask[];
+  } catch { /* ignore */ }
+  return initialTasks;
+};
+
+const loadMessages = (): ChatMessage[] => {
+  try {
+    const raw = localStorage.getItem(LS_CHAT_KEY);
+    if (raw) return JSON.parse(raw) as ChatMessage[];
+  } catch { /* ignore */ }
+  return initialMessages;
+};
 
 export const TeamsPage = () => {
   const [showInvite, setShowInvite] = useState(false);
   const [activeTab, setActiveTab] = useState<'chat' | 'tasks'>('chat');
   const [selectedMember, setSelectedMember] = useState<string | null>(null);
   const [showMobileMembers, setShowMobileMembers] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
+  const [addTaskColumn, setAddTaskColumn] = useState<KanbanTask['column'] | null>(null);
   const { user } = useAuth();
 
-  const handleSendMessage = (text: string) => {
+  // ── Tasks state with localStorage persistence ──
+  const [tasks, setTasks] = useState<KanbanTask[]>(loadTasks);
+
+  useEffect(() => {
+    localStorage.setItem(LS_TASKS_KEY, JSON.stringify(tasks));
+  }, [tasks]);
+
+  const handleAddTask = useCallback((data: Omit<KanbanTask, 'id'>) => {
+    setTasks(prev => [...prev, { ...data, id: `k${Date.now()}` }]);
+  }, []);
+
+  const handleMoveTask = useCallback((taskId: string, direction: 'left' | 'right') => {
+    setTasks(prev => prev.map(t => {
+      if (t.id !== taskId) return t;
+      const idx = columnOrder.indexOf(t.column);
+      const newIdx = direction === 'right' ? Math.min(idx + 1, columnOrder.length - 1) : Math.max(idx - 1, 0);
+      return { ...t, column: columnOrder[newIdx] };
+    }));
+  }, []);
+
+  const handleDeleteTask = useCallback((taskId: string) => {
+    setTasks(prev => prev.filter(t => t.id !== taskId));
+  }, []);
+
+  // ── Chat state with localStorage persistence ──
+  const [messages, setMessages] = useState<ChatMessage[]>(loadMessages);
+
+  useEffect(() => {
+    localStorage.setItem(LS_CHAT_KEY, JSON.stringify(messages));
+  }, [messages]);
+
+  const handleSendMessage = useCallback((text: string) => {
     const newMsg: ChatMessage = {
       id: `m${Date.now()}`,
       senderId: user?.id || '1',
@@ -388,7 +579,7 @@ export const TeamsPage = () => {
       read: false,
     };
     setMessages(prev => [...prev, newMsg]);
-  };
+  }, [user?.id]);
 
   return (
     <DashboardLayout>
@@ -468,12 +659,26 @@ export const TeamsPage = () => {
               </div>
             </div>
           ) : (
-            <KanbanBoard tasks={initialTasks} members={teamMembers} />
+            <KanbanBoard
+              tasks={tasks}
+              members={teamMembers}
+              onAddTask={(col) => setAddTaskColumn(col)}
+              onMoveTask={handleMoveTask}
+              onDeleteTask={handleDeleteTask}
+            />
           )}
         </div>
 
         {/* Invite Modal */}
         {showInvite && <InviteModal onClose={() => setShowInvite(false)} />}
+        {addTaskColumn && (
+          <AddTaskModal
+            column={addTaskColumn}
+            members={teamMembers}
+            onClose={() => setAddTaskColumn(null)}
+            onSave={handleAddTask}
+          />
+        )}
       </div>
     </DashboardLayout>
   );
