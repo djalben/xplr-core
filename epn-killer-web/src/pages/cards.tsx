@@ -117,40 +117,40 @@ const CardIssueModal = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
-      <div className="relative bg-[#050507]/95 backdrop-blur-3xl border border-white/10 rounded-2xl w-full max-w-md max-h-[90dvh] overflow-y-auto animate-scale-in shadow-2xl shadow-black/60">
-        {/* Card Preview */}
-        <div className="p-6 pb-4">
-          <div className="flex justify-center mb-4">
+      <div className="relative bg-[#050507]/95 backdrop-blur-3xl border border-white/10 rounded-2xl w-full max-w-[440px] max-h-[90dvh] flex flex-col animate-scale-in shadow-2xl shadow-black/60">
+        {/* Fixed header */}
+        <div className="shrink-0 p-5 pb-3 border-b border-white/[0.06]">
+          <div className="flex justify-center mb-3">
             {card.type === 'subscriptions' && <SubscriptionsCardVisual mini={false} />}
             {card.type === 'travel' && <TravelCardVisual mini={false} />}
             {card.type === 'premium' && <PremiumCardVisual mini={false} />}
           </div>
           
           {/* Payment method badges */}
-          <div className="flex justify-center gap-3 mb-4">
+          <div className="flex justify-center gap-3 mb-3">
             {hasApplePay && (
-              <div className="px-3 py-1.5 bg-white/10 rounded-lg flex items-center gap-1.5 border border-white/5">
-                <Apple className="w-4 h-4" />
-                <span className="text-xs font-medium">Pay</span>
+              <div className="px-3 py-1 bg-white/10 rounded-lg flex items-center gap-1.5 border border-white/5">
+                <Apple className="w-3.5 h-3.5" />
+                <span className="text-[11px] font-medium">Pay</span>
               </div>
             )}
             {hasGooglePay && (
-              <div className="px-3 py-1.5 bg-white/10 rounded-lg flex items-center gap-1.5 border border-white/5">
-                <span className="text-sm font-medium text-blue-400">G</span>
-                <span className="text-xs font-medium">Pay</span>
+              <div className="px-3 py-1 bg-white/10 rounded-lg flex items-center gap-1.5 border border-white/5">
+                <span className="text-xs font-medium text-blue-400">G</span>
+                <span className="text-[11px] font-medium">Pay</span>
               </div>
             )}
           </div>
           
-          <h2 className="text-xl font-bold text-white text-center mb-1">{card.name}</h2>
-          <p className="text-slate-400 text-sm text-center mb-4">{card.description}</p>
-          <p className="text-2xl font-bold text-blue-400 text-center mb-2">{card.price}</p>
+          <h2 className="text-lg font-bold text-white text-center mb-0.5">{card.name}</h2>
+          <p className="text-slate-400 text-xs text-center mb-2">{card.description}</p>
+          <p className="text-xl font-bold text-blue-400 text-center mb-2">{card.price}</p>
           
           {/* Currency selector */}
-          <div className="flex items-center justify-center gap-2 mb-3">
+          <div className="flex items-center justify-center gap-2 mb-2">
             <button
               onClick={() => setSelectedCurrency('USD')}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 selectedCurrency === 'USD'
                   ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40'
                   : 'bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10'
@@ -160,7 +160,7 @@ const CardIssueModal = ({
             </button>
             <button
               onClick={() => setSelectedCurrency('EUR')}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 selectedCurrency === 'EUR'
                   ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40'
                   : 'bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10'
@@ -171,84 +171,83 @@ const CardIssueModal = ({
           </div>
 
           {/* Exchange rate - dynamic */}
-          <div className="text-center text-sm text-slate-400 mb-6">
-            {card.type === 'premium' ? 'Лучший курс:' : 'Актуальный курс:'} <span className="text-blue-400">
-              {currencySymbol}1 = {currentRate.toFixed(2)} ₽
-            </span>
-          </div>
+          <p className="text-center text-xs text-slate-400">
+            {card.type === 'premium' ? 'Лучший курс:' : 'Курс:'} <span className="text-blue-400 font-medium">{currencySymbol}1 = {currentRate.toFixed(2)} ₽</span>
+          </p>
         </div>
         
-        {/* Features */}
-        <div className="px-6 pb-4 space-y-3">
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto min-h-0 px-5 py-3 space-y-3">
+          {/* Features */}
           {card.features.map((feature, i) => (
-            <div key={i} className="flex items-start gap-3 p-3 bg-white/5 rounded-xl">
-              <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <Check className="w-4 h-4 text-blue-400" />
+            <div key={i} className="flex items-start gap-2.5 p-2.5 bg-white/5 rounded-xl">
+              <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <Check className="w-3 h-3 text-blue-400" />
               </div>
               <div>
-                <p className="text-white font-medium text-sm">{feature.title}</p>
-                <p className="text-slate-400 text-xs">{feature.items}</p>
+                <p className="text-white font-medium text-xs">{feature.title}</p>
+                <p className="text-slate-400 text-[11px]">{feature.items}</p>
               </div>
             </div>
           ))}
-        </div>
         
-        {/* Conditions */}
-        <div className="px-6 pb-4">
-          <h3 className="text-white font-semibold mb-3">Условия выпуска:</h3>
-          <ul className="space-y-2">
-            {card.conditions.map((cond, i) => (
-              <li key={i} className="flex items-center gap-2 text-sm">
-                <span className="text-slate-400">•</span>
-                <span className="text-slate-300">{cond.label} – <span className="text-white">{cond.value}</span></span>
-              </li>
-            ))}
-          </ul>
-        </div>
-        
-        {/* Capabilities */}
-        <div className="px-6 pb-4">
-          <h3 className="text-white font-semibold mb-3">Возможности:</h3>
-          <ul className="space-y-2">
-            {card.capabilities.map((cap, i) => (
-              <li key={i} className="flex items-center gap-2 text-sm">
-                <span className="text-slate-400">•</span>
-                <span className="text-slate-300">{cap.label} – {cap.link ? (
-                  <span className="text-blue-400 cursor-pointer hover:underline">{cap.value} <span className="text-slate-500 text-xs">(как привязать?)</span></span>
-                ) : (
-                  <span className="text-white">{cap.value}</span>
-                )}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-        
-        {/* Prohibited Operations */}
-        <div className="px-6 pb-4">
-          <button 
-            onClick={() => setShowProhibited(!showProhibited)}
-            className="flex items-center justify-between w-full py-3 border-t border-white/10"
-          >
-            <span className="text-white font-semibold">Запрещенные операции</span>
-            <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${showProhibited ? 'rotate-180' : ''}`} />
-          </button>
-          {showProhibited && (
-            <ul className="space-y-2 pb-4 animate-fade-in">
-              {prohibitedOperations.map((op, i) => (
-                <li key={i} className="flex items-center gap-2 text-sm">
+          {/* Conditions */}
+          <div>
+            <h3 className="text-white font-semibold text-sm mb-2">Условия выпуска:</h3>
+            <ul className="space-y-1.5">
+              {card.conditions.map((cond, i) => (
+                <li key={i} className="flex items-center gap-2 text-xs">
                   <span className="text-slate-400">•</span>
-                  <span className="text-slate-400">{op}</span>
+                  <span className="text-slate-300">{cond.label} – <span className="text-white">{cond.value}</span></span>
                 </li>
               ))}
             </ul>
-          )}
+          </div>
+        
+          {/* Capabilities */}
+          <div>
+            <h3 className="text-white font-semibold text-sm mb-2">Возможности:</h3>
+            <ul className="space-y-1.5">
+              {card.capabilities.map((cap, i) => (
+                <li key={i} className="flex items-center gap-2 text-xs">
+                  <span className="text-slate-400">•</span>
+                  <span className="text-slate-300">{cap.label} – {cap.link ? (
+                    <span className="text-blue-400 cursor-pointer hover:underline">{cap.value}</span>
+                  ) : (
+                    <span className="text-white">{cap.value}</span>
+                  )}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        
+          {/* Prohibited Operations */}
+          <div>
+            <button 
+              onClick={() => setShowProhibited(!showProhibited)}
+              className="flex items-center justify-between w-full py-2 border-t border-white/10"
+            >
+              <span className="text-white font-semibold text-sm">Запрещенные операции</span>
+              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showProhibited ? 'rotate-180' : ''}`} />
+            </button>
+            {showProhibited && (
+              <ul className="space-y-1.5 pb-2 animate-fade-in">
+                {prohibitedOperations.map((op, i) => (
+                  <li key={i} className="flex items-center gap-2 text-xs">
+                    <span className="text-slate-400">•</span>
+                    <span className="text-slate-400">{op}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
         
-        {/* Issue Button */}
-        <div className="p-6 pt-2">
+        {/* Fixed footer button */}
+        <div className="shrink-0 p-5 pt-3 border-t border-white/[0.06]">
           <button 
             onClick={onClose}
-            className="w-full py-4 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold rounded-xl transition-all shadow-lg shadow-blue-500/20"
+            className="w-full py-3.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold rounded-xl transition-all shadow-lg shadow-blue-500/20"
           >
             Выпустить карту {card.price}
           </button>
@@ -261,44 +260,17 @@ const CardIssueModal = ({
 // Subscriptions Card Visual - colorful with service icons (realistic bank card style)
 const SubscriptionsCardVisual = ({ mini = true }: { mini?: boolean }) => (
   <div className={`relative ${mini ? 'w-full aspect-[1.586/1]' : 'w-72 h-44'} rounded-2xl overflow-hidden shadow-2xl`}>
-    {/* Realistic gradient background */}
+    {/* Gradient background */}
     <div className="absolute inset-0">
-      {/* Base gradient - pink/purple/blue like the screenshot */}
       <div className="absolute inset-0 bg-gradient-to-br from-pink-500 via-purple-500 to-blue-600" />
-      
-      {/* Colorful abstract shapes overlay */}
-      <div className="absolute inset-0">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-400/50 rounded-full blur-2xl translate-x-8 -translate-y-8" />
-        <div className="absolute bottom-0 left-0 w-28 h-28 bg-pink-400/50 rounded-full blur-2xl -translate-x-8 translate-y-8" />
-        <div className="absolute top-1/3 left-1/3 w-24 h-24 bg-purple-300/40 rounded-full blur-xl" />
-        <div className="absolute bottom-1/4 right-1/4 w-20 h-20 bg-cyan-400/30 rounded-full blur-xl" />
-      </div>
-      
-      {/* Floating service icon squares */}
-      <div className="absolute top-8 left-6 w-8 h-8 bg-white/25 backdrop-blur-sm rounded-lg flex items-center justify-center shadow-lg">
-        <Monitor className="w-4 h-4 text-white" />
-      </div>
-      <div className="absolute top-6 left-16 w-7 h-7 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center">
-        <Bot className="w-3.5 h-3.5 text-white" />
-      </div>
-      <div className="absolute top-14 right-16 w-7 h-7 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center">
-        <Briefcase className="w-3.5 h-3.5 text-white" />
-      </div>
     </div>
     
     {/* Card content */}
     <div className="relative h-full p-4 flex flex-col justify-between">
       {/* Top row - branding and currency */}
       <div className="flex items-start justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-white/25 backdrop-blur-sm flex items-center justify-center">
-            <span className="text-[10px]">🌍</span>
-          </div>
-          <span className="text-white/90 text-xs font-medium tracking-wide">Без границ.</span>
-        </div>
-        <div className="w-8 h-8 rounded-full bg-white/25 backdrop-blur-sm flex items-center justify-center border border-white/20">
-          <span className="text-white text-sm font-bold">€</span>
-        </div>
+        <span className="text-white/90 text-xs font-medium tracking-wide">Без границ.</span>
+        <span className="text-white text-sm font-bold">€</span>
       </div>
       
       {/* Card number at bottom */}
@@ -321,37 +293,14 @@ const TravelCardVisual = ({ mini = true }: { mini?: boolean }) => (
     {/* Blue gradient background */}
     <div className="absolute inset-0">
       <div className="absolute inset-0 bg-gradient-to-br from-blue-400 via-blue-500 to-blue-700" />
-      
-      {/* Soft light effects */}
-      <div className="absolute top-0 right-0 w-40 h-40 bg-blue-300/40 rounded-full blur-3xl -translate-y-12 translate-x-12" />
-      <div className="absolute bottom-0 left-0 w-32 h-32 bg-blue-300/30 rounded-full blur-2xl translate-y-8 -translate-x-8" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-blue-200/20 rounded-full blur-3xl" />
-      
-      {/* Subtle globe pattern */}
-      <div className="absolute inset-0 opacity-15">
-        <svg viewBox="0 0 200 200" className="w-full h-full">
-          <circle cx="100" cy="100" r="70" fill="none" stroke="white" strokeWidth="0.5" />
-          <ellipse cx="100" cy="100" rx="70" ry="25" fill="none" stroke="white" strokeWidth="0.5" />
-          <ellipse cx="100" cy="100" rx="25" ry="70" fill="none" stroke="white" strokeWidth="0.5" />
-          <line x1="30" y1="100" x2="170" y2="100" stroke="white" strokeWidth="0.5" />
-          <line x1="100" y1="30" x2="100" y2="170" stroke="white" strokeWidth="0.5" />
-        </svg>
-      </div>
     </div>
     
     {/* Card content */}
     <div className="relative h-full p-4 flex flex-col justify-between">
       {/* Top row - branding and currency */}
       <div className="flex items-start justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-white/25 backdrop-blur-sm flex items-center justify-center">
-            <Plane className="w-3 h-3 text-white" />
-          </div>
-          <span className="text-white/90 text-xs font-medium tracking-wide">Без границ.</span>
-        </div>
-        <div className="w-8 h-8 rounded-full bg-white/25 backdrop-blur-sm flex items-center justify-center border border-white/20">
-          <span className="text-white text-sm font-bold">$</span>
-        </div>
+        <span className="text-white/90 text-xs font-medium tracking-wide">Без границ.</span>
+        <span className="text-white text-sm font-bold">$</span>
       </div>
       
       {/* Card number at bottom */}
@@ -449,7 +398,8 @@ const PersonalCardTypeCard = ({
   currency, 
   currencySymbol,
   price, 
-  exchangeRate,
+  usdRate,
+  eurRate,
   onSelect 
 }: { 
   type: 'subscriptions' | 'travel' | 'premium';
@@ -458,7 +408,8 @@ const PersonalCardTypeCard = ({
   currency: string;
   currencySymbol: string;
   price: string;
-  exchangeRate: string;
+  usdRate: number;
+  eurRate: number;
   onSelect: () => void;
 }) => {
   return (
@@ -479,9 +430,10 @@ const PersonalCardTypeCard = ({
           <p className="text-blue-400 font-bold text-lg">{price}</p>
           <p className="text-slate-500 text-[10px]">Стоимость</p>
         </div>
-        <div className="p-2 bg-white/5 rounded-lg text-center">
-          <p className="text-white font-medium text-sm">{exchangeRate}</p>
-          <p className="text-slate-500 text-[10px]">Курс</p>
+        <div className="p-2 bg-white/5 rounded-lg text-center flex flex-col items-center justify-center">
+          <p className="text-white font-medium text-[11px]">USD: {usdRate.toFixed(2)} ₽</p>
+          <p className="text-white font-medium text-[11px]">EUR: {eurRate.toFixed(2)} ₽</p>
+          <p className="text-slate-500 text-[10px] mt-0.5">Курс</p>
         </div>
       </div>
       
@@ -612,79 +564,86 @@ const TopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () => void
       <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
 
       {/* Modal panel — deep opaque glass */}
-      <div className="relative bg-[#0d0d0f]/95 backdrop-blur-3xl border border-white/10 p-5 rounded-2xl w-full max-w-md animate-scale-in max-h-[90dvh] overflow-y-auto shadow-2xl shadow-black/60">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-blue-500/20 border border-emerald-500/30 flex items-center justify-center">
-              <Banknote className="w-5 h-5 text-emerald-400" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-white">Пополнить карту</h3>
-              <p className="text-xs text-slate-400">{card.name}</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
-            <X className="w-5 h-5 text-slate-400" />
-          </button>
-        </div>
-        
-        <div className="mb-4">
-          <label className="block text-sm text-slate-400 mb-2">Способ оплаты</label>
-          <div className="grid grid-cols-5 gap-2">
-            {banks.map((bank) => (
-              <BankLogoButton key={bank.id} bank={bank} selected={selectedBank === bank.id} onClick={() => setSelectedBank(bank.id)} />
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-3 mb-4">
-          <div>
-            <label className="block text-sm text-slate-400 mb-1.5">Сумма в рублях</label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 text-lg font-bold">₽</span>
-              <input
-                type="number"
-                placeholder="10 000"
-                value={rubAmount}
-                onChange={(e) => handleRubChange(e.target.value)}
-                className="w-full h-12 pl-12 pr-4 bg-white/[0.04] border border-white/10 rounded-xl text-white text-lg font-semibold focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-600"
-              />
-            </div>
-          </div>
-          
-          <div className="flex items-center justify-center py-1">
+      <div className="relative bg-[#0d0d0f]/95 backdrop-blur-3xl border border-white/10 rounded-2xl w-full max-w-[440px] max-h-[90dvh] flex flex-col animate-scale-in shadow-2xl shadow-black/60">
+        {/* Fixed header */}
+        <div className="shrink-0 p-5 pb-4 border-b border-white/[0.06]">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-px w-10 bg-white/10" />
-              <div className="w-8 h-8 rounded-full bg-white/[0.04] border border-white/10 flex items-center justify-center">
-                <span className="text-xs font-bold text-slate-300">₽→{currencySymbol}</span>
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-blue-500/20 border border-emerald-500/30 flex items-center justify-center">
+                <Banknote className="w-5 h-5 text-emerald-400" />
               </div>
-              <div className="h-px w-10 bg-white/10" />
+              <div>
+                <h3 className="text-lg font-semibold text-white">Пополнить карту</h3>
+                <p className="text-xs text-slate-400">{card.name}</p>
+              </div>
             </div>
-          </div>
-
-          <div>
-            <label className="block text-sm text-slate-400 mb-1.5">Получите на карту</label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400 text-lg font-bold">{currencySymbol}</span>
-              <input
-                type="number"
-                placeholder="0.00"
-                value={foreignAmount}
-                onChange={(e) => handleForeignChange(e.target.value)}
-                className="w-full h-12 pl-12 pr-4 bg-emerald-500/[0.04] border border-emerald-500/20 rounded-xl text-emerald-400 text-lg font-semibold focus:outline-none focus:border-emerald-500/50 transition-all placeholder:text-emerald-900"
-              />
-            </div>
+            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+              <X className="w-5 h-5 text-slate-400" />
+            </button>
           </div>
         </div>
 
-        <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10 mb-4">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-400">Курс:</span>
-            <span className="text-white font-bold">1 {currencyCode} = {exchangeRate.toFixed(2)} ₽</span>
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto min-h-0 p-5 space-y-4">
+          <div>
+            <label className="block text-sm text-slate-400 mb-2">Способ оплаты</label>
+            <div className="grid grid-cols-5 gap-2">
+              {banks.map((bank) => (
+                <BankLogoButton key={bank.id} bank={bank} selected={selectedBank === bank.id} onClick={() => setSelectedBank(bank.id)} />
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm text-slate-400 mb-1.5">Сумма в рублях</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 text-lg font-bold">₽</span>
+                <input
+                  type="number"
+                  placeholder="10 000"
+                  value={rubAmount}
+                  onChange={(e) => handleRubChange(e.target.value)}
+                  className="w-full h-12 pl-12 pr-4 bg-white/[0.04] border border-white/10 rounded-xl text-white text-lg font-semibold focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-600"
+                />
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-center py-1">
+              <div className="flex items-center gap-3">
+                <div className="h-px w-10 bg-white/10" />
+                <div className="w-8 h-8 rounded-full bg-white/[0.04] border border-white/10 flex items-center justify-center">
+                  <span className="text-xs font-bold text-slate-300">₽→{currencySymbol}</span>
+                </div>
+                <div className="h-px w-10 bg-white/10" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm text-slate-400 mb-1.5">Получите на карту</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400 text-lg font-bold">{currencySymbol}</span>
+                <input
+                  type="number"
+                  placeholder="0.00"
+                  value={foreignAmount}
+                  onChange={(e) => handleForeignChange(e.target.value)}
+                  className="w-full h-12 pl-12 pr-4 bg-emerald-500/[0.04] border border-emerald-500/20 rounded-xl text-emerald-400 text-lg font-semibold focus:outline-none focus:border-emerald-500/50 transition-all placeholder:text-emerald-900"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-slate-400">Курс:</span>
+              <span className="text-white font-bold">1 {currencyCode} = {exchangeRate.toFixed(2)} ₽</span>
+            </div>
           </div>
         </div>
         
-        <div className="flex gap-3">
+        {/* Fixed footer */}
+        <div className="shrink-0 p-5 pt-4 border-t border-white/[0.06] flex gap-3">
           <button onClick={onClose} className="flex-1 px-4 py-3 bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-slate-300 font-medium rounded-xl transition-colors">
             Отмена
           </button>
@@ -805,9 +764,9 @@ const RealisticCreditCard = ({
 const CloseCardModal = ({ card, onClose, onConfirm }: { card: PersonalCard; onClose: () => void; onConfirm: () => void }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
     <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
-    <div className="relative bg-[#050507]/95 backdrop-blur-3xl border border-white/10 p-6 rounded-2xl w-full max-w-md animate-scale-in shadow-2xl shadow-black/60">
+    <div className="relative bg-[#050507]/95 backdrop-blur-3xl border border-white/10 p-6 rounded-2xl w-full max-w-[440px] animate-scale-in shadow-2xl shadow-black/60">
       <div className="flex items-center gap-3 mb-4">
-        <div className="w-12 h-12 rounded-xl bg-red-500/20 flex items-center justify-center">
+        <div className="w-10 h-10 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center">
           <Trash2 className="w-6 h-6 text-red-400" />
         </div>
         <div>
@@ -828,7 +787,7 @@ const CloseCardModal = ({ card, onClose, onConfirm }: { card: PersonalCard; onCl
 const PaymentMethodModal = ({ type, onClose }: { type: 'apple' | 'google'; onClose: () => void }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
     <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
-    <div className="relative bg-[#050507]/95 backdrop-blur-3xl border border-white/10 p-6 rounded-2xl w-full max-w-md animate-scale-in shadow-2xl shadow-black/60">
+    <div className="relative bg-[#050507]/95 backdrop-blur-3xl border border-white/10 p-6 rounded-2xl w-full max-w-[440px] animate-scale-in shadow-2xl shadow-black/60">
       <div className="flex items-center gap-3 mb-4">
         <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
           {type === 'apple' ? <Apple className="w-6 h-6 text-white" /> : <Smartphone className="w-6 h-6 text-white" />}
@@ -1014,7 +973,6 @@ export const CardsPage = () => {
       currency: 'EUR',
       currencySymbol: '€',
       price: '2 990 ₽',
-      exchangeRate: `USD: ${rates.usd.toFixed(2)}₽ | EUR: ${rates.eur.toFixed(2)}₽`,
       features: [
         { title: 'Онлайн сервисы', items: 'Netflix, Patreon, Apple Music, Disney+' },
         { title: 'Нейросети', items: 'ChatGPT, Grok, DeepL, Midjourney, Gemini, DeepSeek, Veo 3' },
@@ -1041,7 +999,6 @@ export const CardsPage = () => {
       currency: 'USD',
       currencySymbol: '$',
       price: '3 990 ₽',
-      exchangeRate: `USD: ${rates.usd.toFixed(2)}₽ | EUR: ${rates.eur.toFixed(2)}₽`,
       features: [
         { title: 'Бронирование и оплата отелей', items: 'Booking, AirBnb, Trip.com и другие' },
         { title: 'Покупка авиабилетов', items: 'Google Flights, Skyscanner, Kayak, Momondo' },
@@ -1067,7 +1024,6 @@ export const CardsPage = () => {
       currency: 'USD',
       currencySymbol: '$',
       price: '14 990 ₽',
-      exchangeRate: `USD: ${rates.usd.toFixed(2)}₽ | EUR: ${rates.eur.toFixed(2)}₽`,
       features: [
         { title: 'Для покупок и подписок', items: 'Booking, Grab, Uber, Trip.com и любые другие сервисы' },
         { title: 'Покупка авиабилетов', items: 'Google Flights, Skyscanner, Kayak, Momondo' },
@@ -1144,7 +1100,8 @@ export const CardsPage = () => {
                     currency={ct.currency}
                     currencySymbol={ct.currencySymbol}
                     price={ct.price}
-                    exchangeRate={ct.exchangeRate}
+                    usdRate={rates.usd}
+                    eurRate={rates.eur}
                     onSelect={() => setIssueModal(ct)}
                   />
                 ))}
