@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Share, Plus, Download } from 'lucide-react';
+import { ModalPortal } from './modal-portal';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -97,6 +98,7 @@ export const PWAInstallPrompt = () => {
   // ── iOS Safari instruction modal ──
   if (showIOSModal) {
     return (
+      <ModalPortal>
       <div className="fixed inset-0 z-[100] flex items-end justify-center p-4 pb-8 md:items-center">
         <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={handleDismiss} />
         <div className="relative bg-[#0d0d12]/95 backdrop-blur-3xl border border-white/10 rounded-2xl p-6 w-full max-w-sm shadow-2xl shadow-black/60 animate-slide-up">
@@ -157,6 +159,7 @@ export const PWAInstallPrompt = () => {
           </button>
         </div>
       </div>
+      </ModalPortal>
     );
   }
 

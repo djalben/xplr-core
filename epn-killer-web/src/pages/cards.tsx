@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useMode } from '../store/mode-context';
 import { useRates } from '../store/rates-context';
 import { DashboardLayout } from '../components/dashboard-layout';
+import { ModalPortal } from '../components/modal-portal';
 import { BackButton } from '../components/back-button';
 import { 
   Plus, 
@@ -115,6 +116,7 @@ const CardIssueModal = ({
   const hasGooglePay = true; // All cards support Google Pay
 
   return (
+    <ModalPortal>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
       <div className="relative bg-[#050507]/95 backdrop-blur-3xl border border-white/10 rounded-2xl w-full max-w-[440px] max-h-[90dvh] flex flex-col animate-scale-in shadow-2xl shadow-black/60">
@@ -254,6 +256,7 @@ const CardIssueModal = ({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 };
 
@@ -559,6 +562,7 @@ const TopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () => void
   };
 
   return (
+    <ModalPortal>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Dense dark overlay — 80% black + heavy blur */}
       <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
@@ -654,6 +658,7 @@ const TopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () => void
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 };
 
@@ -762,6 +767,7 @@ const RealisticCreditCard = ({
 
 // Close Card Modal
 const CloseCardModal = ({ card, onClose, onConfirm }: { card: PersonalCard; onClose: () => void; onConfirm: () => void }) => (
+  <ModalPortal>
   <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
     <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
     <div className="relative bg-[#050507]/95 backdrop-blur-3xl border border-white/10 p-6 rounded-2xl w-full max-w-[440px] animate-scale-in shadow-2xl shadow-black/60">
@@ -781,10 +787,12 @@ const CloseCardModal = ({ card, onClose, onConfirm }: { card: PersonalCard; onCl
       </div>
     </div>
   </div>
+  </ModalPortal>
 );
 
 // Payment Method Modal
 const PaymentMethodModal = ({ type, onClose }: { type: 'apple' | 'google'; onClose: () => void }) => (
+  <ModalPortal>
   <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
     <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
     <div className="relative bg-[#050507]/95 backdrop-blur-3xl border border-white/10 p-6 rounded-2xl w-full max-w-[440px] animate-scale-in shadow-2xl shadow-black/60">
@@ -803,6 +811,7 @@ const PaymentMethodModal = ({ type, onClose }: { type: 'apple' | 'google'; onClo
       <button onClick={onClose} className="w-full px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-xl">Понятно</button>
     </div>
   </div>
+  </ModalPortal>
 );
 
 // Bank Fees Tooltip

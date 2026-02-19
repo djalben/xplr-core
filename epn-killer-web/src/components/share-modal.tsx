@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ModalPortal } from './modal-portal';
 import { X, Check, Send, MessageCircle, Link2, Share2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -22,6 +23,7 @@ export const ShareModal = ({ url, title = 'Поделиться', text, onClose 
   const shareUrl = encodeURIComponent(url);
 
   return (
+    <ModalPortal>
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 pb-6 sm:pb-4">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
       <div className="relative w-full max-w-sm animate-slide-up">
@@ -141,5 +143,6 @@ export const ShareModal = ({ url, title = 'Поделиться', text, onClose 
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 };

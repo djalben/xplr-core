@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { DashboardLayout } from '../components/dashboard-layout';
+import { ModalPortal } from '../components/modal-portal';
 import { BackButton } from '../components/back-button';
 import { 
   UserPlus,
@@ -81,6 +82,7 @@ const InviteModal = ({ onClose }: { onClose: () => void }) => {
   };
 
   return (
+    <ModalPortal>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
       <div className="relative bg-[#050507]/95 backdrop-blur-3xl border border-white/10 p-6 rounded-2xl w-full max-w-[440px] max-h-[90dvh] overflow-y-auto shadow-2xl shadow-black/60 animate-scale-in">
@@ -153,6 +155,7 @@ const InviteModal = ({ onClose }: { onClose: () => void }) => {
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 };
 
