@@ -18,7 +18,7 @@ export const OnboardingPage = () => {
     <div className="min-h-[100dvh] bg-[#050507] flex flex-col items-center justify-center p-4 overflow-hidden relative">
       <div className="absolute inset-0 bg-gradient-to-br from-[#05050a] via-[#080812] to-[#04040a]" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(30,58,138,0.12)_0%,transparent_60%)]" />
-      <NeuralBackground reducedDensity />
+      <NeuralBackground />
 
       <div className="relative z-10 w-full max-w-3xl">
         {/* Logo */}

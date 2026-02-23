@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   CreditCard, 
@@ -23,145 +23,20 @@ import {
   Play
 } from 'lucide-react';
 
-// Enhanced Neural Background for Dark Theme Landing
-const LandingNeuralBackground = () => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    interface Particle {
-      x: number;
-      y: number;
-      vx: number;
-      vy: number;
-      radius: number;
-      glowIntensity: number;
-    }
-
-    let particles: Particle[] = [];
-    let animationId: number;
-
-    const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      initParticles();
-    };
-
-    const initParticles = () => {
-      const count = Math.min(Math.floor((canvas.width * canvas.height) / 20000), 120);
-      particles = [];
-      
-      for (let i = 0; i < count; i++) {
-        particles.push({
-          x: Math.random() * canvas.width,
-          y: Math.random() * canvas.height,
-          vx: (Math.random() - 0.5) * 0.3,
-          vy: (Math.random() - 0.5) * 0.3,
-          radius: Math.random() * 2.5 + 1,
-          glowIntensity: Math.random() * 0.5 + 0.5,
-        });
-      }
-    };
-
-    const animate = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      const connectionDistance = 170;
-
-      // Update particles
-      particles.forEach(p => {
-        p.x += p.vx;
-        p.y += p.vy;
-
-        if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
-        if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
-
-        p.x = Math.max(0, Math.min(canvas.width, p.x));
-        p.y = Math.max(0, Math.min(canvas.height, p.y));
-      });
-
-      // Draw connections with blue-purple gradient
-      for (let i = 0; i < particles.length; i++) {
-        for (let j = i + 1; j < particles.length; j++) {
-          const dx = particles[i].x - particles[j].x;
-          const dy = particles[i].y - particles[j].y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-
-          if (distance < connectionDistance) {
-            const opacity = (1 - distance / connectionDistance) * 0.25;
-            const gradient = ctx.createLinearGradient(
-              particles[i].x, particles[i].y,
-              particles[j].x, particles[j].y
-            );
-            gradient.addColorStop(0, `rgba(59, 130, 246, ${opacity})`);
-            gradient.addColorStop(0.5, `rgba(99, 102, 241, ${opacity})`);
-            gradient.addColorStop(1, `rgba(139, 92, 246, ${opacity})`);
-            
-            ctx.beginPath();
-            ctx.moveTo(particles[i].x, particles[i].y);
-            ctx.lineTo(particles[j].x, particles[j].y);
-            ctx.strokeStyle = gradient;
-            ctx.lineWidth = 1;
-            ctx.stroke();
-          }
-        }
-      }
-
-      // Draw particles with glow
-      particles.forEach(p => {
-        // Outer glow
-        const outerGlow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius * 8);
-        outerGlow.addColorStop(0, `rgba(59, 130, 246, ${0.15 * p.glowIntensity})`);
-        outerGlow.addColorStop(0.5, `rgba(139, 92, 246, ${0.08 * p.glowIntensity})`);
-        outerGlow.addColorStop(1, 'transparent');
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius * 8, 0, Math.PI * 2);
-        ctx.fillStyle = outerGlow;
-        ctx.fill();
-
-        // Inner glow
-        const innerGlow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius * 4);
-        innerGlow.addColorStop(0, `rgba(96, 165, 250, ${0.3 * p.glowIntensity})`);
-        innerGlow.addColorStop(1, 'transparent');
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius * 4, 0, Math.PI * 2);
-        ctx.fillStyle = innerGlow;
-        ctx.fill();
-
-        // Core particle
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(147, 197, 253, ${0.6 * p.glowIntensity})`;
-        ctx.fill();
-      });
-
-      animationId = requestAnimationFrame(animate);
-    };
-
-    resize();
-    animate();
-
-    window.addEventListener('resize', resize);
-
-    return () => {
-      window.removeEventListener('resize', resize);
-      cancelAnimationFrame(animationId);
-    };
-  }, []);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      className="fixed inset-0 pointer-events-none"
-      style={{ zIndex: 0, opacity: 0.85, willChange: 'transform', transform: 'translate3d(0,0,0)' }}
-    />
-  );
-};
+// Static ambient background — no canvas, no animation loop
+const LandingNeuralBackground = () => (
+  <div
+    className="fixed inset-0 pointer-events-none"
+    style={{
+      zIndex: 0,
+      background: `
+        radial-gradient(ellipse 60% 50% at 20% 20%, rgba(59,130,246,0.10) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 40% at 80% 50%, rgba(139,92,246,0.09) 0%, transparent 70%),
+        radial-gradient(ellipse 45% 50% at 50% 85%, rgba(99,102,241,0.06) 0%, transparent 70%)
+      `,
+    }}
+  />
+);
 
 // Floating 3D Card Component — matches dashboard card branding
 const FloatingCard = ({ className = '', delay = 0, variant = 'blue' }: { className?: string; delay?: number; variant?: 'blue' | 'purple' | 'gold' }) => {

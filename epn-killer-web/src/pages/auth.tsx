@@ -121,7 +121,7 @@ export const AuthPage = () => {
       {/* Subtle radial accent */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(30,58,138,0.15)_0%,transparent_60%)]" />
 
-      <NeuralBackground reducedDensity />
+      <NeuralBackground />
 
       <div className="relative z-10 w-full max-w-md animate-fade-in-up">
         {/* Back to landing */}
