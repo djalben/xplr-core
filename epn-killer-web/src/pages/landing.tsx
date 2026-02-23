@@ -733,8 +733,9 @@ export const LandingPage = () => {
             </div>
 
             <div className="grid md:grid-cols-4 gap-8 relative">
-              {/* Connection line */}
-              <div className="hidden md:block absolute top-6 left-[12%] right-[12%] h-0.5 bg-gradient-to-r from-blue-500/50 via-purple-500/50 to-pink-500/50" />
+              {/* Connection line — continuous gradient through all 4 checkpoints */}
+              <div className="hidden md:block absolute top-[22px] left-[6%] right-[6%] h-[3px] rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 opacity-60" />
+              <div className="hidden md:block absolute top-[21px] left-[6%] right-[6%] h-[5px] rounded-full bg-gradient-to-r from-blue-500/30 via-purple-500/30 to-pink-500/30 blur-sm" />
               
               <StepCard 
                 number={1}

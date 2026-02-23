@@ -56,9 +56,9 @@ interface ArbitrageCard {
   fullNumber: string;
   expiry: string;
   cvv: string;
-  budget: number;
+  limit: number;
   spent: number;
-  status: 'active' | 'paused' | 'depleted';
+  status: 'active' | 'paused' | 'blocked';
   cardType: 'visa' | 'mastercard';
 }
 
@@ -306,13 +306,13 @@ const SubscriptionsCardVisual = ({ mini = true, currencySymbol }: { mini?: boole
         <div>
           <p className="text-white/90 text-sm font-bold tracking-[0.2em] leading-none">XPLR</p>
           <p className="text-white/60 text-[7px] font-light tracking-[0.25em] uppercase leading-none mt-0.5">Explorer</p>
-          <p className="text-white/50 text-[6px] font-light tracking-[0.15em] uppercase leading-none mt-1">БЕЗ ГРАНИЦ</p>
         </div>
         <span className="text-white text-sm font-bold">{currencySymbol ?? '€'}</span>
       </div>
       
       {/* Card number at bottom */}
       <div className="mt-auto">
+        <p className="text-white/40 text-[7px] font-light tracking-[0.15em] uppercase leading-none mb-1.5">БЕЗ ГРАНИЦ</p>
         <p className="text-white/50 text-[10px] mb-0.5">Card number</p>
         <p className="text-white font-mono text-sm tracking-widest">**** **** **** 1234</p>
       </div>
@@ -371,13 +371,13 @@ const TravelCardVisual = ({ mini = true, currencySymbol }: { mini?: boolean; cur
         <div>
           <p className="text-white/90 text-sm font-bold tracking-[0.2em] leading-none">XPLR</p>
           <p className="text-white/60 text-[7px] font-light tracking-[0.25em] uppercase leading-none mt-0.5">Explorer</p>
-          <p className="text-white/50 text-[6px] font-light tracking-[0.15em] uppercase leading-none mt-1">БЕЗ ГРАНИЦ</p>
         </div>
         <span className="text-white text-sm font-bold">{currencySymbol ?? '$'}</span>
       </div>
       
       {/* Card number at bottom */}
       <div className="mt-auto">
+        <p className="text-white/40 text-[7px] font-light tracking-[0.15em] uppercase leading-none mb-1.5">БЕЗ ГРАНИЦ</p>
         <p className="text-white/50 text-[10px] mb-0.5">Card number</p>
         <p className="text-white font-mono text-sm tracking-widest">**** **** **** 1234</p>
       </div>
@@ -431,7 +431,6 @@ const PremiumCardVisual = ({ mini = true, currencySymbol }: { mini?: boolean; cu
         <div>
           <p className="text-white font-bold text-lg tracking-[0.25em] leading-none">XPLR PRIME</p>
           <p className="text-white/40 text-[7px] font-light tracking-[0.25em] uppercase leading-none mt-0.5">Explorer</p>
-          <p className="text-white/30 text-[6px] font-light tracking-[0.15em] uppercase leading-none mt-1">БЕЗ ГРАНИЦ</p>
         </div>
         <div className="w-8 h-8 rounded-full bg-white/[0.06] backdrop-blur-sm flex items-center justify-center border border-white/[0.08]">
           <span className="text-white text-sm font-bold">{currencySymbol ?? '$'}</span>
@@ -452,6 +451,7 @@ const PremiumCardVisual = ({ mini = true, currencySymbol }: { mini?: boolean; cu
 
       {/* Card number at bottom */}
       <div className="mt-auto">
+        <p className="text-white/25 text-[7px] font-light tracking-[0.15em] uppercase leading-none mb-1.5">БЕЗ ГРАНИЦ</p>
         <p className="text-white/25 text-[10px] mb-0.5">Card number</p>
         <p className="text-white/90 font-mono text-sm tracking-widest">**** **** **** 1234</p>
       </div>
@@ -957,7 +957,7 @@ const ArbitrageCardRow = ({ card }: { card: ArbitrageCard }) => {
   const { t } = useTranslation();
   const [showDetails, setShowDetails] = useState(false);
   const [copied, setCopied] = useState(false);
-  const usagePercent = (card.spent / card.budget) * 100;
+  const usagePercent = card.limit > 0 ? (card.spent / card.limit) * 100 : 0;
 
   return (
     <tr className="hover:bg-white/[0.02]">
@@ -976,14 +976,14 @@ const ArbitrageCardRow = ({ card }: { card: ArbitrageCard }) => {
       <td className="py-4 px-4">
         <div className="flex items-center gap-3">
           <div className="flex-1 max-w-[120px] h-1.5 bg-white/10 rounded-full overflow-hidden">
-            <div className={`h-full rounded-full ${usagePercent > 90 ? 'bg-red-500' : usagePercent > 70 ? 'bg-yellow-500' : 'bg-blue-500'}`} style={{ width: `${usagePercent}%` }} />
+            <div className={`h-full rounded-full ${usagePercent > 90 ? 'bg-red-500' : usagePercent > 70 ? 'bg-yellow-500' : 'bg-blue-500'}`} style={{ width: `${Math.min(usagePercent, 100)}%` }} />
           </div>
-          <span className="text-sm text-slate-400">${card.spent.toLocaleString()} / ${card.budget.toLocaleString()}</span>
+          <span className="text-sm text-slate-400">${card.spent.toLocaleString()} / ${card.limit.toLocaleString()}</span>
         </div>
       </td>
       <td className="py-4 px-4">
         <span className={`badge ${card.status === 'active' ? 'badge-success' : card.status === 'paused' ? 'badge-warning' : 'badge-error'}`}>
-          {card.status === 'active' ? t('cards.active') : card.status === 'paused' ? t('cards.paused') : t('cards.depleted')}
+          {card.status === 'active' ? t('cards.active') : card.status === 'paused' ? t('cards.paused') : 'Заблокирована'}
         </span>
       </td>
       <td className="py-4 px-4">
@@ -1048,10 +1048,20 @@ export const CardsPage = () => {
     { id: '3', type: 'premium', name: 'Премиальная карта', holderName: 'IVAN PETROV', number: '3782 8224 6310 0052', expiry: '03/28', cvv: '921', balance: 12580.00, currency: '$', cardNetwork: 'mastercard', color: 'gold', price: '14 990₽' },
   ];
 
+  // ── Master balance: all arbitrage cards draw from this shared pool ──
+  const [masterBalance] = useState(() => {
+    try { const v = localStorage.getItem('xplr_master_balance'); if (v) return parseFloat(v); } catch {}
+    return 25000;
+  });
+
   const arbitrageCards: ArbitrageCard[] = [
-    { id: '1', bin: '486555', last4: '4521', fullNumber: '4865 5512 3456 4521', expiry: '12/26', cvv: '847', budget: 5000, spent: 3240, status: 'active', cardType: 'visa' },
-    { id: '2', bin: '536025', last4: '7832', fullNumber: '5360 2534 5678 7832', expiry: '11/26', cvv: '293', budget: 5000, spent: 4890, status: 'active', cardType: 'mastercard' },
+    { id: '1', bin: '486555', last4: '4521', fullNumber: '4865 5512 3456 4521', expiry: '12/26', cvv: '847', limit: 5000, spent: 3240, status: 'active', cardType: 'visa' },
+    { id: '2', bin: '536025', last4: '7832', fullNumber: '5360 2534 5678 7832', expiry: '11/26', cvv: '293', limit: 5000, spent: 4890, status: 'active', cardType: 'mastercard' },
+    { id: '3', bin: '486555', last4: '9104', fullNumber: '4865 5598 7612 9104', expiry: '06/27', cvv: '514', limit: 3000, spent: 0, status: 'blocked', cardType: 'visa' },
   ];
+
+  const totalSpent = arbitrageCards.reduce((sum, c) => sum + c.spent, 0);
+  const availableBalance = masterBalance - totalSpent;
 
   const cardTypesForIssue = [
     { 
@@ -1235,10 +1245,40 @@ export const CardsPage = () => {
               </div>
             </div>
 
+            {/* ── Master Balance Panel ── */}
+            <div className="glass-card p-6 mb-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Общий баланс аккаунта</p>
+                  <p className="text-3xl font-bold text-white">${masterBalance.toLocaleString()}</p>
+                </div>
+                <div className="flex items-center gap-6">
+                  <div className="text-center">
+                    <p className="text-xs text-slate-500 mb-0.5">Потрачено</p>
+                    <p className="text-lg font-semibold text-amber-400">${totalSpent.toLocaleString()}</p>
+                  </div>
+                  <div className="w-px h-10 bg-white/10" />
+                  <div className="text-center">
+                    <p className="text-xs text-slate-500 mb-0.5">Доступно</p>
+                    <p className="text-lg font-semibold text-emerald-400">${availableBalance.toLocaleString()}</p>
+                  </div>
+                  <div className="w-px h-10 bg-white/10" />
+                  <div className="text-center">
+                    <p className="text-xs text-slate-500 mb-0.5">Карт</p>
+                    <p className="text-lg font-semibold text-blue-400">{arbitrageCards.length}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4 h-2 bg-white/10 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all" style={{ width: `${Math.min((totalSpent / masterBalance) * 100, 100)}%` }} />
+              </div>
+              <p className="mt-2 text-[11px] text-slate-600">Все карты привязаны к единому счёту. Блокировка одной карты не затрагивает баланс — средства мгновенно доступны для других карт.</p>
+            </div>
+
             <h3 className="section-header flex items-center gap-2"><CardIcon className="w-4 h-4" />{t('cards.active')}</h3>
             <div className="glass-card overflow-x-auto">
               <table className="xplr-table min-w-[800px]">
-                <thead><tr><th>BIN</th><th>Карта</th><th>Бюджет</th><th>Статус</th><th>Действия</th></tr></thead>
+                <thead><tr><th>BIN</th><th>Карта</th><th>Лимит / Расход</th><th>Статус</th><th>Действия</th></tr></thead>
                 <tbody>{arbitrageCards.map(card => <ArbitrageCardRow key={card.id} card={card} />)}</tbody>
               </table>
             </div>
