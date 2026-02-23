@@ -163,7 +163,7 @@ const LandingNeuralBackground = () => {
   );
 };
 
-// Floating 3D Card Component
+// Floating 3D Card Component — matches dashboard card branding
 const FloatingCard = ({ className = '', delay = 0, variant = 'blue' }: { className?: string; delay?: number; variant?: 'blue' | 'purple' | 'gold' }) => {
   const gradients = {
     blue: 'bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700',
@@ -173,7 +173,7 @@ const FloatingCard = ({ className = '', delay = 0, variant = 'blue' }: { classNa
 
   return (
     <div 
-      className={`relative w-72 h-44 rounded-2xl ${gradients[variant]} shadow-2xl shadow-blue-500/30 ${className}`}
+      className={`relative w-72 h-44 rounded-2xl ${gradients[variant]} shadow-2xl shadow-blue-500/30 overflow-hidden ${className}`}
       style={{
         animation: `float ${4 + delay}s ease-in-out infinite`,
         animationDelay: `${delay}s`,
@@ -183,34 +183,32 @@ const FloatingCard = ({ className = '', delay = 0, variant = 'blue' }: { classNa
       {/* Glossy overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-transparent rounded-2xl" />
       
-      {/* Card chip */}
-      <div className="absolute top-6 left-6 w-12 h-9 rounded-md bg-gradient-to-br from-yellow-300 via-yellow-400 to-yellow-600">
-        <div className="absolute inset-1 bg-gradient-to-br from-yellow-200 to-yellow-500 rounded-sm" />
-        <div className="absolute top-1/2 left-0 right-0 h-px bg-yellow-700/50" />
-        <div className="absolute top-0 bottom-0 left-1/2 w-px bg-yellow-700/50" />
+      {/* Card content */}
+      <div className="relative h-full p-5 flex flex-col justify-between">
+        {/* Top row — XPLR + EXPLORER */}
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-white/90 text-base font-bold tracking-[0.2em] leading-none">XPLR</p>
+            <p className="text-white/60 text-[8px] font-light tracking-[0.25em] uppercase leading-none mt-0.5">Explorer</p>
+          </div>
+          {/* NFC icon */}
+          <svg className="w-6 h-6 text-white/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1.5-2.5" strokeLinecap="round" />
+            <path d="M6.5 16.5A4.5 4.5 0 0 0 13 12c0-2.76-1.5-4-3-5" strokeLinecap="round" />
+          </svg>
+        </div>
+
+        {/* Bottom — slogan + card number */}
+        <div>
+          <p className="text-white/40 text-[8px] font-light tracking-[0.15em] uppercase leading-none mb-1.5">БЕЗ ГРАНИЦ</p>
+          <p className="text-white/80 font-mono text-sm tracking-widest">•••• •••• •••• 4521</p>
+        </div>
       </div>
 
-      {/* XPLR logo */}
-      <div className="absolute top-6 right-6 text-white/90 font-bold text-lg tracking-wider">XPLR</div>
-
-      {/* Card number placeholder */}
-      <div className="absolute bottom-16 left-6 text-white/80 font-mono text-lg tracking-widest">
-        •••• •••• •••• 4521
-      </div>
-
-      {/* NFC icon */}
-      <div className="absolute bottom-6 right-6">
-        <svg className="w-8 h-8 text-white/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1.5-2.5" strokeLinecap="round" />
-          <path d="M6.5 16.5A4.5 4.5 0 0 0 13 12c0-2.76-1.5-4-3-5" strokeLinecap="round" />
-          <path d="M4.5 18.5A6.5 6.5 0 0 0 15 12c0-4.14-2.5-6-4.5-7.5" strokeLinecap="round" />
-        </svg>
-      </div>
-
-      {/* Visa-style stripes */}
-      <div className="absolute bottom-6 left-6 flex gap-1">
-        <div className="w-8 h-6 bg-white/20 rounded" />
-        <div className="w-8 h-6 bg-white/10 rounded" />
+      {/* Mastercard-style circles bottom right */}
+      <div className="absolute bottom-4 right-4 flex -space-x-2">
+        <div className="w-6 h-6 rounded-full bg-white/20" />
+        <div className="w-6 h-6 rounded-full bg-white/15" />
       </div>
     </div>
   );
@@ -377,7 +375,7 @@ const GradeTier = ({ name, commission, volume, active = false }: { name: string;
 // Step card
 const StepCard = ({ number, title, description }: { number: number; title: string; description: string }) => (
   <div className="relative">
-    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg mb-4 shadow-lg shadow-blue-500/30">
+    <div className="relative z-10 w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg mb-4 shadow-lg shadow-blue-500/30">
       {number}
     </div>
     <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
@@ -733,9 +731,24 @@ export const LandingPage = () => {
             </div>
 
             <div className="grid md:grid-cols-4 gap-8 relative">
-              {/* Connection line — continuous gradient through all 4 checkpoints */}
-              <div className="hidden md:block absolute top-[22px] left-[6%] right-[6%] h-[3px] rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 opacity-60" />
-              <div className="hidden md:block absolute top-[21px] left-[6%] right-[6%] h-[5px] rounded-full bg-gradient-to-r from-blue-500/30 via-purple-500/30 to-pink-500/30 blur-sm" />
+              {/* Connection line — SVG for precise control across all 4 step badges */}
+              <svg className="hidden md:block absolute top-[23px] left-0 right-0 h-[6px] overflow-visible pointer-events-none" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="stepLineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#3b82f6" />
+                    <stop offset="50%" stopColor="#8b5cf6" />
+                    <stop offset="100%" stopColor="#ec4899" />
+                  </linearGradient>
+                  <filter id="stepLineGlow">
+                    <feGaussianBlur stdDeviation="2" result="blur" />
+                    <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                  </filter>
+                </defs>
+                {/* Glow layer */}
+                <line x1="12.5%" y1="50%" x2="87.5%" y2="50%" stroke="url(#stepLineGrad)" strokeWidth="4" strokeLinecap="round" opacity="0.3" filter="url(#stepLineGlow)" />
+                {/* Main line */}
+                <line x1="12.5%" y1="50%" x2="87.5%" y2="50%" stroke="url(#stepLineGrad)" strokeWidth="2.5" strokeLinecap="round" opacity="0.7" />
+              </svg>
               
               <StepCard 
                 number={1}
