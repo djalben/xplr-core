@@ -303,7 +303,11 @@ const SubscriptionsCardVisual = ({ mini = true, currencySymbol }: { mini?: boole
     <div className="relative h-full p-4 flex flex-col justify-between">
       {/* Top row - branding and currency */}
       <div className="flex items-start justify-between">
-        <span className="text-white/90 text-xs font-medium tracking-wide">No Borders</span>
+        <div>
+          <p className="text-white/90 text-sm font-bold tracking-[0.2em] leading-none">XPLR</p>
+          <p className="text-white/60 text-[7px] font-light tracking-[0.25em] uppercase leading-none mt-0.5">Explorer</p>
+          <p className="text-white/50 text-[6px] font-light tracking-[0.15em] uppercase leading-none mt-1">БЕЗ ГРАНИЦ</p>
+        </div>
         <span className="text-white text-sm font-bold">{currencySymbol ?? '€'}</span>
       </div>
       
@@ -364,7 +368,11 @@ const TravelCardVisual = ({ mini = true, currencySymbol }: { mini?: boolean; cur
     <div className="relative h-full p-4 flex flex-col justify-between">
       {/* Top row - branding and currency */}
       <div className="flex items-start justify-between">
-        <span className="text-white/90 text-xs font-medium tracking-wide">No Borders</span>
+        <div>
+          <p className="text-white/90 text-sm font-bold tracking-[0.2em] leading-none">XPLR</p>
+          <p className="text-white/60 text-[7px] font-light tracking-[0.25em] uppercase leading-none mt-0.5">Explorer</p>
+          <p className="text-white/50 text-[6px] font-light tracking-[0.15em] uppercase leading-none mt-1">БЕЗ ГРАНИЦ</p>
+        </div>
         <span className="text-white text-sm font-bold">{currencySymbol ?? '$'}</span>
       </div>
       
@@ -421,8 +429,9 @@ const PremiumCardVisual = ({ mini = true, currencySymbol }: { mini?: boolean; cu
       {/* Top row — XPLR PRIME branding and currency */}
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-white font-bold text-lg tracking-[0.25em]">XPLR PRIME</p>
-          <p className="text-white/25 text-[8px] tracking-[0.3em] uppercase">Platinum Edition</p>
+          <p className="text-white font-bold text-lg tracking-[0.25em] leading-none">XPLR PRIME</p>
+          <p className="text-white/40 text-[7px] font-light tracking-[0.25em] uppercase leading-none mt-0.5">Explorer</p>
+          <p className="text-white/30 text-[6px] font-light tracking-[0.15em] uppercase leading-none mt-1">БЕЗ ГРАНИЦ</p>
         </div>
         <div className="w-8 h-8 rounded-full bg-white/[0.06] backdrop-blur-sm flex items-center justify-center border border-white/[0.08]">
           <span className="text-white text-sm font-bold">{currencySymbol ?? '$'}</span>
