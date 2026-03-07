@@ -188,6 +188,13 @@ export const DashboardPage = () => {
 
   useEffect(() => {
     fetchData();
+    // Auto-refresh vault balance every 30s (picks up webhook credits)
+    const vaultInterval = setInterval(() => {
+      getVault()
+        .then((v) => setVault(v))
+        .catch(() => {});
+    }, 30000);
+    return () => clearInterval(vaultInterval);
   }, []);
 
   const fetchData = async () => {

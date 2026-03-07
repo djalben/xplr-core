@@ -5,6 +5,7 @@ import { DashboardLayout } from '../components/dashboard-layout';
 import { ModalPortal } from '../components/modal-portal';
 import { BackButton } from '../components/back-button';
 import { getVault, transferVaultToCard, type InternalBalance } from '../api/vault';
+import { getUserCards, issuePersonalCard, getCardDetails, updateCardStatus, type Card as BackendCard } from '../api/cards';
 import { 
   Plus, 
   CreditCard as CardIcon,
@@ -74,10 +75,14 @@ export const MastercardLogo = ({ className = "h-8 w-auto" }: { className?: strin
 // Card Issue Modal
 const CardIssueModal = ({ 
   card, 
-  onClose 
+  onClose,
+  onIssue,
+  isIssuing = false
 }: { 
   card: { type: string; name: string; price: string; currency: string; description: string; features: { title: string; items: string }[]; conditions: { label: string; value: string }[]; capabilities: { label: string; value: string; link?: boolean }[] };
   onClose: () => void;
+  onIssue?: (cardType: 'subscriptions' | 'travel' | 'premium', priceRub: number) => void;
+  isIssuing?: boolean;
 }) => {
   const [showProhibited, setShowProhibited] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState<'USD' | 'EUR'>(card.currency === 'EUR' ? 'EUR' : 'USD');
@@ -233,10 +238,18 @@ const CardIssueModal = ({
         {/* Fixed footer button */}
         <div className="shrink-0 p-5 pt-3 border-t border-white/[0.06]">
           <button 
-            onClick={onClose}
-            className="w-full py-3.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold rounded-xl transition-all shadow-lg shadow-blue-500/20"
+            onClick={() => {
+              if (onIssue) {
+                const priceNum = parseInt(card.price.replace(/\D/g, '')) || 0;
+                onIssue(card.type as 'subscriptions' | 'travel' | 'premium', priceNum);
+              } else {
+                onClose();
+              }
+            }}
+            disabled={isIssuing}
+            className="w-full py-3.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold rounded-xl transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {t('cards.issueCard')} {card.price}
+            {isIssuing ? 'Выпускаем карту...' : `${t('cards.issueCard')} ${card.price}`}
           </button>
         </div>
       </div>
@@ -889,20 +902,115 @@ export const CardsPage = () => {
   const [topUpModal, setTopUpModal] = useState<PersonalCard | null>(null);
   const [paymentModal, setPaymentModal] = useState<{ type: 'apple' | 'google' } | null>(null);
   const [issueModal, setIssueModal] = useState<any>(null);
-  const [vaultBalance, setVaultBalance] = useState(0); // master_balance in ₽
+  const [vaultBalance, setVaultBalance] = useState(0);
+  const [personalCards, setPersonalCards] = useState<PersonalCard[]>([]);
+  const [isLoadingCards, setIsLoadingCards] = useState(true);
+  const [isIssuing, setIsIssuing] = useState(false);
 
-  const [personalCards, setPersonalCards] = useState<PersonalCard[]>([
-    { id: '1', type: 'subscriptions', name: 'Карта для подписок', holderName: 'IVAN PETROV', number: '4521 8834 2291 7432', expiry: '12/26', cvv: '847', balance: 1250.50, currency: '€', cardNetwork: 'mastercard', color: 'blue', price: '2 990₽' },
-    { id: '2', type: 'travel', name: 'Карта для путешествий', holderName: 'IVAN PETROV', number: '5234 1192 8847 0923', expiry: '08/27', cvv: '312', balance: 3840.00, currency: '$', cardNetwork: 'mastercard', color: 'purple', price: '3 990₽' },
-    { id: '3', type: 'premium', name: 'Премиальная карта', holderName: 'IVAN PETROV', number: '3782 8224 6310 0052', expiry: '03/28', cvv: '921', balance: 12580.00, currency: '$', cardNetwork: 'mastercard', color: 'gold', price: '14 990₽' },
-  ]);
+  // Map backend card type to PersonalCard color
+  const typeColorMap: Record<string, 'blue' | 'purple' | 'gold'> = {
+    subscriptions: 'blue', services: 'blue',
+    travel: 'purple',
+    premium: 'gold',
+  };
 
-  // Fetch vault balance on mount
+  // Map backend Card → PersonalCard
+  const mapBackendCard = (bc: BackendCard, details?: { full_number: string; cvv: string; expiry: string }): PersonalCard => {
+    const slug = bc.service_slug || bc.category || 'subscriptions';
+    const typeMap: Record<string, 'subscriptions' | 'travel' | 'premium'> = {
+      subscriptions: 'subscriptions', services: 'subscriptions',
+      travel: 'travel', premium: 'premium',
+    };
+    const cardType = typeMap[slug] || 'subscriptions';
+    const isEur = slug === 'subscriptions' || slug === 'services';
+    return {
+      id: String(bc.id),
+      type: cardType,
+      name: bc.nickname || 'Карта',
+      holderName: 'XPLR USER',
+      number: details?.full_number
+        ? details.full_number.replace(/(.{4})/g, '$1 ').trim()
+        : `**** **** **** ${bc.last_4_digits}`,
+      expiry: details?.expiry || '—',
+      cvv: details?.cvv || '***',
+      balance: parseFloat(bc.card_balance || '0'),
+      currency: isEur ? '€' : '$',
+      cardNetwork: (bc.card_type || '').toLowerCase().includes('visa') ? 'visa' : 'mastercard',
+      color: typeColorMap[slug] || 'blue',
+      price: '',
+    };
+  };
+
+  // Fetch cards from backend (only ACTIVE)
+  const fetchCards = async () => {
+    try {
+      const backendCards = await getUserCards();
+      const activeCards = (backendCards || []).filter(c => c.card_status === 'ACTIVE');
+
+      // Fetch details for each card in parallel
+      const mapped = await Promise.all(
+        activeCards.map(async (bc) => {
+          try {
+            const details = await getCardDetails(bc.id);
+            return mapBackendCard(bc, details);
+          } catch {
+            return mapBackendCard(bc);
+          }
+        })
+      );
+      setPersonalCards(mapped);
+    } catch (err) {
+      console.error('Failed to fetch cards:', err);
+    } finally {
+      setIsLoadingCards(false);
+    }
+  };
+
+  // Fetch vault + cards on mount, auto-refresh vault every 30s
   useEffect(() => {
-    getVault()
-      .then((v) => setVaultBalance(Number(v.master_balance) || 0))
-      .catch(() => {});
+    fetchCards();
+    const refreshVault = () => {
+      getVault()
+        .then((v) => setVaultBalance(Number(v.master_balance) || 0))
+        .catch(() => {});
+    };
+    refreshVault();
+    const interval = setInterval(refreshVault, 30000);
+    return () => clearInterval(interval);
   }, []);
+
+  // Handle card issuance via real API
+  const handleIssueCard = async (cardType: 'subscriptions' | 'travel' | 'premium', priceRub: number) => {
+    setIsIssuing(true);
+    try {
+      const result = await issuePersonalCard(cardType, priceRub);
+      if (result.successful_count > 0) {
+        await fetchCards(); // Refresh card list from DB
+        setIssueModal(null);
+        setActiveTab('my-cards');
+      } else {
+        const msg = result.results?.[0]?.message || 'Ошибка выпуска карты';
+        alert(msg);
+      }
+    } catch (err: any) {
+      const msg = err?.response?.data || err?.message || 'Ошибка выпуска карты';
+      alert(typeof msg === 'string' ? msg : JSON.stringify(msg));
+    } finally {
+      setIsIssuing(false);
+    }
+  };
+
+  // Handle card close via real API
+  const handleCloseCard = async (card: PersonalCard) => {
+    try {
+      await updateCardStatus(parseInt(card.id), 'CLOSED');
+      setPersonalCards(prev => prev.filter(c => c.id !== card.id));
+      setCloseCardModal(null);
+    } catch (err) {
+      console.error('Failed to close card:', err);
+      setCloseCardModal(null);
+    }
+  };
 
   // Handle vault-to-card transfer with optimistic UI
   const handleTransfer = async (card: PersonalCard, amountInCurrency: number) => {
@@ -1049,7 +1157,11 @@ export const CardsPage = () => {
         {/* Tab: Мои карты */}
         {activeTab === 'my-cards' && (
           <div>
-            {personalCards.length > 0 ? (
+            {isLoadingCards ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+              </div>
+            ) : personalCards.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {personalCards.map(card => (
                   <RealisticCreditCard 
@@ -1095,10 +1207,10 @@ export const CardsPage = () => {
           </div>
         )}
 
-        {closeCardModal && <CloseCardModal card={closeCardModal} onClose={() => setCloseCardModal(null)} onConfirm={() => setCloseCardModal(null)} />}
+        {closeCardModal && <CloseCardModal card={closeCardModal} onClose={() => setCloseCardModal(null)} onConfirm={() => handleCloseCard(closeCardModal)} />}
         {topUpModal && <VaultTopUpModal card={topUpModal} vaultBalance={vaultBalance} onClose={() => setTopUpModal(null)} onTransfer={(amt) => handleTransfer(topUpModal, amt)} />}
         {paymentModal && <PaymentMethodModal type={paymentModal.type} onClose={() => setPaymentModal(null)} />}
-        {issueModal && <CardIssueModal card={issueModal} onClose={() => setIssueModal(null)} />}
+        {issueModal && <CardIssueModal card={issueModal} onClose={() => setIssueModal(null)} onIssue={handleIssueCard} isIssuing={isIssuing} />}
       </div>
 
       <style>{`
