@@ -574,6 +574,83 @@ export const LandingPage = () => {
           </div>
         </section>
 
+        {/* Vault Features — Автопилот баланса + Честный возврат */}
+        <section className="py-24 px-6">
+          <div className="max-w-7xl mx-auto">
+            <div className="grid md:grid-cols-2 gap-8">
+              
+              {/* Автопилот баланса */}
+              <div className="relative group rounded-2xl border border-blue-500/20 bg-gradient-to-br from-blue-500/[0.06] to-transparent p-8 overflow-hidden hover:border-blue-500/40 transition-all">
+                <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 group-hover:bg-blue-500/15 transition-colors" />
+                <div className="relative z-10">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mb-6 shadow-lg shadow-blue-500/30">
+                    <Zap className="w-7 h-7 text-white" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-white mb-3">Автопилот баланса</h3>
+                  <p className="text-slate-400 mb-6 leading-relaxed">
+                    Подписки не отключатся, пока есть деньги в Сейфе. Система автоматически переводит нужную сумму на карту в момент списания — вам не нужно следить за балансом каждой карты.
+                  </p>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
+                        <Check className="w-3.5 h-3.5 text-blue-400" />
+                      </div>
+                      <span className="text-sm text-slate-300">Один Сейф — все карты питаются из него</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
+                        <Check className="w-3.5 h-3.5 text-blue-400" />
+                      </div>
+                      <span className="text-sm text-slate-300">Мгновенный перевод при оплате</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
+                        <Check className="w-3.5 h-3.5 text-blue-400" />
+                      </div>
+                      <span className="text-sm text-slate-300">Лимит на каждую карту для контроля расходов</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Честный возврат */}
+              <div className="relative group rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/[0.06] to-transparent p-8 overflow-hidden hover:border-emerald-500/40 transition-all">
+                <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 group-hover:bg-emerald-500/15 transition-colors" />
+                <div className="relative z-10">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mb-6 shadow-lg shadow-emerald-500/30">
+                    <Shield className="w-7 h-7 text-white" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-white mb-3">Честный возврат</h3>
+                  <p className="text-slate-400 mb-6 leading-relaxed">
+                    Деньги не сгорают вместе с картой. Когда срок карты истекает, неиспользованный остаток лимита автоматически возвращается в ваш Сейф — ни копейки не теряется.
+                  </p>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      </div>
+                      <span className="text-sm text-slate-300">Автовозврат при истечении карты</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      </div>
+                      <span className="text-sm text-slate-300">Полная прозрачность: видно сколько потрачено</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      </div>
+                      <span className="text-sm text-slate-300">Средства всегда под вашим контролем</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </section>
+
         {/* Reviews */}
         <section id="reviews" className="py-24 px-6">
           <div className="max-w-7xl mx-auto">

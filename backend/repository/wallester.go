@@ -24,8 +24,8 @@ import (
 // WallesterRepository - репозиторий для работы с API Wallester
 // Реализует принципы Clean Architecture: изоляция внешних зависимостей
 type WallesterRepository struct {
-	apiKey    string
-	apiURL    string
+	apiKey     string
+	apiURL     string
 	httpClient *http.Client
 }
 
@@ -33,7 +33,7 @@ type WallesterRepository struct {
 func NewWallesterRepository() *WallesterRepository {
 	apiKey := os.Getenv("WALLESTER_API_KEY")
 	apiURL := os.Getenv("WALLESTER_API_URL")
-	
+
 	if apiKey == "" {
 		log.Println("⚠️  WALLESTER_API_KEY not set in environment")
 	}
@@ -53,17 +53,17 @@ func NewWallesterRepository() *WallesterRepository {
 
 // WallesterCardRequest - запрос на создание карты в Wallester
 type WallesterCardRequest struct {
-	Currency    string `json:"currency"`
-	CardType    string `json:"card_type"`    // VISA, MasterCard
-	CardName    string `json:"card_name,omitempty"`
-	Amount      string `json:"amount,omitempty"` // Начальный баланс карты
+	Currency string `json:"currency"`
+	CardType string `json:"card_type"` // VISA, MasterCard
+	CardName string `json:"card_name,omitempty"`
+	Amount   string `json:"amount,omitempty"` // Начальный баланс карты
 }
 
 // WallesterCardResponse - ответ от Wallester при создании карты
 type WallesterCardResponse struct {
 	Success bool   `json:"success"`
 	CardID  string `json:"card_id,omitempty"`
-	PAN     string `json:"pan,omitempty"`      // Маскированный номер карты
+	PAN     string `json:"pan,omitempty"` // Маскированный номер карты
 	BIN     string `json:"bin,omitempty"`
 	Last4   string `json:"last_4,omitempty"`
 	Status  string `json:"status,omitempty"`
@@ -129,7 +129,7 @@ func (wr *WallesterRepository) IssueCard(
 	// Минимальная сумма для выпуска карты + начальное пополнение (например, 100 руб)
 	minRequired := decimal.NewFromInt(100)
 	if user.BalanceRub.LessThan(minRequired) {
-		return nil, fmt.Errorf("insufficient funds: required %s, available %s", 
+		return nil, fmt.Errorf("insufficient funds: required %s, available %s",
 			minRequired.String(), user.BalanceRub.String())
 	}
 
@@ -238,7 +238,7 @@ func (wr *WallesterRepository) IssueCard(
 	}
 
 	card.ID = cardID
-	log.Printf("✅ Card issued via Wallester: ID=%d, ExternalID=%s, Last4=%s", 
+	log.Printf("✅ Card issued via Wallester: ID=%d, ExternalID=%s, Last4=%s",
 		cardID, card.ExternalID, card.Last4Digits)
 
 	return &card, nil
@@ -344,7 +344,7 @@ func (wr *WallesterRepository) SyncBalance(cardID int, externalID string) error 
 		return fmt.Errorf("failed to update card balance: %w", err)
 	}
 
-	log.Printf("✅ Synced balance for card %d (external_id=%s): %s", 
+	log.Printf("✅ Synced balance for card %d (external_id=%s): %s",
 		cardID, externalID, balance.String())
 
 	return nil
@@ -404,15 +404,15 @@ func (wr *WallesterRepository) SyncAllCardsBalances() error {
 
 // WallesterWebhookPayload - структура для обработки webhook от Wallester
 type WallesterWebhookPayload struct {
-	EventType     string                 `json:"event_type"`      // transaction, balance_update, 3ds_authentication, etc.
-	CardID        string                 `json:"card_id"`         // external_id карты
-	TransactionID string                 `json:"transaction_id"`  // ID транзакции от Wallester (для idempotency)
+	EventType     string                 `json:"event_type"`     // transaction, balance_update, 3ds_authentication, etc.
+	CardID        string                 `json:"card_id"`        // external_id карты
+	TransactionID string                 `json:"transaction_id"` // ID транзакции от Wallester (для idempotency)
 	Amount        string                 `json:"amount"`
 	Currency      string                 `json:"currency"`
 	Status        string                 `json:"status"`
 	Timestamp     string                 `json:"timestamp"`
-	AuthCode      string                 `json:"auth_code,omitempty"`      // Код подтверждения для 3DS
-	MerchantName  string                 `json:"merchant_name,omitempty"`  // Название магазина
+	AuthCode      string                 `json:"auth_code,omitempty"`     // Код подтверждения для 3DS
+	MerchantName  string                 `json:"merchant_name,omitempty"` // Название магазина
 	Metadata      map[string]interface{} `json:"metadata,omitempty"`
 }
 
@@ -544,7 +544,7 @@ func (wr *WallesterRepository) ProcessWebhook(payload WallesterWebhookPayload) e
 		// Извлекаем auth_code и merchant_name из payload
 		authCode := payload.AuthCode
 		merchantName := payload.MerchantName
-		
+
 		if authCode == "" {
 			log.Printf("⚠️  3DS webhook received but auth_code is empty")
 			return nil // Не критичная ошибка, просто логируем
@@ -577,22 +577,22 @@ func (wr *WallesterRepository) ProcessWebhook(payload WallesterWebhookPayload) e
 			log.Printf("⚠️  User %d has no Telegram chat ID, skipping 3DS notification", userID)
 		}
 
-		log.Printf("✅ 3DS notification sent: auth_code=%s, merchant=%s, user=%d", 
+		log.Printf("✅ 3DS notification sent: auth_code=%s, merchant=%s, user=%d",
 			authCode, merchantName, userID)
 		return nil
 
 	case "transaction", "capture", "authorization", "payment_success":
-		// Списание средств с баланса пользователя
+		// ═══════════════════════════════════════════════════════════════
+		// THE BRIDGE: Списание из Сейфа (internal_balances) вместо balance_rub
+		// 1. Проверяем internal_balance >= amount
+		// 2. Проверяем spending_limit карты >= (spent_from_vault + amount)
+		// 3. Если ОК — списываем из Сейфа и одобряем транзакцию
+		// ═══════════════════════════════════════════════════════════════
 		if payload.Status == "approved" || payload.Status == "completed" || payload.EventType == "payment_success" {
-			// Проверяем баланс перед списанием
+			// Получаем данные пользователя для уведомлений
 			user, err := GetUserByID(userID)
 			if err != nil {
 				return fmt.Errorf("failed to get user: %w", err)
-			}
-
-			if user.BalanceRub.LessThan(amount) {
-				return fmt.Errorf("insufficient funds for transaction: required %s, available %s",
-					amount.String(), user.BalanceRub.String())
 			}
 
 			// Начинаем транзакцию БД для атомарности
@@ -602,23 +602,66 @@ func (wr *WallesterRepository) ProcessWebhook(payload WallesterWebhookPayload) e
 			}
 			defer tx.Rollback()
 
-			// Списание с balance_rub
+			// 1. Проверяем Сейф (internal_balance) — с блокировкой строки
+			var vaultBalance decimal.Decimal
+			err = tx.QueryRow(
+				`SELECT COALESCE(master_balance, 0) FROM internal_balances WHERE user_id = $1 FOR UPDATE`,
+				userID,
+			).Scan(&vaultBalance)
+			if err != nil {
+				return fmt.Errorf("vault not found for user %d (create vault first)", userID)
+			}
+
+			if vaultBalance.LessThan(amount) {
+				return fmt.Errorf("insufficient vault balance: required %s, available %s",
+					amount.String(), vaultBalance.String())
+			}
+
+			// 2. Проверяем spending_limit карты
+			var spendingLimit, spentFromVault decimal.Decimal
+			err = tx.QueryRow(
+				`SELECT COALESCE(spending_limit, 0), COALESCE(spent_from_vault, 0) FROM cards WHERE id = $1 FOR UPDATE`,
+				cardID,
+			).Scan(&spendingLimit, &spentFromVault)
+			if err != nil {
+				return fmt.Errorf("failed to get card limits: %w", err)
+			}
+
+			// spending_limit = 0 означает «без лимита» (unlimited)
+			if spendingLimit.GreaterThan(decimal.Zero) {
+				remaining := spendingLimit.Sub(spentFromVault)
+				if amount.GreaterThan(remaining) {
+					return fmt.Errorf("card spending limit exceeded: limit remaining %s, tx amount %s",
+						remaining.String(), amount.String())
+				}
+			}
+
+			// 3. Списываем из Сейфа
 			_, err = tx.Exec(
-				"UPDATE users SET balance_rub = balance_rub - $1 WHERE id = $2",
+				`UPDATE internal_balances SET master_balance = master_balance - $1, updated_at = NOW() WHERE user_id = $2`,
 				amount, userID,
 			)
 			if err != nil {
-				return fmt.Errorf("failed to deduct balance: %w", err)
+				return fmt.Errorf("failed to deduct vault: %w", err)
 			}
 
-			// Получаем новый баланс после списания
-			var newBalance decimal.Decimal
-			err = tx.QueryRow("SELECT balance_rub FROM users WHERE id = $1", userID).Scan(&newBalance)
+			// 4. Обновляем spent_from_vault на карте
+			_, err = tx.Exec(
+				`UPDATE cards SET spent_from_vault = COALESCE(spent_from_vault, 0) + $1 WHERE id = $2`,
+				amount, cardID,
+			)
 			if err != nil {
-				return fmt.Errorf("failed to get new balance: %w", err)
+				return fmt.Errorf("failed to update card spent: %w", err)
 			}
 
-			// Записываем транзакцию с provider_tx_id для idempotency
+			// 5. Получаем новый баланс Сейфа для уведомления
+			var newVaultBalance decimal.Decimal
+			err = tx.QueryRow("SELECT master_balance FROM internal_balances WHERE user_id = $1", userID).Scan(&newVaultBalance)
+			if err != nil {
+				return fmt.Errorf("failed to get new vault balance: %w", err)
+			}
+
+			// 6. Записываем транзакцию с provider_tx_id для idempotency
 			merchantName := payload.MerchantName
 			if merchantName == "" {
 				merchantName = "Unknown"
@@ -629,8 +672,8 @@ func (wr *WallesterRepository) ProcessWebhook(payload WallesterWebhookPayload) e
 				userID,
 				cardID,
 				amount,
-				decimal.Zero, // Комиссия для webhook транзакций
-				fmt.Sprintf("Wallester webhook: %s from card %s, merchant: %s", payload.EventType, payload.CardID, merchantName),
+				decimal.Zero,
+				fmt.Sprintf("Bridge: %s from vault via card %s, merchant: %s", payload.EventType, payload.CardID, merchantName),
 				payload.TransactionID,
 				time.Now(),
 			)
@@ -638,29 +681,28 @@ func (wr *WallesterRepository) ProcessWebhook(payload WallesterWebhookPayload) e
 				return fmt.Errorf("failed to record transaction: %w", err)
 			}
 
-			// Коммитим транзакцию
+			// 7. Коммитим транзакцию
 			if err := tx.Commit(); err != nil {
 				return fmt.Errorf("failed to commit transaction: %w", err)
 			}
 
-			log.Printf("✅ Webhook: Deducted %s from user %d (card %s, tx_id=%s)", 
-				amount.String(), userID, payload.CardID, payload.TransactionID)
+			log.Printf("✅ Bridge: Deducted %s from vault (user %d, card %s, tx_id=%s). Vault balance: %s",
+				amount.String(), userID, payload.CardID, payload.TransactionID, newVaultBalance.String())
 
-			// Отправляем уведомление об успешном списании (не блокируем обработку при ошибке)
+			// 8. Telegram-уведомление
 			if user.TelegramChatID.Valid {
 				currency := payload.Currency
 				if currency == "" {
 					currency = "RUB"
 				}
 				message := fmt.Sprintf(
-					"💸 Списание: %s %s | Карта: *%s | Магазин: %s\n\nВаш новый баланс: %s₽",
+					"💸 Списание: %s %s | Карта: *%s | Магазин: %s\n\n🏦 Остаток в Сейфе: %s₽",
 					amount.String(),
 					currency,
 					last4Digits,
 					merchantName,
-					newBalance.String(),
+					newVaultBalance.String(),
 				)
-				// Отправка уведомления (не блокируем обработку при ошибке)
 				func() {
 					defer func() {
 						if r := recover(); r != nil {
@@ -669,25 +711,33 @@ func (wr *WallesterRepository) ProcessWebhook(payload WallesterWebhookPayload) e
 					}()
 					notification.SendTelegramMessage(user.TelegramChatID.Int64, message)
 				}()
-			} else {
-				log.Printf("⚠️  User %d has no Telegram chat ID, skipping transaction notification", userID)
 			}
 		}
 
 	case "refund", "reversal":
-		// Возврат средств на баланс пользователя
+		// Возврат средств в Сейф пользователя (вместо balance_rub)
 		tx, err := GlobalDB.Begin()
 		if err != nil {
 			return fmt.Errorf("failed to begin transaction: %w", err)
 		}
 		defer tx.Rollback()
 
+		// Возвращаем в Сейф
 		_, err = tx.Exec(
-			"UPDATE users SET balance_rub = balance_rub + $1 WHERE id = $2",
+			`UPDATE internal_balances SET master_balance = master_balance + $1, updated_at = NOW() WHERE user_id = $2`,
 			amount, userID,
 		)
 		if err != nil {
-			return fmt.Errorf("failed to refund balance: %w", err)
+			return fmt.Errorf("failed to refund to vault: %w", err)
+		}
+
+		// Уменьшаем spent_from_vault на карте
+		_, err = tx.Exec(
+			`UPDATE cards SET spent_from_vault = GREATEST(COALESCE(spent_from_vault, 0) - $1, 0) WHERE id = $2`,
+			amount, cardID,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to update card spent_from_vault: %w", err)
 		}
 
 		// Записываем транзакцию возврата
@@ -698,7 +748,7 @@ func (wr *WallesterRepository) ProcessWebhook(payload WallesterWebhookPayload) e
 			cardID,
 			amount,
 			decimal.Zero,
-			fmt.Sprintf("Wallester webhook: %s for card %s", payload.EventType, payload.CardID),
+			fmt.Sprintf("Bridge refund: %s back to vault via card %s", payload.EventType, payload.CardID),
 			payload.TransactionID,
 			time.Now(),
 		)
@@ -710,7 +760,7 @@ func (wr *WallesterRepository) ProcessWebhook(payload WallesterWebhookPayload) e
 			return fmt.Errorf("failed to commit refund transaction: %w", err)
 		}
 
-		log.Printf("✅ Webhook: Refunded %s to user %d (card %s, tx_id=%s)", 
+		log.Printf("✅ Bridge: Refunded %s to vault (user %d, card %s, tx_id=%s)",
 			amount.String(), userID, payload.CardID, payload.TransactionID)
 
 	case "balance_update":

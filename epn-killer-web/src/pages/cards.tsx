@@ -578,61 +578,26 @@ const BankLogoButton = ({
   </button>
 );
 
-// Top-up Modal with bidirectional conversion
-const TopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () => void }) => {
-  const { t } = useTranslation();
-  const [rubAmount, setRubAmount] = useState('');
-  const [foreignAmount, setForeignAmount] = useState('');
-  const [selectedBank, setSelectedBank] = useState('sbp');
-  const { rates } = useRates();
-  
-  const currencySymbol = card.currency === '€' ? '€' : '$';
-  const currencyCode = card.currency === '€' ? 'EUR' : 'USD';
-  const exchangeRate = card.currency === '€' ? rates.eur : rates.usd;
-
-  const banks = [
-    { id: 'sbp', name: 'СБП' },
-    { id: 'sber', name: 'Сбер' },
-    { id: 'tbank', name: 'Т-Банк' },
-    { id: 'alfa', name: 'Альфа' },
-    { id: 'vtb', name: 'ВТБ' },
-  ];
-
-  const handleRubChange = (value: string) => {
-    setRubAmount(value);
-    if (value && !isNaN(parseFloat(value))) {
-      setForeignAmount((parseFloat(value) / exchangeRate).toFixed(2));
-    } else {
-      setForeignAmount('');
-    }
-  };
-
-  const handleForeignChange = (value: string) => {
-    setForeignAmount(value);
-    if (value && !isNaN(parseFloat(value))) {
-      setRubAmount((parseFloat(value) * exchangeRate).toFixed(0));
-    } else {
-      setRubAmount('');
-    }
-  };
+// Spending Limit Modal — set how much this card can draw from the Vault
+const SpendingLimitModal = ({ card, onClose }: { card: PersonalCard; onClose: () => void }) => {
+  const [limitValue, setLimitValue] = useState('5000');
+  const presets = [1000, 3000, 5000, 10000, 25000, 50000];
 
   return (
     <ModalPortal>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Dense dark overlay — 80% black + heavy blur */}
       <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
 
-      {/* Modal panel — deep opaque glass */}
-      <div className="relative bg-[#0d0d0f]/95 backdrop-blur-3xl border border-white/10 rounded-2xl w-full max-w-[440px] max-h-[90dvh] flex flex-col animate-scale-in shadow-2xl shadow-black/60">
-        {/* Fixed header */}
+      <div className="relative bg-[#0d0d0f]/95 backdrop-blur-3xl border border-white/10 rounded-2xl w-full max-w-[440px] flex flex-col animate-scale-in shadow-2xl shadow-black/60">
+        {/* Header */}
         <div className="shrink-0 p-5 pb-4 border-b border-white/[0.06]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-blue-500/20 border border-emerald-500/30 flex items-center justify-center">
-                <Banknote className="w-5 h-5 text-emerald-400" />
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center">
+                <ArrowUpDown className="w-5 h-5 text-amber-400" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-white">{t('cards.topUpModal.title')}</h3>
+                <h3 className="text-lg font-semibold text-white">Лимит списания</h3>
                 <p className="text-xs text-slate-400">{card.name}</p>
               </div>
             </div>
@@ -642,73 +607,70 @@ const TopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () => void
           </div>
         </div>
 
-        {/* Scrollable body */}
-        <div className="flex-1 overflow-y-auto min-h-0 p-5 space-y-4">
+        {/* Body */}
+        <div className="p-5 space-y-5">
+          <div className="p-4 rounded-xl bg-amber-500/[0.06] border border-amber-500/20">
+            <p className="text-sm text-amber-200/80">
+              Лимит определяет максимум, который эта карта может списать из Сейфа. Реальный баланс карты = 0 — средства переводятся автоматически при оплате.
+            </p>
+          </div>
+
           <div>
-            <label className="block text-sm text-slate-400 mb-2">Способ оплаты</label>
-            <div className="grid grid-cols-5 gap-2">
-              {banks.map((bank) => (
-                <BankLogoButton key={bank.id} bank={bank} selected={selectedBank === bank.id} onClick={() => setSelectedBank(bank.id)} />
-              ))}
+            <label className="block text-sm text-slate-400 mb-2">Максимум списания из Сейфа</label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-amber-400 text-lg font-bold">₽</span>
+              <input
+                type="number"
+                placeholder="5 000"
+                value={limitValue}
+                onChange={(e) => setLimitValue(e.target.value)}
+                className="w-full h-12 pl-12 pr-4 bg-white/[0.04] border border-white/10 rounded-xl text-white text-lg font-semibold focus:outline-none focus:border-amber-500/50 transition-all placeholder:text-slate-600"
+              />
             </div>
           </div>
 
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm text-slate-400 mb-1.5">{t('cards.topUpModal.amountRub')}</label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 text-lg font-bold">₽</span>
-                <input
-                  type="number"
-                  placeholder="10 000"
-                  value={rubAmount}
-                  onChange={(e) => handleRubChange(e.target.value)}
-                  className="w-full h-12 pl-12 pr-4 bg-white/[0.04] border border-white/10 rounded-xl text-white text-lg font-semibold focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-600"
-                />
-              </div>
-            </div>
-            
-            <div className="flex items-center justify-center py-1">
-              <div className="flex items-center gap-3">
-                <div className="h-px w-10 bg-white/10" />
-                <div className="w-8 h-8 rounded-full bg-white/[0.04] border border-white/10 flex items-center justify-center">
-                  <span className="text-xs font-bold text-slate-300">₽→{currencySymbol}</span>
-                </div>
-                <div className="h-px w-10 bg-white/10" />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm text-slate-400 mb-1.5">{t('cards.topUpModal.amountForeign')}</label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400 text-lg font-bold">{currencySymbol}</span>
-                <input
-                  type="number"
-                  placeholder="0.00"
-                  value={foreignAmount}
-                  onChange={(e) => handleForeignChange(e.target.value)}
-                  className="w-full h-12 pl-12 pr-4 bg-emerald-500/[0.04] border border-emerald-500/20 rounded-xl text-emerald-400 text-lg font-semibold focus:outline-none focus:border-emerald-500/50 transition-all placeholder:text-emerald-900"
-                />
-              </div>
-            </div>
+          <div className="flex flex-wrap gap-2">
+            {presets.map(p => (
+              <button 
+                key={p} 
+                onClick={() => setLimitValue(String(p))}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  limitValue === String(p) 
+                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' 
+                    : 'bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10'
+                }`}
+              >
+                {p.toLocaleString()} ₽
+              </button>
+            ))}
           </div>
 
-          <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10">
+          <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10 space-y-2">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-400">Курс:</span>
-              <span className="text-white font-bold">1 {currencyCode} = {exchangeRate.toFixed(2)} ₽</span>
+              <span className="text-slate-400">Потрачено из лимита</span>
+              <span className="text-white font-medium">0 ₽</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-slate-400">Доступно к списанию</span>
+              <span className="text-amber-400 font-bold">{Number(limitValue || 0).toLocaleString()} ₽</span>
+            </div>
+            <div className="h-1.5 bg-white/10 rounded-full overflow-hidden mt-1">
+              <div className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full" style={{ width: '0%' }} />
             </div>
           </div>
         </div>
         
-        {/* Fixed footer */}
+        {/* Footer */}
         <div className="shrink-0 p-5 pt-4 border-t border-white/[0.06] flex gap-3">
           <button onClick={onClose} className="flex-1 px-4 py-3 bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-slate-300 font-medium rounded-xl transition-colors">
-            {t('cards.topUpModal.cancel')}
+            Отмена
           </button>
-          <button className="flex-1 px-4 py-3 bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-400 hover:to-blue-400 text-white font-semibold rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2">
-            <Banknote className="w-4 h-4" />
-            {t('cards.topUpModal.topUp')}
+          <button 
+            onClick={onClose}
+            className="flex-1 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-semibold rounded-xl transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2"
+          >
+            <Check className="w-4 h-4" />
+            Сохранить
           </button>
         </div>
       </div>
@@ -792,10 +754,10 @@ const RealisticCreditCard = ({
       <div className="mt-3 flex gap-2">
         <button 
           onClick={onTopUp}
-          className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-xl transition-colors text-sm border border-emerald-500/30"
+          className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-xl transition-colors text-sm border border-amber-500/30"
         >
-          <Banknote className="w-4 h-4" />
-          {t('cards.topUp')}
+          <ArrowUpDown className="w-4 h-4" />
+          Лимит списания
         </button>
         <button 
           onClick={onClose}
@@ -1033,7 +995,7 @@ export const CardsPage = () => {
         </div>
 
         {closeCardModal && <CloseCardModal card={closeCardModal} onClose={() => setCloseCardModal(null)} onConfirm={() => setCloseCardModal(null)} />}
-        {topUpModal && <TopUpModal card={topUpModal} onClose={() => setTopUpModal(null)} />}
+        {topUpModal && <SpendingLimitModal card={topUpModal} onClose={() => setTopUpModal(null)} />}
         {paymentModal && <PaymentMethodModal type={paymentModal.type} onClose={() => setPaymentModal(null)} />}
         {issueModal && <CardIssueModal card={issueModal} onClose={() => setIssueModal(null)} />}
       </div>

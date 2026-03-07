@@ -11,14 +11,14 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/rs/cors"
 	_ "github.com/lib/pq"
+	"github.com/rs/cors"
 
 	// ВАЖНО: Убедитесь, что пути верны
+	"github.com/djalben/xplr-core/backend/core"
 	"github.com/djalben/xplr-core/backend/handlers"
 	"github.com/djalben/xplr-core/backend/middleware"
 	"github.com/djalben/xplr-core/backend/repository"
-	"github.com/djalben/xplr-core/backend/core"
 	"github.com/djalben/xplr-core/backend/telegram"
 )
 
@@ -93,6 +93,9 @@ func main() {
 	// 1.5. Запуск фонового процесса автопополнения карт
 	go core.StartAutoReplenishmentWorker()
 
+	// 1.7. Запуск cron-задачи: возврат остатков истёкших карт в Сейф
+	go core.StartExpiryReclaimWorker()
+
 	// 1.6. Запуск периодической синхронизации балансов карт из Wallester
 	go func() {
 		ticker := time.NewTicker(5 * time.Minute) // Синхронизация каждые 5 минут
@@ -137,9 +140,12 @@ func main() {
 	protectedRouter.HandleFunc("/cards/{id}/auto-replenishment", handlers.UnsetCardAutoReplenishmentHandler).Methods("DELETE")
 	protectedRouter.HandleFunc("/cards/{id}/details", handlers.GetCardDetailsHandler).Methods("GET")
 	protectedRouter.HandleFunc("/cards/{id}/sync-balance", handlers.SyncCardBalanceHandler).Methods("POST")
+	protectedRouter.HandleFunc("/cards/{id}/spending-limit", handlers.SetSpendingLimitHandler).Methods("PATCH")
+	protectedRouter.HandleFunc("/vault", handlers.GetVaultHandler).Methods("GET")
+	protectedRouter.HandleFunc("/vault/topup", handlers.TopUpVaultHandler).Methods("POST")
 	protectedRouter.HandleFunc("/report", handlers.GetUserTransactionReportHandler).Methods("GET")
 	protectedRouter.HandleFunc("/api-key", handlers.CreateAPIKeyHandler).Methods("POST")
-	
+
 	// Команды (Teams)
 	protectedRouter.HandleFunc("/teams", handlers.GetUserTeamsHandler).Methods("GET")
 	protectedRouter.HandleFunc("/teams", handlers.CreateTeamHandler).Methods("POST")
@@ -147,7 +153,7 @@ func main() {
 	protectedRouter.HandleFunc("/teams/{id}/members", handlers.InviteTeamMemberHandler).Methods("POST")
 	protectedRouter.HandleFunc("/teams/{id}/members/{userId}", handlers.RemoveTeamMemberHandler).Methods("DELETE")
 	protectedRouter.HandleFunc("/teams/{id}/members/{userId}/role", handlers.UpdateTeamMemberRoleHandler).Methods("PATCH")
-	
+
 	// Реферальная программа
 	protectedRouter.HandleFunc("/referrals", handlers.GetReferralStatsHandler).Methods("GET")
 

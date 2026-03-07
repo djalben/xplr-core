@@ -12,10 +12,13 @@ import {
   Wallet,
   Sparkles,
   Target,
-  Zap
+  Zap,
+  Shield,
+  Lock
 } from 'lucide-react';
 import apiClient, { API_BASE_URL } from '../api/axios';
 import { getUserGrade, type GradeInfo } from '../api/grade';
+import { getVault, type InternalBalance } from '../api/vault';
 import { WorldClocks } from '../components/world-clocks';
 
 interface StatCardProps {
@@ -179,6 +182,7 @@ export const DashboardPage = () => {
   const [cardCount, setCardCount] = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [vault, setVault] = useState<InternalBalance | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -193,6 +197,7 @@ export const DashboardPage = () => {
 
       // Non-critical fetches
       try { const g = await getUserGrade(); setGradeInfo(g); } catch {}
+      try { const v = await getVault(); setVault(v); } catch {}
       try { const c = await apiClient.get(`${API_BASE_URL}/user/cards`); setCardCount(Array.isArray(c.data) ? c.data.length : 0); } catch {}
       try {
         const t = await apiClient.get(`${API_BASE_URL}/user/report`);
@@ -249,6 +254,41 @@ export const DashboardPage = () => {
             {/* World Clocks — inline with greeting */}
             <div className="shrink-0">
               <WorldClocks />
+            </div>
+          </div>
+        </div>
+
+        {/* Главный Сейф */}
+        <div className="glass-card p-6 mb-6 relative overflow-hidden border border-amber-500/20">
+          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-amber-500/[0.05] via-transparent to-blue-500/[0.05]" />
+          <div className="relative z-10">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
+                  <Shield className="w-7 h-7 text-white" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-lg font-semibold text-white">Главный сейф</h3>
+                    <Lock className="w-4 h-4 text-amber-400/60" />
+                  </div>
+                  <p className="text-sm text-slate-400">Единый баланс для всех карт</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-3xl md:text-4xl font-bold text-white">
+                  {vault ? `${Number(vault.master_balance).toLocaleString('ru-RU', { minimumFractionDigits: 2 })} ₽` : '—'}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">Карты списывают из Сейфа автоматически</p>
+              </div>
+            </div>
+            <div className="mt-4 flex items-center gap-3">
+              <button onClick={() => navigate('/finance')} className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-medium rounded-xl text-sm hover:shadow-lg hover:shadow-amber-500/25 transition-all">
+                Пополнить Сейф
+              </button>
+              <button onClick={() => navigate('/cards')} className="px-5 py-2.5 bg-white/5 border border-white/10 text-white font-medium rounded-xl text-sm hover:bg-white/10 transition-all">
+                Управление картами
+              </button>
             </div>
           </div>
         </div>

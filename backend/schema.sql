@@ -133,6 +133,16 @@ CREATE INDEX idx_referrals_referrer_id ON referrals(referrer_id);
 CREATE INDEX idx_referrals_referred_id ON referrals(referred_id);
 CREATE INDEX idx_referrals_code ON referrals(referral_code);
 
+-- 9. Таблица внутренних балансов (Сейф) — один master_balance на пользователя
+CREATE TABLE IF NOT EXISTS internal_balances (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+    master_balance NUMERIC(20, 4) DEFAULT 0.0000 NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_internal_balances_user_id ON internal_balances(user_id);
+
 -- Миграции XPLR: новые поля users и cards (идемпотентно)
 DO $$
 BEGIN
@@ -152,5 +162,17 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'transactions' AND column_name = 'provider_tx_id') THEN
         ALTER TABLE transactions ADD COLUMN provider_tx_id VARCHAR(255);
         CREATE INDEX IF NOT EXISTS idx_transactions_provider_tx_id ON transactions(provider_tx_id) WHERE provider_tx_id IS NOT NULL;
+    END IF;
+    -- Лимит списания карты из Сейфа (максимум, который карта может потратить)
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cards' AND column_name = 'spending_limit') THEN
+        ALTER TABLE cards ADD COLUMN spending_limit NUMERIC(20, 4) DEFAULT 0.0000;
+    END IF;
+    -- Дата истечения срока карты (для cron-возврата остатка в Сейф)
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cards' AND column_name = 'expiry_date') THEN
+        ALTER TABLE cards ADD COLUMN expiry_date TIMESTAMP WITH TIME ZONE;
+    END IF;
+    -- Сколько карта реально потратила из Сейфа (для отслеживания остатка)
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cards' AND column_name = 'spent_from_vault') THEN
+        ALTER TABLE cards ADD COLUMN spent_from_vault NUMERIC(20, 4) DEFAULT 0.0000;
     END IF;
 END $$;

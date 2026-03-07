@@ -126,7 +126,30 @@ type Card struct {
 	AutoReplenishThreshold decimal.Decimal `json:"auto_replenish_threshold"`
 	AutoReplenishAmount    decimal.Decimal `json:"auto_replenish_amount"`
 	CardBalance            decimal.Decimal `json:"card_balance"` // Виртуальный баланс: при списке карт = BalanceRub пользователя
+	SpendingLimit          decimal.Decimal `json:"spending_limit"`    // Макс. сумма, которую карта может потратить из Сейфа
+	SpentFromVault         decimal.Decimal `json:"spent_from_vault"`  // Сколько карта реально потратила из Сейфа
+	ExpiryDate             *time.Time      `json:"expiry_date,omitempty"` // Дата истечения срока карты
 	CreatedAt              time.Time       `json:"created_at"`
+}
+
+// --- СТРУКТУРЫ ВНУТРЕННЕГО БАЛАНСА (СЕЙФ) ---
+
+// InternalBalance - Внутренний баланс пользователя (Сейф)
+type InternalBalance struct {
+	ID            int             `json:"id"`
+	UserID        int             `json:"user_id"`
+	MasterBalance decimal.Decimal `json:"master_balance"`
+	UpdatedAt     time.Time       `json:"updated_at"`
+}
+
+// SpendingLimitRequest - Запрос на установку лимита списания карты
+type SpendingLimitRequest struct {
+	SpendingLimit decimal.Decimal `json:"spending_limit"`
+}
+
+// TopUpVaultRequest - Запрос на пополнение Сейфа
+type TopUpVaultRequest struct {
+	Amount decimal.Decimal `json:"amount"`
 }
 
 // MassIssueRequest - Запрос на массовый выпуск карт
