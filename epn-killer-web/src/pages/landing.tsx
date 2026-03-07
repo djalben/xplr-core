@@ -20,7 +20,6 @@ import {
   Play
 } from 'lucide-react';
 
-import { NeuralBackground } from '../components/neural-background';
 import { MastercardLogo } from './cards';
 
 // Floating 3D Card Component — matches dashboard card branding
@@ -180,7 +179,7 @@ const FeatureCard = ({ icon: Icon, title, description }: { icon: React.ElementTy
   </div>
 );
 
-// Landing tariff card — all tariff info INSIDE the realistic card gradient visual
+// Landing tariff card — strict equal height, realistic card visual, currency toggle + button
 const LandingTariffCard = ({ type, name, defaultCurrency, price, features, popular = false }: { 
   type: 'subscriptions' | 'travel' | 'premium';
   name: string;
@@ -199,20 +198,20 @@ const LandingTariffCard = ({ type, name, defaultCurrency, price, features, popul
   };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* ── Popular badge ── */}
-      {popular && (
-        <div className="flex justify-center mb-3">
+    <div className="flex flex-col" style={{ minHeight: 0 }}>
+      {/* Badge row — ALL cards reserve this height for alignment */}
+      <div className="h-8 flex items-center justify-center mb-2">
+        {popular && (
           <span className="px-4 py-1 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full text-xs font-semibold text-white shadow-lg shadow-blue-500/30">
             Выбор 72% клиентов
           </span>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* ── Card Visual — all info INSIDE the gradient ── */}
-      <div className={`relative rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br ${gradients[type]} flex flex-col flex-1`}>
+      {/* Card Visual — fixed aspect ratio for equal heights */}
+      <div className={`relative rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br ${gradients[type]} flex-1 flex flex-col`}>
 
-        {/* Watermark layer */}
+        {/* Watermark layers */}
         {type === 'subscriptions' && (
           <div className="absolute inset-0 opacity-[0.10] pointer-events-none">
             <svg viewBox="0 0 280 340" className="w-full h-full" preserveAspectRatio="xMidYMid slice">
@@ -223,9 +222,6 @@ const LandingTariffCard = ({ type, name, defaultCurrency, price, features, popul
               <path d="M70,280 v-22 l16,-5 v22" fill="none" stroke="white" strokeWidth="0.7" />
               <circle cx="70" cy="280" r="4" fill="none" stroke="white" strokeWidth="0.7" />
               <circle cx="86" cy="275" r="4" fill="none" stroke="white" strokeWidth="0.7" />
-              <path d="M200,300 a8,8 0 0,1 16,0" fill="none" stroke="white" strokeWidth="0.6" />
-              <path d="M196,295 a14,14 0 0,1 24,0" fill="none" stroke="white" strokeWidth="0.6" />
-              <circle cx="208" cy="303" r="1.5" fill="white" />
             </svg>
           </div>
         )}
@@ -234,14 +230,8 @@ const LandingTariffCard = ({ type, name, defaultCurrency, price, features, popul
             <svg viewBox="0 0 280 340" className="w-full h-full" preserveAspectRatio="xMidYMid slice">
               <rect x="30" y="55" width="28" height="22" rx="3" fill="none" stroke="white" strokeWidth="0.8" />
               <rect x="38" y="48" width="12" height="8" rx="2" fill="none" stroke="white" strokeWidth="0.7" />
-              <line x1="220" y1="310" x2="220" y2="265" stroke="white" strokeWidth="0.8" />
-              <path d="M220,265 q-18,-5 -22,-20" fill="none" stroke="white" strokeWidth="0.7" />
-              <path d="M220,265 q18,-5 22,-20" fill="none" stroke="white" strokeWidth="0.7" />
               <circle cx="130" cy="35" r="12" fill="none" stroke="white" strokeWidth="0.8" />
               <path d="M60,300 l30,-15 l-5,5 l15,0 l-30,15 l5,-5 l-15,0z" fill="none" stroke="white" strokeWidth="0.7" />
-              <circle cx="250" cy="45" r="10" fill="none" stroke="white" strokeWidth="0.6" />
-              <line x1="250" y1="37" x2="250" y2="53" stroke="white" strokeWidth="0.5" />
-              <line x1="242" y1="45" x2="258" y2="45" stroke="white" strokeWidth="0.5" />
             </svg>
           </div>
         )}
@@ -260,14 +250,13 @@ const LandingTariffCard = ({ type, name, defaultCurrency, price, features, popul
               </svg>
             </div>
             <div className="absolute top-0 bottom-0 right-10 w-[3px] bg-gradient-to-b from-transparent via-red-600 to-transparent pointer-events-none" />
-            <div className="absolute top-0 bottom-0 right-[38px] w-[7px] bg-gradient-to-b from-transparent via-red-500/40 to-transparent blur-sm pointer-events-none" />
           </>
         )}
 
-        {/* Card content — branding + tariff info + card number */}
-        <div className="relative p-5 flex flex-col min-h-[320px]">
-          {/* Top: XPLR branding + currency */}
-          <div className="flex items-start justify-between mb-4">
+        {/* Card content */}
+        <div className="relative p-5 flex flex-col flex-1">
+          {/* Top: branding + currency */}
+          <div className="flex items-start justify-between mb-3">
             <div>
               <p className={`${type === 'premium' ? 'text-white font-bold text-lg tracking-[0.25em]' : 'text-white/90 text-sm font-bold tracking-[0.2em]'} leading-none`}>
                 {type === 'premium' ? 'XPLR PRIME' : 'XPLR'}
@@ -277,9 +266,9 @@ const LandingTariffCard = ({ type, name, defaultCurrency, price, features, popul
             <span className="text-white text-sm font-bold">{currencySymbol}</span>
           </div>
 
-          {/* Platinum chip for premium */}
+          {/* Chip for premium */}
           {type === 'premium' && (
-            <div className="w-10 h-7 rounded-md bg-gradient-to-br from-slate-300 via-slate-200 to-slate-400 mb-3 shadow-lg shadow-white/10">
+            <div className="w-10 h-7 rounded-md bg-gradient-to-br from-slate-300 via-slate-200 to-slate-400 mb-2 shadow-lg shadow-white/10">
               <div className="w-full h-full flex">
                 <div className="w-1/3 border-r border-slate-400/50" />
                 <div className="w-1/3 border-r border-slate-400/50 flex flex-col"><div className="h-1/2 border-b border-slate-400/50" /><div className="h-1/2" /></div>
@@ -287,15 +276,17 @@ const LandingTariffCard = ({ type, name, defaultCurrency, price, features, popul
               </div>
             </div>
           )}
+          {/* Chip placeholder for non-premium to keep alignment */}
+          {type !== 'premium' && <div className="h-9" />}
 
-          {/* Tariff name + price */}
-          <h3 className="text-white font-bold text-xl mb-0.5">{name}</h3>
-          <p className="text-white text-3xl font-bold mb-4">{price}<span className="text-lg text-white/50"> ₽</span></p>
+          {/* Name + price */}
+          <h3 className="text-white font-bold text-lg mb-0.5">{name}</h3>
+          <p className="text-white text-2xl font-bold mb-3">{price}<span className="text-base text-white/50"> ₽</span></p>
 
-          {/* Features INSIDE the card */}
-          <ul className="space-y-2 mb-auto flex-1">
+          {/* Features */}
+          <ul className="space-y-1.5 flex-1">
             {features.map((feature, i) => (
-              <li key={i} className="flex items-center gap-2 text-sm text-white/80">
+              <li key={i} className="flex items-center gap-2 text-[13px] text-white/80">
                 <div className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
                   <Check className="w-2.5 h-2.5 text-white" />
                 </div>
@@ -305,17 +296,16 @@ const LandingTariffCard = ({ type, name, defaultCurrency, price, features, popul
           </ul>
 
           {/* Bottom: card number + MC logo */}
-          <div className="mt-4 pt-3 border-t border-white/[0.10]">
-            <p className="text-white/30 text-[7px] font-light tracking-[0.15em] uppercase leading-none mb-1">БЕЗ ГРАНИЦ</p>
+          <div className="mt-3 pt-3 border-t border-white/[0.10]">
             <div className="flex items-end justify-between">
-              <p className="text-white/70 font-mono text-sm tracking-widest">**** **** **** 1234</p>
-              <MastercardLogo className="h-7 w-auto" />
+              <p className="text-white/60 font-mono text-xs tracking-widest">**** **** **** 1234</p>
+              <MastercardLogo className="h-6 w-auto" />
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── USD / EUR Toggle — under the card ── */}
+      {/* USD / EUR Toggle */}
       <div className="flex gap-2 mt-3">
         <button
           onClick={() => setSelectedCurrency('USD')}
@@ -335,7 +325,7 @@ const LandingTariffCard = ({ type, name, defaultCurrency, price, features, popul
         >€ EUR</button>
       </div>
 
-      {/* ── Button — strictly under the card ── */}
+      {/* Identical gradient button */}
       <Link to="/auth" className="mt-3">
         <button className="w-full py-3.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30">
           Выпустить карту
@@ -454,9 +444,7 @@ export const LandingPage = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#0a0a0f] via-[#0f0f18] to-[#12121a] relative overflow-x-hidden">
-      <NeuralBackground />
-      
+    <div className="min-h-screen bg-transparent relative overflow-x-hidden">
       {/* Content wrapper */}
       <div className="relative z-10">
         
@@ -541,7 +529,7 @@ export const LandingPage = () => {
         </section>
 
         {/* Services Marquee */}
-        <section className="py-12 bg-white/[0.02] border-y border-white/[0.05] overflow-hidden">
+        <section className="py-12 bg-black/20 border-y border-white/[0.05] overflow-hidden">
           <div className="max-w-7xl mx-auto px-6 text-center mb-8">
             <p className="text-slate-400 font-medium">Оплачивайте более <span className="text-blue-400 font-bold">560+ сервисов</span> по всему миру</p>
           </div>
@@ -583,7 +571,7 @@ export const LandingPage = () => {
         </section>
 
         {/* Personal Section */}
-        <section id="personal" className="py-24 px-6 bg-white/[0.02]">
+        <section id="personal" className="py-24 px-6 bg-black/20">
           <div className="max-w-7xl mx-auto">
             <div className="text-center mb-16">
               <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-full text-emerald-400 text-sm font-medium mb-6">
@@ -636,7 +624,7 @@ export const LandingPage = () => {
         </section>
 
         {/* How It Works */}
-        <section id="how-it-works" className="py-24 px-6 bg-white/[0.02]">
+        <section id="how-it-works" className="py-24 px-6 bg-black/20">
           <div className="max-w-7xl mx-auto">
             <div className="text-center mb-16">
               <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">

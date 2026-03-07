@@ -1,6 +1,5 @@
 import { ReactNode } from 'react';
 import { Sidebar } from './sidebar';
-import { NeuralBackground } from './neural-background';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -8,8 +7,7 @@ interface DashboardLayoutProps {
 
 export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   return (
-    <div className="min-h-[100dvh] bg-gradient-to-br from-[#0a0a0f] via-[#0f0f18] to-[#12121a] relative overflow-hidden">
-      <NeuralBackground />
+    <div className="min-h-[100dvh] bg-transparent relative overflow-hidden">
       <Sidebar />
       {/* Desktop: sidebar offset. Mobile: header + bottom nav offset */}
       <main className="lg:ml-64 min-h-[100dvh] relative z-10">

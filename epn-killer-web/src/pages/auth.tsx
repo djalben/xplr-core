@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { NeuralBackground } from '../components/neural-background';
 import { Wifi, Eye, EyeOff, Lock, Mail, ChevronRight, ArrowLeft, Check, X } from 'lucide-react';
 import { login, register } from '../api/auth';
 
@@ -113,13 +112,11 @@ export const AuthPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#050507] flex items-center justify-center p-4 overflow-hidden relative">
-      {/* Deep dark gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#05050a] via-[#080812] to-[#04040a]" />
+    <div className="min-h-screen bg-transparent flex items-center justify-center p-4 overflow-hidden relative">
+      {/* Subtle dark tint so content reads well over neural bg */}
+      <div className="absolute inset-0 bg-[#05050a]/70" />
       {/* Subtle radial accent */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(30,58,138,0.15)_0%,transparent_60%)]" />
-
-      <NeuralBackground />
 
       <div className="relative z-10 w-full max-w-md animate-fade-in-up">
         {/* Back to landing */}

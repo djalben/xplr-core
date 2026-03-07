@@ -14,6 +14,7 @@ import { SupportPage } from './pages/support';
 import { LandingPage } from './pages/landing';
 import { AdminRatesPage } from './pages/admin-rates';
 import { PWAInstallPrompt } from './components/pwa-install-prompt';
+import { NeuralBackground } from './components/neural-background';
 
 interface GuardProps {
   children: React.ReactNode;
@@ -37,6 +38,7 @@ function App() {
     <AuthProvider>
     <ModeProvider>
     <RatesProvider>
+      <NeuralBackground />
       <PWAInstallPrompt />
       <Routes>
         <Route path="/" element={<RootRedirect />} />
