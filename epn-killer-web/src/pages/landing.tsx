@@ -179,44 +179,209 @@ const FeatureCard = ({ icon: Icon, title, description }: { icon: React.ElementTy
   </div>
 );
 
-// Card type card
-const CardTypeCard = ({ type, currency, price, features, popular = false }: { 
-  type: string; 
-  currency: string; 
+// Landing tariff card — realistic bank card visual + info + currency toggle
+const LandingTariffCard = ({ type, name, defaultCurrency, price, features, popular = false }: { 
+  type: 'subscriptions' | 'travel' | 'premium';
+  name: string;
+  defaultCurrency: string; 
   price: string; 
   features: string[];
   popular?: boolean;
-}) => (
-  <div className={`glass-card p-6 relative ${popular ? 'border-blue-500/50 shadow-lg shadow-blue-500/20' : ''}`}>
-    {popular && (
-      <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full text-xs font-semibold text-white shadow-lg">
-        Выбор 72% клиентов
+}) => {
+  const [selectedCurrency, setSelectedCurrency] = useState<'USD' | 'EUR'>(defaultCurrency === 'EUR' ? 'EUR' : 'USD');
+  const currencySymbol = selectedCurrency === 'USD' ? '$' : '€';
+
+  return (
+    <div className={`relative rounded-2xl border ${popular ? 'border-blue-500/30 shadow-lg shadow-blue-500/10' : 'border-white/[0.08]'} bg-[#0d0d14]/80 backdrop-blur-xl overflow-hidden flex flex-col`}>
+      {popular && (
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 px-4 py-1 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full text-xs font-semibold text-white shadow-lg shadow-blue-500/30 whitespace-nowrap">
+          Выбор 72% клиентов
+        </div>
+      )}
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/40 to-transparent" />
+
+      {/* ── Realistic Card Visual ── */}
+      <div className="p-4 pb-0">
+
+        {/* Subscriptions — purple card */}
+        {type === 'subscriptions' && (
+          <div className="relative w-full aspect-[1.586/1] rounded-2xl overflow-hidden shadow-2xl">
+            <div className="absolute inset-0 bg-gradient-to-br from-violet-500 via-purple-600 to-indigo-700" />
+            <div className="absolute inset-0 opacity-[0.10] pointer-events-none">
+              <svg viewBox="0 0 280 170" className="w-full h-full" preserveAspectRatio="xMidYMid slice">
+                <circle cx="60" cy="110" r="6" fill="none" stroke="white" strokeWidth="0.8"/>
+                <line x1="66" y1="110" x2="66" y2="65" stroke="white" strokeWidth="0.8"/>
+                <line x1="66" y1="65" x2="86" y2="60" stroke="white" strokeWidth="0.8"/>
+                <line x1="86" y1="60" x2="86" y2="100" stroke="white" strokeWidth="0.8"/>
+                <circle cx="80" cy="100" r="6" fill="none" stroke="white" strokeWidth="0.8"/>
+                <circle cx="200" cy="85" r="18" fill="none" stroke="white" strokeWidth="0.8"/>
+                <polygon points="195,75 195,95 210,85" fill="none" stroke="white" strokeWidth="0.8"/>
+                <rect x="120" y="30" width="40" height="28" rx="2" fill="none" stroke="white" strokeWidth="0.7"/>
+                <line x1="140" y1="58" x2="140" y2="65" stroke="white" strokeWidth="0.6"/>
+                <line x1="130" y1="65" x2="150" y2="65" stroke="white" strokeWidth="0.6"/>
+              </svg>
+            </div>
+            <div className="relative h-full p-4 flex flex-col justify-between">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-white/90 text-sm font-bold tracking-[0.2em] leading-none">XPLR</p>
+                  <p className="text-white/60 text-[7px] font-light tracking-[0.25em] uppercase leading-none mt-0.5">Explorer</p>
+                </div>
+                <span className="text-white text-sm font-bold">{currencySymbol}</span>
+              </div>
+              <div className="mt-auto">
+                <p className="text-white/40 text-[7px] font-light tracking-[0.15em] uppercase leading-none mb-1.5">БЕЗ ГРАНИЦ</p>
+                <p className="text-white font-mono text-sm tracking-widest">**** **** **** 1234</p>
+              </div>
+              <div className="absolute bottom-4 right-4 flex -space-x-1.5">
+                <div className="w-5 h-5 rounded-full bg-[#EB001B]/80" />
+                <div className="w-5 h-5 rounded-full bg-[#F79E1B]/80" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Travel — blue card */}
+        {type === 'travel' && (
+          <div className="relative w-full aspect-[1.586/1] rounded-2xl overflow-hidden shadow-2xl">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-400 via-blue-500 to-blue-700" />
+            <div className="absolute inset-0 opacity-[0.10] pointer-events-none">
+              <svg viewBox="0 0 280 170" className="w-full h-full" preserveAspectRatio="xMidYMid slice">
+                <rect x="30" y="55" width="28" height="22" rx="3" fill="none" stroke="white" strokeWidth="0.8"/>
+                <rect x="38" y="48" width="12" height="8" rx="2" fill="none" stroke="white" strokeWidth="0.7"/>
+                <line x1="220" y1="130" x2="220" y2="85" stroke="white" strokeWidth="0.8"/>
+                <path d="M220,85 q-18,-5 -22,-20" fill="none" stroke="white" strokeWidth="0.7"/>
+                <path d="M220,85 q18,-5 22,-20" fill="none" stroke="white" strokeWidth="0.7"/>
+                <path d="M220,88 q-20,2 -26,-12" fill="none" stroke="white" strokeWidth="0.6"/>
+                <path d="M220,88 q20,2 26,-12" fill="none" stroke="white" strokeWidth="0.6"/>
+                <circle cx="130" cy="35" r="12" fill="none" stroke="white" strokeWidth="0.8"/>
+                <path d="M60,120 l30,-15 l-5,5 l15,0 l-30,15 l5,-5 l-15,0z" fill="none" stroke="white" strokeWidth="0.7"/>
+                <circle cx="250" cy="45" r="10" fill="none" stroke="white" strokeWidth="0.6"/>
+                <line x1="250" y1="37" x2="250" y2="53" stroke="white" strokeWidth="0.5"/>
+                <line x1="242" y1="45" x2="258" y2="45" stroke="white" strokeWidth="0.5"/>
+              </svg>
+            </div>
+            <div className="relative h-full p-4 flex flex-col justify-between">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-white/90 text-sm font-bold tracking-[0.2em] leading-none">XPLR</p>
+                  <p className="text-white/60 text-[7px] font-light tracking-[0.25em] uppercase leading-none mt-0.5">Explorer</p>
+                </div>
+                <span className="text-white text-sm font-bold">{currencySymbol}</span>
+              </div>
+              <div className="mt-auto">
+                <p className="text-white/40 text-[7px] font-light tracking-[0.15em] uppercase leading-none mb-1.5">БЕЗ ГРАНИЦ</p>
+                <p className="text-white font-mono text-sm tracking-widest">**** **** **** 1234</p>
+              </div>
+              <div className="absolute bottom-4 right-4 flex -space-x-1.5">
+                <div className="w-5 h-5 rounded-full bg-[#EB001B]/80" />
+                <div className="w-5 h-5 rounded-full bg-[#F79E1B]/80" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Premium — matte black PRIME card */}
+        {type === 'premium' && (
+          <div className="relative w-full aspect-[1.586/1] rounded-2xl overflow-hidden shadow-2xl">
+            <div className="absolute inset-0 bg-gradient-to-br from-[#0a0a0a] via-[#111111] to-[#080808]">
+              <div className="absolute inset-0 opacity-[0.12]">
+                <svg viewBox="0 0 200 120" className="w-full h-full" preserveAspectRatio="xMidYMid slice">
+                  <defs>
+                    <pattern id="landing-neural" width="16" height="16" patternUnits="userSpaceOnUse">
+                      <path d="M 16 0 L 0 0 0 16" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="0.25"/>
+                      <circle cx="0" cy="0" r="0.6" fill="rgba(255,255,255,0.2)"/>
+                      <circle cx="16" cy="16" r="0.6" fill="rgba(255,255,255,0.2)"/>
+                    </pattern>
+                  </defs>
+                  <rect width="100%" height="100%" fill="url(#landing-neural)"/>
+                  <line x1="20" y1="20" x2="60" y2="40" stroke="rgba(255,255,255,0.06)" strokeWidth="0.3"/>
+                  <line x1="60" y1="40" x2="100" y2="25" stroke="rgba(255,255,255,0.06)" strokeWidth="0.3"/>
+                  <line x1="100" y1="25" x2="140" y2="50" stroke="rgba(255,255,255,0.06)" strokeWidth="0.3"/>
+                  <line x1="140" y1="50" x2="180" y2="35" stroke="rgba(255,255,255,0.06)" strokeWidth="0.3"/>
+                </svg>
+              </div>
+              <div className="absolute top-0 bottom-0 right-10 w-[3px] bg-gradient-to-b from-transparent via-red-600 to-transparent" />
+              <div className="absolute top-0 bottom-0 right-[38px] w-[7px] bg-gradient-to-b from-transparent via-red-500/40 to-transparent blur-sm" />
+            </div>
+            <div className="relative h-full p-4 flex flex-col justify-between">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-white font-bold text-lg tracking-[0.25em] leading-none">XPLR PRIME</p>
+                  <p className="text-white/40 text-[7px] font-light tracking-[0.25em] uppercase leading-none mt-0.5">Explorer</p>
+                </div>
+                <div className="w-8 h-8 rounded-full bg-white/[0.06] backdrop-blur-sm flex items-center justify-center border border-white/[0.08]">
+                  <span className="text-white text-sm font-bold">{currencySymbol}</span>
+                </div>
+              </div>
+              {/* Platinum chip */}
+              <div className="w-10 h-7 rounded-md bg-gradient-to-br from-slate-300 via-slate-200 to-slate-400 mt-1 shadow-lg shadow-white/10">
+                <div className="w-full h-full flex">
+                  <div className="w-1/3 border-r border-slate-400/50" />
+                  <div className="w-1/3 border-r border-slate-400/50 flex flex-col"><div className="h-1/2 border-b border-slate-400/50" /><div className="h-1/2" /></div>
+                  <div className="w-1/3" />
+                </div>
+              </div>
+              <div className="mt-auto">
+                <p className="text-white/25 text-[7px] font-light tracking-[0.15em] uppercase leading-none mb-1.5">БЕЗ ГРАНИЦ</p>
+                <p className="text-white/90 font-mono text-sm tracking-widest">**** **** **** 1234</p>
+              </div>
+              <div className="absolute bottom-4 right-4 flex -space-x-1.5">
+                <div className="w-5 h-5 rounded-full bg-[#EB001B]/80" />
+                <div className="w-5 h-5 rounded-full bg-[#F79E1B]/80" />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-    )}
-    <div className="text-sm text-slate-500 mb-1">{currency}</div>
-    <h3 className="text-xl font-bold text-white mb-2">{type}</h3>
-    <div className="text-3xl font-bold text-white mb-4">
-      {price}<span className="text-lg text-slate-500">₽</span>
+
+      {/* ── Info Section ── */}
+      <div className="p-5 pt-4 flex-1 flex flex-col">
+        <h3 className="text-xl font-bold text-white text-center mb-1">{name}</h3>
+        <div className="text-3xl font-bold text-white text-center mb-4">
+          {price}<span className="text-lg text-slate-500"> ₽</span>
+        </div>
+
+        {/* USD / EUR Toggle */}
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => setSelectedCurrency('USD')}
+            className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all text-center ${
+              selectedCurrency === 'USD'
+                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40'
+                : 'bg-white/[0.04] text-slate-400 border border-white/[0.08] hover:bg-white/[0.08]'
+            }`}
+          >$ USD</button>
+          <button
+            onClick={() => setSelectedCurrency('EUR')}
+            className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all text-center ${
+              selectedCurrency === 'EUR'
+                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40'
+                : 'bg-white/[0.04] text-slate-400 border border-white/[0.08] hover:bg-white/[0.08]'
+            }`}
+          >€ EUR</button>
+        </div>
+
+        {/* Feature list */}
+        <ul className="space-y-2.5 mb-6 flex-1">
+          {features.map((feature, i) => (
+            <li key={i} className="flex items-center gap-2.5 text-sm text-slate-300">
+              <Check className="w-4 h-4 text-blue-400 flex-shrink-0" />
+              {feature}
+            </li>
+          ))}
+        </ul>
+
+        {/* Button — strictly under card info */}
+        <Link to="/auth">
+          <button className="w-full py-3.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30">
+            Выпустить карту
+          </button>
+        </Link>
+      </div>
     </div>
-    <ul className="space-y-2 mb-6">
-      {features.map((feature, i) => (
-        <li key={i} className="flex items-center gap-2 text-sm text-slate-300">
-          <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-          {feature}
-        </li>
-      ))}
-    </ul>
-    <Link to="/auth">
-      <button className={`w-full py-3 rounded-xl font-medium transition-all ${
-        popular 
-          ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:shadow-lg hover:shadow-blue-500/25' 
-          : 'bg-white/10 text-white hover:bg-white/15 border border-white/10'
-      }`}>
-        Выпустить карту
-      </button>
-    </Link>
-  </div>
-);
+  );
+};
 
 // Step card
 const StepCard = ({ number, title, description }: { number: number; title: string; description: string }) => (
@@ -471,26 +636,29 @@ export const LandingPage = () => {
               </p>
             </div>
 
-            {/* Card Types */}
-            <div className="grid md:grid-cols-3 gap-6 mb-16">
-              <CardTypeCard 
-                type="Подписки"
-                currency="EUR"
+            {/* Card Types — realistic card showcase */}
+            <div className="grid md:grid-cols-3 gap-8 mb-16">
+              <LandingTariffCard 
+                type="subscriptions"
+                name="Подписки"
+                defaultCurrency="EUR"
                 price="2 990"
-                features={['Выпуск за 2 минуты', 'Пополнение через СБП', '3D Secure защита', 'Netflix, Spotify и др.']}
+                features={['Пополнение через СБП — 0₽', '3D Secure защита', 'Netflix, Spotify, ChatGPT и др.', 'Комиссия €0.25 за транзакцию']}
               />
-              <CardTypeCard 
-                type="Путешествия"
-                currency="USD"
+              <LandingTariffCard 
+                type="travel"
+                name="Путешествия"
+                defaultCurrency="USD"
                 price="3 990"
-                features={['Apple Pay / Google Pay', 'Работает в 190 странах', '0₽ комиссия за пополнение', 'Booking, Airbnb, Uber']}
+                features={['Apple Pay / Google Pay', 'Работает в 190 странах', 'Пополнение через СБП — 0₽', 'Booking, Airbnb, Uber']}
                 popular
               />
-              <CardTypeCard 
-                type="Премиум"
-                currency="USD/EUR"
+              <LandingTariffCard 
+                type="premium"
+                name="Премиум"
+                defaultCurrency="USD"
                 price="14 990"
-                features={['Безлимитные операции', 'Приоритетная поддержка 24/7', 'Все возможности', 'VIP условия']}
+                features={['Лучший курс конвертации', 'Apple Pay / Google Pay', 'Приоритетная поддержка 24/7', 'Безлимитные операции']}
               />
             </div>
 
