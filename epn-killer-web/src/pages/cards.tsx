@@ -1,7 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useMode } from '../store/mode-context';
 import { useRates } from '../store/rates-context';
 import { DashboardLayout } from '../components/dashboard-layout';
 import { ModalPortal } from '../components/modal-portal';
@@ -14,13 +12,10 @@ import {
   EyeOff,
   Copy,
   Trash2,
-  Pause,
   Check,
   X,
   Smartphone,
   Apple,
-  LayoutGrid,
-  List,
   ChevronRight,
   Banknote,
   ArrowUpDown,
@@ -47,19 +42,6 @@ interface PersonalCard {
   cardNetwork: 'visa' | 'mastercard';
   color: 'blue' | 'purple' | 'gold';
   price: string;
-}
-
-interface ArbitrageCard {
-  id: string;
-  bin: string;
-  last4: string;
-  fullNumber: string;
-  expiry: string;
-  cvv: string;
-  limit: number;
-  spent: number;
-  status: 'active' | 'paused' | 'blocked';
-  cardType: 'visa' | 'mastercard';
 }
 
 // Professional Visa Logo
@@ -907,161 +889,19 @@ const BankFeesTooltip = ({ fees }: { fees: { name: string; value: string }[] }) 
   </div>
 );
 
-// Arbitrage Card Row
-const ArbitrageCardTypeRow = ({ cardType, bin, network, price, topUpFee, fees, onIssue }: { 
-  cardType: string; bin: string; network: 'visa' | 'mastercard'; price: number; topUpFee: number; 
-  fees: { name: string; value: string }[]; onIssue: () => void;
-}) => {
-  const [showFees, setShowFees] = useState(false);
-
-  return (
-    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-white/[0.02] hover:bg-white/[0.04] border border-white/10 rounded-xl transition-all">
-      <div className="flex items-center gap-4">
-        <div className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-          <span className="text-amber-400 font-mono text-sm">{bin}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className={`w-14 h-9 rounded-md flex items-center justify-center ${network === 'visa' ? 'bg-white' : 'bg-gradient-to-r from-red-500 to-yellow-500'}`}>
-            {network === 'visa' ? <VisaLogo className="h-5 w-auto" /> : <MastercardLogo className="h-6 w-auto" />}
-          </div>
-          <span className="text-white font-medium">{network === 'visa' ? 'Visa' : 'MasterCard'}</span>
-        </div>
-      </div>
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg">
-          <span className="text-slate-400 text-sm">Карта: </span><span className="text-white">${price}</span>
-        </div>
-        <div className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg">
-          <span className="text-slate-400 text-sm">Пополнение: </span><span className="text-white">{topUpFee}%</span>
-        </div>
-        <div className="relative">
-          <button
-            onMouseEnter={() => setShowFees(true)}
-            onMouseLeave={() => setShowFees(false)}
-            className="px-3 py-1.5 bg-transparent border border-amber-500/50 text-amber-400 hover:bg-amber-500/10 rounded-lg text-sm"
-          >
-            Доп. тарифы
-          </button>
-          {showFees && <BankFeesTooltip fees={fees} />}
-        </div>
-        <button onClick={onIssue} className="px-6 py-2.5 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg">
-          Выпустить
-        </button>
-      </div>
-    </div>
-  );
-};
-
-// Arbitrage Card display
-const ArbitrageCardRow = ({ card }: { card: ArbitrageCard }) => {
-  const { t } = useTranslation();
-  const [showDetails, setShowDetails] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const usagePercent = card.limit > 0 ? (card.spent / card.limit) * 100 : 0;
-
-  return (
-    <tr className="hover:bg-white/[0.02]">
-      <td className="py-4 px-4"><span className="font-mono text-white">{card.bin}</span></td>
-      <td className="py-4 px-4">
-        <div className="flex items-center gap-2">
-          <div className={`w-10 h-6 rounded flex items-center justify-center ${card.cardType === 'visa' ? 'bg-white' : 'bg-gradient-to-r from-red-500 to-yellow-500'}`}>
-            {card.cardType === 'visa' ? <VisaLogo className="h-3 w-auto" /> : <MastercardLogo className="h-4 w-auto" />}
-          </div>
-          <span className="font-mono text-slate-400">{showDetails ? card.fullNumber : `•••• ${card.last4}`}</span>
-          <button onClick={() => setShowDetails(!showDetails)} className="p-1.5 hover:bg-white/10 rounded">
-            {showDetails ? <EyeOff className="w-4 h-4 text-slate-400" /> : <Eye className="w-4 h-4 text-slate-400" />}
-          </button>
-        </div>
-      </td>
-      <td className="py-4 px-4">
-        <div className="flex items-center gap-3">
-          <div className="flex-1 max-w-[120px] h-1.5 bg-white/10 rounded-full overflow-hidden">
-            <div className={`h-full rounded-full ${usagePercent > 90 ? 'bg-red-500' : usagePercent > 70 ? 'bg-yellow-500' : 'bg-blue-500'}`} style={{ width: `${Math.min(usagePercent, 100)}%` }} />
-          </div>
-          <span className="text-sm text-slate-400">${card.spent.toLocaleString()} / ${card.limit.toLocaleString()}</span>
-        </div>
-      </td>
-      <td className="py-4 px-4">
-        <span className={`badge ${card.status === 'active' ? 'badge-success' : card.status === 'paused' ? 'badge-warning' : 'badge-error'}`}>
-          {card.status === 'active' ? t('cards.active') : card.status === 'paused' ? t('cards.paused') : 'Заблокирована'}
-        </span>
-      </td>
-      <td className="py-4 px-4">
-        <div className="flex items-center gap-2">
-          <button onClick={() => { navigator.clipboard.writeText(`${card.fullNumber} ${card.expiry} ${card.cvv}`); setCopied(true); setTimeout(() => setCopied(false), 2000); }} className="p-2 hover:bg-white/10 rounded-lg">
-            {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-slate-400" />}
-          </button>
-          <button className="p-2 hover:bg-white/10 rounded-lg"><Pause className="w-4 h-4 text-slate-400" /></button>
-          <button className="p-2 hover:bg-red-500/20 rounded-lg"><Trash2 className="w-4 h-4 text-slate-400" /></button>
-        </div>
-      </td>
-    </tr>
-  );
-};
-
-// Grade Display
-const GradeDisplay = () => {
-  const grades = [
-    { name: 'Стандарт', commission: '6.7%', color: 'bg-slate-500' },
-    { name: 'Серебро', commission: '6.0%', color: 'bg-slate-400' },
-    { name: 'Золото', commission: '5.0%', color: 'bg-amber-500' },
-    { name: 'Платина', commission: '4.0%', color: 'bg-purple-400' },
-    { name: 'Блэк', commission: '3.0%', color: 'bg-slate-900' },
-  ];
-
-  return (
-    <div className="glass-card p-6 mb-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="block-title mb-0">Грейд и комиссии</h3>
-        <span className="px-3 py-1 bg-slate-500/20 border border-slate-500/30 text-slate-400 rounded-full text-sm">Стандарт</span>
-      </div>
-      <div className="h-2 bg-white/10 rounded-full overflow-hidden mb-4">
-        <div className="h-full w-1/4 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full" />
-      </div>
-      <div className="flex gap-1">
-        {grades.map((g, i) => (
-          <div key={g.name} className="flex-1 text-center">
-            <div className={`h-2 ${g.color} ${i === 0 ? 'rounded-l-full' : ''} ${i === 4 ? 'rounded-r-full' : ''} ${i === 0 ? 'opacity-100' : 'opacity-30'}`} />
-            <p className="text-xs text-slate-500 mt-2">{g.name}</p>
-            <p className="text-[10px] text-slate-600">{g.commission}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
 export const CardsPage = () => {
-  const { mode } = useMode();
   const { rates } = useRates();
-  const navigate = useNavigate();
   const { t } = useTranslation();
   const [closeCardModal, setCloseCardModal] = useState<PersonalCard | null>(null);
   const [topUpModal, setTopUpModal] = useState<PersonalCard | null>(null);
   const [paymentModal, setPaymentModal] = useState<{ type: 'apple' | 'google' } | null>(null);
   const [issueModal, setIssueModal] = useState<any>(null);
-  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
 
   const personalCards: PersonalCard[] = [
     { id: '1', type: 'subscriptions', name: 'Карта для подписок', holderName: 'IVAN PETROV', number: '4521 8834 2291 7432', expiry: '12/26', cvv: '847', balance: 1250.50, currency: '€', cardNetwork: 'mastercard', color: 'blue', price: '2 990₽' },
     { id: '2', type: 'travel', name: 'Карта для путешествий', holderName: 'IVAN PETROV', number: '5234 1192 8847 0923', expiry: '08/27', cvv: '312', balance: 3840.00, currency: '$', cardNetwork: 'mastercard', color: 'purple', price: '3 990₽' },
     { id: '3', type: 'premium', name: 'Премиальная карта', holderName: 'IVAN PETROV', number: '3782 8224 6310 0052', expiry: '03/28', cvv: '921', balance: 12580.00, currency: '$', cardNetwork: 'mastercard', color: 'gold', price: '14 990₽' },
   ];
-
-  // ── Master balance: all arbitrage cards draw from this shared pool ──
-  const [masterBalance] = useState(() => {
-    try { const v = localStorage.getItem('xplr_master_balance'); if (v) return parseFloat(v); } catch {}
-    return 25000;
-  });
-
-  const arbitrageCards: ArbitrageCard[] = [
-    { id: '1', bin: '486555', last4: '4521', fullNumber: '4865 5512 3456 4521', expiry: '12/26', cvv: '847', limit: 5000, spent: 3240, status: 'active', cardType: 'visa' },
-    { id: '2', bin: '536025', last4: '7832', fullNumber: '5360 2534 5678 7832', expiry: '11/26', cvv: '293', limit: 5000, spent: 4890, status: 'active', cardType: 'mastercard' },
-    { id: '3', bin: '486555', last4: '9104', fullNumber: '4865 5598 7612 9104', expiry: '06/27', cvv: '514', limit: 3000, spent: 0, status: 'blocked', cardType: 'visa' },
-  ];
-
-  const totalSpent = arbitrageCards.reduce((sum, c) => sum + c.spent, 0);
-  const availableBalance = masterBalance - totalSpent;
 
   const cardTypesForIssue = [
     { 
@@ -1142,22 +982,6 @@ export const CardsPage = () => {
     },
   ];
 
-  const bankFees = [
-    { name: 'Комиссия за транзакцию', value: '$0.2' },
-    { name: 'Международная транзакция', value: '$0.5 + 1.2%' },
-    { name: 'Отмена транзакции', value: '$0.2' },
-    { name: 'Отмена международной транзакции', value: '$0.8' },
-    { name: 'Возврат средств', value: '$0.2 + 1%' },
-    { name: 'Возврат средств (международный)', value: '$0.5 + 1%' },
-    { name: 'Отклонение платежа', value: '$0.1' },
-    { name: 'Отклонение международного платежа', value: '$0.4' },
-  ];
-
-  const availableCardTypes = [
-    { id: 'visa-1', cardType: 'Visa', bin: '4865 55** *', network: 'visa' as const, price: 4, topUpFee: 6.7 },
-    { id: 'mastercard-1', cardType: 'MasterCard', bin: '5360 25** *', network: 'mastercard' as const, price: 4, topUpFee: 6.7 },
-  ];
-
   return (
     <DashboardLayout>
       <div className="stagger-fade-in">
@@ -1167,26 +991,12 @@ export const CardsPage = () => {
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">{t('cards.title')}</h1>
             <p className="text-slate-400 text-sm">
-              {mode === 'PERSONAL' ? t('cards.myCards') : t('cards.arbCards')}
+              {t('cards.myCards')}
             </p>
           </div>
-          {mode === 'ARBITRAGE' && (
-            <div className="flex items-center gap-3">
-              <div className="flex items-center glass-card p-1">
-                <button onClick={() => setViewMode('table')} className={`p-2.5 rounded-lg ${viewMode === 'table' ? 'bg-blue-500/20 text-blue-400' : 'text-slate-400'}`}>
-                  <List className="w-5 h-5" />
-                </button>
-                <button onClick={() => setViewMode('grid')} className={`p-2.5 rounded-lg ${viewMode === 'grid' ? 'bg-blue-500/20 text-blue-400' : 'text-slate-400'}`}>
-                  <LayoutGrid className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-          )}
         </div>
 
-        {mode === 'PERSONAL' && (
-          <>
-            <div className="mb-8">
+        <div className="mb-8">
               <h3 className="section-header flex items-center gap-2"><Plus className="w-4 h-4" />{t('cards.issueNewCard')}</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {cardTypesForIssue.map(ct => (
@@ -1206,84 +1016,21 @@ export const CardsPage = () => {
               </div>
             </div>
 
-            <div>
-              <h3 className="section-header flex items-center gap-2"><CardIcon className="w-4 h-4" />{t('cards.myCards')}</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {personalCards.map(card => (
-                  <RealisticCreditCard 
-                    key={card.id} 
-                    card={card}
-                    onClose={() => setCloseCardModal(card)}
-                    onTopUp={() => setTopUpModal(card)}
-                    onApplePay={() => setPaymentModal({ type: 'apple' })}
-                    onGooglePay={() => setPaymentModal({ type: 'google' })}
-                  />
-                ))}
-              </div>
-            </div>
-          </>
-        )}
-
-        {mode === 'ARBITRAGE' && (
-          <>
-            <GradeDisplay />
-            <div className="mb-8">
-              <h3 className="section-header flex items-center gap-2"><Plus className="w-4 h-4" />{t('cards.issueCard')}</h3>
-              <div className="space-y-3">
-                {availableCardTypes.map(ct => (
-                  <ArbitrageCardTypeRow
-                    key={ct.id}
-                    cardType={ct.cardType}
-                    bin={ct.bin}
-                    network={ct.network}
-                    price={ct.price}
-                    topUpFee={ct.topUpFee}
-                    fees={bankFees}
-                    onIssue={() => navigate(`/card-issue?type=${ct.network}&bin=${encodeURIComponent(ct.bin)}`)}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* ── Master Balance Panel ── */}
-            <div className="glass-card p-6 mb-6">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Общий баланс аккаунта</p>
-                  <p className="text-3xl font-bold text-white">${masterBalance.toLocaleString()}</p>
-                </div>
-                <div className="flex items-center gap-6">
-                  <div className="text-center">
-                    <p className="text-xs text-slate-500 mb-0.5">Потрачено</p>
-                    <p className="text-lg font-semibold text-amber-400">${totalSpent.toLocaleString()}</p>
-                  </div>
-                  <div className="w-px h-10 bg-white/10" />
-                  <div className="text-center">
-                    <p className="text-xs text-slate-500 mb-0.5">Доступно</p>
-                    <p className="text-lg font-semibold text-emerald-400">${availableBalance.toLocaleString()}</p>
-                  </div>
-                  <div className="w-px h-10 bg-white/10" />
-                  <div className="text-center">
-                    <p className="text-xs text-slate-500 mb-0.5">Карт</p>
-                    <p className="text-lg font-semibold text-blue-400">{arbitrageCards.length}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-4 h-2 bg-white/10 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all" style={{ width: `${Math.min((totalSpent / masterBalance) * 100, 100)}%` }} />
-              </div>
-              <p className="mt-2 text-[11px] text-slate-600">Все карты привязаны к единому счёту. Блокировка одной карты не затрагивает баланс — средства мгновенно доступны для других карт.</p>
-            </div>
-
-            <h3 className="section-header flex items-center gap-2"><CardIcon className="w-4 h-4" />{t('cards.active')}</h3>
-            <div className="glass-card overflow-x-auto">
-              <table className="xplr-table min-w-[800px]">
-                <thead><tr><th>BIN</th><th>Карта</th><th>Лимит / Расход</th><th>Статус</th><th>Действия</th></tr></thead>
-                <tbody>{arbitrageCards.map(card => <ArbitrageCardRow key={card.id} card={card} />)}</tbody>
-              </table>
-            </div>
-          </>
-        )}
+        <div>
+          <h3 className="section-header flex items-center gap-2"><CardIcon className="w-4 h-4" />{t('cards.myCards')}</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {personalCards.map(card => (
+              <RealisticCreditCard 
+                key={card.id} 
+                card={card}
+                onClose={() => setCloseCardModal(card)}
+                onTopUp={() => setTopUpModal(card)}
+                onApplePay={() => setPaymentModal({ type: 'apple' })}
+                onGooglePay={() => setPaymentModal({ type: 'google' })}
+              />
+            ))}
+          </div>
+        </div>
 
         {closeCardModal && <CloseCardModal card={closeCardModal} onClose={() => setCloseCardModal(null)} onConfirm={() => setCloseCardModal(null)} />}
         {topUpModal && <TopUpModal card={topUpModal} onClose={() => setTopUpModal(null)} />}

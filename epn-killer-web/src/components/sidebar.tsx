@@ -1,18 +1,14 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useMode } from '../store/mode-context';
 import { useRates } from '../store/rates-context';
 import { useAuth } from '../store/auth-context';
 import {
   LayoutDashboard,
   CreditCard,
   Receipt,
-  Users,
   Gift,
-  Code,
   ChevronRight,
-  User,
   Menu,
   X,
   LogOut,
@@ -43,52 +39,6 @@ const CurrencyRates = () => {
   );
 };
 
-const ModeToggle = () => {
-  const { mode, setMode } = useMode();
-  const { isOwner, userMode } = useAuth();
-  const { t } = useTranslation();
-
-  // In personal userMode — no toggle at all, everything is personal
-  if (userMode === 'personal') return null;
-
-  // MEMBER users in business mode — locked to ARBITRAGE
-  if (!isOwner) {
-    return (
-      <div className="glass-card p-1.5 flex relative">
-        <div className="absolute top-1.5 bottom-1.5 left-1.5 right-1.5 gradient-accent rounded-xl shadow-lg shadow-blue-500/25" />
-        <div className="relative z-10 flex-1 px-4 py-2.5 text-xs font-bold tracking-wide rounded-xl text-white text-center">
-          {t('nav.arbitrage')}
-        </div>
-      </div>
-    );
-  }
-
-  // OWNER in business mode — can toggle
-  return (
-    <div className="glass-card p-1.5 flex relative">
-      <div
-        className="absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] gradient-accent rounded-xl transition-all duration-150 ease-out shadow-lg shadow-blue-500/25"
-        style={{ left: mode === 'PERSONAL' ? '6px' : 'calc(50%)' }}
-      />
-      <button
-        onClick={() => setMode('PERSONAL')}
-        className={`relative z-10 flex-1 px-4 py-2.5 text-xs font-bold tracking-wide rounded-xl transition-colors duration-150 ${
-          mode === 'PERSONAL' ? 'text-white' : 'text-slate-500 hover:text-slate-300'
-        }`}
-      >
-        {t('nav.personal')}
-      </button>
-      <button
-        onClick={() => setMode('ARBITRAGE')}
-        className={`relative z-10 flex-1 px-4 py-2.5 text-xs font-bold tracking-wide rounded-xl transition-colors duration-150 ${
-          mode === 'ARBITRAGE' ? 'text-white' : 'text-slate-500 hover:text-slate-300'
-        }`}
-      >
-        {t('nav.arbitrage')}
-      </button>
-    </div>
-  );
-};
 
 interface NavItemProps {
   href: string;
@@ -172,30 +122,19 @@ const BottomNavItem = ({ href, icon, label, isActive }: { href: string; icon: Re
 
 export const Sidebar = () => {
   const location = useLocation();
-  const { mode } = useMode();
-  const { userMode, isMember } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const { t } = useTranslation();
 
   const navItems = [
-    { href: '/dashboard', icon: <LayoutDashboard className="w-5 h-5" />, label: t('nav.home'), showIn: ['PERSONAL', 'ARBITRAGE'], modes: ['personal', 'business'] as const },
-    { href: '/cards', icon: <CreditCard className="w-5 h-5" />, label: t('nav.cards'), showIn: ['PERSONAL', 'ARBITRAGE'], modes: ['personal', 'business'] as const },
-    { href: '/finance', icon: <Receipt className="w-5 h-5" />, label: t('nav.finance'), showIn: ['PERSONAL', 'ARBITRAGE'], modes: ['personal', 'business'] as const },
-    { href: '/teams', icon: <Users className="w-5 h-5" />, label: t('nav.teams'), showIn: ['ARBITRAGE'], modes: ['business'] as const },
-    { href: '/referrals', icon: <Gift className="w-5 h-5" />, label: t('nav.referrals'), showIn: ['PERSONAL', 'ARBITRAGE'], modes: ['personal', 'business'] as const },
-    { href: '/api', icon: <Code className="w-5 h-5" />, label: t('nav.api'), showIn: ['ARBITRAGE'], modes: ['business'] as const },
-    { href: '/support', icon: <HelpCircle className="w-5 h-5" />, label: t('nav.support'), showIn: ['PERSONAL', 'ARBITRAGE'], modes: ['personal', 'business'] as const },
+    { href: '/dashboard', icon: <LayoutDashboard className="w-5 h-5" />, label: t('nav.home') },
+    { href: '/cards', icon: <CreditCard className="w-5 h-5" />, label: t('nav.cards') },
+    { href: '/finance', icon: <Receipt className="w-5 h-5" />, label: t('nav.finance') },
+    { href: '/referrals', icon: <Gift className="w-5 h-5" />, label: t('nav.referrals') },
+    { href: '/support', icon: <HelpCircle className="w-5 h-5" />, label: t('nav.support') },
   ];
 
-  // Step 1: filter by userMode (personal vs business)
-  // Step 2: in business mode, also filter by PERSONAL/ARBITRAGE toggle
-  const filteredNavItems = navItems.filter(item => {
-    if (!(item.modes as readonly string[]).includes(userMode)) return false;
-    if (userMode === 'personal') return true; // personal mode shows all its items
-    return item.showIn.includes(mode); // business mode respects PERSONAL/ARBITRAGE toggle
-  });
-  const bottomNavItems = filteredNavItems.slice(0, 5);
+  const bottomNavItems = navItems.slice(0, 5);
 
   return (
     <>
@@ -211,13 +150,8 @@ export const Sidebar = () => {
           <div className="mb-4">
             <CurrencyRates />
           </div>
-          {userMode === 'business' && (
-            <div className="mb-6">
-              <ModeToggle />
-            </div>
-          )}
           <nav className="flex-1 min-h-0 overflow-y-auto space-y-1 scrollbar-thin">
-            {filteredNavItems.map(item => (
+            {navItems.map(item => (
               <NavItem
                 key={item.href}
                 href={item.href}
@@ -247,11 +181,6 @@ export const Sidebar = () => {
             </button>
           </div>
         </div>
-        {userMode === 'business' && (
-          <div className="px-4 pb-3">
-            <ModeToggle />
-          </div>
-        )}
       </header>
 
       {/* Mobile Menu Overlay */}
@@ -263,7 +192,7 @@ export const Sidebar = () => {
               <CurrencyRates />
             </div>
             <nav className="space-y-1">
-              {filteredNavItems.map(item => (
+              {navItems.map(item => (
                 <NavItem
                   key={item.href}
                   href={item.href}

@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useMode } from '../store/mode-context';
 import { DashboardLayout } from '../components/dashboard-layout';
 import { BackButton } from '../components/back-button';
 import { ShareModal } from '../components/share-modal';
@@ -114,7 +113,6 @@ const QRCodeDisplay = ({ value, size = 120 }: { value: string; size?: number }) 
 };
 
 export const ReferralsPage = () => {
-  const { mode } = useMode();
   const [copied, setCopied] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -148,22 +146,7 @@ export const ReferralsPage = () => {
     bonusForNew: 5
   };
 
-  const arbitrageStats = {
-    totalReferrals: 47,
-    earnings: 4250,
-    pending: 850,
-    currentTier: 'Золото'
-  };
-
-  const stats = mode === 'PERSONAL' ? personalStats : arbitrageStats;
-
-  const tiers = [
-    { tier: 'Бронза', reward: '$5/реферал', volume: '0-10 рефералов', current: false },
-    { tier: 'Серебро', reward: '$10/реферал', volume: '11-25 рефералов', current: false },
-    { tier: 'Золото', reward: '$25/реферал', volume: '26-50 рефералов', current: true },
-    { tier: 'Платина', reward: '$50/реферал', volume: '51-100 рефералов', current: false },
-    { tier: 'Бриллиант', reward: '$100/реферал', volume: '100+ рефералов', current: false },
-  ];
+  const stats = personalStats;
 
   const statusLabels: Record<string, string> = {
     active: 'Активен',
@@ -180,9 +163,7 @@ export const ReferralsPage = () => {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">Партнёрская программа</h1>
           <p className="text-slate-500">
-            {mode === 'PERSONAL' 
-              ? `Приглашайте друзей и получайте $${personalStats.rewardPerReferral} за каждого. Ваш друг тоже получит $${personalStats.bonusForNew}!` 
-              : 'Зарабатывайте больше с каждым новым уровнем партнёрства'}
+            {`Приглашайте друзей и получайте $${personalStats.rewardPerReferral} за каждого. Ваш друг тоже получит $${personalStats.bonusForNew}!`}
           </p>
         </div>
 
@@ -244,12 +225,10 @@ export const ReferralsPage = () => {
                   <p className="text-gray-400">
                     Код: <span className="text-white font-mono font-semibold">{referralCode}</span>
                   </p>
-                  {mode === 'PERSONAL' && (
-                    <div className="flex items-center gap-2 text-green-400">
-                      <Gift className="w-4 h-4" />
-                      <span>+${personalStats.bonusForNew} новому пользователю</span>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2 text-green-400">
+                    <Gift className="w-4 h-4" />
+                    <span>+${personalStats.bonusForNew} новому пользователю</span>
+                  </div>
                 </div>
               </div>
 
@@ -285,25 +264,16 @@ export const ReferralsPage = () => {
             value={`$${stats.pending}`}
             iconClass="stat-icon-yellow"
           />
-          {mode === 'PERSONAL' ? (
-            <StatCard 
-              icon={<Trophy className="w-5 h-5 text-purple-400" />}
-              label="За реферала"
-              value={`$${personalStats.rewardPerReferral}`}
-              iconClass="stat-icon-purple"
-            />
-          ) : (
-            <StatCard 
-              icon={<Trophy className="w-5 h-5 text-purple-400" />}
-              label="Текущий тир"
-              value={arbitrageStats.currentTier}
-              iconClass="stat-icon-purple"
-            />
-          )}
+          <StatCard 
+            icon={<Trophy className="w-5 h-5 text-purple-400" />}
+            label="За реферала"
+            value={`$${personalStats.rewardPerReferral}`}
+            iconClass="stat-icon-purple"
+          />
         </div>
 
-        {/* How it works - Personal only */}
-        {mode === 'PERSONAL' && (
+        {/* How it works */}
+        {
           <div className="glass-card p-6 mb-8">
             <h3 className="block-title flex items-center gap-2">
               <Gift className="w-5 h-5 text-blue-400" />
@@ -333,25 +303,7 @@ export const ReferralsPage = () => {
               </div>
             </div>
           </div>
-        )}
-
-        {/* Tier System - Arbitrage Only */}
-        {mode === 'ARBITRAGE' && (
-          <div className="glass-card p-6 mb-8">
-            <h3 className="block-title flex items-center gap-2">
-              <Trophy className="w-5 h-5 text-yellow-400" />
-              Уровни наград
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              {tiers.map(tier => (
-                <TierCard key={tier.tier} {...tier} />
-              ))}
-            </div>
-            <p className="text-sm text-gray-400 mt-4">
-              Поднимайтесь по уровням и увеличивайте вознаграждение за каждого нового реферала
-            </p>
-          </div>
-        )}
+        }
 
         {/* Referral List */}
         <div className="glass-card overflow-hidden mb-6">

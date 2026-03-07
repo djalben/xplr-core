@@ -1,8 +1,6 @@
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 
-type Mode = 'PERSONAL' | 'ARBITRAGE';
-
-const STORAGE_KEY = 'xplr_app_mode';
+type Mode = 'PERSONAL';
 
 interface ModeContextType {
   mode: Mode;
@@ -13,22 +11,9 @@ interface ModeContextType {
 const ModeContext = createContext<ModeContextType | undefined>(undefined);
 
 export const ModeProvider = ({ children }: { children: ReactNode }) => {
-  const [mode, setModeState] = useState<Mode>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return (saved === 'PERSONAL' || saved === 'ARBITRAGE') ? saved : 'PERSONAL';
-  });
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, mode);
-  }, [mode]);
-
-  const toggleMode = useCallback(() => {
-    setModeState(prev => prev === 'PERSONAL' ? 'ARBITRAGE' : 'PERSONAL');
-  }, []);
-
-  const setMode = useCallback((newMode: Mode) => {
-    setModeState(newMode);
-  }, []);
+  const mode: Mode = 'PERSONAL';
+  const toggleMode = () => {};
+  const setMode = (_mode: Mode) => {};
 
   return (
     <ModeContext.Provider value={{ mode, toggleMode, setMode }}>

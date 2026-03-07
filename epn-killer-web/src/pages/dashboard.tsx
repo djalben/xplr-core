@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useMode } from '../store/mode-context';
 import { DashboardLayout } from '../components/dashboard-layout';
 import {
   TrendingUp,
@@ -173,7 +172,6 @@ const GradeProgressCard = ({ gradeInfo }: { gradeInfo: GradeInfo | null }) => {
 };
 
 export const DashboardPage = () => {
-  const { mode } = useMode();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [userData, setUserData] = useState<any>(null);
@@ -226,7 +224,6 @@ export const DashboardPage = () => {
     );
   }
 
-  const balanceArb = Number(userData?.balance_arbitrage ?? userData?.balance ?? 0);
   const balancePers = Number(userData?.balance_personal ?? 0);
   const userName = userData?.email?.split('@')[0] || 'Пользователь';
 
@@ -246,9 +243,7 @@ export const DashboardPage = () => {
                 {t('dashboard.hello', { name: userName })}
               </h2>
               <p className="text-slate-400">
-                {mode === 'PERSONAL'
-                  ? t('dashboard.personalSubtitle')
-                  : t('dashboard.arbitrageSubtitle')}
+                {t('dashboard.personalSubtitle')}
               </p>
             </div>
             {/* World Clocks — inline with greeting */}
@@ -260,19 +255,9 @@ export const DashboardPage = () => {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {mode === 'PERSONAL' ? (
-            <>
-              <StatCard title={t('dashboard.balance')} value={`$${balancePers.toFixed(2)}`} icon={<Wallet className="w-6 h-6 text-blue-400" />} iconClass="stat-icon-blue" accent />
-              <StatCard title={t('dashboard.activeCards')} value={String(cardCount)} icon={<CreditCard className="w-6 h-6 text-purple-400" />} iconClass="stat-icon-purple" onClick={() => navigate('/cards?filter=active')} />
-              <StatCard title={t('dashboard.transactions')} value={String(transactions.length)} icon={<DollarSign className="w-6 h-6 text-emerald-400" />} iconClass="stat-icon-green" onClick={() => navigate('/finance?from=dashboard')} />
-            </>
-          ) : (
-            <>
-              <StatCard title={t('dashboard.balance')} value={`$${balanceArb.toFixed(2)}`} subValue={gradeInfo ? <GradeIndicator grade={gradeInfo.grade} /> : undefined} icon={<Wallet className="w-6 h-6 text-blue-400" />} iconClass="stat-icon-blue" accent />
-              <StatCard title={t('dashboard.activeCards')} value={String(cardCount)} icon={<CreditCard className="w-6 h-6 text-purple-400" />} iconClass="stat-icon-purple" onClick={() => navigate('/cards?filter=active')} />
-              <StatCard title={t('dashboard.transactions')} value={String(transactions.length)} icon={<DollarSign className="w-6 h-6 text-amber-400" />} iconClass="stat-icon-yellow" onClick={() => navigate('/finance?from=dashboard')} />
-            </>
-          )}
+          <StatCard title={t('dashboard.balance')} value={`$${balancePers.toFixed(2)}`} icon={<Wallet className="w-6 h-6 text-blue-400" />} iconClass="stat-icon-blue" accent />
+          <StatCard title={t('dashboard.activeCards')} value={String(cardCount)} icon={<CreditCard className="w-6 h-6 text-purple-400" />} iconClass="stat-icon-purple" onClick={() => navigate('/cards?filter=active')} />
+          <StatCard title={t('dashboard.transactions')} value={String(transactions.length)} icon={<DollarSign className="w-6 h-6 text-emerald-400" />} iconClass="stat-icon-green" onClick={() => navigate('/finance?from=dashboard')} />
         </div>
 
         {/* Charts and Transactions */}
@@ -296,8 +281,6 @@ export const DashboardPage = () => {
           </div>
         </div>
 
-        {/* Grade Progress - Only for Arbitrage */}
-        {mode === 'ARBITRAGE' && <GradeProgressCard gradeInfo={gradeInfo} />}
       </div>
     </DashboardLayout>
   );

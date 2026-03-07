@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   CreditCard, 
-  Users, 
   Globe, 
   Shield, 
   Zap, 
@@ -13,8 +12,6 @@ import {
   ChevronUp,
   Copy,
   Headphones,
-  Code,
-  Layers,
   TrendingUp,
   Smartphone,
   Building,
@@ -234,19 +231,6 @@ const CardTypeCard = ({ type, currency, price, features, popular = false }: {
   </div>
 );
 
-// Grade tier
-const GradeTier = ({ name, commission, volume, active = false }: { name: string; commission: string; volume: string; active?: boolean }) => (
-  <div className={`p-4 rounded-xl border transition-all ${
-    active 
-      ? 'bg-blue-500/20 border-blue-500/50 shadow-lg shadow-blue-500/20' 
-      : 'bg-white/5 border-white/10 hover:border-white/20'
-  }`}>
-    <div className="font-semibold text-white mb-1">{name}</div>
-    <div className="text-2xl font-bold text-blue-400 mb-1">{commission}</div>
-    <div className="text-xs text-slate-500">от {volume}</div>
-  </div>
-);
-
 // Step card
 const StepCard = ({ number, title, description }: { number: number; title: string; description: string }) => (
   <div className="relative">
@@ -335,7 +319,7 @@ export const LandingPage = () => {
     },
     {
       question: 'Что можно оплачивать картами XPLR?',
-      answer: 'Картами XPLR можно оплачивать более 560 сервисов: Netflix, Spotify, ChatGPT, Midjourney, Booking, Airbnb, Steam, Adobe и многие другие. Также карты работают для оплаты рекламы в Facebook, Google, TikTok и других платформах.'
+      answer: 'Картами XPLR можно оплачивать более 560 сервисов: Netflix, Spotify, ChatGPT, Midjourney, Booking, Airbnb, Steam, Adobe и многие другие.'
     },
     {
       question: 'Безопасно ли использовать XPLR?',
@@ -347,7 +331,7 @@ export const LandingPage = () => {
     },
     {
       question: 'Какая комиссия за использование карт?',
-      answer: 'Для личного использования комиссия составляет 3.5% от суммы операции. Для арбитража действует грейдовая система: от 6.7% (Стандарт) до 3% (Блэк). Чем больше оборот, тем ниже комиссия.'
+      answer: 'Комиссия составляет 3.5% от суммы операции. За пополнение через СБП комиссия — 0₽.'
     },
     {
       question: 'Можно ли добавить карту в Apple Pay?',
@@ -374,8 +358,7 @@ export const LandingPage = () => {
               </span>
             </div>
             <div className="hidden md:flex items-center gap-8">
-              <a href="#personal" className="text-slate-400 hover:text-white transition-colors font-medium">Для личного</a>
-              <a href="#arbitrage" className="text-slate-400 hover:text-white transition-colors font-medium">Для арбитража</a>
+              <a href="#personal" className="text-slate-400 hover:text-white transition-colors font-medium">Карты</a>
               <a href="#how-it-works" className="text-slate-400 hover:text-white transition-colors font-medium">Как это работает</a>
               <a href="#faq" className="text-slate-400 hover:text-white transition-colors font-medium">FAQ</a>
             </div>
@@ -407,7 +390,7 @@ export const LandingPage = () => {
                 </h1>
                 
                 <p className="text-xl text-slate-400 leading-relaxed max-w-xl">
-                  Оплачивайте подписки, путешествуйте, запускайте рекламу — одна платформа для всего. Принимается в 190 странах.
+                  Оплачивайте подписки, путешествуйте и совершайте покупки по всему миру. Принимается в 190 странах.
                 </p>
                 
                 <div className="flex flex-col sm:flex-row gap-4">
@@ -535,64 +518,6 @@ export const LandingPage = () => {
           </div>
         </section>
 
-        {/* Arbitrage Section */}
-        <section id="arbitrage" className="py-24 px-6">
-          <div className="max-w-7xl mx-auto">
-            <div className="text-center mb-16">
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-500/20 border border-purple-500/30 rounded-full text-purple-400 text-sm font-medium mb-6">
-                <TrendingUp className="w-4 h-4" />
-                Для арбитража и рекламы
-              </div>
-              <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">
-                Масштабируйте рекламные кампании
-              </h2>
-              <p className="text-xl text-slate-400 max-w-2xl mx-auto">
-                Виртуальные карты для Facebook, Google, TikTok Ads и других рекламных платформ
-              </p>
-            </div>
-
-            {/* Grade System */}
-            <div className="glass-card p-8 mb-16">
-              <h3 className="text-xl font-bold text-white mb-6 text-center">Грейдовая система комиссий</h3>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                <GradeTier name="Standard" commission="6.7%" volume="$0" />
-                <GradeTier name="Silver" commission="6.0%" volume="$1K" />
-                <GradeTier name="Gold" commission="5.0%" volume="$10K" active />
-                <GradeTier name="Platinum" commission="4.0%" volume="$50K" />
-                <GradeTier name="Black" commission="3.0%" volume="$100K" />
-              </div>
-            </div>
-
-            {/* Arbitrage Features */}
-            <div className="grid md:grid-cols-3 gap-6 mb-12">
-              <FeatureCard 
-                icon={Layers}
-                title="Массовый выпуск"
-                description="Выпускайте от 1 до 100 карт одной кнопкой для ваших рекламных кампаний"
-              />
-              <FeatureCard 
-                icon={Users}
-                title="Командные аккаунты"
-                description="Добавляйте участников команды и распределяйте лимиты между ними"
-              />
-              <FeatureCard 
-                icon={Code}
-                title="API интеграция"
-                description="Полнофункциональный API для автоматизации выпуска и управления картами"
-              />
-            </div>
-
-            <div className="text-center">
-              <Link to="/auth">
-                <button className="px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl text-white font-semibold text-lg hover:shadow-xl hover:shadow-purple-500/30 transition-all inline-flex items-center gap-2">
-                  Создать команду
-                  <ArrowRight className="w-5 h-5" />
-                </button>
-              </Link>
-            </div>
-          </div>
-        </section>
-
         {/* How It Works */}
         <section id="how-it-works" className="py-24 px-6 bg-white/[0.02]">
           <div className="max-w-7xl mx-auto">
@@ -633,7 +558,7 @@ export const LandingPage = () => {
               <StepCard 
                 number={2}
                 title="Выберите тип карты"
-                description="Подберите карту под ваши задачи: подписки, путешествия или арбитраж"
+                description="Подберите карту под ваши задачи: подписки, путешествия или премиум"
               />
               <StepCard 
                 number={3}
@@ -670,8 +595,8 @@ export const LandingPage = () => {
               />
               <ReviewCard 
                 name="Мария"
-                role="Маркетолог"
-                text="Использую для арбитража Facebook Ads. Массовый выпуск карт — это то, что нужно. Комиссии адекватные, поддержка отвечает быстро. Рекомендую!"
+                role="Дизайнер"
+                text="Оплачиваю Figma, Adobe и Canva без проблем. Раньше приходилось просить друзей за границей, теперь всё делаю сама за пару минут. Супер удобно!"
                 rating={5}
               />
               <ReviewCard 
@@ -804,10 +729,9 @@ export const LandingPage = () => {
               <div>
                 <h4 className="font-semibold text-white mb-4">Продукт</h4>
                 <ul className="space-y-2">
-                  <li><a href="#personal" className="text-slate-400 hover:text-white transition-colors text-sm">Для личного</a></li>
-                  <li><a href="#arbitrage" className="text-slate-400 hover:text-white transition-colors text-sm">Для арбитража</a></li>
-                  <li><a href="#" className="text-slate-400 hover:text-white transition-colors text-sm">Тарифы</a></li>
-                  <li><a href="#" className="text-slate-400 hover:text-white transition-colors text-sm">API</a></li>
+                  <li><a href="#personal" className="text-slate-400 hover:text-white transition-colors text-sm">Карты</a></li>
+                  <li><a href="#how-it-works" className="text-slate-400 hover:text-white transition-colors text-sm">Как это работает</a></li>
+                  <li><a href="#faq" className="text-slate-400 hover:text-white transition-colors text-sm">FAQ</a></li>
                 </ul>
               </div>
 
