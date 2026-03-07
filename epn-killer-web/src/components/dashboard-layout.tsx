@@ -7,7 +7,7 @@ interface DashboardLayoutProps {
 
 export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   return (
-    <div className="min-h-[100dvh] bg-transparent relative overflow-hidden">
+    <div className="min-h-[100dvh] bg-transparent relative z-2">
       <Sidebar />
       {/* Desktop: sidebar offset. Mobile: header + bottom nav offset */}
       <main className="lg:ml-64 min-h-[100dvh] relative z-10">

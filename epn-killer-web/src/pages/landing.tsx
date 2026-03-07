@@ -444,7 +444,7 @@ export const LandingPage = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-transparent relative overflow-x-hidden">
+    <div className="min-h-screen bg-transparent relative overflow-x-hidden z-2">
       {/* Content wrapper */}
       <div className="relative z-10">
         

@@ -112,7 +112,7 @@ export const AuthPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-transparent flex items-center justify-center p-4 overflow-hidden relative">
+    <div className="min-h-screen bg-transparent flex items-center justify-center p-4 overflow-hidden relative z-2">
       {/* Subtle dark tint so content reads well over neural bg */}
       <div className="absolute inset-0 bg-[#05050a]/70" />
       {/* Subtle radial accent */}
@@ -168,13 +168,13 @@ export const AuthPage = () => {
 
         {/* Error message */}
         {error && (
-          <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center backdrop-blur-sm">
+          <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center">
             {error}
           </div>
         )}
 
         {/* ── Bank Card Form (Glassmorphism) ── */}
-        <div className="perspective-[1200px]">
+        <div>
           <form
             onSubmit={handleSubmit}
             className="relative rounded-[22px] p-8 overflow-hidden
@@ -204,7 +204,7 @@ export const AuthPage = () => {
               <div className="flex items-start justify-between mb-8">
                 {/* Left: XPLR branding */}
                 <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 border border-white/[0.08] flex items-center justify-center backdrop-blur-sm">
+                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 border border-white/[0.08] flex items-center justify-center">
                     <span className="text-blue-400 font-bold text-lg">X</span>
                   </div>
                   <div>
@@ -236,7 +236,7 @@ export const AuthPage = () => {
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full bg-white/[0.04] border border-white/[0.10] rounded-xl py-4 pl-12 pr-4
                       text-white placeholder-slate-600
-                      focus:outline-none focus:border-blue-400 focus:bg-white/[0.08] focus:ring-1 focus:ring-blue-400/50
+                      focus:outline-none focus:border-blue-400 focus:bg-white/[0.06] focus:ring-2 focus:ring-blue-500/60
                       transition-colors duration-150 text-base font-mono tracking-wide"
                     required
                     autoComplete="email"
@@ -253,7 +253,7 @@ export const AuthPage = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full bg-white/[0.04] border border-white/[0.10] rounded-xl py-4 pl-12 pr-14
                       text-white placeholder-slate-600
-                      focus:outline-none focus:border-blue-400 focus:bg-white/[0.08] focus:ring-1 focus:ring-blue-400/50
+                      focus:outline-none focus:border-blue-400 focus:bg-white/[0.06] focus:ring-2 focus:ring-blue-500/60
                       transition-colors duration-150 text-base font-mono tracking-widest"
                     required
                     autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
@@ -294,7 +294,7 @@ export const AuthPage = () => {
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       className="w-full bg-white/[0.04] border border-white/[0.10] rounded-xl py-4 pl-12 pr-4
                         text-white placeholder-slate-600
-                        focus:outline-none focus:border-blue-400 focus:bg-white/[0.08] focus:ring-1 focus:ring-blue-400/50
+                        focus:outline-none focus:border-blue-400 focus:bg-white/[0.06] focus:ring-2 focus:ring-blue-500/60
                         transition-colors duration-150 text-base font-mono tracking-widest"
                       required
                       autoComplete="new-password"

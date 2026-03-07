@@ -151,10 +151,13 @@
 /* ========== NEURAL NETWORK BACKGROUND ========== */
 .neural-bg {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
   pointer-events: none;
   overflow: hidden;
-  z-index: 0;
+  z-index: 1;
 }
 
 /* Custom scrollbar - Dark */
