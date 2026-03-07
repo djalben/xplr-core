@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useRates } from '../store/rates-context';
 import { DashboardLayout } from '../components/dashboard-layout';
 import { ModalPortal } from '../components/modal-portal';
 import { BackButton } from '../components/back-button';
+import { getVault, transferVaultToCard, type InternalBalance } from '../api/vault';
 import { 
   Plus, 
   CreditCard as CardIcon,
@@ -585,55 +586,50 @@ const BankLogoButton = ({
   </button>
 );
 
-// Vault Top-Up Modal — fund card from Vault with currency calculator + RUB presets
-const VaultTopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () => void }) => {
+// Vault-to-Card Transfer Modal — internal transfer, no banks/СБП
+const VaultTopUpModal = ({ card, vaultBalance, onClose, onTransfer }: {
+  card: PersonalCard;
+  vaultBalance: number;      // master_balance in ₽
+  onClose: () => void;
+  onTransfer: (amount: number) => void; // amount in card's currency
+}) => {
   const { rates } = useRates();
-  const [selectedCurrency, setSelectedCurrency] = useState<'USD' | 'EUR'>(card.currency === '€' ? 'EUR' : 'USD');
-  const [foreignAmount, setForeignAmount] = useState('');
-  const [activeRubPreset, setActiveRubPreset] = useState<number | null>(null);
-  const currentRate = selectedCurrency === 'USD' ? rates.usd : rates.eur;
-  const currencySymbol = selectedCurrency === 'USD' ? '$' : '€';
-  const rubAmount = foreignAmount && !isNaN(parseFloat(foreignAmount))
-    ? (parseFloat(foreignAmount) * currentRate).toFixed(0)
-    : '';
+  const [amount, setAmount] = useState('');
+  const [isTransferring, setIsTransferring] = useState(false);
 
-  const rubPresets = [1000, 2000, 5000, 10000, 20000, 50000];
+  const currencySymbol = card.currency;
+  const rate = card.currency === '€' ? rates.eur : rates.usd;
+  const availableInCurrency = rate > 0 ? vaultBalance / rate : 0;
 
-  const handleRubPreset = (rub: number) => {
-    setActiveRubPreset(rub);
-    const converted = (rub / currentRate).toFixed(2);
-    setForeignAmount(converted);
+  const numAmount = parseFloat(amount) || 0;
+  const isInsufficient = numAmount > 0 && numAmount > availableInCurrency;
+  const canTransfer = numAmount > 0 && !isInsufficient && !isTransferring;
+
+  const presets = [10, 25, 50, 100, 250, 500];
+
+  const handleTransfer = () => {
+    if (!canTransfer) return;
+    setIsTransferring(true);
+    onTransfer(numAmount);
   };
-
-  const handleForeignInput = (val: string) => {
-    setForeignAmount(val);
-    setActiveRubPreset(null);
-  };
-
-  const bankIcons = [
-    { id: 'sber', name: 'Сбер' },
-    { id: 'tbank', name: 'Т-Банк' },
-    { id: 'alfa', name: 'Альфа' },
-    { id: 'vtb', name: 'ВТБ' },
-  ];
 
   return (
     <ModalPortal>
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-xl" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose} />
 
-      <div className="relative bg-[#0a0a12]/95 backdrop-blur-3xl border border-white/[0.10] rounded-t-2xl sm:rounded-2xl w-full max-w-[440px] max-h-[85dvh] flex flex-col animate-scale-in shadow-[0_24px_80px_-12px_rgba(0,0,0,0.8)]">
-        {/* Glass accent top edge */}
+      <div className="relative bg-[#0b0b14]/95 border border-white/[0.10] rounded-t-2xl sm:rounded-2xl w-full max-w-[380px] flex flex-col animate-scale-in shadow-[0_24px_80px_-12px_rgba(0,0,0,0.8)]">
+        {/* Glass accent */}
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-400/40 to-transparent rounded-t-2xl" />
 
-        {/* Header — compact */}
-        <div className="shrink-0 px-5 py-3.5 border-b border-white/[0.06] flex items-center justify-between">
+        {/* Header */}
+        <div className="px-5 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 border border-blue-500/30 flex items-center justify-center">
-              <Banknote className="w-4 h-4 text-blue-400" />
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500/20 to-blue-500/20 border border-emerald-500/30 flex items-center justify-center">
+              <ArrowUpDown className="w-4 h-4 text-emerald-400" />
             </div>
             <div>
-              <h3 className="text-base font-semibold text-white leading-tight">Пополнить из Сейфа</h3>
+              <h3 className="text-base font-semibold text-white leading-tight">Перевод на карту</h3>
               <p className="text-[11px] text-slate-400">{card.name}</p>
             </div>
           </div>
@@ -642,99 +638,70 @@ const VaultTopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () =>
           </button>
         </div>
 
-        {/* Body — compact flex-col */}
-        <div className="flex-1 overflow-y-auto min-h-0 px-5 py-4 space-y-3">
-          {/* Currency toggle */}
-          <div className="flex gap-2">
-            <button
-              onClick={() => { setSelectedCurrency('USD'); setActiveRubPreset(null); }}
-              className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all text-center ${
-                selectedCurrency === 'USD'
-                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40'
-                  : 'bg-white/[0.04] text-slate-400 border border-white/[0.08] hover:bg-white/[0.08]'
-              }`}
-            >$ USD</button>
-            <button
-              onClick={() => { setSelectedCurrency('EUR'); setActiveRubPreset(null); }}
-              className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all text-center ${
-                selectedCurrency === 'EUR'
-                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40'
-                  : 'bg-white/[0.04] text-slate-400 border border-white/[0.08] hover:bg-white/[0.08]'
-              }`}
-            >€ EUR</button>
+        {/* Body */}
+        <div className="px-5 pb-2 space-y-4">
+          {/* Vault balance info */}
+          <div className="p-3 rounded-xl bg-white/[0.04] border border-white/[0.06]">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-slate-400">Доступно в Сейфе:</span>
+              <span className="text-white font-bold text-sm">
+                {currencySymbol}{availableInCurrency.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
           </div>
 
           {/* Amount input */}
           <div>
-            <label className="block text-xs text-slate-400 mb-1">Сумма в валюте</label>
+            <label className="block text-xs text-slate-400 mb-1.5">Сумма перевода</label>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400 text-lg font-bold">{currencySymbol}</span>
+              <span className={`absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold ${isInsufficient ? 'text-red-400' : 'text-blue-400'}`}>
+                {currencySymbol}
+              </span>
               <input
                 type="number"
-                placeholder="100"
-                value={foreignAmount}
-                onChange={(e) => handleForeignInput(e.target.value)}
-                className="w-full h-11 pl-12 pr-4 bg-white/[0.04] border border-white/[0.10] rounded-xl text-white text-lg font-semibold focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/50 transition-colors placeholder:text-slate-600"
+                inputMode="decimal"
+                placeholder="0.00"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className={`w-full h-14 pl-12 pr-4 bg-white/[0.04] rounded-xl text-white text-2xl font-bold focus:outline-none transition-colors placeholder:text-slate-600 ${
+                  isInsufficient
+                    ? 'border-2 border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500/50 text-red-300'
+                    : 'border border-white/[0.10] focus:border-blue-400 focus:ring-1 focus:ring-blue-400/50'
+                }`}
               />
             </div>
+            {isInsufficient && (
+              <p className="text-red-400 text-xs mt-1.5 font-medium">Недостаточно средств в Сейфе</p>
+            )}
           </div>
 
-          {/* RUB quick-select presets */}
+          {/* Quick presets */}
           <div className="flex flex-wrap gap-1.5">
-            {rubPresets.map(rub => (
+            {presets.map(p => (
               <button
-                key={rub}
-                onClick={() => handleRubPreset(rub)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
-                  activeRubPreset === rub
+                key={p}
+                onClick={() => setAmount(String(p))}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  parseFloat(amount) === p
                     ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40'
                     : 'bg-white/[0.04] text-slate-400 border border-white/[0.08] hover:bg-white/[0.08]'
                 }`}
               >
-                {rub >= 1000 ? `${rub / 1000}k` : rub} ₽
+                {currencySymbol}{p}
               </button>
             ))}
           </div>
-
-          {/* Conversion + result row */}
-          <div className="flex items-center gap-2">
-            <div className="flex-1 relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50 text-sm font-bold">₽</span>
-              <input
-                type="text"
-                readOnly
-                value={rubAmount ? Number(rubAmount).toLocaleString('ru-RU') : ''}
-                placeholder="0"
-                className="w-full h-11 pl-9 pr-3 bg-white/[0.04] border border-white/[0.08] rounded-xl text-white text-base font-semibold placeholder:text-slate-600 cursor-default"
-              />
-            </div>
-            <div className="px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.06] text-[11px] text-slate-400 whitespace-nowrap">
-              1 {selectedCurrency} = {currentRate.toFixed(2)} ₽
-            </div>
-          </div>
         </div>
-        
-        {/* Footer — one main СБП button + decorative bank icons */}
-        <div className="shrink-0 px-5 pb-5 pt-3 border-t border-white/[0.06] flex flex-col gap-3">
-          <button 
-            onClick={onClose}
-            disabled={!foreignAmount || parseFloat(foreignAmount) <= 0}
-            className="w-full py-3.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+
+        {/* Transfer button — large, thumb-friendly */}
+        <div className="px-5 pt-3 pb-5">
+          <button
+            onClick={handleTransfer}
+            disabled={!canTransfer}
+            className="w-full py-4 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 disabled:opacity-40 disabled:cursor-not-allowed text-base"
           >
-            {BankLogos['sbp']}
-            <span>Пополнить через СБП {rubAmount ? `— ${Number(rubAmount).toLocaleString('ru-RU')} ₽` : ''}</span>
+            {isTransferring ? 'Переводим...' : `Перевести на карту${numAmount > 0 ? ` ${currencySymbol}${numAmount.toLocaleString()}` : ''}`}
           </button>
-          {/* Decorative bank icons row */}
-          <div className="flex items-center justify-center gap-3">
-            <span className="text-[10px] text-slate-500">Поддерживаемые банки:</span>
-            <div className="flex items-center gap-2">
-              {bankIcons.map((b) => (
-                <div key={b.id} className="w-6 h-6 rounded-md overflow-hidden opacity-60">
-                  {BankLogos[b.id]}
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -922,12 +889,45 @@ export const CardsPage = () => {
   const [topUpModal, setTopUpModal] = useState<PersonalCard | null>(null);
   const [paymentModal, setPaymentModal] = useState<{ type: 'apple' | 'google' } | null>(null);
   const [issueModal, setIssueModal] = useState<any>(null);
+  const [vaultBalance, setVaultBalance] = useState(0); // master_balance in ₽
 
-  const personalCards: PersonalCard[] = [
+  const [personalCards, setPersonalCards] = useState<PersonalCard[]>([
     { id: '1', type: 'subscriptions', name: 'Карта для подписок', holderName: 'IVAN PETROV', number: '4521 8834 2291 7432', expiry: '12/26', cvv: '847', balance: 1250.50, currency: '€', cardNetwork: 'mastercard', color: 'blue', price: '2 990₽' },
     { id: '2', type: 'travel', name: 'Карта для путешествий', holderName: 'IVAN PETROV', number: '5234 1192 8847 0923', expiry: '08/27', cvv: '312', balance: 3840.00, currency: '$', cardNetwork: 'mastercard', color: 'purple', price: '3 990₽' },
     { id: '3', type: 'premium', name: 'Премиальная карта', holderName: 'IVAN PETROV', number: '3782 8224 6310 0052', expiry: '03/28', cvv: '921', balance: 12580.00, currency: '$', cardNetwork: 'mastercard', color: 'gold', price: '14 990₽' },
-  ];
+  ]);
+
+  // Fetch vault balance on mount
+  useEffect(() => {
+    getVault()
+      .then((v) => setVaultBalance(Number(v.master_balance) || 0))
+      .catch(() => {});
+  }, []);
+
+  // Handle vault-to-card transfer with optimistic UI
+  const handleTransfer = async (card: PersonalCard, amountInCurrency: number) => {
+    const rate = card.currency === '€' ? rates.eur : rates.usd;
+    const rubEquivalent = amountInCurrency * rate;
+
+    // Optimistic update — instant visual feedback
+    setPersonalCards(prev =>
+      prev.map(c => c.id === card.id ? { ...c, balance: c.balance + amountInCurrency } : c)
+    );
+    setVaultBalance(prev => prev - rubEquivalent);
+    setTopUpModal(null);
+
+    try {
+      const updatedVault = await transferVaultToCard(card.id, amountInCurrency, card.currency);
+      setVaultBalance(Number(updatedVault.master_balance) || 0);
+    } catch (err) {
+      // Revert on error
+      setPersonalCards(prev =>
+        prev.map(c => c.id === card.id ? { ...c, balance: c.balance - amountInCurrency } : c)
+      );
+      setVaultBalance(prev => prev + rubEquivalent);
+      console.error('Transfer failed:', err);
+    }
+  };
 
   const cardTypesForIssue = [
     { 
@@ -1096,7 +1096,7 @@ export const CardsPage = () => {
         )}
 
         {closeCardModal && <CloseCardModal card={closeCardModal} onClose={() => setCloseCardModal(null)} onConfirm={() => setCloseCardModal(null)} />}
-        {topUpModal && <VaultTopUpModal card={topUpModal} onClose={() => setTopUpModal(null)} />}
+        {topUpModal && <VaultTopUpModal card={topUpModal} vaultBalance={vaultBalance} onClose={() => setTopUpModal(null)} onTransfer={(amt) => handleTransfer(topUpModal, amt)} />}
         {paymentModal && <PaymentMethodModal type={paymentModal.type} onClose={() => setPaymentModal(null)} />}
         {issueModal && <CardIssueModal card={issueModal} onClose={() => setIssueModal(null)} />}
       </div>

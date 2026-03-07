@@ -27,3 +27,16 @@ export const setCardSpendingLimit = async (cardId: number, spendingLimit: number
     spending_limit: spendingLimit,
   });
 };
+
+// Перевести средства из Сейфа на карту (внутренний перевод)
+export const transferVaultToCard = async (
+  cardId: string,
+  amount: number,
+  currency: string
+): Promise<InternalBalance> => {
+  const res = await apiClient.post<InternalBalance>(
+    `${API_BASE_URL}/user/vault/transfer-to-card`,
+    { card_id: cardId, amount, currency }
+  );
+  return res.data;
+};
