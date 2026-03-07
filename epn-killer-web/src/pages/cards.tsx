@@ -578,26 +578,42 @@ const BankLogoButton = ({
   </button>
 );
 
-// Spending Limit Modal — set how much this card can draw from the Vault
-const SpendingLimitModal = ({ card, onClose }: { card: PersonalCard; onClose: () => void }) => {
-  const [limitValue, setLimitValue] = useState('5000');
-  const presets = [1000, 3000, 5000, 10000, 25000, 50000];
+// Vault Top-Up Modal — fund card from Vault with currency calculator
+const VaultTopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () => void }) => {
+  const { rates } = useRates();
+  const [selectedCurrency, setSelectedCurrency] = useState<'USD' | 'EUR'>(card.currency === '€' ? 'EUR' : 'USD');
+  const [foreignAmount, setForeignAmount] = useState('');
+  const [selectedBank, setSelectedBank] = useState('sbp');
+
+  const currentRate = selectedCurrency === 'USD' ? rates.usd : rates.eur;
+  const currencySymbol = selectedCurrency === 'USD' ? '$' : '€';
+  const rubAmount = foreignAmount && !isNaN(parseFloat(foreignAmount))
+    ? (parseFloat(foreignAmount) * currentRate).toFixed(0)
+    : '';
+
+  const banks = [
+    { id: 'sbp', name: 'СБП' },
+    { id: 'sber', name: 'Сбер' },
+    { id: 'tbank', name: 'Т-Банк' },
+    { id: 'alfa', name: 'Альфа' },
+    { id: 'vtb', name: 'ВТБ' },
+  ];
 
   return (
     <ModalPortal>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
 
-      <div className="relative bg-[#0d0d0f]/95 backdrop-blur-3xl border border-white/10 rounded-2xl w-full max-w-[440px] flex flex-col animate-scale-in shadow-2xl shadow-black/60">
+      <div className="relative bg-[#0d0d0f]/95 backdrop-blur-3xl border border-white/10 rounded-2xl w-full max-w-[440px] max-h-[90dvh] flex flex-col animate-scale-in shadow-2xl shadow-black/60">
         {/* Header */}
         <div className="shrink-0 p-5 pb-4 border-b border-white/[0.06]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center">
-                <ArrowUpDown className="w-5 h-5 text-amber-400" />
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-blue-500/20 border border-emerald-500/30 flex items-center justify-center">
+                <Banknote className="w-5 h-5 text-emerald-400" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-white">Лимит списания</h3>
+                <h3 className="text-lg font-semibold text-white">Пополнить из Сейфа</h3>
                 <p className="text-xs text-slate-400">{card.name}</p>
               </div>
             </div>
@@ -608,54 +624,87 @@ const SpendingLimitModal = ({ card, onClose }: { card: PersonalCard; onClose: ()
         </div>
 
         {/* Body */}
-        <div className="p-5 space-y-5">
-          <div className="p-4 rounded-xl bg-amber-500/[0.06] border border-amber-500/20">
-            <p className="text-sm text-amber-200/80">
-              Лимит определяет максимум, который эта карта может списать из Сейфа. Реальный баланс карты = 0 — средства переводятся автоматически при оплате.
-            </p>
+        <div className="flex-1 overflow-y-auto min-h-0 p-5 space-y-4">
+          {/* Currency selector */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSelectedCurrency('USD')}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all text-center ${
+                selectedCurrency === 'USD'
+                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40'
+                  : 'bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10'
+              }`}
+            >
+              $ USD
+            </button>
+            <button
+              onClick={() => setSelectedCurrency('EUR')}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all text-center ${
+                selectedCurrency === 'EUR'
+                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40'
+                  : 'bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10'
+              }`}
+            >
+              € EUR
+            </button>
           </div>
 
+          {/* Amount input */}
           <div>
-            <label className="block text-sm text-slate-400 mb-2">Максимум списания из Сейфа</label>
+            <label className="block text-sm text-slate-400 mb-1.5">Сумма в валюте</label>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-amber-400 text-lg font-bold">₽</span>
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400 text-lg font-bold">{currencySymbol}</span>
               <input
                 type="number"
-                placeholder="5 000"
-                value={limitValue}
-                onChange={(e) => setLimitValue(e.target.value)}
-                className="w-full h-12 pl-12 pr-4 bg-white/[0.04] border border-white/10 rounded-xl text-white text-lg font-semibold focus:outline-none focus:border-amber-500/50 transition-all placeholder:text-slate-600"
+                placeholder="100"
+                value={foreignAmount}
+                onChange={(e) => setForeignAmount(e.target.value)}
+                className="w-full h-12 pl-12 pr-4 bg-white/[0.04] border border-white/10 rounded-xl text-white text-lg font-semibold focus:outline-none focus:border-emerald-500/50 transition-all placeholder:text-slate-600"
               />
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            {presets.map(p => (
-              <button 
-                key={p} 
-                onClick={() => setLimitValue(String(p))}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  limitValue === String(p) 
-                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' 
-                    : 'bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10'
-                }`}
-              >
-                {p.toLocaleString()} ₽
-              </button>
-            ))}
+          {/* Conversion arrow */}
+          <div className="flex items-center justify-center py-1">
+            <div className="flex items-center gap-3">
+              <div className="h-px w-10 bg-white/10" />
+              <div className="w-8 h-8 rounded-full bg-white/[0.04] border border-white/10 flex items-center justify-center">
+                <span className="text-xs font-bold text-slate-300">{currencySymbol}→₽</span>
+              </div>
+              <div className="h-px w-10 bg-white/10" />
+            </div>
           </div>
 
-          <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10 space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-400">Потрачено из лимита</span>
-              <span className="text-white font-medium">0 ₽</span>
+          {/* RUB result */}
+          <div>
+            <label className="block text-sm text-slate-400 mb-1.5">К оплате через СБП</label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 text-lg font-bold">₽</span>
+              <input
+                type="text"
+                readOnly
+                value={rubAmount ? Number(rubAmount).toLocaleString('ru-RU') : ''}
+                placeholder="0"
+                className="w-full h-12 pl-12 pr-4 bg-white/[0.04] border border-white/10 rounded-xl text-white text-lg font-semibold placeholder:text-slate-600 cursor-default"
+              />
             </div>
+          </div>
+
+          {/* Rate info */}
+          <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-400">Доступно к списанию</span>
-              <span className="text-amber-400 font-bold">{Number(limitValue || 0).toLocaleString()} ₽</span>
+              <span className="text-slate-400">Курс:</span>
+              <span className="text-white font-bold">1 {selectedCurrency} = {currentRate.toFixed(2)} ₽</span>
             </div>
-            <div className="h-1.5 bg-white/10 rounded-full overflow-hidden mt-1">
-              <div className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full" style={{ width: '0%' }} />
+          </div>
+
+          {/* Bank selector */}
+          <div>
+            <label className="block text-sm text-slate-400 mb-2">Способ оплаты</label>
+            <div className="grid grid-cols-5 gap-2">
+              {banks.map((bank) => (
+                <BankLogoButton key={bank.id} bank={bank} selected={selectedBank === bank.id} onClick={() => setSelectedBank(bank.id)} />
+              ))}
             </div>
           </div>
         </div>
@@ -667,10 +716,10 @@ const SpendingLimitModal = ({ card, onClose }: { card: PersonalCard; onClose: ()
           </button>
           <button 
             onClick={onClose}
-            className="flex-1 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-semibold rounded-xl transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2"
+            className="flex-1 px-4 py-3 bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-400 hover:to-blue-400 text-white font-semibold rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
           >
-            <Check className="w-4 h-4" />
-            Сохранить
+            <Banknote className="w-4 h-4" />
+            Пополнить {rubAmount ? `${Number(rubAmount).toLocaleString('ru-RU')} ₽` : ''}
           </button>
         </div>
       </div>
@@ -754,10 +803,10 @@ const RealisticCreditCard = ({
       <div className="mt-3 flex gap-2">
         <button 
           onClick={onTopUp}
-          className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-xl transition-colors text-sm border border-amber-500/30"
+          className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-xl transition-colors text-sm border border-emerald-500/30"
         >
-          <ArrowUpDown className="w-4 h-4" />
-          Лимит списания
+          <Banknote className="w-4 h-4" />
+          Пополнить
         </button>
         <button 
           onClick={onClose}
@@ -854,6 +903,7 @@ const BankFeesTooltip = ({ fees }: { fees: { name: string; value: string }[] }) 
 export const CardsPage = () => {
   const { rates } = useRates();
   const { t } = useTranslation();
+  const [activeTab, setActiveTab] = useState<'my-cards' | 'new-card'>('my-cards');
   const [closeCardModal, setCloseCardModal] = useState<PersonalCard | null>(null);
   const [topUpModal, setTopUpModal] = useState<PersonalCard | null>(null);
   const [paymentModal, setPaymentModal] = useState<{ type: 'apple' | 'google' } | null>(null);
@@ -949,53 +999,90 @@ export const CardsPage = () => {
       <div className="stagger-fade-in">
         <BackButton />
         
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">{t('cards.title')}</h1>
-            <p className="text-slate-400 text-sm">
-              {t('cards.myCards')}
-            </p>
+            <p className="text-slate-400 text-sm">Управление картами и выпуск новых</p>
           </div>
         </div>
 
-        <div className="mb-8">
-              <h3 className="section-header flex items-center gap-2"><Plus className="w-4 h-4" />{t('cards.issueNewCard')}</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {cardTypesForIssue.map(ct => (
-                  <PersonalCardTypeCard
-                    key={ct.type}
-                    type={ct.type}
-                    name={ct.name}
-                    description={ct.description}
-                    currency={ct.currency}
-                    currencySymbol={ct.currencySymbol}
-                    price={ct.price}
-                    usdRate={rates.usd}
-                    eurRate={rates.eur}
-                    onSelect={() => setIssueModal(ct)}
+        {/* Tabs */}
+        <div className="flex gap-1 p-1 bg-white/[0.04] rounded-xl mb-8 w-fit">
+          <button
+            onClick={() => setActiveTab('my-cards')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
+              activeTab === 'my-cards'
+                ? 'bg-white/10 text-white shadow-sm'
+                : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
+            }`}
+          >
+            <CardIcon className="w-4 h-4" />
+            Мои карты
+          </button>
+          <button
+            onClick={() => setActiveTab('new-card')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
+              activeTab === 'new-card'
+                ? 'bg-white/10 text-white shadow-sm'
+                : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
+            }`}
+          >
+            <Plus className="w-4 h-4" />
+            Новая карта
+          </button>
+        </div>
+
+        {/* Tab: Мои карты */}
+        {activeTab === 'my-cards' && (
+          <div>
+            {personalCards.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {personalCards.map(card => (
+                  <RealisticCreditCard 
+                    key={card.id} 
+                    card={card}
+                    onClose={() => setCloseCardModal(card)}
+                    onTopUp={() => setTopUpModal(card)}
+                    onApplePay={() => setPaymentModal({ type: 'apple' })}
+                    onGooglePay={() => setPaymentModal({ type: 'google' })}
                   />
                 ))}
               </div>
-            </div>
+            ) : (
+              <div className="glass-card p-12 text-center">
+                <CardIcon className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-white mb-2">Нет активных карт</h3>
+                <p className="text-slate-400 text-sm mb-4">Выпустите первую карту, чтобы начать</p>
+                <button onClick={() => setActiveTab('new-card')} className="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium rounded-xl text-sm">
+                  Выпустить карту
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
-        <div>
-          <h3 className="section-header flex items-center gap-2"><CardIcon className="w-4 h-4" />{t('cards.myCards')}</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {personalCards.map(card => (
-              <RealisticCreditCard 
-                key={card.id} 
-                card={card}
-                onClose={() => setCloseCardModal(card)}
-                onTopUp={() => setTopUpModal(card)}
-                onApplePay={() => setPaymentModal({ type: 'apple' })}
-                onGooglePay={() => setPaymentModal({ type: 'google' })}
+        {/* Tab: Новая карта */}
+        {activeTab === 'new-card' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {cardTypesForIssue.map(ct => (
+              <PersonalCardTypeCard
+                key={ct.type}
+                type={ct.type}
+                name={ct.name}
+                description={ct.description}
+                currency={ct.currency}
+                currencySymbol={ct.currencySymbol}
+                price={ct.price}
+                usdRate={rates.usd}
+                eurRate={rates.eur}
+                onSelect={() => setIssueModal(ct)}
               />
             ))}
           </div>
-        </div>
+        )}
 
         {closeCardModal && <CloseCardModal card={closeCardModal} onClose={() => setCloseCardModal(null)} onConfirm={() => setCloseCardModal(null)} />}
-        {topUpModal && <SpendingLimitModal card={topUpModal} onClose={() => setTopUpModal(null)} />}
+        {topUpModal && <VaultTopUpModal card={topUpModal} onClose={() => setTopUpModal(null)} />}
         {paymentModal && <PaymentMethodModal type={paymentModal.type} onClose={() => setPaymentModal(null)} />}
         {issueModal && <CardIssueModal card={issueModal} onClose={() => setIssueModal(null)} />}
       </div>

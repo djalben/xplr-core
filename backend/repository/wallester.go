@@ -186,12 +186,24 @@ func (wr *WallesterRepository) IssueCard(
 		return nil, fmt.Errorf("wallester card creation failed: %s", wallesterResp.Error)
 	}
 
-	// 5. Сохранение карты в таблицу cards Supabase
+	// 5. Дефолтные лимиты по типу карты
+	// subscriptions → 50 000₽, travel → 200 000₽, premium → 0 (безлимит)
+	var defaultMaxLimit decimal.Decimal
+	switch serviceSlug {
+	case "subscriptions":
+		defaultMaxLimit = decimal.NewFromInt(50000)
+	case "travel":
+		defaultMaxLimit = decimal.NewFromInt(200000)
+	default: // premium и др. — безлимит
+		defaultMaxLimit = decimal.Zero
+	}
+
+	// 6. Сохранение карты в таблицу cards Supabase
 	card := models.Card{
 		UserID:          userID,
 		ServiceID:       serviceID,
 		ProviderCardID:  wallesterResp.CardID,
-		ExternalID:      wallesterResp.CardID, // external_id = card_id от Wallester
+		ExternalID:      wallesterResp.CardID,
 		BIN:             wallesterResp.BIN,
 		Last4Digits:     wallesterResp.Last4,
 		CardStatus:      wallesterResp.Status,
@@ -201,6 +213,7 @@ func (wr *WallesterRepository) IssueCard(
 		DailySpendLimit: dailyLimit,
 		CardType:        cardType,
 		CardBalance:     decimal.Zero,
+		SpendingLimit:   defaultMaxLimit,
 		CreatedAt:       time.Now(),
 	}
 
@@ -209,8 +222,8 @@ func (wr *WallesterRepository) IssueCard(
 		INSERT INTO cards (
 			user_id, service_id, provider_card_id, external_id, bin, last_4_digits,
 			card_status, status, nickname, service_slug, daily_spend_limit,
-			card_type, card_balance, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+			card_type, card_balance, spending_limit, default_max_limit, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 		RETURNING id
 	`
 
@@ -230,6 +243,8 @@ func (wr *WallesterRepository) IssueCard(
 		card.DailySpendLimit,
 		card.CardType,
 		card.CardBalance,
+		defaultMaxLimit,
+		defaultMaxLimit,
 		card.CreatedAt,
 	).Scan(&cardID)
 

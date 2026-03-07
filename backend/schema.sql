@@ -175,4 +175,13 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cards' AND column_name = 'spent_from_vault') THEN
         ALTER TABLE cards ADD COLUMN spent_from_vault NUMERIC(20, 4) DEFAULT 0.0000;
     END IF;
+    -- Telegram ID для интеграции с ботом
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'telegram_id') THEN
+        ALTER TABLE users ADD COLUMN telegram_id BIGINT;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id) WHERE telegram_id IS NOT NULL;
+    END IF;
+    -- Дефолтный лимит карты по типу (устанавливается при выпуске)
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cards' AND column_name = 'default_max_limit') THEN
+        ALTER TABLE cards ADD COLUMN default_max_limit NUMERIC(20, 4) DEFAULT 0.0000;
+    END IF;
 END $$;

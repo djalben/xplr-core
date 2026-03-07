@@ -12,7 +12,8 @@ import {
   Trophy,
   Share2,
   QrCode,
-  ExternalLink
+  ExternalLink,
+  Shield
 } from 'lucide-react';
 
 interface Referral {
@@ -353,12 +354,32 @@ export const ReferralsPage = () => {
           </div>
         </div>
 
-        {/* Withdraw Button */}
-        <div className="flex justify-end">
-          <button className="flex items-center gap-2 px-6 py-3 gradient-accent text-white font-medium rounded-xl transition-all shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:opacity-90">
-            Вывести на баланс
-            <ArrowRight className="w-5 h-5" />
-          </button>
+        {/* Transfer to Vault */}
+        <div className="glass-card p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center">
+              <Shield className="w-6 h-6 text-amber-400" />
+            </div>
+            <div>
+              <p className="text-white font-semibold">Перевести в Сейф</p>
+              <p className="text-xs text-slate-400">Минимум для вывода: $100</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-lg font-bold text-white">${stats.earnings}</span>
+            <button 
+              disabled={stats.earnings < 100}
+              className={`flex items-center gap-2 px-6 py-3 font-medium rounded-xl transition-all ${
+                stats.earnings >= 100
+                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:opacity-90'
+                  : 'bg-white/5 text-slate-500 border border-white/10 cursor-not-allowed'
+              }`}
+            >
+              <Shield className="w-5 h-5" />
+              В Сейф
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 

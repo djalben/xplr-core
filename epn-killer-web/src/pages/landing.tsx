@@ -20,20 +20,7 @@ import {
   Play
 } from 'lucide-react';
 
-// Static ambient background — no canvas, no animation loop
-const LandingNeuralBackground = () => (
-  <div
-    className="fixed inset-0 pointer-events-none"
-    style={{
-      zIndex: 0,
-      background: `
-        radial-gradient(ellipse 60% 50% at 20% 20%, rgba(59,130,246,0.10) 0%, transparent 70%),
-        radial-gradient(ellipse 50% 40% at 80% 50%, rgba(139,92,246,0.09) 0%, transparent 70%),
-        radial-gradient(ellipse 45% 50% at 50% 85%, rgba(99,102,241,0.06) 0%, transparent 70%)
-      `,
-    }}
-  />
-);
+import { NeuralBackground } from '../components/neural-background';
 
 // Floating 3D Card Component — matches dashboard card branding
 const FloatingCard = ({ className = '', delay = 0, variant = 'blue' }: { className?: string; delay?: number; variant?: 'blue' | 'purple' | 'gold' }) => {
@@ -341,7 +328,7 @@ export const LandingPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0a0a0f] via-[#0f0f18] to-[#12121a] relative overflow-x-hidden">
-      <LandingNeuralBackground />
+      <NeuralBackground />
       
       {/* Content wrapper */}
       <div className="relative z-10">
