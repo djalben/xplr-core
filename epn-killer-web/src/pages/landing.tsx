@@ -199,7 +199,7 @@ const LandingTariffCard = ({ type, name, defaultCurrency, price, features, popul
   };
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col h-full">
       {/* ── Popular badge ── */}
       {popular && (
         <div className="flex justify-center mb-3">
@@ -210,7 +210,7 @@ const LandingTariffCard = ({ type, name, defaultCurrency, price, features, popul
       )}
 
       {/* ── Card Visual — all info INSIDE the gradient ── */}
-      <div className={`relative rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br ${gradients[type]} flex flex-col`}>
+      <div className={`relative rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br ${gradients[type]} flex flex-col flex-1`}>
 
         {/* Watermark layer */}
         {type === 'subscriptions' && (
@@ -265,7 +265,7 @@ const LandingTariffCard = ({ type, name, defaultCurrency, price, features, popul
         )}
 
         {/* Card content — branding + tariff info + card number */}
-        <div className="relative p-5 flex flex-col min-h-[360px]">
+        <div className="relative p-5 flex flex-col min-h-[320px]">
           {/* Top: XPLR branding + currency */}
           <div className="flex items-start justify-between mb-4">
             <div>
@@ -599,7 +599,7 @@ export const LandingPage = () => {
             </div>
 
             {/* Card Types — realistic card showcase */}
-            <div className="grid md:grid-cols-3 gap-8 mb-16">
+            <div className="grid md:grid-cols-3 gap-6 mb-16 items-stretch">
               <LandingTariffCard 
                 type="subscriptions"
                 name="Подписки"

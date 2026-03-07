@@ -20,6 +20,7 @@ import apiClient, { API_BASE_URL } from '../api/axios';
 import { getUserGrade, type GradeInfo } from '../api/grade';
 import { getVault, type InternalBalance } from '../api/vault';
 import { WorldClocks } from '../components/world-clocks';
+import { VaultTopUpModal } from '../components/vault-topup-modal';
 
 interface StatCardProps {
   title: string;
@@ -183,6 +184,7 @@ export const DashboardPage = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [vault, setVault] = useState<InternalBalance | null>(null);
+  const [isVaultModalOpen, setIsVaultModalOpen] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -283,7 +285,7 @@ export const DashboardPage = () => {
               </div>
             </div>
             <div className="mt-4 flex items-center gap-3">
-              <button onClick={() => navigate('/finance')} className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-medium rounded-xl text-sm hover:shadow-lg hover:shadow-amber-500/25 transition-all">
+              <button onClick={() => setIsVaultModalOpen(true)} className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-medium rounded-xl text-sm hover:shadow-lg hover:shadow-amber-500/25 transition-all">
                 Пополнить Сейф
               </button>
               <button onClick={() => navigate('/cards')} className="px-5 py-2.5 bg-white/5 border border-white/10 text-white font-medium rounded-xl text-sm hover:bg-white/10 transition-all">
@@ -322,6 +324,7 @@ export const DashboardPage = () => {
         </div>
 
       </div>
+      {isVaultModalOpen && <VaultTopUpModal onClose={() => setIsVaultModalOpen(false)} />}
     </DashboardLayout>
   );
 };
