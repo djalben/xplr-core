@@ -4,17 +4,11 @@ import { useTranslation } from 'react-i18next';
 interface ClockProps {
   timezone: string;
   label: string;
+  now: Date;
 }
 
-const AnalogClock = ({ timezone, label }: ClockProps) => {
-  const [time, setTime] = useState(new Date());
-
-  useEffect(() => {
-    const interval = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const localTime = new Date(time.toLocaleString('en-US', { timeZone: timezone }));
+const AnalogClock = ({ timezone, label, now }: ClockProps) => {
+  const localTime = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
   const hours = localTime.getHours() % 12;
   const minutes = localTime.getMinutes();
   const seconds = localTime.getSeconds();
@@ -26,7 +20,7 @@ const AnalogClock = ({ timezone, label }: ClockProps) => {
   const timeStr = localTime.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', hour12: false });
 
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="flex flex-col items-center gap-2" style={{ width: 80, minHeight: 110 }}>
       <div className="relative w-16 h-16 md:w-20 md:h-20">
         {/* Clock face */}
         <svg viewBox="0 0 100 100" className="w-full h-full">
@@ -96,11 +90,18 @@ const AnalogClock = ({ timezone, label }: ClockProps) => {
 
 export const WorldClocks = () => {
   const { t } = useTranslation();
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
-    <div className="flex items-center gap-6 md:gap-8">
-      <AnalogClock timezone="Europe/Moscow" label={t('clocks.moscow')} />
-      <AnalogClock timezone="Europe/London" label={t('clocks.london')} />
-      <AnalogClock timezone="America/New_York" label={t('clocks.newYork')} />
+    <div className="flex items-center gap-6 md:gap-8" style={{ minWidth: 280, minHeight: 110 }}>
+      <AnalogClock timezone="Europe/Moscow" label={t('clocks.moscow')} now={now} />
+      <AnalogClock timezone="Europe/London" label={t('clocks.london')} now={now} />
+      <AnalogClock timezone="America/New_York" label={t('clocks.newYork')} now={now} />
     </div>
   );
 };

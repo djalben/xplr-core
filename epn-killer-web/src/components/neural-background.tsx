@@ -106,7 +106,7 @@ export const NeuralBackground = () => {
   }, []);
 
   return (
-    <div className="neural-bg" style={{ overflow: 'hidden' }}>
+    <div className="neural-bg" style={{ overflow: 'hidden', contain: 'strict' }}>
       <canvas
         ref={canvasRef}
         style={{

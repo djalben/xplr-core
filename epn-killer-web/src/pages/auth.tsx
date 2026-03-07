@@ -184,8 +184,7 @@ export const AuthPage = () => {
               bg-gradient-to-br from-[#0d1528]/90 via-[#0a1025]/95 to-[#0c0f20]/90
               backdrop-blur-2xl
               shadow-[0_8px_60px_-12px_rgba(30,64,175,0.25)]
-              border border-white/[0.08]
-              transition-transform duration-150 hover:scale-[1.005]"
+              border border-white/[0.08]"
           >
             {/* Glass shine overlay */}
             <div className="absolute inset-0 bg-gradient-to-br from-white/[0.06] via-transparent to-transparent pointer-events-none rounded-[22px]" />
@@ -239,10 +238,10 @@ export const AuthPage = () => {
                     placeholder="Email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl py-4 pl-12 pr-4
+                    className="w-full bg-white/[0.04] border border-white/[0.10] rounded-xl py-4 pl-12 pr-4
                       text-white placeholder-slate-600
-                      focus:outline-none focus:border-blue-500/40 focus:bg-white/[0.06] focus:shadow-[0_0_20px_-4px_rgba(59,130,246,0.15)]
-                      transition-all text-base font-mono tracking-wide"
+                      focus:outline-none focus:border-blue-400 focus:bg-white/[0.08] focus:ring-1 focus:ring-blue-400/50
+                      transition-colors duration-150 text-base font-mono tracking-wide"
                     required
                     autoComplete="email"
                   />
@@ -256,10 +255,10 @@ export const AuthPage = () => {
                     placeholder={t('auth.password')}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl py-4 pl-12 pr-14
+                    className="w-full bg-white/[0.04] border border-white/[0.10] rounded-xl py-4 pl-12 pr-14
                       text-white placeholder-slate-600
-                      focus:outline-none focus:border-blue-500/40 focus:bg-white/[0.06] focus:shadow-[0_0_20px_-4px_rgba(59,130,246,0.15)]
-                      transition-all text-base font-mono tracking-widest"
+                      focus:outline-none focus:border-blue-400 focus:bg-white/[0.08] focus:ring-1 focus:ring-blue-400/50
+                      transition-colors duration-150 text-base font-mono tracking-widest"
                     required
                     autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                   />
@@ -297,10 +296,10 @@ export const AuthPage = () => {
                       placeholder={t('auth.confirmPassword')}
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl py-4 pl-12 pr-4
+                      className="w-full bg-white/[0.04] border border-white/[0.10] rounded-xl py-4 pl-12 pr-4
                         text-white placeholder-slate-600
-                        focus:outline-none focus:border-blue-500/40 focus:bg-white/[0.06] focus:shadow-[0_0_20px_-4px_rgba(59,130,246,0.15)]
-                        transition-all text-base font-mono tracking-widest"
+                        focus:outline-none focus:border-blue-400 focus:bg-white/[0.08] focus:ring-1 focus:ring-blue-400/50
+                        transition-colors duration-150 text-base font-mono tracking-widest"
                       required
                       autoComplete="new-password"
                     />

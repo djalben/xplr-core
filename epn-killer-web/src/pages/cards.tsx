@@ -470,36 +470,43 @@ const PersonalCardTypeCard = ({
 }) => {
   const { t } = useTranslation();
   return (
-    <div className="glass-card p-4 card-hover">
+    <div className="relative rounded-2xl border border-white/[0.08] bg-[#0d0d14]/80 backdrop-blur-xl overflow-hidden flex flex-col">
+      {/* Accent top edge */}
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/40 to-transparent" />
+
       {/* Card preview */}
-      <div className="mb-4">
+      <div className="p-4 pb-0">
         {type === 'subscriptions' && <SubscriptionsCardVisual mini={true} />}
         {type === 'travel' && <TravelCardVisual mini={true} />}
         {type === 'premium' && <PremiumCardVisual mini={true} />}
       </div>
-      
-      <h4 className="text-white font-semibold text-center mb-1">{name}</h4>
-      <p className="text-slate-400 text-xs text-center mb-3">{description}</p>
-      
-      {/* Price and rate */}
-      <div className="grid grid-cols-2 gap-2 mb-4">
-        <div className="p-2 bg-white/5 rounded-lg text-center">
-          <p className="text-blue-400 font-bold text-lg">{price}</p>
-          <p className="text-slate-500 text-[10px]">{t('cards.cost')}</p>
+
+      {/* Info block */}
+      <div className="p-4 pt-4 flex-1 flex flex-col">
+        <h4 className="text-white font-semibold text-center mb-1">{name}</h4>
+        <p className="text-slate-400 text-xs text-center mb-4">{description}</p>
+        
+        {/* Price and rate */}
+        <div className="grid grid-cols-2 gap-2 mb-5">
+          <div className="p-2.5 bg-white/[0.04] rounded-xl text-center border border-white/[0.06]">
+            <p className="text-blue-400 font-bold text-lg">{price}</p>
+            <p className="text-slate-500 text-[10px]">{t('cards.cost')}</p>
+          </div>
+          <div className="p-2.5 bg-white/[0.04] rounded-xl text-center flex flex-col items-center justify-center border border-white/[0.06]">
+            <p className="text-white font-medium text-[11px]">USD: {usdRate.toFixed(2)} ₽</p>
+            <p className="text-white font-medium text-[11px]">EUR: {eurRate.toFixed(2)} ₽</p>
+            <p className="text-slate-500 text-[10px] mt-0.5">{t('cards.rate')}</p>
+          </div>
         </div>
-        <div className="p-2 bg-white/5 rounded-lg text-center flex flex-col items-center justify-center">
-          <p className="text-white font-medium text-[11px]">USD: {usdRate.toFixed(2)} ₽</p>
-          <p className="text-white font-medium text-[11px]">EUR: {eurRate.toFixed(2)} ₽</p>
-          <p className="text-slate-500 text-[10px] mt-0.5">{t('cards.rate')}</p>
-        </div>
+        
+        {/* Button strictly under info */}
+        <button 
+          onClick={onSelect}
+          className="w-full py-3.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white font-semibold rounded-xl transition-all text-sm shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 mt-auto"
+        >
+          {t('cards.issueCard')} {price}
+        </button>
       </div>
-      
-      <button 
-        onClick={onSelect}
-        className="w-full py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium rounded-xl transition-all text-sm"
-      >
-        {t('cards.issueCard')} {price}
-      </button>
     </div>
   );
 };
@@ -578,11 +585,12 @@ const BankLogoButton = ({
   </button>
 );
 
-// Vault Top-Up Modal — fund card from Vault with currency calculator
+// Vault Top-Up Modal — fund card from Vault with currency calculator + RUB presets
 const VaultTopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () => void }) => {
   const { rates } = useRates();
   const [selectedCurrency, setSelectedCurrency] = useState<'USD' | 'EUR'>(card.currency === '€' ? 'EUR' : 'USD');
   const [foreignAmount, setForeignAmount] = useState('');
+  const [activeRubPreset, setActiveRubPreset] = useState<number | null>(null);
   const [selectedBank, setSelectedBank] = useState('sbp');
 
   const currentRate = selectedCurrency === 'USD' ? rates.usd : rates.eur;
@@ -590,6 +598,19 @@ const VaultTopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () =>
   const rubAmount = foreignAmount && !isNaN(parseFloat(foreignAmount))
     ? (parseFloat(foreignAmount) * currentRate).toFixed(0)
     : '';
+
+  const rubPresets = [1000, 2000, 5000, 10000, 20000, 50000, 100000];
+
+  const handleRubPreset = (rub: number) => {
+    setActiveRubPreset(rub);
+    const converted = (rub / currentRate).toFixed(2);
+    setForeignAmount(converted);
+  };
+
+  const handleForeignInput = (val: string) => {
+    setForeignAmount(val);
+    setActiveRubPreset(null);
+  };
 
   const banks = [
     { id: 'sbp', name: 'СБП' },
@@ -602,15 +623,18 @@ const VaultTopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () =>
   return (
     <ModalPortal>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-xl" onClick={onClose} />
 
-      <div className="relative bg-[#0d0d0f]/95 backdrop-blur-3xl border border-white/10 rounded-2xl w-full max-w-[440px] max-h-[90dvh] flex flex-col animate-scale-in shadow-2xl shadow-black/60">
+      <div className="relative bg-[#0a0a12]/90 backdrop-blur-3xl border border-white/[0.10] rounded-2xl w-full max-w-[440px] max-h-[90dvh] flex flex-col animate-scale-in shadow-[0_24px_80px_-12px_rgba(0,0,0,0.8)]">
+        {/* Glass accent top edge */}
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-400/40 to-transparent rounded-t-2xl" />
+
         {/* Header */}
         <div className="shrink-0 p-5 pb-4 border-b border-white/[0.06]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-blue-500/20 border border-emerald-500/30 flex items-center justify-center">
-                <Banknote className="w-5 h-5 text-emerald-400" />
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 border border-blue-500/30 flex items-center justify-center">
+                <Banknote className="w-5 h-5 text-blue-400" />
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-white">Пополнить из Сейфа</h3>
@@ -628,21 +652,21 @@ const VaultTopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () =>
           {/* Currency selector */}
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setSelectedCurrency('USD')}
+              onClick={() => { setSelectedCurrency('USD'); setActiveRubPreset(null); }}
               className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all text-center ${
                 selectedCurrency === 'USD'
                   ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40'
-                  : 'bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10'
+                  : 'bg-white/[0.04] text-slate-400 border border-white/[0.08] hover:bg-white/[0.08]'
               }`}
             >
               $ USD
             </button>
             <button
-              onClick={() => setSelectedCurrency('EUR')}
+              onClick={() => { setSelectedCurrency('EUR'); setActiveRubPreset(null); }}
               className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all text-center ${
                 selectedCurrency === 'EUR'
                   ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40'
-                  : 'bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10'
+                  : 'bg-white/[0.04] text-slate-400 border border-white/[0.08] hover:bg-white/[0.08]'
               }`}
             >
               € EUR
@@ -653,25 +677,45 @@ const VaultTopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () =>
           <div>
             <label className="block text-sm text-slate-400 mb-1.5">Сумма в валюте</label>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400 text-lg font-bold">{currencySymbol}</span>
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400 text-lg font-bold">{currencySymbol}</span>
               <input
                 type="number"
                 placeholder="100"
                 value={foreignAmount}
-                onChange={(e) => setForeignAmount(e.target.value)}
-                className="w-full h-12 pl-12 pr-4 bg-white/[0.04] border border-white/10 rounded-xl text-white text-lg font-semibold focus:outline-none focus:border-emerald-500/50 transition-all placeholder:text-slate-600"
+                onChange={(e) => handleForeignInput(e.target.value)}
+                className="w-full h-12 pl-12 pr-4 bg-white/[0.04] border border-white/[0.10] rounded-xl text-white text-lg font-semibold focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/50 transition-colors placeholder:text-slate-600"
               />
+            </div>
+          </div>
+
+          {/* RUB quick-select presets */}
+          <div>
+            <label className="block text-sm text-slate-400 mb-2">Быстрый выбор в рублях</label>
+            <div className="flex flex-wrap gap-2">
+              {rubPresets.map(rub => (
+                <button
+                  key={rub}
+                  onClick={() => handleRubPreset(rub)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    activeRubPreset === rub
+                      ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40 shadow-sm shadow-blue-500/10'
+                      : 'bg-white/[0.04] text-slate-400 border border-white/[0.08] hover:bg-white/[0.08] hover:text-white'
+                  }`}
+                >
+                  {rub >= 1000 ? `${rub / 1000}k` : rub} ₽
+                </button>
+              ))}
             </div>
           </div>
 
           {/* Conversion arrow */}
           <div className="flex items-center justify-center py-1">
             <div className="flex items-center gap-3">
-              <div className="h-px w-10 bg-white/10" />
-              <div className="w-8 h-8 rounded-full bg-white/[0.04] border border-white/10 flex items-center justify-center">
+              <div className="h-px w-10 bg-white/[0.06]" />
+              <div className="w-8 h-8 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center">
                 <span className="text-xs font-bold text-slate-300">{currencySymbol}→₽</span>
               </div>
-              <div className="h-px w-10 bg-white/10" />
+              <div className="h-px w-10 bg-white/[0.06]" />
             </div>
           </div>
 
@@ -679,19 +723,19 @@ const VaultTopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () =>
           <div>
             <label className="block text-sm text-slate-400 mb-1.5">К оплате через СБП</label>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 text-lg font-bold">₽</span>
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/60 text-lg font-bold">₽</span>
               <input
                 type="text"
                 readOnly
                 value={rubAmount ? Number(rubAmount).toLocaleString('ru-RU') : ''}
                 placeholder="0"
-                className="w-full h-12 pl-12 pr-4 bg-white/[0.04] border border-white/10 rounded-xl text-white text-lg font-semibold placeholder:text-slate-600 cursor-default"
+                className="w-full h-12 pl-12 pr-4 bg-white/[0.04] border border-white/[0.08] rounded-xl text-white text-lg font-semibold placeholder:text-slate-600 cursor-default"
               />
             </div>
           </div>
 
           {/* Rate info */}
-          <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10">
+          <div className="p-3 rounded-xl bg-white/[0.04] border border-white/[0.06]">
             <div className="flex items-center justify-between text-sm">
               <span className="text-slate-400">Курс:</span>
               <span className="text-white font-bold">1 {selectedCurrency} = {currentRate.toFixed(2)} ₽</span>
@@ -711,12 +755,13 @@ const VaultTopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () =>
         
         {/* Footer */}
         <div className="shrink-0 p-5 pt-4 border-t border-white/[0.06] flex gap-3">
-          <button onClick={onClose} className="flex-1 px-4 py-3 bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-slate-300 font-medium rounded-xl transition-colors">
+          <button onClick={onClose} className="flex-1 px-4 py-3 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-slate-300 font-medium rounded-xl transition-colors">
             Отмена
           </button>
           <button 
             onClick={onClose}
-            className="flex-1 px-4 py-3 bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-400 hover:to-blue-400 text-white font-semibold rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
+            disabled={!foreignAmount || parseFloat(foreignAmount) <= 0}
+            className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Banknote className="w-4 h-4" />
             Пополнить {rubAmount ? `${Number(rubAmount).toLocaleString('ru-RU')} ₽` : ''}
