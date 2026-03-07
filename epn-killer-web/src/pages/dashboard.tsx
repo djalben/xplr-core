@@ -234,7 +234,7 @@ export const DashboardPage = () => {
 
   return (
     <DashboardLayout>
-      <div className="stagger-fade-in">
+      <div>
         {/* Welcome Card */}
         <div className="glass-card p-6 mb-6 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />

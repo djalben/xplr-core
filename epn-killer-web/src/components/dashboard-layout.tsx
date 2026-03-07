@@ -8,7 +8,7 @@ interface DashboardLayoutProps {
 
 export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   return (
-    <div className="min-h-[100dvh] bg-gradient-to-br from-[#0a0a0f] via-[#0f0f18] to-[#12121a]">
+    <div className="min-h-[100dvh] bg-gradient-to-br from-[#0a0a0f] via-[#0f0f18] to-[#12121a] relative overflow-hidden">
       <NeuralBackground />
       <Sidebar />
       {/* Desktop: sidebar offset. Mobile: header + bottom nav offset */}

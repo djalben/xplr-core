@@ -59,7 +59,7 @@ const VisaLogo = ({ className = "h-8 w-auto", color = "#1A1F71" }: { className?:
 );
 
 // Professional Mastercard Logo
-const MastercardLogo = ({ className = "h-8 w-auto" }: { className?: string }) => (
+export const MastercardLogo = ({ className = "h-8 w-auto" }: { className?: string }) => (
   <svg viewBox="0 0 780 500" className={className} preserveAspectRatio="xMidYMid meet">
     <circle cx="250" cy="250" r="150" fill="#EB001B"/>
     <circle cx="530" cy="250" r="150" fill="#F79E1B"/>
@@ -245,7 +245,7 @@ const CardIssueModal = ({
 };
 
 // Subscriptions Card Visual - colorful with service icons (realistic bank card style)
-const SubscriptionsCardVisual = ({ mini = true, currencySymbol }: { mini?: boolean; currencySymbol?: string }) => (
+export const SubscriptionsCardVisual = ({ mini = true, currencySymbol }: { mini?: boolean; currencySymbol?: string }) => (
   <div className={`relative ${mini ? 'w-full aspect-[1.586/1]' : 'w-72 h-44'} rounded-2xl overflow-hidden shadow-2xl`}>
     {/* Gradient background */}
     <div className="absolute inset-0">
@@ -308,7 +308,7 @@ const SubscriptionsCardVisual = ({ mini = true, currencySymbol }: { mini?: boole
 );
 
 // Travel Card Visual - blue gradient (realistic bank card style)
-const TravelCardVisual = ({ mini = true, currencySymbol }: { mini?: boolean; currencySymbol?: string }) => (
+export const TravelCardVisual = ({ mini = true, currencySymbol }: { mini?: boolean; currencySymbol?: string }) => (
   <div className={`relative ${mini ? 'w-full aspect-[1.586/1]' : 'w-72 h-44'} rounded-2xl overflow-hidden shadow-2xl`}>
     {/* Blue gradient background */}
     <div className="absolute inset-0">
@@ -373,7 +373,7 @@ const TravelCardVisual = ({ mini = true, currencySymbol }: { mini?: boolean; cur
 );
 
 // Premium Card Visual - XPLR PRIME: deep black matte, neural texture, platinum chip, Power Beam
-const PremiumCardVisual = ({ mini = true, currencySymbol }: { mini?: boolean; currencySymbol?: string }) => (
+export const PremiumCardVisual = ({ mini = true, currencySymbol }: { mini?: boolean; currencySymbol?: string }) => (
   <div className={`relative ${mini ? 'w-full aspect-[1.586/1]' : 'w-72 h-44'} rounded-2xl overflow-hidden shadow-2xl`}>
     {/* Deep matte black background */}
     <div className="absolute inset-0 bg-gradient-to-br from-[#0a0a0a] via-[#111111] to-[#080808]">
@@ -591,15 +591,13 @@ const VaultTopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () =>
   const [selectedCurrency, setSelectedCurrency] = useState<'USD' | 'EUR'>(card.currency === '€' ? 'EUR' : 'USD');
   const [foreignAmount, setForeignAmount] = useState('');
   const [activeRubPreset, setActiveRubPreset] = useState<number | null>(null);
-  const [selectedBank, setSelectedBank] = useState('sbp');
-
   const currentRate = selectedCurrency === 'USD' ? rates.usd : rates.eur;
   const currencySymbol = selectedCurrency === 'USD' ? '$' : '€';
   const rubAmount = foreignAmount && !isNaN(parseFloat(foreignAmount))
     ? (parseFloat(foreignAmount) * currentRate).toFixed(0)
     : '';
 
-  const rubPresets = [1000, 2000, 5000, 10000, 20000, 50000, 100000];
+  const rubPresets = [1000, 2000, 5000, 10000, 20000, 50000];
 
   const handleRubPreset = (rub: number) => {
     setActiveRubPreset(rub);
@@ -612,8 +610,7 @@ const VaultTopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () =>
     setActiveRubPreset(null);
   };
 
-  const banks = [
-    { id: 'sbp', name: 'СБП' },
+  const bankIcons = [
     { id: 'sber', name: 'Сбер' },
     { id: 'tbank', name: 'Т-Банк' },
     { id: 'alfa', name: 'Альфа' },
@@ -622,60 +619,54 @@ const VaultTopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () =>
 
   return (
     <ModalPortal>
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-xl" onClick={onClose} />
 
-      <div className="relative bg-[#0a0a12]/90 backdrop-blur-3xl border border-white/[0.10] rounded-2xl w-full max-w-[440px] max-h-[90dvh] flex flex-col animate-scale-in shadow-[0_24px_80px_-12px_rgba(0,0,0,0.8)]">
+      <div className="relative bg-[#0a0a12]/95 backdrop-blur-3xl border border-white/[0.10] rounded-t-2xl sm:rounded-2xl w-full max-w-[440px] max-h-[85dvh] flex flex-col animate-scale-in shadow-[0_24px_80px_-12px_rgba(0,0,0,0.8)]">
         {/* Glass accent top edge */}
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-400/40 to-transparent rounded-t-2xl" />
 
-        {/* Header */}
-        <div className="shrink-0 p-5 pb-4 border-b border-white/[0.06]">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 border border-blue-500/30 flex items-center justify-center">
-                <Banknote className="w-5 h-5 text-blue-400" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-white">Пополнить из Сейфа</h3>
-                <p className="text-xs text-slate-400">{card.name}</p>
-              </div>
+        {/* Header — compact */}
+        <div className="shrink-0 px-5 py-3.5 border-b border-white/[0.06] flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 border border-blue-500/30 flex items-center justify-center">
+              <Banknote className="w-4 h-4 text-blue-400" />
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
-              <X className="w-5 h-5 text-slate-400" />
-            </button>
+            <div>
+              <h3 className="text-base font-semibold text-white leading-tight">Пополнить из Сейфа</h3>
+              <p className="text-[11px] text-slate-400">{card.name}</p>
+            </div>
           </div>
+          <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors">
+            <X className="w-5 h-5 text-slate-400" />
+          </button>
         </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto min-h-0 p-5 space-y-4">
-          {/* Currency selector */}
-          <div className="flex items-center gap-2">
+        {/* Body — compact flex-col */}
+        <div className="flex-1 overflow-y-auto min-h-0 px-5 py-4 space-y-3">
+          {/* Currency toggle */}
+          <div className="flex gap-2">
             <button
               onClick={() => { setSelectedCurrency('USD'); setActiveRubPreset(null); }}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all text-center ${
+              className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all text-center ${
                 selectedCurrency === 'USD'
                   ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40'
                   : 'bg-white/[0.04] text-slate-400 border border-white/[0.08] hover:bg-white/[0.08]'
               }`}
-            >
-              $ USD
-            </button>
+            >$ USD</button>
             <button
               onClick={() => { setSelectedCurrency('EUR'); setActiveRubPreset(null); }}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all text-center ${
+              className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all text-center ${
                 selectedCurrency === 'EUR'
                   ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40'
                   : 'bg-white/[0.04] text-slate-400 border border-white/[0.08] hover:bg-white/[0.08]'
               }`}
-            >
-              € EUR
-            </button>
+            >€ EUR</button>
           </div>
 
           {/* Amount input */}
           <div>
-            <label className="block text-sm text-slate-400 mb-1.5">Сумма в валюте</label>
+            <label className="block text-xs text-slate-400 mb-1">Сумма в валюте</label>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400 text-lg font-bold">{currencySymbol}</span>
               <input
@@ -683,89 +674,67 @@ const VaultTopUpModal = ({ card, onClose }: { card: PersonalCard; onClose: () =>
                 placeholder="100"
                 value={foreignAmount}
                 onChange={(e) => handleForeignInput(e.target.value)}
-                className="w-full h-12 pl-12 pr-4 bg-white/[0.04] border border-white/[0.10] rounded-xl text-white text-lg font-semibold focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/50 transition-colors placeholder:text-slate-600"
+                className="w-full h-11 pl-12 pr-4 bg-white/[0.04] border border-white/[0.10] rounded-xl text-white text-lg font-semibold focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/50 transition-colors placeholder:text-slate-600"
               />
             </div>
           </div>
 
           {/* RUB quick-select presets */}
-          <div>
-            <label className="block text-sm text-slate-400 mb-2">Быстрый выбор в рублях</label>
-            <div className="flex flex-wrap gap-2">
-              {rubPresets.map(rub => (
-                <button
-                  key={rub}
-                  onClick={() => handleRubPreset(rub)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                    activeRubPreset === rub
-                      ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40 shadow-sm shadow-blue-500/10'
-                      : 'bg-white/[0.04] text-slate-400 border border-white/[0.08] hover:bg-white/[0.08] hover:text-white'
-                  }`}
-                >
-                  {rub >= 1000 ? `${rub / 1000}k` : rub} ₽
-                </button>
-              ))}
-            </div>
+          <div className="flex flex-wrap gap-1.5">
+            {rubPresets.map(rub => (
+              <button
+                key={rub}
+                onClick={() => handleRubPreset(rub)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                  activeRubPreset === rub
+                    ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40'
+                    : 'bg-white/[0.04] text-slate-400 border border-white/[0.08] hover:bg-white/[0.08]'
+                }`}
+              >
+                {rub >= 1000 ? `${rub / 1000}k` : rub} ₽
+              </button>
+            ))}
           </div>
 
-          {/* Conversion arrow */}
-          <div className="flex items-center justify-center py-1">
-            <div className="flex items-center gap-3">
-              <div className="h-px w-10 bg-white/[0.06]" />
-              <div className="w-8 h-8 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center">
-                <span className="text-xs font-bold text-slate-300">{currencySymbol}→₽</span>
-              </div>
-              <div className="h-px w-10 bg-white/[0.06]" />
-            </div>
-          </div>
-
-          {/* RUB result */}
-          <div>
-            <label className="block text-sm text-slate-400 mb-1.5">К оплате через СБП</label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/60 text-lg font-bold">₽</span>
+          {/* Conversion + result row */}
+          <div className="flex items-center gap-2">
+            <div className="flex-1 relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50 text-sm font-bold">₽</span>
               <input
                 type="text"
                 readOnly
                 value={rubAmount ? Number(rubAmount).toLocaleString('ru-RU') : ''}
                 placeholder="0"
-                className="w-full h-12 pl-12 pr-4 bg-white/[0.04] border border-white/[0.08] rounded-xl text-white text-lg font-semibold placeholder:text-slate-600 cursor-default"
+                className="w-full h-11 pl-9 pr-3 bg-white/[0.04] border border-white/[0.08] rounded-xl text-white text-base font-semibold placeholder:text-slate-600 cursor-default"
               />
             </div>
-          </div>
-
-          {/* Rate info */}
-          <div className="p-3 rounded-xl bg-white/[0.04] border border-white/[0.06]">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-400">Курс:</span>
-              <span className="text-white font-bold">1 {selectedCurrency} = {currentRate.toFixed(2)} ₽</span>
-            </div>
-          </div>
-
-          {/* Bank selector */}
-          <div>
-            <label className="block text-sm text-slate-400 mb-2">Способ оплаты</label>
-            <div className="grid grid-cols-5 gap-2">
-              {banks.map((bank) => (
-                <BankLogoButton key={bank.id} bank={bank} selected={selectedBank === bank.id} onClick={() => setSelectedBank(bank.id)} />
-              ))}
+            <div className="px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.06] text-[11px] text-slate-400 whitespace-nowrap">
+              1 {selectedCurrency} = {currentRate.toFixed(2)} ₽
             </div>
           </div>
         </div>
         
-        {/* Footer */}
-        <div className="shrink-0 p-5 pt-4 border-t border-white/[0.06] flex gap-3">
-          <button onClick={onClose} className="flex-1 px-4 py-3 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-slate-300 font-medium rounded-xl transition-colors">
-            Отмена
-          </button>
+        {/* Footer — one main СБП button + decorative bank icons */}
+        <div className="shrink-0 px-5 pb-5 pt-3 border-t border-white/[0.06] flex flex-col gap-3">
           <button 
             onClick={onClose}
             disabled={!foreignAmount || parseFloat(foreignAmount) <= 0}
-            className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-full py-3.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <Banknote className="w-4 h-4" />
-            Пополнить {rubAmount ? `${Number(rubAmount).toLocaleString('ru-RU')} ₽` : ''}
+            {BankLogos['sbp']}
+            <span>Пополнить через СБП {rubAmount ? `— ${Number(rubAmount).toLocaleString('ru-RU')} ₽` : ''}</span>
           </button>
+          {/* Decorative bank icons row */}
+          <div className="flex items-center justify-center gap-3">
+            <span className="text-[10px] text-slate-500">Поддерживаемые банки:</span>
+            <div className="flex items-center gap-2">
+              {bankIcons.map((b) => (
+                <div key={b.id} className="w-6 h-6 rounded-md overflow-hidden opacity-60">
+                  {BankLogos[b.id]}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -20,7 +20,7 @@ const AnalogClock = ({ timezone, label, now }: ClockProps) => {
   const timeStr = localTime.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', hour12: false });
 
   return (
-    <div className="flex flex-col items-center gap-2" style={{ width: 80, minHeight: 110 }}>
+    <div className="flex flex-col items-center gap-2" style={{ width: 80, height: 110 }}>
       <div className="relative w-16 h-16 md:w-20 md:h-20">
         {/* Clock face */}
         <svg viewBox="0 0 100 100" className="w-full h-full">
@@ -98,7 +98,7 @@ export const WorldClocks = () => {
   }, []);
 
   return (
-    <div className="flex items-center gap-6 md:gap-8" style={{ minWidth: 280, minHeight: 110 }}>
+    <div className="flex items-center gap-6 md:gap-8" style={{ width: 280, height: 110 }}>
       <AnalogClock timezone="Europe/Moscow" label={t('clocks.moscow')} now={now} />
       <AnalogClock timezone="Europe/London" label={t('clocks.london')} now={now} />
       <AnalogClock timezone="America/New_York" label={t('clocks.newYork')} now={now} />

@@ -143,7 +143,7 @@ export const AuthPage = () => {
 
         {/* Mode Toggle */}
         <div className="flex justify-center mb-6">
-          <div className="bg-white/[0.04] backdrop-blur-xl border border-white/[0.06] rounded-2xl p-1.5 flex shadow-2xl">
+          <div className="bg-white/[0.04] border border-white/[0.06] rounded-2xl p-1.5 flex shadow-2xl">
             <button
               type="button"
               onClick={() => { setMode('login'); setError(''); }}
@@ -181,8 +181,7 @@ export const AuthPage = () => {
           <form
             onSubmit={handleSubmit}
             className="relative rounded-[22px] p-8 overflow-hidden
-              bg-gradient-to-br from-[#0d1528]/90 via-[#0a1025]/95 to-[#0c0f20]/90
-              backdrop-blur-2xl
+              bg-gradient-to-br from-[#0d1528] via-[#0a1025] to-[#0c0f20]
               shadow-[0_8px_60px_-12px_rgba(30,64,175,0.25)]
               border border-white/[0.08]"
           >
@@ -356,7 +355,7 @@ export const AuthPage = () => {
             { icon: '💳', label: t('auth.virtualCards') },
             { icon: '⚡', label: t('auth.instant') },
           ].map((f) => (
-            <div key={f.label} className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.05] rounded-xl p-4">
+            <div key={f.label} className="bg-white/[0.02] border border-white/[0.05] rounded-xl p-4">
               <div className="text-xl mb-1">{f.icon}</div>
               <p className="text-[11px] text-slate-600">{f.label}</p>
             </div>
