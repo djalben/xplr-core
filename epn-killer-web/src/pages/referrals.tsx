@@ -245,7 +245,7 @@ export const ReferralsPage = () => {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 gap-4 mb-8">
           <StatCard 
             icon={<Users className="w-5 h-5 text-blue-400" />}
             label="Всего рефералов"
@@ -258,18 +258,6 @@ export const ReferralsPage = () => {
             label="Заработано"
             value={`$${stats.earnings}`}
             iconClass="stat-icon-green"
-          />
-          <StatCard 
-            icon={<Gift className="w-5 h-5 text-yellow-400" />}
-            label="На выводе"
-            value={`$${stats.pending}`}
-            iconClass="stat-icon-yellow"
-          />
-          <StatCard 
-            icon={<Trophy className="w-5 h-5 text-purple-400" />}
-            label="За реферала"
-            value={`$${personalStats.rewardPerReferral}`}
-            iconClass="stat-icon-purple"
           />
         </div>
 
@@ -361,7 +349,7 @@ export const ReferralsPage = () => {
               <Shield className="w-6 h-6 text-amber-400" />
             </div>
             <div>
-              <p className="text-white font-semibold">Перевести в Сейф</p>
+              <p className="text-white font-semibold">Перевести в Кошелёк</p>
               <p className="text-xs text-slate-400">Минимум для вывода: $100</p>
             </div>
           </div>
@@ -376,7 +364,7 @@ export const ReferralsPage = () => {
               }`}
             >
               <Shield className="w-5 h-5" />
-              В Сейф
+              В Кошелёк
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>

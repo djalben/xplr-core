@@ -129,7 +129,7 @@ export const Sidebar = () => {
   const navItems = [
     { href: '/dashboard', icon: <LayoutDashboard className="w-5 h-5" />, label: t('nav.home') },
     { href: '/cards', icon: <CreditCard className="w-5 h-5" />, label: t('nav.cards') },
-    { href: '/finance', icon: <Receipt className="w-5 h-5" />, label: t('nav.finance') },
+    { href: '/history', icon: <Receipt className="w-5 h-5" />, label: 'История' },
     { href: '/referrals', icon: <Gift className="w-5 h-5" />, label: t('nav.referrals') },
     { href: '/support', icon: <HelpCircle className="w-5 h-5" />, label: t('nav.support') },
   ];

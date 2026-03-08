@@ -656,7 +656,7 @@ const VaultTopUpModal = ({ card, vaultBalance, onClose, onTransfer }: {
           {/* Vault balance info */}
           <div className="p-3 rounded-xl bg-white/[0.04] border border-white/[0.06]">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400">Доступно в Сейфе:</span>
+              <span className="text-xs text-slate-400">Доступно в Кошельке:</span>
               <span className="text-white font-bold text-sm">
                 {currencySymbol}{availableInCurrency.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
@@ -684,7 +684,7 @@ const VaultTopUpModal = ({ card, vaultBalance, onClose, onTransfer }: {
               />
             </div>
             {isInsufficient && (
-              <p className="text-red-400 text-xs mt-1.5 font-medium">Недостаточно средств в Сейфе</p>
+              <p className="text-red-400 text-xs mt-1.5 font-medium">Недостаточно средств в Кошельке</p>
             )}
           </div>
 

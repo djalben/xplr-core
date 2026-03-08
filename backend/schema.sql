@@ -184,4 +184,8 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cards' AND column_name = 'default_max_limit') THEN
         ALTER TABLE cards ADD COLUMN default_max_limit NUMERIC(20, 4) DEFAULT 0.0000;
     END IF;
+    -- Автопополнение карт из Кошелька
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'internal_balances' AND column_name = 'auto_topup_enabled') THEN
+        ALTER TABLE internal_balances ADD COLUMN auto_topup_enabled BOOLEAN DEFAULT FALSE;
+    END IF;
 END $$;

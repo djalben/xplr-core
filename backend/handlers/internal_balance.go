@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/gorilla/mux"
 	"github.com/djalben/xplr-core/backend/middleware"
 	"github.com/djalben/xplr-core/backend/models"
 	"github.com/djalben/xplr-core/backend/repository"
+	"github.com/gorilla/mux"
 	"github.com/shopspring/decimal"
 )
 
@@ -59,6 +59,45 @@ func TopUpVaultHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(ib)
+}
+
+// SetAutoTopupHandler — PATCH /api/v1/user/vault/auto-topup
+// Включает/выключает автопополнение карт из Кошелька
+func SetAutoTopupHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if repository.GlobalDB == nil {
+		http.Error(w, "Database not initialized", http.StatusInternalServerError)
+		return
+	}
+
+	_, err := repository.GlobalDB.Exec(
+		`INSERT INTO internal_balances (user_id, auto_topup_enabled) VALUES ($1, $2)
+		 ON CONFLICT (user_id) DO UPDATE SET auto_topup_enabled = $2, updated_at = NOW()`,
+		userID, req.Enabled,
+	)
+	if err != nil {
+		http.Error(w, "Failed to update auto-topup: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":  "ok",
+		"enabled": req.Enabled,
+	})
 }
 
 // SetSpendingLimitHandler — PATCH /api/v1/user/cards/{id}/spending-limit

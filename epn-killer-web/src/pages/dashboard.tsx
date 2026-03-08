@@ -14,7 +14,10 @@ import {
   Target,
   Zap,
   Shield,
-  Lock
+  Lock,
+  ToggleLeft,
+  ToggleRight,
+  Info
 } from 'lucide-react';
 import apiClient, { API_BASE_URL } from '../api/axios';
 import { getUserGrade, type GradeInfo } from '../api/grade';
@@ -185,6 +188,8 @@ export const DashboardPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [vault, setVault] = useState<InternalBalance | null>(null);
   const [isVaultModalOpen, setIsVaultModalOpen] = useState(false);
+  const [autoTopup, setAutoTopup] = useState(false);
+  const [showAutoTopupTooltip, setShowAutoTopupTooltip] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -267,7 +272,7 @@ export const DashboardPage = () => {
           </div>
         </div>
 
-        {/* Главный Сейф */}
+        {/* Кошелёк */}
         <div className="glass-card p-6 mb-6 relative overflow-hidden border border-amber-500/20">
           <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-amber-500/[0.05] via-transparent to-blue-500/[0.05]" />
           <div className="relative z-10">
@@ -278,33 +283,65 @@ export const DashboardPage = () => {
                 </div>
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-lg font-semibold text-white">Главный сейф</h3>
+                    <h3 className="text-lg font-semibold text-white">Кошелёк</h3>
                     <Lock className="w-4 h-4 text-amber-400/60" />
                   </div>
-                  <p className="text-sm text-slate-400">Единый баланс для всех карт</p>
+                  <p className="text-sm text-slate-400">Баланс Кошелька · все карты</p>
                 </div>
               </div>
               <div className="text-right">
                 <p className="text-3xl md:text-4xl font-bold text-white">
                   {vault ? `${Number(vault.master_balance).toLocaleString('ru-RU', { minimumFractionDigits: 2 })} ₽` : '—'}
                 </p>
-                <p className="text-xs text-slate-500 mt-1">Карты списывают из Сейфа автоматически</p>
+                <p className="text-xs text-slate-500 mt-1">Карты списывают из Кошелька автоматически</p>
               </div>
             </div>
-            <div className="mt-4 flex items-center gap-3">
+            <div className="mt-4 flex items-center gap-3 flex-wrap">
               <button onClick={() => setIsVaultModalOpen(true)} className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-medium rounded-xl text-sm hover:shadow-lg hover:shadow-amber-500/25 transition-all">
-                Пополнить Сейф
+                Пополнить кошелёк
               </button>
               <button onClick={() => navigate('/cards')} className="px-5 py-2.5 bg-white/5 border border-white/10 text-white font-medium rounded-xl text-sm hover:bg-white/10 transition-all">
                 Управление картами
               </button>
+              {/* Auto-topup toggle */}
+              <div className="flex items-center gap-2 relative">
+                <button
+                  onClick={() => {
+                    const next = !autoTopup;
+                    setAutoTopup(next);
+                    // TODO: PATCH /user/vault/auto-topup { enabled: next }
+                    apiClient.patch(`${API_BASE_URL}/user/vault/auto-topup`, { enabled: next }).catch(() => setAutoTopup(!next));
+                  }}
+                  className="flex items-center gap-1.5 text-sm"
+                >
+                  {autoTopup
+                    ? <ToggleRight className="w-7 h-7 text-emerald-400" />
+                    : <ToggleLeft className="w-7 h-7 text-slate-500" />
+                  }
+                  <span className={autoTopup ? 'text-emerald-400 font-medium' : 'text-slate-400'}>Авто</span>
+                </button>
+                <button
+                  onMouseEnter={() => setShowAutoTopupTooltip(true)}
+                  onMouseLeave={() => setShowAutoTopupTooltip(false)}
+                  onClick={() => setShowAutoTopupTooltip(v => !v)}
+                  className="text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  <Info className="w-4 h-4" />
+                </button>
+                {showAutoTopupTooltip && (
+                  <div className="absolute bottom-full left-0 mb-2 w-64 p-3 bg-[#1a1a24] border border-white/10 rounded-xl shadow-2xl z-50 text-xs text-slate-300 leading-relaxed">
+                    При нехватке средств на карте, система автоматически переведёт нужную сумму из Кошелька.
+                    <div className="absolute -bottom-1.5 left-4 w-3 h-3 bg-[#1a1a24] border-r border-b border-white/10 transform rotate-45" />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          <StatCard title={t('dashboard.balance')} value={`$${balancePers.toFixed(2)}`} icon={<Wallet className="w-6 h-6 text-blue-400" />} iconClass="stat-icon-blue" accent />
+          <StatCard title="Баланс Кошелька" value={`$${balancePers.toFixed(2)}`} icon={<Wallet className="w-6 h-6 text-blue-400" />} iconClass="stat-icon-blue" accent />
           <StatCard title={t('dashboard.activeCards')} value={String(cardCount)} icon={<CreditCard className="w-6 h-6 text-purple-400" />} iconClass="stat-icon-purple" onClick={() => navigate('/cards?filter=active')} />
           <StatCard title={t('dashboard.transactions')} value={String(transactions.length)} icon={<DollarSign className="w-6 h-6 text-emerald-400" />} iconClass="stat-icon-green" onClick={() => navigate('/finance?from=dashboard')} />
         </div>
@@ -316,7 +353,7 @@ export const DashboardPage = () => {
           <div className="glass-card p-6">
             <div className="flex items-center justify-between mb-6">
               <h3 className="block-title mb-0">{t('dashboard.recentOps')}</h3>
-              <button onClick={() => navigate('/finance')} className="text-sm text-blue-400 hover:text-blue-300 transition-colors font-medium">
+              <button onClick={() => navigate('/history')} className="text-sm text-blue-400 hover:text-blue-300 transition-colors font-medium">
                 {t('dashboard.viewAll')}
               </button>
             </div>

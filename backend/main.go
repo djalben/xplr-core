@@ -146,6 +146,7 @@ func main() {
 	protectedRouter.HandleFunc("/cards/{id}/spending-limit", handlers.SetSpendingLimitHandler).Methods("PATCH")
 	protectedRouter.HandleFunc("/vault", handlers.GetVaultHandler).Methods("GET")
 	protectedRouter.HandleFunc("/vault/topup", handlers.TopUpVaultHandler).Methods("POST")
+	protectedRouter.HandleFunc("/vault/auto-topup", handlers.SetAutoTopupHandler).Methods("PATCH")
 	protectedRouter.HandleFunc("/report", handlers.GetUserTransactionReportHandler).Methods("GET")
 	protectedRouter.HandleFunc("/api-key", handlers.CreateAPIKeyHandler).Methods("POST")
 

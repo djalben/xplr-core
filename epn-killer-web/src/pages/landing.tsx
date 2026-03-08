@@ -208,8 +208,8 @@ const LandingTariffCard = ({ type, name, defaultCurrency, price, features, popul
         )}
       </div>
 
-      {/* Card Visual — fixed aspect ratio for equal heights */}
-      <div className={`relative rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br ${gradients[type]} flex-1 flex flex-col`}>
+      {/* Card Visual — bank card proportions */}
+      <div className={`relative rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br ${gradients[type]} flex flex-col`} style={{ aspectRatio: '0.63' }}>
 
         {/* Watermark layers */}
         {type === 'subscriptions' && (
@@ -587,7 +587,7 @@ export const LandingPage = () => {
             </div>
 
             {/* Card Types — realistic card showcase */}
-            <div className="grid md:grid-cols-3 gap-6 mb-16 items-stretch">
+            <div className="grid md:grid-cols-3 gap-8 mb-16 items-center max-w-4xl mx-auto">
               <LandingTariffCard 
                 type="subscriptions"
                 name="Подписки"

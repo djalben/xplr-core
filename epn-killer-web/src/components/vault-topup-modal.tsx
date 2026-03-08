@@ -96,7 +96,7 @@ export const VaultTopUpModal = ({ onClose }: VaultTopUpModalProps) => {
                 </svg>
               </div>
               <div>
-                <h3 className="text-base font-semibold text-white leading-tight">Пополнить Сейф</h3>
+                <h3 className="text-base font-semibold text-white leading-tight">Пополнить кошелёк</h3>
                 <p className="text-[11px] text-slate-400">Через Систему быстрых платежей</p>
               </div>
             </div>

@@ -7,7 +7,7 @@ import { AuthPage } from './pages/auth';
 import { DashboardPage } from './pages/dashboard';
 import { CardsPage } from './pages/cards';
 import { CardIssuePage } from './pages/card-issue';
-import { FinancePage } from './pages/finance';
+import { HistoryPage } from './pages/history';
 import { ReferralsPage } from './pages/referrals';
 import { SettingsPage } from './pages/settings';
 import { SupportPage } from './pages/support';
@@ -51,7 +51,8 @@ function App() {
         <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
         <Route path="/cards" element={<ProtectedRoute><CardsPage /></ProtectedRoute>} />
         <Route path="/card-issue" element={<ProtectedRoute><CardIssuePage /></ProtectedRoute>} />
-        <Route path="/finance" element={<ProtectedRoute><FinancePage /></ProtectedRoute>} />
+        <Route path="/history" element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
+        <Route path="/finance" element={<Navigate to="/history" replace />} />
         <Route path="/referrals" element={<ProtectedRoute><ReferralsPage /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="/support" element={<ProtectedRoute><SupportPage /></ProtectedRoute>} />
