@@ -296,54 +296,92 @@ export const DashboardPage = () => {
                 <p className="text-xs text-slate-500 mt-1">Карты списывают из Кошелька автоматически</p>
               </div>
             </div>
-            <div className="mt-4 flex items-center gap-3 flex-wrap">
-              <button onClick={() => setIsVaultModalOpen(true)} className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-medium rounded-xl text-sm hover:shadow-lg hover:shadow-amber-500/25 transition-all">
-                Пополнить кошелёк
-              </button>
-              <button onClick={() => navigate('/cards')} className="px-5 py-2.5 bg-white/5 border border-white/10 text-white font-medium rounded-xl text-sm hover:bg-white/10 transition-all">
-                Управление картами
-              </button>
-              {/* Auto-topup toggle */}
-              <div className="flex items-center gap-2 relative">
-                <button
-                  onClick={() => {
-                    const next = !autoTopup;
-                    setAutoTopup(next);
-                    // TODO: PATCH /user/vault/auto-topup { enabled: next }
-                    apiClient.patch(`${API_BASE_URL}/user/vault/auto-topup`, { enabled: next }).catch(() => setAutoTopup(!next));
-                  }}
-                  className="flex items-center gap-1.5 text-sm"
-                >
-                  {autoTopup
-                    ? <ToggleRight className="w-7 h-7 text-emerald-400" />
-                    : <ToggleLeft className="w-7 h-7 text-slate-500" />
-                  }
-                  <span className={autoTopup ? 'text-emerald-400 font-medium' : 'text-slate-400'}>Авто</span>
-                </button>
-                <button
-                  onMouseEnter={() => setShowAutoTopupTooltip(true)}
-                  onMouseLeave={() => setShowAutoTopupTooltip(false)}
-                  onClick={() => setShowAutoTopupTooltip(v => !v)}
-                  className="text-slate-500 hover:text-slate-300 transition-colors"
-                >
-                  <Info className="w-4 h-4" />
-                </button>
-                {showAutoTopupTooltip && (
-                  <div className="absolute bottom-full left-0 mb-2 w-64 p-3 bg-[#1a1a24] border border-white/10 rounded-xl shadow-2xl z-50 text-xs text-slate-300 leading-relaxed">
-                    При нехватке средств на карте, система автоматически переведёт нужную сумму из Кошелька.
-                    <div className="absolute -bottom-1.5 left-4 w-3 h-3 bg-[#1a1a24] border-r border-b border-white/10 transform rotate-45" />
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
         </div>
 
-        {/* Stats Grid */}
+        {/* Stats Grid — enhanced widgets */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          <StatCard title="Баланс Кошелька" value={`$${balancePers.toFixed(2)}`} icon={<Wallet className="w-6 h-6 text-blue-400" />} iconClass="stat-icon-blue" accent />
-          <StatCard title={t('dashboard.activeCards')} value={String(cardCount)} icon={<CreditCard className="w-6 h-6 text-purple-400" />} iconClass="stat-icon-purple" onClick={() => navigate('/cards?filter=active')} />
-          <StatCard title={t('dashboard.transactions')} value={String(transactions.length)} icon={<DollarSign className="w-6 h-6 text-emerald-400" />} iconClass="stat-icon-green" onClick={() => navigate('/finance?from=dashboard')} />
+          {/* Баланс Кошелька + Пополнить */}
+          <div className="glass-card p-6 border-blue-500/30">
+            <div className="flex items-start justify-between mb-4">
+              <div className="p-3 rounded-xl stat-icon-blue"><Wallet className="w-6 h-6 text-blue-400" /></div>
+            </div>
+            <p className="text-slate-400 text-sm mb-1">Баланс Кошелька</p>
+            <p className="text-2xl font-bold text-white balance-display">{vault ? `${Number(vault.master_balance).toLocaleString('ru-RU', { minimumFractionDigits: 2 })} ₽` : `$${balancePers.toFixed(2)}`}</p>
+            <button
+              onClick={() => setIsVaultModalOpen(true)}
+              className="mt-4 w-full py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-medium rounded-xl text-sm hover:shadow-lg hover:shadow-amber-500/25 transition-all"
+            >
+              Пополнить
+            </button>
+          </div>
+
+          {/* Активные карты + Управление + Автопополнение */}
+          <div className="glass-card p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="p-3 rounded-xl stat-icon-purple"><CreditCard className="w-6 h-6 text-purple-400" /></div>
+            </div>
+            <p className="text-slate-400 text-sm mb-1">{t('dashboard.activeCards')}</p>
+            <p className="text-2xl font-bold text-white balance-display">{cardCount}</p>
+            <button
+              onClick={() => navigate('/cards')}
+              className="mt-4 w-full py-2.5 bg-white/5 border border-white/10 text-white font-medium rounded-xl text-sm hover:bg-white/10 transition-all"
+            >
+              Управление картами
+            </button>
+            {/* Автопополнение toggle */}
+            <div className="mt-3 flex items-center justify-between relative">
+              <button
+                onClick={() => {
+                  const next = !autoTopup;
+                  setAutoTopup(next);
+                  apiClient.patch(`${API_BASE_URL}/user/vault/auto-topup`, { enabled: next }).catch(() => setAutoTopup(!next));
+                }}
+                className="flex items-center gap-2 text-sm"
+              >
+                {autoTopup
+                  ? <ToggleRight className="w-7 h-7 text-emerald-400" />
+                  : <ToggleLeft className="w-7 h-7 text-slate-500" />
+                }
+                <span className={autoTopup ? 'text-emerald-400 font-medium' : 'text-slate-400'}>Автопополнение</span>
+              </button>
+              <button
+                onMouseEnter={() => setShowAutoTopupTooltip(true)}
+                onMouseLeave={() => setShowAutoTopupTooltip(false)}
+                onClick={() => setShowAutoTopupTooltip(v => !v)}
+                className="text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                <Info className="w-4 h-4" />
+              </button>
+              {showAutoTopupTooltip && (
+                <div className="absolute bottom-full right-0 mb-2 w-64 p-3 bg-[#1a1a24] border border-white/10 rounded-xl shadow-2xl z-50 text-xs text-slate-300 leading-relaxed">
+                  При нехватке средств на карте, система автоматически переведёт нужную сумму из Кошелька.
+                  <div className="absolute -bottom-1.5 right-4 w-3 h-3 bg-[#1a1a24] border-r border-b border-white/10 transform rotate-45" />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Транзакции — clickable → /history, today spending */}
+          <div
+            className="glass-card p-6 cursor-pointer card-hover"
+            onClick={() => navigate('/history')}
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div className="p-3 rounded-xl stat-icon-green"><DollarSign className="w-6 h-6 text-emerald-400" /></div>
+            </div>
+            <p className="text-slate-400 text-sm mb-1">{t('dashboard.transactions')}</p>
+            <p className="text-2xl font-bold text-white balance-display">{transactions.length}</p>
+            <p className="text-sm text-slate-400 mt-3">
+              Расходы за сегодня: <span className="text-white font-semibold">${(() => {
+                const today = new Date().toLocaleDateString('ru-RU');
+                return transactions
+                  .filter(tx => tx.type === 'expense' && tx.date === today)
+                  .reduce((sum, tx) => sum + Math.abs(tx.amount), 0)
+                  .toLocaleString();
+              })()}</span>
+            </p>
+          </div>
         </div>
 
         {/* Charts and Transactions */}

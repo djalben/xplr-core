@@ -179,7 +179,7 @@ const FeatureCard = ({ icon: Icon, title, description }: { icon: React.ElementTy
   </div>
 );
 
-// Landing tariff card — strict equal height, realistic card visual, currency toggle + button
+// Landing tariff card — horizontal bank card format (1.586:1), features below
 const LandingTariffCard = ({ type, name, defaultCurrency, price, features, popular = false }: { 
   type: 'subscriptions' | 'travel' | 'premium';
   name: string;
@@ -208,37 +208,32 @@ const LandingTariffCard = ({ type, name, defaultCurrency, price, features, popul
         )}
       </div>
 
-      {/* Card Visual — bank card proportions */}
-      <div className={`relative rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br ${gradients[type]} flex flex-col`} style={{ aspectRatio: '0.63' }}>
+      {/* Card Visual — standard bank card 1.586:1 */}
+      <div className={`relative rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br ${gradients[type]}`} style={{ aspectRatio: '1.586' }}>
 
         {/* Watermark layers */}
         {type === 'subscriptions' && (
           <div className="absolute inset-0 opacity-[0.10] pointer-events-none">
-            <svg viewBox="0 0 280 340" className="w-full h-full" preserveAspectRatio="xMidYMid slice">
-              <polygon points="30,25 30,50 50,37.5" fill="none" stroke="white" strokeWidth="0.8" />
-              <rect x="220" y="20" width="4" height="18" rx="1" fill="none" stroke="white" strokeWidth="0.7" />
-              <rect x="228" y="20" width="4" height="18" rx="1" fill="none" stroke="white" strokeWidth="0.7" />
-              <path d="M140,35 a12,12 0 0,1 24,0 a10,10 0 0,1 10,10 h-44 a10,10 0 0,1 10,-10z" fill="none" stroke="white" strokeWidth="0.7" />
-              <path d="M70,280 v-22 l16,-5 v22" fill="none" stroke="white" strokeWidth="0.7" />
-              <circle cx="70" cy="280" r="4" fill="none" stroke="white" strokeWidth="0.7" />
-              <circle cx="86" cy="275" r="4" fill="none" stroke="white" strokeWidth="0.7" />
+            <svg viewBox="0 0 340 214" className="w-full h-full" preserveAspectRatio="xMidYMid slice">
+              <polygon points="280,30 280,55 300,42.5" fill="none" stroke="white" strokeWidth="0.8" />
+              <rect x="20" y="170" width="4" height="18" rx="1" fill="none" stroke="white" strokeWidth="0.7" />
+              <rect x="28" y="170" width="4" height="18" rx="1" fill="none" stroke="white" strokeWidth="0.7" />
+              <circle cx="300" cy="180" r="8" fill="none" stroke="white" strokeWidth="0.7" />
             </svg>
           </div>
         )}
         {type === 'travel' && (
           <div className="absolute inset-0 opacity-[0.10] pointer-events-none">
-            <svg viewBox="0 0 280 340" className="w-full h-full" preserveAspectRatio="xMidYMid slice">
-              <rect x="30" y="55" width="28" height="22" rx="3" fill="none" stroke="white" strokeWidth="0.8" />
-              <rect x="38" y="48" width="12" height="8" rx="2" fill="none" stroke="white" strokeWidth="0.7" />
-              <circle cx="130" cy="35" r="12" fill="none" stroke="white" strokeWidth="0.8" />
-              <path d="M60,300 l30,-15 l-5,5 l15,0 l-30,15 l5,-5 l-15,0z" fill="none" stroke="white" strokeWidth="0.7" />
+            <svg viewBox="0 0 340 214" className="w-full h-full" preserveAspectRatio="xMidYMid slice">
+              <circle cx="290" cy="40" r="12" fill="none" stroke="white" strokeWidth="0.8" />
+              <path d="M260,180 l30,-15 l-5,5 l15,0 l-30,15 l5,-5 l-15,0z" fill="none" stroke="white" strokeWidth="0.7" />
             </svg>
           </div>
         )}
         {type === 'premium' && (
           <>
             <div className="absolute inset-0 opacity-[0.12] pointer-events-none">
-              <svg viewBox="0 0 200 300" className="w-full h-full" preserveAspectRatio="xMidYMid slice">
+              <svg viewBox="0 0 340 214" className="w-full h-full" preserveAspectRatio="xMidYMid slice">
                 <defs>
                   <pattern id="ln-mesh" width="16" height="16" patternUnits="userSpaceOnUse">
                     <path d="M 16 0 L 0 0 0 16" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="0.25"/>
@@ -249,61 +244,67 @@ const LandingTariffCard = ({ type, name, defaultCurrency, price, features, popul
                 <rect width="100%" height="100%" fill="url(#ln-mesh)" />
               </svg>
             </div>
-            <div className="absolute top-0 bottom-0 right-10 w-[3px] bg-gradient-to-b from-transparent via-red-600 to-transparent pointer-events-none" />
+            <div className="absolute left-0 right-0 bottom-8 h-[2px] bg-gradient-to-r from-transparent via-red-600 to-transparent pointer-events-none" />
           </>
         )}
 
-        {/* Card content */}
-        <div className="relative p-5 flex flex-col flex-1">
-          {/* Top: branding + currency */}
-          <div className="flex items-start justify-between mb-3">
+        {/* Card content — horizontal layout */}
+        <div className="relative p-4 flex flex-col h-full">
+          {/* Top row: branding + currency */}
+          <div className="flex items-start justify-between">
             <div>
-              <p className={`${type === 'premium' ? 'text-white font-bold text-lg tracking-[0.25em]' : 'text-white/90 text-sm font-bold tracking-[0.2em]'} leading-none`}>
+              <p className={`${type === 'premium' ? 'text-white font-bold text-sm tracking-[0.25em]' : 'text-white/90 text-xs font-bold tracking-[0.2em]'} leading-none`}>
                 {type === 'premium' ? 'XPLR PRIME' : 'XPLR'}
               </p>
-              <p className="text-white/50 text-[7px] font-light tracking-[0.25em] uppercase leading-none mt-0.5">Explorer</p>
+              <p className="text-white/50 text-[6px] font-light tracking-[0.25em] uppercase leading-none mt-0.5">Explorer</p>
             </div>
-            <span className="text-white text-sm font-bold">{currencySymbol}</span>
+            <span className="text-white text-xs font-bold">{currencySymbol}</span>
           </div>
 
-          {/* Chip for premium */}
-          {type === 'premium' && (
-            <div className="w-10 h-7 rounded-md bg-gradient-to-br from-slate-300 via-slate-200 to-slate-400 mb-2 shadow-lg shadow-white/10">
-              <div className="w-full h-full flex">
-                <div className="w-1/3 border-r border-slate-400/50" />
-                <div className="w-1/3 border-r border-slate-400/50 flex flex-col"><div className="h-1/2 border-b border-slate-400/50" /><div className="h-1/2" /></div>
-                <div className="w-1/3" />
-              </div>
-            </div>
-          )}
-          {/* Chip placeholder for non-premium to keep alignment */}
-          {type !== 'premium' && <div className="h-9" />}
-
-          {/* Name + price */}
-          <h3 className="text-white font-bold text-lg mb-0.5">{name}</h3>
-          <p className="text-white text-2xl font-bold mb-3">{price}<span className="text-base text-white/50"> ₽</span></p>
-
-          {/* Features */}
-          <ul className="space-y-1.5 flex-1">
-            {features.map((feature, i) => (
-              <li key={i} className="flex items-center gap-2 text-[13px] text-white/80">
-                <div className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-                  <Check className="w-2.5 h-2.5 text-white" />
+          {/* Middle: chip + name/price */}
+          <div className="flex items-center gap-3 mt-auto mb-auto">
+            {type === 'premium' ? (
+              <div className="w-9 h-6 rounded-[3px] bg-gradient-to-br from-slate-300 via-slate-200 to-slate-400 shrink-0 shadow-md">
+                <div className="w-full h-full flex">
+                  <div className="w-1/3 border-r border-slate-400/50" />
+                  <div className="w-1/3 border-r border-slate-400/50 flex flex-col"><div className="h-1/2 border-b border-slate-400/50" /><div className="h-1/2" /></div>
+                  <div className="w-1/3" />
                 </div>
-                {feature}
-              </li>
-            ))}
-          </ul>
+              </div>
+            ) : (
+              <div className="w-9 h-6 rounded-[3px] bg-gradient-to-br from-amber-300 via-amber-200 to-amber-400 shrink-0 shadow-md opacity-80">
+                <div className="w-full h-full flex">
+                  <div className="w-1/3 border-r border-amber-500/40" />
+                  <div className="w-1/3 border-r border-amber-500/40 flex flex-col"><div className="h-1/2 border-b border-amber-500/40" /><div className="h-1/2" /></div>
+                  <div className="w-1/3" />
+                </div>
+              </div>
+            )}
+            <div>
+              <h3 className="text-white font-bold text-sm leading-tight">{name}</h3>
+              <p className="text-white text-lg font-bold leading-tight">{price}<span className="text-xs text-white/50"> ₽</span></p>
+            </div>
+          </div>
 
           {/* Bottom: card number + MC logo */}
-          <div className="mt-3 pt-3 border-t border-white/[0.10]">
-            <div className="flex items-end justify-between">
-              <p className="text-white/60 font-mono text-xs tracking-widest">**** **** **** 1234</p>
-              <MastercardLogo className="h-6 w-auto" />
-            </div>
+          <div className="flex items-end justify-between">
+            <p className="text-white/60 font-mono text-[10px] tracking-widest">**** **** **** 1234</p>
+            <MastercardLogo className="h-5 w-auto" />
           </div>
         </div>
       </div>
+
+      {/* Features list — below card */}
+      <ul className="mt-3 space-y-1.5">
+        {features.map((feature, i) => (
+          <li key={i} className="flex items-center gap-2 text-[12px] text-slate-300">
+            <div className="w-4 h-4 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+              <Check className="w-2.5 h-2.5 text-blue-400" />
+            </div>
+            {feature}
+          </li>
+        ))}
+      </ul>
 
       {/* USD / EUR Toggle */}
       <div className="flex gap-2 mt-3">
