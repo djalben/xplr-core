@@ -159,6 +159,7 @@ func main() {
 	verifiedWallet.HandleFunc("/topup", handlers.TopUpWalletHandler).Methods("POST")
 	verifiedWallet.HandleFunc("/auto-topup", handlers.SetAutoTopupHandler).Methods("PATCH")
 	protectedRouter.HandleFunc("/report", handlers.GetUserTransactionReportHandler).Methods("GET")
+	protectedRouter.HandleFunc("/transactions", handlers.GetUnifiedTransactionsHandler).Methods("GET")
 	protectedRouter.HandleFunc("/api-key", handlers.CreateAPIKeyHandler).Methods("POST")
 
 	// Команды (Teams)
@@ -171,6 +172,7 @@ func main() {
 
 	// Реферальная программа
 	protectedRouter.HandleFunc("/referrals", handlers.GetReferralStatsHandler).Methods("GET")
+	protectedRouter.HandleFunc("/referrals/info", handlers.GetReferralInfoHandler).Methods("GET")
 
 	// Привязка Telegram Chat ID для уведомлений
 	protectedRouter.HandleFunc("/settings/telegram", handlers.UpdateTelegramChatIDHandler).Methods("POST")

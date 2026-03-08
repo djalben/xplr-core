@@ -96,7 +96,10 @@ type Transaction struct {
 	TransactionType string          `json:"transaction_type"`
 	Status          string          `json:"status"`
 	Details         string          `json:"details"`
-	ProviderTxID    string          `json:"provider_tx_id,omitempty"` // ID транзакции от провайдера (Wallester) для idempotency
+	ProviderTxID    string          `json:"provider_tx_id,omitempty"`
+	SourceType      string          `json:"source_type,omitempty"`
+	SourceID        *int            `json:"source_id,omitempty"`
+	Currency        string          `json:"currency,omitempty"`
 	ExecutedAt      time.Time       `json:"executed_at"`
 }
 

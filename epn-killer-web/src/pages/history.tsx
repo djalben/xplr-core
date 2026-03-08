@@ -36,49 +36,57 @@ export const HistoryPage = () => {
   const [transactions, setTransactions] = useState<HistoryTx[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+
   useEffect(() => {
     fetchTransactions();
-  }, []);
+  }, [period]);
 
   const fetchTransactions = async () => {
     setIsLoading(true);
     try {
-      const res = await apiClient.get(`${API_BASE_URL}/user/report`);
+      const now = new Date();
+      const start = new Date(now);
+      if (period === 'day') start.setDate(now.getDate() - 1);
+      else if (period === 'week') start.setDate(now.getDate() - 7);
+      else start.setDate(now.getDate() - 31);
+
+      const res = await apiClient.get(`${API_BASE_URL}/user/transactions`, {
+        params: { start_date: fmt(start), end_date: fmt(now), limit: 200 }
+      });
       const txs: any[] = res.data?.transactions ?? [];
+      const sourceLabels: Record<string, string> = {
+        wallet_topup: 'Пополнение кошелька',
+        card_transfer: 'Перевод на карту',
+        card_charge: 'Списание',
+        referral_bonus: 'Реферальный бонус',
+        refund: 'Возврат',
+        commission: 'Комиссия',
+      };
       const mapped: HistoryTx[] = txs.map((tx: any, i: number) => {
-        const amt = parseFloat(tx.amount_usd || tx.amount || '0');
-        const createdAt = tx.created_at ? new Date(tx.created_at) : new Date();
+        const amt = parseFloat(tx.amount || '0');
+        const executedAt = tx.executed_at ? new Date(tx.executed_at) : new Date();
+        const srcType = tx.source_type || 'card_charge';
+        const desc = tx.details || sourceLabels[srcType] || tx.transaction_type || 'Операция';
+        const cur = tx.currency === 'RUB' ? '₽' : tx.currency === 'EUR' ? '€' : '$';
         return {
-          id: tx.id ? String(tx.id) : String(i),
-          description: tx.description || tx.type || 'Операция',
+          id: tx.transaction_id ? String(tx.transaction_id) : String(i),
+          description: desc,
           amount: Math.abs(amt),
-          currency: tx.currency || '₽',
-          type: amt >= 0 ? 'income' : 'expense',
-          date: createdAt.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' }),
-          time: createdAt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
-          cardLast4: tx.card_last4 || '',
+          currency: cur,
+          type: (srcType === 'wallet_topup' || srcType === 'referral_bonus' || srcType === 'refund' || amt > 0) ? 'income' as const : 'expense' as const,
+          date: executedAt.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' }),
+          time: executedAt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+          cardLast4: tx.card_last_4_digits || '',
         };
       });
       setTransactions(mapped);
     } catch {
-      // fallback demo data
-      setTransactions([
-        { id: '1', description: 'Пополнение кошелька', amount: 10000, currency: '₽', type: 'income', date: '20 дек 2024', time: '14:32', cardLast4: '' },
-        { id: '2', description: 'Netflix Premium', amount: 15.99, currency: '$', type: 'expense', date: '19 дек 2024', time: '21:05', cardLast4: '4521' },
-        { id: '3', description: 'Spotify', amount: 9.99, currency: '€', type: 'expense', date: '19 дек 2024', time: '18:15', cardLast4: '7832' },
-        { id: '4', description: 'Пополнение кошелька', amount: 5000, currency: '₽', type: 'income', date: '18 дек 2024', time: '10:44', cardLast4: '' },
-        { id: '5', description: 'Booking.com', amount: 124.50, currency: '$', type: 'expense', date: '17 дек 2024', time: '09:30', cardLast4: '4521' },
-        { id: '6', description: 'ChatGPT Plus', amount: 20.00, currency: '$', type: 'expense', date: '16 дек 2024', time: '03:00', cardLast4: '7832' },
-        { id: '7', description: 'Uber', amount: 24.30, currency: '$', type: 'expense', date: '15 дек 2024', time: '22:10', cardLast4: '4521' },
-      ]);
+      setTransactions([]);
     } finally {
       setIsLoading(false);
     }
   };
-
-  // Filter by period
-  const now = new Date();
-  const cutoffMs = period === 'day' ? 86400000 : period === 'week' ? 7 * 86400000 : 31 * 86400000;
 
   const filtered = transactions.filter(tx => {
     if (searchQuery && !tx.description.toLowerCase().includes(searchQuery.toLowerCase())) return false;

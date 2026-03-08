@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import apiClient, { API_BASE_URL } from '../api/axios';
 import { DashboardLayout } from '../components/dashboard-layout';
 import { BackButton } from '../components/back-button';
 import { ShareModal } from '../components/share-modal';
@@ -117,9 +118,45 @@ export const ReferralsPage = () => {
   const [copied, setCopied] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const referralCode = 'XPLR-AT8K2M';
-  const referralLink = `https://xplr.io/r/${referralCode}`;
+  const [referralCode, setReferralCode] = useState('');
+  const [referralLink, setReferralLink] = useState('');
+  const [referrals, setReferrals] = useState<Referral[]>([]);
+  const [stats, setStats] = useState({ totalReferrals: 0, earnings: 0, pending: 0, rewardPerReferral: 10, bonusForNew: 5 });
+  const personalStats = stats;
+
+  useEffect(() => {
+    const fetchReferralData = async () => {
+      try {
+        const res = await apiClient.get(`${API_BASE_URL}/user/referrals/info`);
+        const data = res.data;
+        setReferralCode(data.referral_code || '');
+        setReferralLink(data.referral_link || '');
+        setStats({
+          totalReferrals: data.stats?.total_referrals || 0,
+          earnings: parseFloat(data.stats?.total_earnings || '0'),
+          pending: parseFloat(data.stats?.pending_amount || '0'),
+          rewardPerReferral: data.reward_per_referral || 10,
+          bonusForNew: data.bonus_for_new || 5,
+        });
+        const recent: Referral[] = (data.recent_referrals || []).map((r: any) => ({
+          id: String(r.id),
+          name: r.email?.split('@')[0] || 'User',
+          email: r.email || '',
+          joinedDate: r.joined_date ? new Date(r.joined_date).toLocaleDateString('ru-RU') : '',
+          status: r.is_active ? 'active' as const : 'pending' as const,
+          earnings: parseFloat(r.earnings || '0'),
+        }));
+        setReferrals(recent);
+      } catch {
+        // keep defaults
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchReferralData();
+  }, []);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(referralLink);
@@ -130,24 +167,6 @@ export const ReferralsPage = () => {
   const handleShare = () => {
     setShowShareModal(true);
   };
-
-  const referrals: Referral[] = [
-    { id: '1', name: 'Иван Смирнов', email: 'i***@gmail.com', joinedDate: '2024-12-15', status: 'active', earnings: 10 },
-    { id: '2', name: 'Мария Козлова', email: 'm***@yahoo.com', joinedDate: '2024-12-10', status: 'active', earnings: 10 },
-    { id: '3', name: 'Дмитрий Попов', email: 'd***@outlook.com', joinedDate: '2024-12-05', status: 'pending', earnings: 0 },
-    { id: '4', name: 'Анна Новикова', email: 'a***@icloud.com', joinedDate: '2024-11-28', status: 'active', earnings: 10 },
-    { id: '5', name: 'Сергей Волков', email: 's***@gmail.com', joinedDate: '2024-11-20', status: 'expired', earnings: 0 },
-  ];
-
-  const personalStats = {
-    totalReferrals: 12,
-    earnings: 120,
-    pending: 30,
-    rewardPerReferral: 10,
-    bonusForNew: 5
-  };
-
-  const stats = personalStats;
 
   const statusLabels: Record<string, string> = {
     active: 'Активен',

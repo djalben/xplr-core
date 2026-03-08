@@ -60,11 +60,26 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Генерация персонального реферального кода для нового пользователя
+	refCode, err := repository.GetUserReferralCode(createdUser.ID)
+	if err != nil {
+		log.Printf("Warning: Failed to generate referral code for user %d: %v", createdUser.ID, err)
+	} else {
+		repository.SyncUserReferralCode(createdUser.ID, refCode)
+	}
+
 	// Обработать реферальный код (если указан)
 	if req.ReferralCode != "" {
 		if err := repository.ProcessReferralRegistration(createdUser.ID, req.ReferralCode); err != nil {
 			log.Printf("Warning: Failed to process referral code %s for user %d: %v", req.ReferralCode, createdUser.ID, err)
-			// Не блокируем регистрацию, если реферальный код невалиден
+		} else {
+			// Также сохраняем referred_by в users таблицу
+			referrerID := repository.GetReferrerID(createdUser.ID)
+			if referrerID > 0 {
+				if err := repository.SetReferredBy(createdUser.ID, referrerID); err != nil {
+					log.Printf("Warning: Failed to set referred_by for user %d: %v", createdUser.ID, err)
+				}
+			}
 		}
 	}
 

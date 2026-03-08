@@ -834,25 +834,26 @@ export const LandingPage = () => {
                   Приглашайте друзей и получайте <span className="text-white font-bold">$10</span> за каждого нового пользователя
                 </p>
 
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-                  <div className="flex-1 max-w-md w-full">
-                    <div className="flex items-center gap-2 p-3 bg-white/10 border border-white/20 rounded-xl backdrop-blur">
+                <div className="flex justify-center mb-8 px-2">
+                  <div className="w-full max-w-md overflow-hidden">
+                    <div className="flex items-center gap-2 p-2 sm:p-3 bg-white/10 border border-white/20 rounded-xl backdrop-blur overflow-hidden">
                       <input 
                         type="text" 
                         value="https://xplr.io/ref/USER123" 
                         readOnly 
-                        className="flex-1 bg-transparent text-white text-sm outline-none"
+                        className="flex-1 min-w-0 bg-transparent text-white text-xs sm:text-sm outline-none truncate"
                       />
                       <button 
                         onClick={copyReferralLink}
-                        className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 text-sm whitespace-nowrap overflow-hidden shrink-0 ${
+                        className={`px-3 sm:px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-1.5 text-xs sm:text-sm whitespace-nowrap shrink-0 ${
                           copied 
                             ? 'bg-emerald-500 text-white' 
                             : 'bg-white text-slate-800 hover:bg-slate-100'
                         }`}
                       >
                         <Copy className="w-4 h-4 shrink-0" />
-                        {copied ? 'Скопировано!' : 'Копировать'}
+                        <span className="hidden xs:inline">{copied ? 'Скопировано!' : 'Копировать'}</span>
+                        <span className="xs:hidden">{copied ? '✓' : 'Copy'}</span>
                       </button>
                     </div>
                   </div>

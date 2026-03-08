@@ -225,3 +225,48 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token ON password_reset_tokens(token);
+
+-- 12. Миграция: расширение transactions для единой истории денежных потоков
+DO $$
+BEGIN
+    -- source_type: 'wallet_topup', 'card_transfer', 'card_charge', 'referral_bonus', 'refund', 'commission'
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'transactions' AND column_name = 'source_type') THEN
+        ALTER TABLE transactions ADD COLUMN source_type VARCHAR(50) DEFAULT 'card_charge';
+    END IF;
+    -- source_id: ID карты или кошелька, с которым связана операция
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'transactions' AND column_name = 'source_id') THEN
+        ALTER TABLE transactions ADD COLUMN source_id INTEGER;
+    END IF;
+    -- currency для мультивалютности
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'transactions' AND column_name = 'currency') THEN
+        ALTER TABLE transactions ADD COLUMN currency VARCHAR(10) DEFAULT 'USD';
+    END IF;
+END $$;
+
+-- 13. Миграция: реферальная система — индивидуальный трекинг
+DO $$
+BEGIN
+    -- Уникальный реферальный код пользователя (генерируется при регистрации)
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'referral_code') THEN
+        ALTER TABLE users ADD COLUMN referral_code VARCHAR(20) UNIQUE;
+    END IF;
+    -- Кто пригласил (ID пользователя-реферера)
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'referred_by') THEN
+        ALTER TABLE users ADD COLUMN referred_by INTEGER REFERENCES users(id);
+    END IF;
+END $$;
+CREATE INDEX IF NOT EXISTS idx_users_referral_code ON users(referral_code) WHERE referral_code IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_users_referred_by ON users(referred_by) WHERE referred_by IS NOT NULL;
+
+-- 14. Таблица реферальных комиссий
+CREATE TABLE IF NOT EXISTS referral_commissions (
+    id SERIAL PRIMARY KEY,
+    referrer_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    referred_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    source_transaction_id INTEGER REFERENCES transactions(id),
+    commission_amount NUMERIC(20, 4) NOT NULL,
+    commission_percent NUMERIC(5, 2) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_referral_commissions_referrer ON referral_commissions(referrer_id);
+CREATE INDEX IF NOT EXISTS idx_referral_commissions_referred ON referral_commissions(referred_id);
