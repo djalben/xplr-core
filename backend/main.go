@@ -119,7 +119,9 @@ func main() {
 	router.HandleFunc("/api/v1/auth/register", handlers.RegisterHandler).Methods("POST")
 	router.HandleFunc("/api/v1/auth/login", handlers.LoginHandler).Methods("POST")
 	router.HandleFunc("/api/v1/auth/verify", handlers.VerifyEmailHandler).Methods("GET")
-	router.HandleFunc("/api/v1/auth/reset-password-request", handlers.ResetPasswordRequestHandler).Methods("POST")
+	// Rate limiter: 5 запросов сброса пароля за 15 минут с одного IP
+	resetLimiter := middleware.NewRateLimiter(5, 15*time.Minute)
+	router.HandleFunc("/api/v1/auth/reset-password-request", resetLimiter.Limit(handlers.ResetPasswordRequestHandler)).Methods("POST")
 	router.HandleFunc("/api/v1/auth/reset-password", handlers.ResetPasswordHandler).Methods("POST")
 
 	// Webhook от Wallester (публичный, без middleware)

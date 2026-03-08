@@ -8,6 +8,17 @@ export const ForgotPasswordPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
+  const [cooldown, setCooldown] = useState(0);
+
+  const startCooldown = () => {
+    setCooldown(60);
+    const timer = setInterval(() => {
+      setCooldown((prev) => {
+        if (prev <= 1) { clearInterval(timer); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -16,16 +27,22 @@ export const ForgotPasswordPage = () => {
       setError('Введите email');
       return;
     }
+    if (cooldown > 0) return;
     setIsLoading(true);
     try {
       await requestPasswordReset(email.trim());
       setSent(true);
+      startCooldown();
     } catch (err: any) {
       if (err.code === 'ERR_NETWORK') {
         setError('Сервер недоступен. Проверьте подключение.');
+      } else if (err.response?.status === 429) {
+        setError('Слишком много попыток. Подождите несколько минут.');
+        startCooldown();
       } else {
         // Always show success to not leak email existence
         setSent(true);
+        startCooldown();
       }
     } finally {
       setIsLoading(false);

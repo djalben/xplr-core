@@ -170,6 +170,20 @@ export const AuthPage = () => {
         {error && (
           <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center">
             {error}
+            {mode === 'register' && error.includes('уже зарегистрирован') && (
+              <div className="flex flex-col gap-1.5 mt-2">
+                <button
+                  type="button"
+                  onClick={() => { setMode('login'); setError(''); }}
+                  className="text-blue-400 hover:text-blue-300 transition-colors text-xs font-medium"
+                >
+                  Уже есть аккаунт? Войти
+                </button>
+                <Link to="/forgot-password" className="text-slate-400 hover:text-slate-300 transition-colors text-xs">
+                  Забыли пароль? Восстановить
+                </Link>
+              </div>
+            )}
             {mode === 'login' && (
               <Link to="/forgot-password" className="block mt-2 text-blue-400 hover:text-blue-300 transition-colors text-xs font-medium">
                 Забыли пароль?

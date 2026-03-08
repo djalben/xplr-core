@@ -110,12 +110,12 @@ const UserProfile = () => {
 };
 
 const BottomNavItem = ({ href, icon, label, isActive }: { href: string; icon: React.ReactNode; label: string; isActive: boolean }) => (
-  <Link to={href}>
-    <div className={`flex flex-col items-center justify-center min-h-[44px] min-w-[44px] py-2 px-3 rounded-xl transition-colors ${
+  <Link to={href} className="flex-1 min-w-0">
+    <div className={`flex flex-col items-center justify-center h-full py-2 px-1 rounded-xl transition-colors ${
       isActive ? 'text-blue-400' : 'text-slate-500'
     }`}>
-      {icon}
-      <span className="text-[10px] mt-1 font-medium">{label}</span>
+      <span className="shrink-0">{icon}</span>
+      <span className="text-[10px] mt-0.5 font-medium leading-tight text-center truncate w-full">{label}</span>
     </div>
   </Link>
 );
@@ -212,7 +212,7 @@ export const Sidebar = () => {
 
       {/* Mobile Bottom Navigation */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0a0a0f]/90 backdrop-blur-xl border-t border-white/[0.08]" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-        <div className="flex items-center justify-around px-2 py-1.5">
+        <div className="flex items-stretch justify-around px-1 py-1">
           {bottomNavItems.map(item => (
             <BottomNavItem
               key={item.href}

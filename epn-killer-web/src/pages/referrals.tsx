@@ -176,7 +176,7 @@ export const ReferralsPage = () => {
           <div className="relative z-10">
             <div className="flex flex-col lg:flex-row lg:items-start gap-6">
               {/* Link section */}
-              <div className="flex-1">
+              <div className="flex-1 min-w-0 overflow-hidden">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-12 h-12 rounded-xl gradient-accent flex items-center justify-center shadow-lg shadow-blue-500/30 shrink-0">
                     <Share2 className="w-6 h-6 text-white" />
@@ -187,14 +187,14 @@ export const ReferralsPage = () => {
                   </div>
                 </div>
                 
-                <div className="flex flex-col sm:flex-row gap-3 mb-4">
-                  <div className="flex-1 flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3 border border-white/10">
+                <div className="flex flex-col gap-3 mb-4">
+                  <div className="flex items-center bg-white/5 rounded-xl px-4 py-3 border border-white/10 overflow-hidden min-w-0">
                     <span className="text-white font-mono text-sm truncate">{referralLink}</span>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <button 
                       onClick={handleCopy}
-                      className={`px-5 py-3 rounded-xl font-medium transition-all flex items-center gap-2 min-w-[130px] justify-center ${
+                      className={`px-5 py-3 rounded-xl font-medium transition-all flex items-center gap-2 justify-center ${
                         copied 
                           ? 'bg-green-500 text-white' 
                           : 'gradient-accent text-white hover:opacity-90'
@@ -205,7 +205,7 @@ export const ReferralsPage = () => {
                     </button>
                     <button 
                       onClick={() => setShowQR(!showQR)}
-                      className={`p-3 rounded-xl transition-colors ${
+                      className={`p-3 rounded-xl transition-colors shrink-0 ${
                         showQR ? 'bg-blue-500/20 text-blue-400' : 'glass-card hover:bg-white/10 text-gray-400'
                       }`}
                       title="QR-код"
@@ -214,7 +214,7 @@ export const ReferralsPage = () => {
                     </button>
                     <button 
                       onClick={handleShare}
-                      className="p-3 glass-card hover:bg-white/10 text-gray-400 rounded-xl transition-colors"
+                      className="p-3 glass-card hover:bg-white/10 text-gray-400 rounded-xl transition-colors shrink-0"
                       title="Поделиться"
                     >
                       <ExternalLink className="w-5 h-5" />
