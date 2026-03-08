@@ -26,6 +26,8 @@ type AdminUserRow struct {
 	BalanceRub string `json:"balance_rub"`
 	Status     string `json:"status"`
 	IsAdmin    bool   `json:"is_admin"`
+	Role       string `json:"role"`
+	IsVerified bool   `json:"is_verified"`
 	CardCount  int    `json:"card_count"`
 	CreatedAt  string `json:"created_at"`
 }
@@ -77,6 +79,7 @@ func GetAllUsersForAdmin() ([]AdminUserRow, error) {
 
 	query := `
 		SELECT u.id, u.email, COALESCE(u.balance_rub, 0), u.status, COALESCE(u.is_admin, FALSE),
+		       COALESCE(u.role, 'user'), COALESCE(u.is_verified, FALSE),
 		       (SELECT COUNT(*) FROM cards c WHERE c.user_id = u.id) as card_count,
 		       u.created_at
 		FROM users u
@@ -94,7 +97,7 @@ func GetAllUsersForAdmin() ([]AdminUserRow, error) {
 		var u AdminUserRow
 		var bal decimal.Decimal
 		var createdAt interface{}
-		if err := rows.Scan(&u.ID, &u.Email, &bal, &u.Status, &u.IsAdmin, &u.CardCount, &createdAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Email, &bal, &u.Status, &u.IsAdmin, &u.Role, &u.IsVerified, &u.CardCount, &createdAt); err != nil {
 			log.Printf("AdminUsers: error scanning row: %v", err)
 			continue
 		}

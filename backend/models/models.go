@@ -55,6 +55,7 @@ type User struct {
 	TelegramChatID   sql.NullInt64   `json:"telegram_chat_id"`
 	IsAdmin          bool            `json:"is_admin"`
 	IsVerified       bool            `json:"is_verified"`
+	Role             string          `json:"role"`
 }
 
 // VerificationToken — токен подтверждения email

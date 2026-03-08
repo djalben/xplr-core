@@ -176,6 +176,19 @@ func main() {
 
 	// Привязка Telegram Chat ID для уведомлений
 	protectedRouter.HandleFunc("/settings/telegram", handlers.UpdateTelegramChatIDHandler).Methods("POST")
+
+	// --- ADMIN ROUTES (JWT + AdminOnly) ---
+	adminRouter := router.PathPrefix("/api/v1/admin").Subrouter()
+	adminRouter.Use(middleware.JWTAuthMiddleware)
+	adminRouter.Use(middleware.AdminOnlyMiddleware)
+	adminRouter.HandleFunc("/users", handlers.AdminUsersHandler).Methods("GET")
+	adminRouter.HandleFunc("/users/{id}/balance", handlers.AdminAdjustBalanceHandler).Methods("PATCH")
+	adminRouter.HandleFunc("/users/{id}/role", handlers.AdminToggleRoleHandler).Methods("PATCH")
+	adminRouter.HandleFunc("/users/{id}/status", handlers.AdminSetUserStatusHandler).Methods("PATCH")
+	adminRouter.HandleFunc("/stats", handlers.AdminStatsHandler).Methods("GET")
+	adminRouter.HandleFunc("/rates", handlers.AdminGetExchangeRatesHandler).Methods("GET")
+	adminRouter.HandleFunc("/rates/{id}/markup", handlers.AdminUpdateMarkupHandler).Methods("PATCH")
+	adminRouter.HandleFunc("/report", handlers.GetAdminTransactionReportHandler).Methods("GET")
 	// --------------------------------------------------------
 
 	// CORS: dynamic origins from ALLOWED_ORIGINS env var (comma-separated)

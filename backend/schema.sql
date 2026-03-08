@@ -270,3 +270,21 @@ CREATE TABLE IF NOT EXISTS referral_commissions (
 );
 CREATE INDEX IF NOT EXISTS idx_referral_commissions_referrer ON referral_commissions(referrer_id);
 CREATE INDEX IF NOT EXISTS idx_referral_commissions_referred ON referral_commissions(referred_id);
+
+-- 15. Миграция: роли пользователей и verification_token
+DO $$
+BEGIN
+    -- role: 'user', 'admin', 'support'
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'role') THEN
+        ALTER TABLE users ADD COLUMN role VARCHAR(20) DEFAULT 'user';
+    END IF;
+    -- verification_token: прямая ссылка на токен верификации (для быстрого доступа)
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'verification_token') THEN
+        ALTER TABLE users ADD COLUMN verification_token VARCHAR(255);
+    END IF;
+    -- is_admin: обратная совместимость (если ещё не существует)
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'is_admin') THEN
+        ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT FALSE;
+    END IF;
+END $$;
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);

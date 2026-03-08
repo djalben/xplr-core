@@ -56,7 +56,7 @@ func GetUserByEmail(email string) (models.User, error) {
 		return models.User{}, fmt.Errorf("database connection not initialized")
 	}
 
-	query := `SELECT id, email, password_hash, balance, COALESCE(balance_rub, 0), COALESCE(balance_arbitrage, 0), COALESCE(balance_personal, 0), COALESCE(kyc_status, ''), COALESCE(active_mode, 'personal'), created_at, status, telegram_chat_id, COALESCE(is_admin, FALSE), COALESCE(is_verified, FALSE) FROM users WHERE email = $1`
+	query := `SELECT id, email, password_hash, balance, COALESCE(balance_rub, 0), COALESCE(balance_arbitrage, 0), COALESCE(balance_personal, 0), COALESCE(kyc_status, ''), COALESCE(active_mode, 'personal'), created_at, status, telegram_chat_id, COALESCE(is_admin, FALSE), COALESCE(is_verified, FALSE), COALESCE(role, 'user') FROM users WHERE email = $1`
 
 	var user models.User
 
@@ -75,6 +75,7 @@ func GetUserByEmail(email string) (models.User, error) {
 		&user.TelegramChatID,
 		&user.IsAdmin,
 		&user.IsVerified,
+		&user.Role,
 	)
 
 	if err != nil {
@@ -94,7 +95,7 @@ func GetUserByID(userID int) (models.User, error) {
 		return models.User{}, fmt.Errorf("database connection not initialized")
 	}
 
-	query := `SELECT id, email, password_hash, balance, COALESCE(balance_rub, 0), COALESCE(balance_arbitrage, 0), COALESCE(balance_personal, 0), COALESCE(kyc_status, ''), COALESCE(active_mode, 'personal'), created_at, status, telegram_chat_id, COALESCE(is_admin, FALSE), COALESCE(is_verified, FALSE) FROM users WHERE id = $1`
+	query := `SELECT id, email, password_hash, balance, COALESCE(balance_rub, 0), COALESCE(balance_arbitrage, 0), COALESCE(balance_personal, 0), COALESCE(kyc_status, ''), COALESCE(active_mode, 'personal'), created_at, status, telegram_chat_id, COALESCE(is_admin, FALSE), COALESCE(is_verified, FALSE), COALESCE(role, 'user') FROM users WHERE id = $1`
 
 	var user models.User
 
@@ -113,6 +114,7 @@ func GetUserByID(userID int) (models.User, error) {
 		&user.TelegramChatID,
 		&user.IsAdmin,
 		&user.IsVerified,
+		&user.Role,
 	)
 
 	if err != nil {

@@ -21,11 +21,15 @@ func SendVerificationEmail(toEmail, token string) error {
 
 	if host == "" || port == "" {
 		log.Printf("[EMAIL] SMTP not configured (SMTP_HOST/SMTP_PORT missing). Verification email for %s skipped. Token: %s", toEmail, token)
-		return nil // Не блокируем регистрацию если SMTP не настроен
+		return nil
 	}
 
 	if from == "" {
-		from = user
+		if user != "" {
+			from = user
+		} else {
+			from = "concierge@xplr.com"
+		}
 	}
 	if domain == "" {
 		domain = "https://xplr-web.vercel.app"
@@ -77,7 +81,11 @@ func SendPasswordResetEmail(toEmail, token string) error {
 	}
 
 	if from == "" {
-		from = user
+		if user != "" {
+			from = user
+		} else {
+			from = "concierge@xplr.com"
+		}
 	}
 	if domain == "" {
 		domain = "https://xplr-web.vercel.app"

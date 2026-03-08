@@ -24,8 +24,8 @@ func AdminOnlyMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		if !user.IsAdmin {
-			log.Printf("AdminOnly: user %d (%s) attempted admin access — denied", userID, user.Email)
+		if !user.IsAdmin && user.Role != "admin" {
+			log.Printf("AdminOnly: user %d (%s) attempted admin access — denied (role=%s)", userID, user.Email, user.Role)
 			http.Error(w, "Forbidden: admin access required", http.StatusForbidden)
 			return
 		}
