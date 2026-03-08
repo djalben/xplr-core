@@ -54,6 +54,17 @@ type User struct {
 	TeamID           sql.NullInt64   `json:"team_id"`
 	TelegramChatID   sql.NullInt64   `json:"telegram_chat_id"`
 	IsAdmin          bool            `json:"is_admin"`
+	IsVerified       bool            `json:"is_verified"`
+}
+
+// VerificationToken — токен подтверждения email
+type VerificationToken struct {
+	ID        int       `json:"id"`
+	UserID    int       `json:"user_id"`
+	Token     string    `json:"token"`
+	ExpiresAt time.Time `json:"expires_at"`
+	Used      bool      `json:"used"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // APIKey - Структура для ключей
@@ -125,16 +136,16 @@ type Card struct {
 	AutoReplenishEnabled   bool            `json:"auto_replenish_enabled"`
 	AutoReplenishThreshold decimal.Decimal `json:"auto_replenish_threshold"`
 	AutoReplenishAmount    decimal.Decimal `json:"auto_replenish_amount"`
-	CardBalance            decimal.Decimal `json:"card_balance"` // Виртуальный баланс: при списке карт = BalanceRub пользователя
-	SpendingLimit          decimal.Decimal `json:"spending_limit"`    // Макс. сумма, которую карта может потратить из Сейфа
-	SpentFromVault         decimal.Decimal `json:"spent_from_vault"`  // Сколько карта реально потратила из Сейфа
+	CardBalance            decimal.Decimal `json:"card_balance"`          // Виртуальный баланс: при списке карт = BalanceRub пользователя
+	SpendingLimit          decimal.Decimal `json:"spending_limit"`        // Макс. сумма, которую карта может потратить из Кошелька
+	SpentFromVault         decimal.Decimal `json:"spent_from_vault"`      // Сколько карта реально потратила из Кошелька
 	ExpiryDate             *time.Time      `json:"expiry_date,omitempty"` // Дата истечения срока карты
 	CreatedAt              time.Time       `json:"created_at"`
 }
 
-// --- СТРУКТУРЫ ВНУТРЕННЕГО БАЛАНСА (СЕЙФ) ---
+// --- СТРУКТУРЫ ВНУТРЕННЕГО БАЛАНСА (КОШЕЛЁК) ---
 
-// InternalBalance - Внутренний баланс пользователя (Сейф)
+// InternalBalance - Внутренний баланс пользователя (Кошелёк)
 type InternalBalance struct {
 	ID            int             `json:"id"`
 	UserID        int             `json:"user_id"`
@@ -147,7 +158,7 @@ type SpendingLimitRequest struct {
 	SpendingLimit decimal.Decimal `json:"spending_limit"`
 }
 
-// TopUpVaultRequest - Запрос на пополнение Сейфа
+// TopUpVaultRequest - Запрос на пополнение Кошелька
 type TopUpVaultRequest struct {
 	Amount decimal.Decimal `json:"amount"`
 }

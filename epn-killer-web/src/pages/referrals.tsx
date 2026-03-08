@@ -162,7 +162,7 @@ export const ReferralsPage = () => {
         
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Партнёрская программа</h1>
+          <h1 className="text-3xl font-bold text-white mb-2">Реферальная программа</h1>
           <p className="text-slate-500">
             {`Приглашайте друзей и получайте $${personalStats.rewardPerReferral} за каждого. Ваш друг тоже получит $${personalStats.bonusForNew}!`}
           </p>
@@ -342,7 +342,7 @@ export const ReferralsPage = () => {
           </div>
         </div>
 
-        {/* Transfer to Vault */}
+        {/* Transfer to Wallet */}
         <div className="glass-card p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center">

@@ -14,17 +14,17 @@ import (
 // ExternalTopUpPayload — входящий webhook от зарубежной организации
 // для подтверждения пополнения (депозита) пользователя.
 type ExternalTopUpPayload struct {
-	UserID        int    `json:"user_id"`
-	ExternalTxID  string `json:"external_tx_id"`
-	Amount        string `json:"amount"`
-	Currency      string `json:"currency"`
-	Status        string `json:"status"` // "confirmed", "pending", "failed"
-	ProviderName  string `json:"provider_name,omitempty"`
+	UserID       int    `json:"user_id"`
+	ExternalTxID string `json:"external_tx_id"`
+	Amount       string `json:"amount"`
+	Currency     string `json:"currency"`
+	Status       string `json:"status"` // "confirmed", "pending", "failed"
+	ProviderName string `json:"provider_name,omitempty"`
 }
 
 // ExternalTopUpWebhookHandler — POST /api/v1/webhooks/external-topup
 // Принимает входящий вебхук от зарубежной организации, проверяет подпись,
-// и зачисляет средства в Сейф пользователя.
+// и зачисляет средства в Кошелёк пользователя.
 func ExternalTopUpWebhookHandler(w http.ResponseWriter, r *http.Request) {
 	if repository.GlobalDB == nil {
 		http.Error(w, "Database not initialized", http.StatusInternalServerError)

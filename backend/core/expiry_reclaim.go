@@ -8,7 +8,7 @@ import (
 )
 
 // StartExpiryReclaimWorker — фоновый процесс: каждые 30 минут проверяет
-// истёкшие карты и возвращает неиспользованный остаток лимита в Сейф.
+// истёкшие карты и возвращает неиспользованный остаток лимита в Кошелёк.
 func StartExpiryReclaimWorker() {
 	log.Println("[EXPIRY-RECLAIM] Starting expiry reclaim worker...")
 

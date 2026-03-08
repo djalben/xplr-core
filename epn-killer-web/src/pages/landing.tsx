@@ -680,7 +680,7 @@ export const LandingPage = () => {
           </div>
         </section>
 
-        {/* Vault Features — Автопилот баланса + Честный возврат */}
+        {/* Wallet Features — Автопилот баланса + Честный возврат */}
         <section className="py-24 px-6">
           <div className="max-w-7xl mx-auto">
             <div className="grid md:grid-cols-2 gap-8">
@@ -823,7 +823,7 @@ export const LandingPage = () => {
               <div className="relative z-10">
                 <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 rounded-full text-white text-sm font-medium mb-6">
                   <TrendingUp className="w-4 h-4" />
-                  Партнёрская программа
+                  Реферальная программа
                 </div>
                 
                 <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
@@ -845,13 +845,13 @@ export const LandingPage = () => {
                       />
                       <button 
                         onClick={copyReferralLink}
-                        className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                        className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 text-sm whitespace-nowrap overflow-hidden shrink-0 ${
                           copied 
                             ? 'bg-emerald-500 text-white' 
                             : 'bg-white text-slate-800 hover:bg-slate-100'
                         }`}
                       >
-                        <Copy className="w-4 h-4" />
+                        <Copy className="w-4 h-4 shrink-0" />
                         {copied ? 'Скопировано!' : 'Копировать'}
                       </button>
                     </div>

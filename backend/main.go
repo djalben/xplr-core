@@ -93,7 +93,7 @@ func main() {
 	// 1.5. Запуск фонового процесса автопополнения карт
 	go core.StartAutoReplenishmentWorker()
 
-	// 1.7. Запуск cron-задачи: возврат остатков истёкших карт в Сейф
+	// 1.7. Запуск cron-задачи: возврат остатков истёкших карт в Кошелёк
 	go core.StartExpiryReclaimWorker()
 
 	// 1.6. Запуск периодической синхронизации балансов карт из Wallester
@@ -118,6 +118,7 @@ func main() {
 	// Настройка публичных маршрутов (Auth)
 	router.HandleFunc("/api/v1/auth/register", handlers.RegisterHandler).Methods("POST")
 	router.HandleFunc("/api/v1/auth/login", handlers.LoginHandler).Methods("POST")
+	router.HandleFunc("/api/v1/auth/verify", handlers.VerifyEmailHandler).Methods("GET")
 
 	// Webhook от Wallester (публичный, без middleware)
 	router.HandleFunc("/api/v1/webhooks/wallester", handlers.WallesterWebhookHandler).Methods("POST")
@@ -136,17 +137,23 @@ func main() {
 	protectedRouter.HandleFunc("/me", handlers.GetMeHandler).Methods("GET")
 	protectedRouter.HandleFunc("/grade", handlers.GetUserGradeHandler).Methods("GET")
 	protectedRouter.HandleFunc("/deposit", handlers.ProcessDepositHandler).Methods("POST")
-	protectedRouter.HandleFunc("/cards", handlers.GetUserCardsHandler).Methods("GET")
-	protectedRouter.HandleFunc("/cards/issue", handlers.MassIssueCardsHandler).Methods("POST")
-	protectedRouter.HandleFunc("/cards/{id}/status", handlers.PatchCardStatusHandler).Methods("PATCH")
-	protectedRouter.HandleFunc("/cards/{id}/auto-replenishment", handlers.SetCardAutoReplenishmentHandler).Methods("POST")
-	protectedRouter.HandleFunc("/cards/{id}/auto-replenishment", handlers.UnsetCardAutoReplenishmentHandler).Methods("DELETE")
-	protectedRouter.HandleFunc("/cards/{id}/details", handlers.GetCardDetailsHandler).Methods("GET")
-	protectedRouter.HandleFunc("/cards/{id}/sync-balance", handlers.SyncCardBalanceHandler).Methods("POST")
-	protectedRouter.HandleFunc("/cards/{id}/spending-limit", handlers.SetSpendingLimitHandler).Methods("PATCH")
-	protectedRouter.HandleFunc("/vault", handlers.GetVaultHandler).Methods("GET")
-	protectedRouter.HandleFunc("/vault/topup", handlers.TopUpVaultHandler).Methods("POST")
-	protectedRouter.HandleFunc("/vault/auto-topup", handlers.SetAutoTopupHandler).Methods("PATCH")
+	// Карты и Кошелёк — только для пользователей с подтверждённым email
+	verifiedCards := protectedRouter.PathPrefix("/cards").Subrouter()
+	verifiedCards.Use(middleware.RequireVerifiedEmail)
+	verifiedCards.HandleFunc("", handlers.GetUserCardsHandler).Methods("GET")
+	verifiedCards.HandleFunc("/issue", handlers.MassIssueCardsHandler).Methods("POST")
+	verifiedCards.HandleFunc("/{id}/status", handlers.PatchCardStatusHandler).Methods("PATCH")
+	verifiedCards.HandleFunc("/{id}/auto-replenishment", handlers.SetCardAutoReplenishmentHandler).Methods("POST")
+	verifiedCards.HandleFunc("/{id}/auto-replenishment", handlers.UnsetCardAutoReplenishmentHandler).Methods("DELETE")
+	verifiedCards.HandleFunc("/{id}/details", handlers.GetCardDetailsHandler).Methods("GET")
+	verifiedCards.HandleFunc("/{id}/sync-balance", handlers.SyncCardBalanceHandler).Methods("POST")
+	verifiedCards.HandleFunc("/{id}/spending-limit", handlers.SetSpendingLimitHandler).Methods("PATCH")
+
+	verifiedVault := protectedRouter.PathPrefix("/vault").Subrouter()
+	verifiedVault.Use(middleware.RequireVerifiedEmail)
+	verifiedVault.HandleFunc("", handlers.GetVaultHandler).Methods("GET")
+	verifiedVault.HandleFunc("/topup", handlers.TopUpVaultHandler).Methods("POST")
+	verifiedVault.HandleFunc("/auto-topup", handlers.SetAutoTopupHandler).Methods("PATCH")
 	protectedRouter.HandleFunc("/report", handlers.GetUserTransactionReportHandler).Methods("GET")
 	protectedRouter.HandleFunc("/api-key", handlers.CreateAPIKeyHandler).Methods("POST")
 

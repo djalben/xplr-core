@@ -9,26 +9,26 @@ export interface InternalBalance {
   updated_at: string;
 }
 
-// Получить текущий баланс Сейфа
+// Получить текущий баланс Кошелька
 export const getVault = async (): Promise<InternalBalance> => {
   const res = await apiClient.get<InternalBalance>(`${API_BASE_URL}/user/vault`);
   return res.data;
 };
 
-// Пополнить Сейф из баланса пользователя
+// Пополнить Кошелёк из баланса пользователя
 export const topUpVault = async (amount: number): Promise<InternalBalance> => {
   const res = await apiClient.post<InternalBalance>(`${API_BASE_URL}/user/vault/topup`, { amount });
   return res.data;
 };
 
-// Установить лимит списания карты из Сейфа
+// Установить лимит списания карты из Кошелька
 export const setCardSpendingLimit = async (cardId: number, spendingLimit: number): Promise<void> => {
   await apiClient.patch(`${API_BASE_URL}/user/cards/${cardId}/spending-limit`, {
     spending_limit: spendingLimit,
   });
 };
 
-// Перевести средства из Сейфа на карту (внутренний перевод)
+// Перевести средства из Кошелька на карту (внутренний перевод)
 export const transferVaultToCard = async (
   cardId: string,
   amount: number,

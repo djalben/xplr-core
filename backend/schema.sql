@@ -133,7 +133,7 @@ CREATE INDEX idx_referrals_referrer_id ON referrals(referrer_id);
 CREATE INDEX idx_referrals_referred_id ON referrals(referred_id);
 CREATE INDEX idx_referrals_code ON referrals(referral_code);
 
--- 9. Таблица внутренних балансов (Сейф) — один master_balance на пользователя
+-- 9. Таблица внутренних балансов (Кошелёк) — один master_balance на пользователя
 CREATE TABLE IF NOT EXISTS internal_balances (
     id SERIAL PRIMARY KEY,
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE UNIQUE,
@@ -163,15 +163,15 @@ BEGIN
         ALTER TABLE transactions ADD COLUMN provider_tx_id VARCHAR(255);
         CREATE INDEX IF NOT EXISTS idx_transactions_provider_tx_id ON transactions(provider_tx_id) WHERE provider_tx_id IS NOT NULL;
     END IF;
-    -- Лимит списания карты из Сейфа (максимум, который карта может потратить)
+    -- Лимит списания карты из Кошелька (максимум, который карта может потратить)
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cards' AND column_name = 'spending_limit') THEN
         ALTER TABLE cards ADD COLUMN spending_limit NUMERIC(20, 4) DEFAULT 0.0000;
     END IF;
-    -- Дата истечения срока карты (для cron-возврата остатка в Сейф)
+    -- Дата истечения срока карты (для cron-возврата остатка в Кошелёк)
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cards' AND column_name = 'expiry_date') THEN
         ALTER TABLE cards ADD COLUMN expiry_date TIMESTAMP WITH TIME ZONE;
     END IF;
-    -- Сколько карта реально потратила из Сейфа (для отслеживания остатка)
+    -- Сколько карта реально потратила из Кошелька (для отслеживания остатка)
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cards' AND column_name = 'spent_from_vault') THEN
         ALTER TABLE cards ADD COLUMN spent_from_vault NUMERIC(20, 4) DEFAULT 0.0000;
     END IF;
@@ -188,4 +188,20 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'internal_balances' AND column_name = 'auto_topup_enabled') THEN
         ALTER TABLE internal_balances ADD COLUMN auto_topup_enabled BOOLEAN DEFAULT FALSE;
     END IF;
+    -- Email verification
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'is_verified') THEN
+        ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE;
+    END IF;
 END $$;
+
+-- 10. Таблица токенов подтверждения email
+CREATE TABLE IF NOT EXISTS verification_tokens (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    token VARCHAR(255) UNIQUE NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_verification_tokens_token ON verification_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_verification_tokens_user_id ON verification_tokens(user_id);

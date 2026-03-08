@@ -13,7 +13,7 @@ import (
 )
 
 // GetVaultHandler — GET /api/v1/user/vault
-// Возвращает текущий баланс Сейфа пользователя
+// Возвращает текущий баланс Кошелька пользователя
 func GetVaultHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
 	if !ok || userID == 0 {
@@ -32,7 +32,7 @@ func GetVaultHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // TopUpVaultHandler — POST /api/v1/user/vault/topup
-// Пополняет Сейф из balance_rub пользователя
+// Пополняет Кошелёк из balance_rub пользователя
 func TopUpVaultHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
 	if !ok || userID == 0 {
@@ -101,7 +101,7 @@ func SetAutoTopupHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // SetSpendingLimitHandler — PATCH /api/v1/user/cards/{id}/spending-limit
-// Устанавливает лимит списания карты из Сейфа
+// Устанавливает лимит списания карты из Кошелька
 func SetSpendingLimitHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
 	if !ok || userID == 0 {

@@ -9,7 +9,7 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// GetInternalBalance — получить внутренний баланс (Сейф) пользователя.
+// GetInternalBalance — получить внутренний баланс (Кошелёк) пользователя.
 // Если записи нет — создаёт с нулевым балансом (upsert).
 func GetInternalBalance(userID int) (*models.InternalBalance, error) {
 	if GlobalDB == nil {
@@ -45,7 +45,7 @@ func GetInternalBalance(userID int) (*models.InternalBalance, error) {
 	return &ib, nil
 }
 
-// TopUpInternalBalance — пополнить Сейф пользователя на указанную сумму.
+// TopUpInternalBalance — пополнить Кошелёк пользователя на указанную сумму.
 // Списывает с balance_rub пользователя и зачисляет в internal_balances.
 func TopUpInternalBalance(userID int, amount decimal.Decimal) (*models.InternalBalance, error) {
 	if GlobalDB == nil {
@@ -77,7 +77,7 @@ func TopUpInternalBalance(userID int, amount decimal.Decimal) (*models.InternalB
 		return nil, fmt.Errorf("failed to deduct user balance: %w", err)
 	}
 
-	// Зачисляем в Сейф (upsert)
+	// Зачисляем в Кошелёк (upsert)
 	_, err = tx.Exec(
 		`INSERT INTO internal_balances (user_id, master_balance, updated_at)
 		 VALUES ($1, $2, NOW())
@@ -108,9 +108,15 @@ func TopUpInternalBalance(userID int, amount decimal.Decimal) (*models.InternalB
 	return GetInternalBalance(userID)
 }
 
-// DeductInternalBalance — списать из Сейфа пользователя (вызывается Bridge при webhook).
+// DeductInternalBalance — списать из Кошелька пользователя (вызывается Bridge при webhook).
 // Атомарно уменьшает master_balance и увеличивает spent_from_vault на карте.
-func DeductInternalBalance(tx interface{ Exec(string, ...interface{}) (interface{ LastInsertId() (int64, error); RowsAffected() (int64, error) }, error); QueryRow(string, ...interface{}) interface{ Scan(...interface{}) error } }, userID int, cardID int, amount decimal.Decimal) error {
+func DeductInternalBalance(tx interface {
+	Exec(string, ...interface{}) (interface {
+		LastInsertId() (int64, error)
+		RowsAffected() (int64, error)
+	}, error)
+	QueryRow(string, ...interface{}) interface{ Scan(...interface{}) error }
+}, userID int, cardID int, amount decimal.Decimal) error {
 	// Уменьшаем master_balance
 	res := tx.QueryRow(
 		`UPDATE internal_balances SET master_balance = master_balance - $1, updated_at = NOW()
@@ -136,7 +142,7 @@ func DeductInternalBalance(tx interface{ Exec(string, ...interface{}) (interface
 }
 
 // ReclaimExpiredCardLimits — возвращает неиспользованный остаток лимита
-// истёкших карт обратно в Сейф пользователя.
+// истёкших карт обратно в Кошелёк пользователя.
 func ReclaimExpiredCardLimits() {
 	if GlobalDB == nil {
 		log.Println("[EXPIRY-RECLAIM] Database not initialized, skipping")
@@ -178,7 +184,7 @@ func ReclaimExpiredCardLimits() {
 			continue
 		}
 
-		// Атомарно: вернуть остаток в Сейф + пометить карту как RECLAIMED
+		// Атомарно: вернуть остаток в Кошелёк + пометить карту как RECLAIMED
 		tx, err := GlobalDB.Begin()
 		if err != nil {
 			log.Printf("[EXPIRY-RECLAIM] Error beginning tx: %v", err)

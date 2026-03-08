@@ -8,6 +8,7 @@ import (
 
 	"github.com/djalben/xplr-core/backend/models"
 	"github.com/djalben/xplr-core/backend/repository"
+	"github.com/djalben/xplr-core/backend/service"
 	"github.com/djalben/xplr-core/backend/utils"
 	"github.com/shopspring/decimal"
 )
@@ -73,6 +74,16 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		// Не блокируем регистрацию
 	}
 
+	// Генерация токена подтверждения email и отправка письма
+	verifyToken, err := repository.CreateVerificationToken(createdUser.ID)
+	if err != nil {
+		log.Printf("Warning: Failed to create verification token for user %d: %v", createdUser.ID, err)
+	} else {
+		if err := service.SendVerificationEmail(createdUser.Email, verifyToken); err != nil {
+			log.Printf("Warning: Failed to send verification email to %s: %v", createdUser.Email, err)
+		}
+	}
+
 	// Генерация JWT токена (авто-логин после регистрации)
 	token, err := utils.GenerateJWT(createdUser.ID)
 	if err != nil {
@@ -85,17 +96,42 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	response := map[string]interface{}{
 		"token": token,
 		"user": map[string]interface{}{
-			"id":         createdUser.ID,
-			"email":      createdUser.Email,
-			"balance":    createdUser.BalanceRub.String(),
-			"status":     "ACTIVE",
-			"created_at": createdUser.CreatedAt,
+			"id":          createdUser.ID,
+			"email":       createdUser.Email,
+			"balance":     createdUser.BalanceRub.String(),
+			"status":      "ACTIVE",
+			"is_verified": false,
+			"created_at":  createdUser.CreatedAt,
 		},
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(response)
+}
+
+// VerifyEmailHandler — GET /api/v1/auth/verify?token=...
+// Подтверждает email пользователя по токену из письма.
+func VerifyEmailHandler(w http.ResponseWriter, r *http.Request) {
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		http.Error(w, "Missing token parameter", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := repository.VerifyToken(token)
+	if err != nil {
+		log.Printf("Email verification failed: %v", err)
+		http.Error(w, "Verification failed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":  "ok",
+		"message": "Email successfully verified",
+		"user_id": userID,
+	})
 }
 
 // LoginHandler - Вход пользователя в систему
@@ -144,10 +180,11 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	response := map[string]interface{}{
 		"token": token,
 		"user": map[string]interface{}{
-			"id":      user.ID,
-			"email":   user.Email,
-			"balance": user.BalanceRub.String(),
-			"status":  user.Status,
+			"id":          user.ID,
+			"email":       user.Email,
+			"balance":     user.BalanceRub.String(),
+			"status":      user.Status,
+			"is_verified": user.IsVerified,
 		},
 	}
 
