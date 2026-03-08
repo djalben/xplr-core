@@ -4,7 +4,7 @@ import { useRates } from '../store/rates-context';
 import { DashboardLayout } from '../components/dashboard-layout';
 import { ModalPortal } from '../components/modal-portal';
 import { BackButton } from '../components/back-button';
-import { getVault, transferVaultToCard, type InternalBalance } from '../api/vault';
+import { getWallet, transferWalletToCard, type InternalBalance } from '../api/wallet';
 import { getUserCards, issuePersonalCard, getCardDetails, updateCardStatus, type Card as BackendCard } from '../api/cards';
 import { 
   Plus, 
@@ -599,10 +599,10 @@ const BankLogoButton = ({
   </button>
 );
 
-// Vault-to-Card Transfer Modal — internal transfer, no banks/СБП
-const VaultTopUpModal = ({ card, vaultBalance, onClose, onTransfer }: {
+// Wallet-to-Card Transfer Modal — internal transfer, no banks/СБП
+const WalletTopUpModal = ({ card, walletBalance, onClose, onTransfer }: {
   card: PersonalCard;
-  vaultBalance: number;      // master_balance in ₽
+  walletBalance: number;      // master_balance in ₽
   onClose: () => void;
   onTransfer: (amount: number) => void; // amount in card's currency
 }) => {
@@ -612,7 +612,7 @@ const VaultTopUpModal = ({ card, vaultBalance, onClose, onTransfer }: {
 
   const currencySymbol = card.currency;
   const rate = card.currency === '€' ? rates.eur : rates.usd;
-  const availableInCurrency = rate > 0 ? vaultBalance / rate : 0;
+  const availableInCurrency = rate > 0 ? walletBalance / rate : 0;
 
   const numAmount = parseFloat(amount) || 0;
   const isInsufficient = numAmount > 0 && numAmount > availableInCurrency;
@@ -653,7 +653,7 @@ const VaultTopUpModal = ({ card, vaultBalance, onClose, onTransfer }: {
 
         {/* Body */}
         <div className="px-5 pb-2 space-y-4">
-          {/* Vault balance info */}
+          {/* Wallet balance info */}
           <div className="p-3 rounded-xl bg-white/[0.04] border border-white/[0.06]">
             <div className="flex items-center justify-between">
               <span className="text-xs text-slate-400">Доступно в Кошельке:</span>
@@ -902,7 +902,7 @@ export const CardsPage = () => {
   const [topUpModal, setTopUpModal] = useState<PersonalCard | null>(null);
   const [paymentModal, setPaymentModal] = useState<{ type: 'apple' | 'google' } | null>(null);
   const [issueModal, setIssueModal] = useState<any>(null);
-  const [vaultBalance, setVaultBalance] = useState(0);
+  const [walletBalance, setWalletBalance] = useState(0);
   const [personalCards, setPersonalCards] = useState<PersonalCard[]>([]);
   const [isLoadingCards, setIsLoadingCards] = useState(true);
   const [isIssuing, setIsIssuing] = useState(false);
@@ -966,16 +966,16 @@ export const CardsPage = () => {
     }
   };
 
-  // Fetch vault + cards on mount, auto-refresh vault every 30s
+  // Fetch wallet + cards on mount, auto-refresh wallet every 30s
   useEffect(() => {
     fetchCards();
-    const refreshVault = () => {
-      getVault()
-        .then((v) => setVaultBalance(Number(v.master_balance) || 0))
+    const refreshWallet = () => {
+      getWallet()
+        .then((v) => setWalletBalance(Number(v.master_balance) || 0))
         .catch(() => {});
     };
-    refreshVault();
-    const interval = setInterval(refreshVault, 30000);
+    refreshWallet();
+    const interval = setInterval(refreshWallet, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -1012,7 +1012,7 @@ export const CardsPage = () => {
     }
   };
 
-  // Handle vault-to-card transfer with optimistic UI
+  // Handle wallet-to-card transfer with optimistic UI
   const handleTransfer = async (card: PersonalCard, amountInCurrency: number) => {
     const rate = card.currency === '€' ? rates.eur : rates.usd;
     const rubEquivalent = amountInCurrency * rate;
@@ -1021,18 +1021,18 @@ export const CardsPage = () => {
     setPersonalCards(prev =>
       prev.map(c => c.id === card.id ? { ...c, balance: c.balance + amountInCurrency } : c)
     );
-    setVaultBalance(prev => prev - rubEquivalent);
+    setWalletBalance(prev => prev - rubEquivalent);
     setTopUpModal(null);
 
     try {
-      const updatedVault = await transferVaultToCard(card.id, amountInCurrency, card.currency);
-      setVaultBalance(Number(updatedVault.master_balance) || 0);
+      const updatedWallet = await transferWalletToCard(card.id, amountInCurrency, card.currency);
+      setWalletBalance(Number(updatedWallet.master_balance) || 0);
     } catch (err) {
       // Revert on error
       setPersonalCards(prev =>
         prev.map(c => c.id === card.id ? { ...c, balance: c.balance - amountInCurrency } : c)
       );
-      setVaultBalance(prev => prev + rubEquivalent);
+      setWalletBalance(prev => prev + rubEquivalent);
       console.error('Transfer failed:', err);
     }
   };
@@ -1208,7 +1208,7 @@ export const CardsPage = () => {
         )}
 
         {closeCardModal && <CloseCardModal card={closeCardModal} onClose={() => setCloseCardModal(null)} onConfirm={() => handleCloseCard(closeCardModal)} />}
-        {topUpModal && <VaultTopUpModal card={topUpModal} vaultBalance={vaultBalance} onClose={() => setTopUpModal(null)} onTransfer={(amt) => handleTransfer(topUpModal, amt)} />}
+        {topUpModal && <WalletTopUpModal card={topUpModal} walletBalance={walletBalance} onClose={() => setTopUpModal(null)} onTransfer={(amt) => handleTransfer(topUpModal, amt)} />}
         {paymentModal && <PaymentMethodModal type={paymentModal.type} onClose={() => setPaymentModal(null)} />}
         {issueModal && <CardIssueModal card={issueModal} onClose={() => setIssueModal(null)} onIssue={handleIssueCard} isIssuing={isIssuing} />}
       </div>

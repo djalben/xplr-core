@@ -21,9 +21,9 @@ import {
 } from 'lucide-react';
 import apiClient, { API_BASE_URL } from '../api/axios';
 import { getUserGrade, type GradeInfo } from '../api/grade';
-import { getVault, type InternalBalance } from '../api/vault';
+import { getWallet, type InternalBalance } from '../api/wallet';
 import { WorldClocks } from '../components/world-clocks';
-import { VaultTopUpModal } from '../components/vault-topup-modal';
+import { WalletTopUpModal } from '../components/wallet-topup-modal';
 
 interface StatCardProps {
   title: string;
@@ -86,26 +86,34 @@ const TransactionRow = ({ transaction }: { transaction: Transaction }) => (
   </div>
 );
 
-const SpendingChart = () => {
+const DAY_LABELS = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+
+const SpendingChart = ({ weeklyData }: { weeklyData: { label: string; amount: number }[] }) => {
   const { t } = useTranslation();
-  const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-  const values = [340, 520, 280, 680, 420, 250, 580];
-  const maxValue = Math.max(...values);
+  const maxValue = Math.max(...weeklyData.map(d => d.amount), 1);
+  const total = weeklyData.reduce((s, d) => s + d.amount, 0);
 
   return (
     <div className="glass-card p-6">
-      <h3 className="block-title">{t('dashboard.weekExpenses')}</h3>
+      <div className="flex items-center justify-between mb-1">
+        <h3 className="block-title">{t('dashboard.weekExpenses')}</h3>
+        <span className="text-sm text-slate-400">Итого: <span className="text-white font-semibold">${total.toLocaleString()}</span></span>
+      </div>
       <div className="flex items-end justify-between gap-2 h-48">
-        {days.map((day, i) => (
-          <div key={day} className="flex-1 flex flex-col items-center gap-2">
+        {weeklyData.map((day) => (
+          <div key={day.label} className="flex-1 flex flex-col items-center gap-2">
             <div className="w-full flex flex-col items-center justify-end h-36">
               <div
-                className="w-full max-w-[40px] bg-gradient-to-t from-blue-600 to-blue-400 rounded-lg transition-all duration-150 hover:from-blue-500 hover:to-blue-300 cursor-pointer shadow-lg shadow-blue-500/20"
-                style={{ height: `${(values[i] / maxValue) * 100}%` }}
+                className={`w-full max-w-[40px] rounded-lg transition-all duration-150 shadow-lg ${
+                  day.amount > 0
+                    ? 'bg-gradient-to-t from-blue-600 to-blue-400 hover:from-blue-500 hover:to-blue-300 shadow-blue-500/20'
+                    : 'bg-white/[0.06]'
+                }`}
+                style={{ height: day.amount > 0 ? `${Math.max((day.amount / maxValue) * 100, 4)}%` : '4%' }}
               />
             </div>
-            <span className="text-xs text-slate-500">{day}</span>
-            <span className="text-xs text-slate-300 font-medium">${values[i]}</span>
+            <span className="text-xs text-slate-500">{day.label}</span>
+            <span className="text-xs text-slate-300 font-medium">{day.amount > 0 ? `$${day.amount.toLocaleString()}` : '0'}</span>
           </div>
         ))}
       </div>
@@ -186,20 +194,26 @@ export const DashboardPage = () => {
   const [cardCount, setCardCount] = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [vault, setVault] = useState<InternalBalance | null>(null);
-  const [isVaultModalOpen, setIsVaultModalOpen] = useState(false);
+  const [wallet, setWallet] = useState<InternalBalance | null>(null);
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [autoTopup, setAutoTopup] = useState(false);
   const [showAutoTopupTooltip, setShowAutoTopupTooltip] = useState(false);
+  const [weeklySpending, setWeeklySpending] = useState<{ label: string; amount: number }[]>(
+    Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(); d.setDate(d.getDate() - 6 + i);
+      return { label: DAY_LABELS[d.getDay()], amount: 0 };
+    })
+  );
 
   useEffect(() => {
     fetchData();
-    // Auto-refresh vault balance every 30s (picks up webhook credits)
-    const vaultInterval = setInterval(() => {
-      getVault()
-        .then((v) => setVault(v))
+    // Auto-refresh wallet balance every 30s (picks up webhook credits)
+    const walletInterval = setInterval(() => {
+      getWallet()
+        .then((v) => setWallet(v))
         .catch(() => {});
     }, 30000);
-    return () => clearInterval(vaultInterval);
+    return () => clearInterval(walletInterval);
   }, []);
 
   const fetchData = async () => {
@@ -211,7 +225,7 @@ export const DashboardPage = () => {
 
       // Non-critical fetches
       try { const g = await getUserGrade(); setGradeInfo(g); } catch {}
-      try { const v = await getVault(); setVault(v); } catch {}
+      try { const v = await getWallet(); setWallet(v); } catch {}
       try { const c = await apiClient.get(`${API_BASE_URL}/user/cards`); setCardCount(Array.isArray(c.data) ? c.data.length : 0); } catch {}
       try {
         const t = await apiClient.get(`${API_BASE_URL}/user/report`, { params: { limit: 3 } });
@@ -225,6 +239,36 @@ export const DashboardPage = () => {
           date: tx.created_at ? new Date(tx.created_at).toLocaleDateString('ru-RU') : '',
           card: tx.card_last4 ? `•••• ${tx.card_last4}` : 'Кошелёк',
         })));
+      } catch {}
+
+      // Fetch 7-day spending data
+      try {
+        const now = new Date();
+        const startDate = new Date(now);
+        startDate.setDate(now.getDate() - 6);
+        const fmt = (d: Date) => d.toISOString().slice(0, 10);
+        const weekRes = await apiClient.get(`${API_BASE_URL}/user/report`, {
+          params: { start_date: fmt(startDate), end_date: fmt(now), limit: 500 }
+        });
+        const weekTxs: any[] = weekRes.data?.transactions ?? [];
+        // Build day-by-day map for last 7 days
+        const dayMap: Record<string, number> = {};
+        const labels: { key: string; label: string }[] = [];
+        for (let i = 0; i < 7; i++) {
+          const d = new Date(startDate);
+          d.setDate(startDate.getDate() + i);
+          const key = fmt(d);
+          dayMap[key] = 0;
+          labels.push({ key, label: DAY_LABELS[d.getDay()] });
+        }
+        weekTxs.forEach((tx: any) => {
+          const amt = Math.abs(parseFloat(tx.amount_usd || tx.amount || '0'));
+          const txDate = tx.created_at ? tx.created_at.slice(0, 10) : tx.executed_at?.slice(0, 10);
+          if (txDate && dayMap[txDate] !== undefined) {
+            dayMap[txDate] += amt;
+          }
+        });
+        setWeeklySpending(labels.map(l => ({ label: l.label, amount: Math.round(dayMap[l.key]) })));
       } catch {}
     } catch (err) {
       console.error('Dashboard fetch error:', err);
@@ -280,9 +324,9 @@ export const DashboardPage = () => {
               <div className="p-3 rounded-xl stat-icon-blue"><Wallet className="w-6 h-6 text-blue-400" /></div>
             </div>
             <p className="text-slate-400 text-sm mb-1">Баланс Кошелька</p>
-            <p className="text-2xl font-bold text-white balance-display">{vault ? `${Number(vault.master_balance).toLocaleString('ru-RU', { minimumFractionDigits: 2 })} ₽` : `$${balancePers.toFixed(2)}`}</p>
+            <p className="text-2xl font-bold text-white balance-display">{wallet ? `${Number(wallet.master_balance).toLocaleString('ru-RU', { minimumFractionDigits: 2 })} ₽` : `$${balancePers.toFixed(2)}`}</p>
             <button
-              onClick={() => setIsVaultModalOpen(true)}
+              onClick={() => setIsWalletModalOpen(true)}
               className="mt-4 w-full py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-medium rounded-xl text-sm hover:shadow-lg hover:shadow-amber-500/25 transition-all"
             >
               Пополнить
@@ -308,7 +352,7 @@ export const DashboardPage = () => {
                 onClick={() => {
                   const next = !autoTopup;
                   setAutoTopup(next);
-                  apiClient.patch(`${API_BASE_URL}/user/vault/auto-topup`, { enabled: next }).catch(() => setAutoTopup(!next));
+                  apiClient.patch(`${API_BASE_URL}/user/wallet/auto-topup`, { enabled: next }).catch(() => setAutoTopup(!next));
                 }}
                 className="flex items-center gap-2 text-sm"
               >
@@ -359,7 +403,7 @@ export const DashboardPage = () => {
 
         {/* Charts and Transactions */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <SpendingChart />
+          <SpendingChart weeklyData={weeklySpending} />
 
           <div className="glass-card p-6">
             <div className="flex items-center justify-between mb-6">
@@ -379,7 +423,7 @@ export const DashboardPage = () => {
         </div>
 
       </div>
-      {isVaultModalOpen && <VaultTopUpModal onClose={() => setIsVaultModalOpen(false)} />}
+      {isWalletModalOpen && <WalletTopUpModal onClose={() => setIsWalletModalOpen(false)} />}
     </DashboardLayout>
   );
 };

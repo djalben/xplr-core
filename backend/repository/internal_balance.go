@@ -85,15 +85,15 @@ func TopUpInternalBalance(userID int, amount decimal.Decimal) (*models.InternalB
 		userID, amount,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to top up vault: %w", err)
+		return nil, fmt.Errorf("failed to top up wallet: %w", err)
 	}
 
 	// Записываем транзакцию
 	_, err = tx.Exec(
 		`INSERT INTO transactions (user_id, amount, fee, transaction_type, status, details, executed_at)
-		 VALUES ($1, $2, 0, 'VAULT_TOPUP', 'APPROVED', $3, $4)`,
+		 VALUES ($1, $2, 0, 'WALLET_TOPUP', 'APPROVED', $3, $4)`,
 		userID, amount,
-		fmt.Sprintf("Top-up vault: +%s", amount.String()),
+		fmt.Sprintf("Top-up wallet: +%s", amount.String()),
 		time.Now(),
 	)
 	if err != nil {
@@ -104,12 +104,12 @@ func TopUpInternalBalance(userID int, amount decimal.Decimal) (*models.InternalB
 		return nil, fmt.Errorf("failed to commit: %w", err)
 	}
 
-	log.Printf("✅ Vault topped up: user=%d, amount=%s", userID, amount.String())
+	log.Printf("✅ Wallet topped up: user=%d, amount=%s", userID, amount.String())
 	return GetInternalBalance(userID)
 }
 
 // DeductInternalBalance — списать из Кошелька пользователя (вызывается Bridge при webhook).
-// Атомарно уменьшает master_balance и увеличивает spent_from_vault на карте.
+// Атомарно уменьшает master_balance и увеличивает spent_from_wallet на карте.
 func DeductInternalBalance(tx interface {
 	Exec(string, ...interface{}) (interface {
 		LastInsertId() (int64, error)
@@ -126,16 +126,16 @@ func DeductInternalBalance(tx interface {
 	)
 	var newBalance decimal.Decimal
 	if err := res.Scan(&newBalance); err != nil {
-		return fmt.Errorf("insufficient vault balance or user not found")
+		return fmt.Errorf("insufficient wallet balance or user not found")
 	}
 
-	// Увеличиваем spent_from_vault на карте
+	// Увеличиваем spent_from_wallet на карте
 	_, err := tx.Exec(
-		`UPDATE cards SET spent_from_vault = COALESCE(spent_from_vault, 0) + $1 WHERE id = $2`,
+		`UPDATE cards SET spent_from_wallet = COALESCE(spent_from_wallet, 0) + $1 WHERE id = $2`,
 		amount, cardID,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to update card spent_from_vault: %w", err)
+		return fmt.Errorf("failed to update card spent_from_wallet: %w", err)
 	}
 
 	return nil
@@ -153,12 +153,12 @@ func ReclaimExpiredCardLimits() {
 
 	// Находим карты с expiry_date в прошлом, у которых есть неиспользованный остаток лимита
 	query := `
-		SELECT c.id, c.user_id, c.spending_limit, COALESCE(c.spent_from_vault, 0), c.last_4_digits
+		SELECT c.id, c.user_id, c.spending_limit, COALESCE(c.spent_from_wallet, 0), c.last_4_digits
 		FROM cards c
 		WHERE c.expiry_date IS NOT NULL
 		  AND c.expiry_date < NOW()
 		  AND c.card_status != 'RECLAIMED'
-		  AND COALESCE(c.spending_limit, 0) > COALESCE(c.spent_from_vault, 0)
+		  AND COALESCE(c.spending_limit, 0) > COALESCE(c.spent_from_wallet, 0)
 	`
 
 	rows, err := GlobalDB.Query(query)
@@ -171,15 +171,15 @@ func ReclaimExpiredCardLimits() {
 	var reclaimed int
 	for rows.Next() {
 		var cardID, userID int
-		var spendingLimit, spentFromVault decimal.Decimal
+		var spendingLimit, spentFromWallet decimal.Decimal
 		var last4 string
 
-		if err := rows.Scan(&cardID, &userID, &spendingLimit, &spentFromVault, &last4); err != nil {
+		if err := rows.Scan(&cardID, &userID, &spendingLimit, &spentFromWallet, &last4); err != nil {
 			log.Printf("[EXPIRY-RECLAIM] Error scanning card: %v", err)
 			continue
 		}
 
-		remainder := spendingLimit.Sub(spentFromVault)
+		remainder := spendingLimit.Sub(spentFromWallet)
 		if remainder.LessThanOrEqual(decimal.Zero) {
 			continue
 		}
@@ -197,12 +197,12 @@ func ReclaimExpiredCardLimits() {
 		)
 		if err != nil {
 			tx.Rollback()
-			log.Printf("[EXPIRY-RECLAIM] Error returning to vault: %v", err)
+			log.Printf("[EXPIRY-RECLAIM] Error returning to wallet: %v", err)
 			continue
 		}
 
 		_, err = tx.Exec(
-			`UPDATE cards SET card_status = 'RECLAIMED', spending_limit = spent_from_vault WHERE id = $1`,
+			`UPDATE cards SET card_status = 'RECLAIMED', spending_limit = spent_from_wallet WHERE id = $1`,
 			cardID,
 		)
 		if err != nil {
@@ -213,9 +213,9 @@ func ReclaimExpiredCardLimits() {
 
 		_, err = tx.Exec(
 			`INSERT INTO transactions (user_id, card_id, amount, fee, transaction_type, status, details, executed_at)
-			 VALUES ($1, $2, $3, 0, 'VAULT_RECLAIM', 'APPROVED', $4, $5)`,
+			 VALUES ($1, $2, $3, 0, 'WALLET_RECLAIM', 'APPROVED', $4, $5)`,
 			userID, cardID, remainder,
-			fmt.Sprintf("Expired card ...%s: reclaimed %s back to vault", last4, remainder.String()),
+			fmt.Sprintf("Expired card ...%s: reclaimed %s back to wallet", last4, remainder.String()),
 			time.Now(),
 		)
 		if err != nil {
@@ -229,7 +229,7 @@ func ReclaimExpiredCardLimits() {
 			continue
 		}
 
-		log.Printf("✅ [EXPIRY-RECLAIM] Card %d (user %d): reclaimed %s back to vault", cardID, userID, remainder.String())
+		log.Printf("✅ [EXPIRY-RECLAIM] Card %d (user %d): reclaimed %s back to wallet", cardID, userID, remainder.String())
 		reclaimed++
 	}
 

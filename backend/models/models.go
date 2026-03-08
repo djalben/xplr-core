@@ -138,7 +138,7 @@ type Card struct {
 	AutoReplenishAmount    decimal.Decimal `json:"auto_replenish_amount"`
 	CardBalance            decimal.Decimal `json:"card_balance"`          // Виртуальный баланс: при списке карт = BalanceRub пользователя
 	SpendingLimit          decimal.Decimal `json:"spending_limit"`        // Макс. сумма, которую карта может потратить из Кошелька
-	SpentFromVault         decimal.Decimal `json:"spent_from_vault"`      // Сколько карта реально потратила из Кошелька
+	SpentFromWallet        decimal.Decimal `json:"spent_from_wallet"`     // Сколько карта реально потратила из Кошелька
 	ExpiryDate             *time.Time      `json:"expiry_date,omitempty"` // Дата истечения срока карты
 	CreatedAt              time.Time       `json:"created_at"`
 }
@@ -158,8 +158,8 @@ type SpendingLimitRequest struct {
 	SpendingLimit decimal.Decimal `json:"spending_limit"`
 }
 
-// TopUpVaultRequest - Запрос на пополнение Кошелька
-type TopUpVaultRequest struct {
+// TopUpWalletRequest - Запрос на пополнение Кошелька
+type TopUpWalletRequest struct {
 	Amount decimal.Decimal `json:"amount"`
 }
 

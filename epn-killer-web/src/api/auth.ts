@@ -46,3 +46,13 @@ export const login = async (data: LoginRequest): Promise<AuthResponse> => {
 export const logout = (): void => {
   localStorage.removeItem('token');
 };
+
+// Запрос сброса пароля
+export const requestPasswordReset = async (email: string): Promise<void> => {
+  await apiClient.post('/auth/reset-password-request', { email });
+};
+
+// Установка нового пароля по токену
+export const resetPassword = async (token: string, password: string): Promise<void> => {
+  await apiClient.post('/auth/reset-password', { token, password });
+};

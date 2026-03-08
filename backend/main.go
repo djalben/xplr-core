@@ -119,6 +119,8 @@ func main() {
 	router.HandleFunc("/api/v1/auth/register", handlers.RegisterHandler).Methods("POST")
 	router.HandleFunc("/api/v1/auth/login", handlers.LoginHandler).Methods("POST")
 	router.HandleFunc("/api/v1/auth/verify", handlers.VerifyEmailHandler).Methods("GET")
+	router.HandleFunc("/api/v1/auth/reset-password-request", handlers.ResetPasswordRequestHandler).Methods("POST")
+	router.HandleFunc("/api/v1/auth/reset-password", handlers.ResetPasswordHandler).Methods("POST")
 
 	// Webhook от Wallester (публичный, без middleware)
 	router.HandleFunc("/api/v1/webhooks/wallester", handlers.WallesterWebhookHandler).Methods("POST")
@@ -149,11 +151,11 @@ func main() {
 	verifiedCards.HandleFunc("/{id}/sync-balance", handlers.SyncCardBalanceHandler).Methods("POST")
 	verifiedCards.HandleFunc("/{id}/spending-limit", handlers.SetSpendingLimitHandler).Methods("PATCH")
 
-	verifiedVault := protectedRouter.PathPrefix("/vault").Subrouter()
-	verifiedVault.Use(middleware.RequireVerifiedEmail)
-	verifiedVault.HandleFunc("", handlers.GetVaultHandler).Methods("GET")
-	verifiedVault.HandleFunc("/topup", handlers.TopUpVaultHandler).Methods("POST")
-	verifiedVault.HandleFunc("/auto-topup", handlers.SetAutoTopupHandler).Methods("PATCH")
+	verifiedWallet := protectedRouter.PathPrefix("/wallet").Subrouter()
+	verifiedWallet.Use(middleware.RequireVerifiedEmail)
+	verifiedWallet.HandleFunc("", handlers.GetWalletHandler).Methods("GET")
+	verifiedWallet.HandleFunc("/topup", handlers.TopUpWalletHandler).Methods("POST")
+	verifiedWallet.HandleFunc("/auto-topup", handlers.SetAutoTopupHandler).Methods("PATCH")
 	protectedRouter.HandleFunc("/report", handlers.GetUserTransactionReportHandler).Methods("GET")
 	protectedRouter.HandleFunc("/api-key", handlers.CreateAPIKeyHandler).Methods("POST")
 

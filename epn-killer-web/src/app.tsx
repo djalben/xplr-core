@@ -13,6 +13,8 @@ import { SettingsPage } from './pages/settings';
 import { SupportPage } from './pages/support';
 import { LandingPage } from './pages/landing';
 import { AdminRatesPage } from './pages/admin-rates';
+import { ForgotPasswordPage } from './pages/forgot-password';
+import { ResetPasswordPage } from './pages/reset-password';
 import { PWAInstallPrompt } from './components/pwa-install-prompt';
 import { NeuralBackground } from './components/neural-background';
 
@@ -47,6 +49,8 @@ function App() {
         {/* Keep old routes working */}
         <Route path="/login" element={<Navigate to="/auth" replace />} />
         <Route path="/register" element={<Navigate to="/auth" replace />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
         <Route path="/cards" element={<ProtectedRoute><CardsPage /></ProtectedRoute>} />

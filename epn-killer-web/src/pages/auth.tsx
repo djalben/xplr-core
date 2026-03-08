@@ -170,6 +170,11 @@ export const AuthPage = () => {
         {error && (
           <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center">
             {error}
+            {mode === 'login' && (
+              <Link to="/forgot-password" className="block mt-2 text-blue-400 hover:text-blue-300 transition-colors text-xs font-medium">
+                Забыли пароль?
+              </Link>
+            )}
           </div>
         )}
 

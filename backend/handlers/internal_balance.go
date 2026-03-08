@@ -12,9 +12,9 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// GetVaultHandler — GET /api/v1/user/vault
+// GetWalletHandler — GET /api/v1/user/wallet
 // Возвращает текущий баланс Кошелька пользователя
-func GetVaultHandler(w http.ResponseWriter, r *http.Request) {
+func GetWalletHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
 	if !ok || userID == 0 {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -23,7 +23,7 @@ func GetVaultHandler(w http.ResponseWriter, r *http.Request) {
 
 	ib, err := repository.GetInternalBalance(userID)
 	if err != nil {
-		http.Error(w, "Failed to get vault: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Failed to get wallet: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -31,16 +31,16 @@ func GetVaultHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(ib)
 }
 
-// TopUpVaultHandler — POST /api/v1/user/vault/topup
+// TopUpWalletHandler — POST /api/v1/user/wallet/topup
 // Пополняет Кошелёк из balance_rub пользователя
-func TopUpVaultHandler(w http.ResponseWriter, r *http.Request) {
+func TopUpWalletHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
 	if !ok || userID == 0 {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	var req models.TopUpVaultRequest
+	var req models.TopUpWalletRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
@@ -61,7 +61,7 @@ func TopUpVaultHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(ib)
 }
 
-// SetAutoTopupHandler — PATCH /api/v1/user/vault/auto-topup
+// SetAutoTopupHandler — PATCH /api/v1/user/wallet/auto-topup
 // Включает/выключает автопополнение карт из Кошелька
 func SetAutoTopupHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(int)

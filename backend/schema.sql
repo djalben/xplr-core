@@ -192,6 +192,15 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'is_verified') THEN
         ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE;
     END IF;
+    -- Rebrand: spent_from_vault → spent_from_wallet
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cards' AND column_name = 'spent_from_vault')
+       AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cards' AND column_name = 'spent_from_wallet') THEN
+        ALTER TABLE cards RENAME COLUMN spent_from_vault TO spent_from_wallet;
+    END IF;
+    -- Auth method preference (email / telegram) — подготовка для Telegram-бот кодов
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'auth_method_preference') THEN
+        ALTER TABLE users ADD COLUMN auth_method_preference VARCHAR(20) DEFAULT 'email';
+    END IF;
 END $$;
 
 -- 10. Таблица токенов подтверждения email
@@ -205,3 +214,14 @@ CREATE TABLE IF NOT EXISTS verification_tokens (
 );
 CREATE INDEX IF NOT EXISTS idx_verification_tokens_token ON verification_tokens(token);
 CREATE INDEX IF NOT EXISTS idx_verification_tokens_user_id ON verification_tokens(user_id);
+
+-- 11. Таблица токенов сброса пароля
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    token VARCHAR(255) UNIQUE NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token ON password_reset_tokens(token);

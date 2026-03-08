@@ -178,7 +178,7 @@ export const ReferralsPage = () => {
               {/* Link section */}
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-xl gradient-accent flex items-center justify-center shadow-lg shadow-blue-500/30">
+                  <div className="w-12 h-12 rounded-xl gradient-accent flex items-center justify-center shadow-lg shadow-blue-500/30 shrink-0">
                     <Share2 className="w-6 h-6 text-white" />
                   </div>
                   <div>
@@ -222,12 +222,12 @@ export const ReferralsPage = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4 text-sm">
-                  <p className="text-gray-400">
-                    Код: <span className="text-white font-mono font-semibold">{referralCode}</span>
+                <div className="flex flex-wrap items-center gap-4 text-sm">
+                  <p className="text-gray-400 flex items-center">
+                    Код: <span className="text-white font-mono font-semibold ml-1">{referralCode}</span>
                   </p>
                   <div className="flex items-center gap-2 text-green-400">
-                    <Gift className="w-4 h-4" />
+                    <Gift className="w-4 h-4 shrink-0" />
                     <span>+${personalStats.bonusForNew} новому пользователю</span>
                   </div>
                 </div>
@@ -269,21 +269,21 @@ export const ReferralsPage = () => {
               Как это работает
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="flex items-start gap-3 p-4 rounded-xl bg-white/[0.02]">
+              <div className="flex items-center gap-3 p-4 rounded-xl bg-white/[0.02]">
                 <div className="w-8 h-8 rounded-full gradient-accent flex items-center justify-center text-white font-bold text-sm shrink-0">1</div>
                 <div>
                   <p className="text-white font-medium mb-1">Поделитесь ссылкой</p>
                   <p className="text-sm text-gray-400">Отправьте ссылку друзьям</p>
                 </div>
               </div>
-              <div className="flex items-start gap-3 p-4 rounded-xl bg-white/[0.02]">
+              <div className="flex items-center gap-3 p-4 rounded-xl bg-white/[0.02]">
                 <div className="w-8 h-8 rounded-full gradient-accent flex items-center justify-center text-white font-bold text-sm shrink-0">2</div>
                 <div>
                   <p className="text-white font-medium mb-1">Друг регистрируется</p>
                   <p className="text-sm text-gray-400">И получает бонус ${personalStats.bonusForNew}</p>
                 </div>
               </div>
-              <div className="flex items-start gap-3 p-4 rounded-xl bg-white/[0.02]">
+              <div className="flex items-center gap-3 p-4 rounded-xl bg-white/[0.02]">
                 <div className="w-8 h-8 rounded-full gradient-accent flex items-center justify-center text-white font-bold text-sm shrink-0">3</div>
                 <div>
                   <p className="text-white font-medium mb-1">Вы получаете ${personalStats.rewardPerReferral}</p>
@@ -343,7 +343,7 @@ export const ReferralsPage = () => {
         </div>
 
         {/* Transfer to Wallet */}
-        <div className="glass-card p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="glass-card p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center">
               <Shield className="w-6 h-6 text-amber-400" />

@@ -73,7 +73,7 @@ func ExternalTopUpWebhookHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Atomic: credit Vault + record transaction
+	// Atomic: credit Wallet + record transaction
 	tx, err := repository.GlobalDB.Begin()
 	if err != nil {
 		http.Error(w, "Transaction begin failed", http.StatusInternalServerError)
@@ -89,8 +89,8 @@ func ExternalTopUpWebhookHandler(w http.ResponseWriter, r *http.Request) {
 		payload.UserID, amount,
 	)
 	if err != nil {
-		log.Printf("[EXT-WEBHOOK] Failed to credit vault: %v", err)
-		http.Error(w, "Failed to credit vault", http.StatusInternalServerError)
+		log.Printf("[EXT-WEBHOOK] Failed to credit wallet: %v", err)
+		http.Error(w, "Failed to credit wallet", http.StatusInternalServerError)
 		return
 	}
 
@@ -118,7 +118,7 @@ func ExternalTopUpWebhookHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("✅ [EXT-WEBHOOK] Credited %s %s to vault (user %d, tx=%s)",
+	log.Printf("✅ [EXT-WEBHOOK] Credited %s %s to wallet (user %d, tx=%s)",
 		amount.String(), payload.Currency, payload.UserID, payload.ExternalTxID)
 
 	w.Header().Set("Content-Type", "application/json")

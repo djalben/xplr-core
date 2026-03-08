@@ -694,14 +694,14 @@ export const LandingPage = () => {
                   </div>
                   <h3 className="text-2xl font-bold text-white mb-3">Автопилот баланса</h3>
                   <p className="text-slate-400 mb-6 leading-relaxed">
-                    Подписки не отключатся, пока есть деньги в Сейфе. Система автоматически переводит нужную сумму на карту в момент списания — вам не нужно следить за балансом каждой карты.
+                    Подписки не отключатся, пока есть деньги в Кошельке. Система автоматически переводит нужную сумму на карту в момент списания — вам не нужно следить за балансом каждой карты.
                   </p>
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">
                       <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
                         <Check className="w-3.5 h-3.5 text-blue-400" />
                       </div>
-                      <span className="text-sm text-slate-300">Один Сейф — все карты питаются из него</span>
+                      <span className="text-sm text-slate-300">Один Кошелёк — все карты питаются из него</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
@@ -728,7 +728,7 @@ export const LandingPage = () => {
                   </div>
                   <h3 className="text-2xl font-bold text-white mb-3">Честный возврат</h3>
                   <p className="text-slate-400 mb-6 leading-relaxed">
-                    Деньги не сгорают вместе с картой. Когда срок карты истекает, неиспользованный остаток лимита автоматически возвращается в ваш Сейф — ни копейки не теряется.
+                    Деньги не сгорают вместе с картой. Когда срок карты истекает, неиспользованный остаток лимита автоматически возвращается в ваш Кошелёк — ни копейки не теряется.
                   </p>
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">

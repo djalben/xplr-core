@@ -7,14 +7,14 @@ import { ModalPortal } from './modal-portal';
 const SbpLogo = () => (
   <svg viewBox="0 0 40 40" className="w-7 h-7">
     <defs>
-      <linearGradient id="vt-sbp" x1="0" y1="0" x2="1" y2="1">
+      <linearGradient id="wt-sbp" x1="0" y1="0" x2="1" y2="1">
         <stop offset="0%" stopColor="#5B57A2" />
         <stop offset="35%" stopColor="#D90751" />
         <stop offset="65%" stopColor="#FAB718" />
         <stop offset="100%" stopColor="#0FA8D6" />
       </linearGradient>
     </defs>
-    <rect rx="8" width="40" height="40" fill="url(#vt-sbp)" />
+    <rect rx="8" width="40" height="40" fill="url(#wt-sbp)" />
     <text x="20" y="26" textAnchor="middle" fill="white" fontSize="14" fontWeight="700" fontFamily="system-ui">СБП</text>
   </svg>
 );
@@ -49,11 +49,11 @@ const bankIcons = [
   )},
 ];
 
-interface VaultTopUpModalProps {
+interface WalletTopUpModalProps {
   onClose: () => void;
 }
 
-export const VaultTopUpModal = ({ onClose }: VaultTopUpModalProps) => {
+export const WalletTopUpModal = ({ onClose }: WalletTopUpModalProps) => {
   const { rates } = useRates();
   const [selectedCurrency, setSelectedCurrency] = useState<'USD' | 'EUR'>('USD');
   const [foreignAmount, setForeignAmount] = useState('');

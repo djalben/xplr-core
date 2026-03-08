@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface ClockProps {
@@ -7,7 +7,7 @@ interface ClockProps {
   now: Date;
 }
 
-const AnalogClock = ({ timezone, label, now }: ClockProps) => {
+const AnalogClock = memo(({ timezone, label, now }: ClockProps) => {
   const localTime = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
   const hours = localTime.getHours() % 12;
   const minutes = localTime.getMinutes();
@@ -86,9 +86,10 @@ const AnalogClock = ({ timezone, label, now }: ClockProps) => {
       </div>
     </div>
   );
-};
+});
+AnalogClock.displayName = 'AnalogClock';
 
-export const WorldClocks = () => {
+export const WorldClocks = memo(() => {
   const { t } = useTranslation();
   const [now, setNow] = useState(new Date());
 
@@ -104,4 +105,5 @@ export const WorldClocks = () => {
       <AnalogClock timezone="America/New_York" label={t('clocks.newYork')} now={now} />
     </div>
   );
-};
+});
+WorldClocks.displayName = 'WorldClocks';

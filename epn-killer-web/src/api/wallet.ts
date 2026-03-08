@@ -10,14 +10,14 @@ export interface InternalBalance {
 }
 
 // Получить текущий баланс Кошелька
-export const getVault = async (): Promise<InternalBalance> => {
-  const res = await apiClient.get<InternalBalance>(`${API_BASE_URL}/user/vault`);
+export const getWallet = async (): Promise<InternalBalance> => {
+  const res = await apiClient.get<InternalBalance>(`${API_BASE_URL}/user/wallet`);
   return res.data;
 };
 
 // Пополнить Кошелёк из баланса пользователя
-export const topUpVault = async (amount: number): Promise<InternalBalance> => {
-  const res = await apiClient.post<InternalBalance>(`${API_BASE_URL}/user/vault/topup`, { amount });
+export const topUpWallet = async (amount: number): Promise<InternalBalance> => {
+  const res = await apiClient.post<InternalBalance>(`${API_BASE_URL}/user/wallet/topup`, { amount });
   return res.data;
 };
 
@@ -29,13 +29,13 @@ export const setCardSpendingLimit = async (cardId: number, spendingLimit: number
 };
 
 // Перевести средства из Кошелька на карту (внутренний перевод)
-export const transferVaultToCard = async (
+export const transferWalletToCard = async (
   cardId: string,
   amount: number,
   currency: string
 ): Promise<InternalBalance> => {
   const res = await apiClient.post<InternalBalance>(
-    `${API_BASE_URL}/user/vault/transfer-to-card`,
+    `${API_BASE_URL}/user/wallet/transfer-to-card`,
     { card_id: cardId, amount, currency }
   );
   return res.data;

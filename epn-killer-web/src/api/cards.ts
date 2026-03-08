@@ -24,7 +24,7 @@ export interface Card {
   auto_replenish_amount?: string;
   card_balance?: string;
   spending_limit?: string;
-  spent_from_vault?: string;
+  spent_from_wallet?: string;
   expiry_date?: string;
   created_at: string;
 }

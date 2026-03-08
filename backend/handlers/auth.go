@@ -134,6 +134,105 @@ func VerifyEmailHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// ResetPasswordRequestHandler — POST /api/v1/auth/reset-password-request
+// Принимает email, создаёт токен сброса и отправляет письмо.
+func ResetPasswordRequestHandler(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Email string `json:"email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	email := strings.TrimSpace(req.Email)
+	if email == "" {
+		http.Error(w, "Email cannot be empty", http.StatusBadRequest)
+		return
+	}
+
+	// Всегда возвращаем 200 (не раскрываем существование email)
+	user, err := repository.GetUserByEmail(email)
+	if err != nil {
+		log.Printf("[RESET] Reset requested for unknown email: %s", email)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  "ok",
+			"message": "If this email is registered, a reset link has been sent.",
+		})
+		return
+	}
+
+	token, err := repository.CreatePasswordResetToken(user.ID)
+	if err != nil {
+		log.Printf("[RESET] Failed to create reset token for user %d: %v", user.ID, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if err := service.SendPasswordResetEmail(user.Email, token); err != nil {
+		log.Printf("[RESET] Failed to send reset email to %s: %v", user.Email, err)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":  "ok",
+		"message": "If this email is registered, a reset link has been sent.",
+	})
+}
+
+// ResetPasswordHandler — POST /api/v1/auth/reset-password
+// Принимает токен и новый пароль, устанавливает новый пароль.
+func ResetPasswordHandler(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Token    string `json:"token"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Token == "" {
+		http.Error(w, "Token is required", http.StatusBadRequest)
+		return
+	}
+	if len(req.Password) < 8 {
+		http.Error(w, "Password must be at least 8 characters", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := repository.ValidatePasswordResetToken(req.Token)
+	if err != nil {
+		log.Printf("[RESET] Invalid reset token: %v", err)
+		http.Error(w, "Invalid or expired reset link", http.StatusBadRequest)
+		return
+	}
+
+	hashedPassword, err := utils.HashPassword(req.Password)
+	if err != nil {
+		log.Printf("[RESET] Failed to hash password: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if err := repository.UpdateUserPassword(userID, hashedPassword); err != nil {
+		log.Printf("[RESET] Failed to update password for user %d: %v", userID, err)
+		http.Error(w, "Failed to update password", http.StatusInternalServerError)
+		return
+	}
+
+	if err := repository.MarkPasswordResetTokenUsed(req.Token); err != nil {
+		log.Printf("[RESET] Failed to mark token as used: %v", err)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":  "ok",
+		"message": "Password successfully reset",
+	})
+}
+
 // LoginHandler - Вход пользователя в систему
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var req models.LoginRequest
