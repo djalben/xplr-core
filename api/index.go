@@ -243,6 +243,9 @@ func buildRouter() *mux.Router {
 	// Telegram Bot Webhook (public — Telegram calls directly)
 	r.HandleFunc("/api/v1/telegram/webhook", handlers.TelegramWebhookHandler).Methods("POST")
 
+	// Daily report (secret-key protected, for cron/internal use)
+	r.HandleFunc("/api/v1/admin/send-daily-report", handlers.SendDailyReportHandler).Methods("GET")
+
 	// Public card types endpoint
 	r.HandleFunc("/api/v1/cards/types", handlers.GetCardTypesHandler).Methods("GET")
 
