@@ -133,6 +133,7 @@ func main() {
 	resetLimiter := middleware.NewRateLimiter(5, 15*time.Minute)
 	router.HandleFunc("/api/v1/auth/reset-password-request", resetLimiter.Limit(handlers.ResetPasswordRequestHandler)).Methods("POST")
 	router.HandleFunc("/api/v1/auth/reset-password", handlers.ResetPasswordHandler).Methods("POST")
+	router.HandleFunc("/api/v1/auth/refresh-token", handlers.RefreshTokenHandler).Methods("POST")
 
 	// Webhook от Wallester (публичный, без middleware)
 	router.HandleFunc("/api/v1/webhooks/wallester", handlers.WallesterWebhookHandler).Methods("POST")

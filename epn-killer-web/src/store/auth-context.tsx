@@ -26,6 +26,7 @@ interface AuthContextType {
   setUser: (user: UserProfile) => void;
   setUserMode: (mode: UserMode) => void;
   completeOnboarding: (mode: UserMode) => void;
+  refreshSession: () => Promise<void>;
   logout: () => void;
 }
 
@@ -33,7 +34,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUserState] = useState<UserProfile>({
-    id: '1',
+    id: '0',
     name: '',
     email: '',
     role: 'OWNER',
@@ -46,27 +47,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const userMode: UserMode = 'personal';
   const onboardingComplete = true;
 
+  // Helper: apply server data to local user state
+  const applyServerData = useCallback((d: Record<string, unknown>) => {
+    const adminFlag = d.is_admin === true || d.role === 'admin';
+    console.log('[AUTH-CONTEXT] Server data received:', {
+      id: d.id, email: d.email, is_admin: d.is_admin, role: d.role,
+      computed_isAdmin: adminFlag,
+    });
+    setUserState(prev => ({
+      ...prev,
+      id: String(d.id ?? prev.id),
+      email: (d.email as string) || prev.email,
+      name: (d.email as string)?.split('@')[0] || prev.name,
+      avatar: ((d.email as string) || '??').substring(0, 2).toUpperCase(),
+      isAdmin: adminFlag,
+      serverRole: (d.role as string) || 'user',
+    }));
+  }, []);
+
+  // Fetch /user/me on mount (if token exists)
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
+      console.log('[AUTH-CONTEXT] No token found, marking authReady');
       setAuthReady(true);
       return;
     }
+    console.log('[AUTH-CONTEXT] Token found, fetching /user/me...');
     apiClient.get('/user/me').then(res => {
-      const d = res.data;
-      setUserState(prev => ({
-        ...prev,
-        id: String(d.id),
-        email: d.email || prev.email,
-        name: d.email?.split('@')[0] || prev.name,
-        avatar: (d.email || '??').substring(0, 2).toUpperCase(),
-        isAdmin: d.is_admin === true || d.role === 'admin',
-        serverRole: d.role || 'user',
-      }));
-    }).catch(() => {}).finally(() => {
+      applyServerData(res.data);
+    }).catch(err => {
+      console.error('[AUTH-CONTEXT] ❌ /user/me FAILED:', err.response?.status, err.response?.data || err.message);
+      // Try to refresh the token to get fresh data
+      apiClient.post('/auth/refresh-token').then(res => {
+        const d = res.data;
+        if (d.token) {
+          localStorage.setItem('token', d.token);
+          console.log('[AUTH-CONTEXT] ✅ Token refreshed, applying user data');
+          applyServerData(d.user);
+        }
+      }).catch(refreshErr => {
+        console.error('[AUTH-CONTEXT] ❌ Token refresh also failed:', refreshErr.message);
+      });
+    }).finally(() => {
       setAuthReady(true);
     });
-  }, []);
+  }, [applyServerData]);
 
   const setUser = useCallback((newUser: UserProfile) => {
     setUserState(newUser);
@@ -75,8 +101,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const setUserMode = useCallback((_mode: UserMode) => {}, []);
   const completeOnboarding = useCallback((_mode: UserMode) => {}, []);
 
+  // refreshSession: call /auth/refresh-token, update local token + state
+  const refreshSession = useCallback(async () => {
+    try {
+      const res = await apiClient.post('/auth/refresh-token');
+      const d = res.data;
+      if (d.token) {
+        localStorage.setItem('token', d.token);
+        applyServerData(d.user);
+        console.log('[AUTH-CONTEXT] ✅ Session refreshed');
+      }
+    } catch (err) {
+      console.error('[AUTH-CONTEXT] refreshSession failed:', err);
+    }
+  }, [applyServerData]);
+
   const logout = useCallback(() => {
     localStorage.removeItem('token');
+    sessionStorage.removeItem('_xplr_staff');
+    setUserState(prev => ({ ...prev, isAdmin: false, serverRole: 'user' }));
   }, []);
 
   const role = user.role;
@@ -85,7 +128,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isAdmin = user.isAdmin === true;
 
   return (
-    <AuthContext.Provider value={{ user, role, isOwner, isMember, isAdmin, authReady, userMode, onboardingComplete, setUser, setUserMode, completeOnboarding, logout }}>
+    <AuthContext.Provider value={{ user, role, isOwner, isMember, isAdmin, authReady, userMode, onboardingComplete, setUser, setUserMode, completeOnboarding, refreshSession, logout }}>
       {children}
     </AuthContext.Provider>
   );

@@ -34,12 +34,38 @@ const ProtectedRoute: React.FC<GuardProps> = ({ children }) => {
 /* ── Requires admin role + session secret ── */
 const AdminRoute: React.FC<GuardProps> = ({ children }) => {
   const token = localStorage.getItem('token');
-  if (!token) return <Navigate to="/auth" replace />;
-  const { isAdmin, authReady } = useAuth();
-  // Wait for /me to finish before deciding — prevents false redirect
-  if (!authReady) return null;
+  if (!token) {
+    console.log('[AdminRoute] ❌ No token → redirect to /auth');
+    return <Navigate to="/auth" replace />;
+  }
+  const { isAdmin, authReady, user } = useAuth();
   const hasAccess = sessionStorage.getItem('_xplr_staff') === 'granted';
-  if (!isAdmin || !hasAccess) return <Navigate to="/dashboard" replace />;
+
+  console.log('[AdminRoute] Guard check:', {
+    authReady,
+    isAdmin,
+    hasAccess,
+    userEmail: user?.email,
+    userIsAdmin: user?.isAdmin,
+    serverRole: user?.serverRole,
+  });
+
+  // CRITICAL: wait for /user/me to complete before making any redirect decision
+  if (!authReady) {
+    console.log('[AdminRoute] ⏳ Waiting for authReady...');
+    return null;
+  }
+
+  if (!isAdmin) {
+    console.log('[AdminRoute] ❌ User is not admin → redirect to /dashboard');
+    return <Navigate to="/dashboard" replace />;
+  }
+  if (!hasAccess) {
+    console.log('[AdminRoute] ❌ No staff session key → redirect to /dashboard');
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  console.log('[AdminRoute] ✅ Access granted');
   return <>{children}</>;
 };
 

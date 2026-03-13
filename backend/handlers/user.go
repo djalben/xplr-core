@@ -167,12 +167,17 @@ func GetMeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 2. Получение данных пользователя из БД
+	// 2. Получение данных пользователя из БД (с fallback)
 	user, err := repository.GetUserByID(userID)
 	if err != nil {
-		log.Printf("Error fetching user %d data: %v", userID, err)
-		http.Error(w, "Failed to fetch user data", http.StatusInternalServerError)
-		return
+		log.Printf("[/me] Full query failed for user %d: %v — trying basic fallback", userID, err)
+		user, err = repository.GetUserByIDBasic(userID)
+		if err != nil {
+			log.Printf("[/me] ❌ Basic fallback also failed for user %d: %v", userID, err)
+			http.Error(w, "Failed to fetch user data", http.StatusInternalServerError)
+			return
+		}
+		log.Printf("[/me] ✅ Basic fallback succeeded for user %d (%s)", user.ID, user.Email)
 	}
 
 	// 3. Получение API Key (для отображения в профиле)
