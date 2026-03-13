@@ -104,6 +104,39 @@ func ensureDB() {
 
 	// 7. Create tables that schema_guard doesn't cover (tables, not columns)
 	tableMigrations := []string{
+		// Wallet (internal balances)
+		`CREATE TABLE IF NOT EXISTS internal_balances (
+			id SERIAL PRIMARY KEY,
+			user_id INTEGER REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+			master_balance NUMERIC(20,4) DEFAULT 0.0000 NOT NULL,
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		// Support tickets
+		`CREATE TABLE IF NOT EXISTS support_tickets (
+			id SERIAL PRIMARY KEY,
+			user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+			subject VARCHAR(500) NOT NULL,
+			status VARCHAR(50) DEFAULT 'open',
+			tg_chat_id BIGINT,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		// Admin logs
+		`CREATE TABLE IF NOT EXISTS admin_logs (
+			id SERIAL PRIMARY KEY,
+			admin_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+			action TEXT NOT NULL,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		// Commission config
+		`CREATE TABLE IF NOT EXISTS commission_config (
+			id SERIAL PRIMARY KEY,
+			key VARCHAR(100) UNIQUE NOT NULL,
+			value NUMERIC(20,4) NOT NULL,
+			description TEXT,
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		// User sessions
 		`CREATE TABLE IF NOT EXISTS user_sessions (
 			id SERIAL PRIMARY KEY,
 			user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -113,6 +146,7 @@ func ensureDB() {
 			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 			last_active TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 		)`,
+		// KYC requests
 		`CREATE TABLE IF NOT EXISTS kyc_requests (
 			id SERIAL PRIMARY KEY,
 			user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -128,6 +162,16 @@ func ensureDB() {
 			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 		)`,
+		// Seed default commission values (idempotent)
+		`INSERT INTO commission_config (key, value, description) VALUES
+			('fee_standard', 6.70, 'Комиссия для грейда STANDARD (%)'),
+			('fee_silver', 5.50, 'Комиссия для грейда SILVER (%)'),
+			('fee_gold', 4.50, 'Комиссия для грейда GOLD (%)'),
+			('fee_platinum', 3.50, 'Комиссия для грейда PLATINUM (%)'),
+			('fee_black', 2.50, 'Комиссия для грейда BLACK (%)'),
+			('referral_percent', 5.00, 'Процент реферальной комиссии'),
+			('card_issue_fee', 2.00, 'Стоимость выпуска карты ($)')
+		ON CONFLICT (key) DO NOTHING`,
 	}
 	for _, m := range tableMigrations {
 		if _, err := db.Exec(m); err != nil {
