@@ -377,6 +377,22 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[LOGIN] ✅ Success: %s (user_id=%d, is_admin=%v, role=%s, fallback=%v)",
 		user.Email, user.ID, isAdmin, role, usedFallback)
 
+	// ── Шаг 7: создаём запись о сессии (IP + User-Agent) ──
+	ip := r.Header.Get("X-Forwarded-For")
+	if ip == "" {
+		ip = r.Header.Get("X-Real-IP")
+	}
+	if ip == "" {
+		ip = r.RemoteAddr
+	}
+	device := r.Header.Get("User-Agent")
+	if len(device) > 200 {
+		device = device[:200]
+	}
+	if err := repository.CreateUserSession(user.ID, ip, device); err != nil {
+		log.Printf("[LOGIN] Warning: failed to create session for user %d: %v", user.ID, err)
+	}
+
 	// Успешный ответ — включает is_admin и role для фронтенда
 	response := map[string]interface{}{
 		"token": token,

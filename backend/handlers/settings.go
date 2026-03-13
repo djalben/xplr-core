@@ -269,3 +269,59 @@ func Disable2FAHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{"two_factor_enabled": false})
 }
+
+// ── POST /api/v1/user/settings/kyc ──
+func SubmitKYCHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var req struct {
+		Country   string `json:"country"`
+		FirstName string `json:"first_name"`
+		LastName  string `json:"last_name"`
+		BirthDate string `json:"birth_date"`
+		Address   string `json:"address"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid body", http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(req.Country) == "" || strings.TrimSpace(req.FirstName) == "" || strings.TrimSpace(req.LastName) == "" {
+		http.Error(w, "Country, first name and last name are required", http.StatusBadRequest)
+		return
+	}
+
+	id, err := repository.CreateKYCRequest(userID, req.Country, req.FirstName, req.LastName, req.BirthDate, req.Address)
+	if err != nil {
+		log.Printf("[KYC] Failed to create request for user %d: %v", userID, err)
+		http.Error(w, "Failed to submit KYC request", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("[KYC] ✅ Request %d submitted by user %d", id, userID)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"id":     id,
+		"status": "pending",
+	})
+}
+
+// ── GET /api/v1/user/settings/kyc ──
+func GetKYCHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	kyc, err := repository.GetLatestKYCRequest(userID)
+	if err != nil {
+		// No KYC request found — return empty
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(nil)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(kyc)
+}

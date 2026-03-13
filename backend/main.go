@@ -202,6 +202,8 @@ func main() {
 	protectedRouter.HandleFunc("/settings/2fa/setup", handlers.Setup2FAHandler).Methods("POST")
 	protectedRouter.HandleFunc("/settings/2fa/verify", handlers.Verify2FAHandler).Methods("POST")
 	protectedRouter.HandleFunc("/settings/2fa/disable", handlers.Disable2FAHandler).Methods("POST")
+	protectedRouter.HandleFunc("/settings/kyc", handlers.SubmitKYCHandler).Methods("POST")
+	protectedRouter.HandleFunc("/settings/kyc", handlers.GetKYCHandler).Methods("GET")
 
 	// --- ADMIN ROUTES (JWT + AdminOnly) ---
 	adminRouter := router.PathPrefix("/api/v1/admin").Subrouter()
