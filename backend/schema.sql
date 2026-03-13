@@ -288,3 +288,151 @@ BEGIN
     END IF;
 END $$;
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+
+-- 16. Таблица тикетов поддержки
+CREATE TABLE IF NOT EXISTS support_tickets (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    subject VARCHAR(500) NOT NULL,
+    status VARCHAR(50) DEFAULT 'open', -- 'open', 'in_progress', 'resolved', 'closed'
+    tg_chat_id BIGINT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_support_tickets_user_id ON support_tickets(user_id);
+CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets(status);
+
+-- 17. Лог действий администраторов
+CREATE TABLE IF NOT EXISTS admin_logs (
+    id SERIAL PRIMARY KEY,
+    admin_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    action TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_admin_logs_admin_id ON admin_logs(admin_id);
+
+-- 18. Конфигурация комиссий (управляется через админку)
+CREATE TABLE IF NOT EXISTS commission_config (
+    id SERIAL PRIMARY KEY,
+    key VARCHAR(100) UNIQUE NOT NULL,       -- e.g. 'fee_standard', 'fee_silver', 'referral_percent'
+    value NUMERIC(20, 4) NOT NULL,
+    description TEXT,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+-- Seed defaults (idempotent)
+INSERT INTO commission_config (key, value, description)
+VALUES
+    ('fee_standard', 6.70, 'Комиссия для грейда STANDARD (%)'),
+    ('fee_silver',   5.50, 'Комиссия для грейда SILVER (%)'),
+    ('fee_gold',     4.50, 'Комиссия для грейда GOLD (%)'),
+    ('fee_platinum', 3.50, 'Комиссия для грейда PLATINUM (%)'),
+    ('fee_black',    2.50, 'Комиссия для грейда BLACK (%)'),
+    ('referral_percent', 5.00, 'Процент реферальной комиссии'),
+    ('card_issue_fee', 2.00, 'Стоимость выпуска карты ($)')
+ON CONFLICT (key) DO NOTHING;
+
+-- 19. Миграция: balance_arbitrage и balance_personal (кошельки по режимам)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'balance_arbitrage') THEN
+        ALTER TABLE users ADD COLUMN balance_arbitrage NUMERIC(20, 4) DEFAULT 0.0000;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'balance_personal') THEN
+        ALTER TABLE users ADD COLUMN balance_personal NUMERIC(20, 4) DEFAULT 0.0000;
+    END IF;
+END $$;
+
+-- 20. Триггер: синхронизация auth.users → public.users (Supabase Auth)
+-- Если пользователь регистрируется через Supabase Auth,
+-- автоматически создаём запись в public.users с базовыми данными.
+CREATE OR REPLACE FUNCTION public.handle_new_auth_user()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO public.users (email, password_hash, balance, balance_rub, status)
+    VALUES (
+        NEW.email,
+        COALESCE(NEW.encrypted_password, ''),
+        0.0000,
+        0.0000,
+        'ACTIVE'
+    )
+    ON CONFLICT (email) DO NOTHING;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Удалить старый триггер если существует, затем создать новый
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW
+    EXECUTE FUNCTION public.handle_new_auth_user();
+
+-- 21. Row Level Security — отключаем RLS на ключевых таблицах,
+-- чтобы Supabase SQL Editor (и Service Role) мог обновлять данные.
+-- Безопасность обеспечивается JWT + middleware на уровне бэкенда.
+ALTER TABLE users DISABLE ROW LEVEL SECURITY;
+ALTER TABLE cards DISABLE ROW LEVEL SECURITY;
+ALTER TABLE transactions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE user_grades DISABLE ROW LEVEL SECURITY;
+ALTER TABLE internal_balances DISABLE ROW LEVEL SECURITY;
+ALTER TABLE api_keys DISABLE ROW LEVEL SECURITY;
+ALTER TABLE teams DISABLE ROW LEVEL SECURITY;
+ALTER TABLE team_members DISABLE ROW LEVEL SECURITY;
+ALTER TABLE referrals DISABLE ROW LEVEL SECURITY;
+ALTER TABLE referral_commissions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE verification_tokens DISABLE ROW LEVEL SECURITY;
+ALTER TABLE password_reset_tokens DISABLE ROW LEVEL SECURITY;
+ALTER TABLE support_tickets DISABLE ROW LEVEL SECURITY;
+ALTER TABLE admin_logs DISABLE ROW LEVEL SECURITY;
+ALTER TABLE commission_config DISABLE ROW LEVEL SECURITY;
+
+-- 22. Таблица сессий пользователей
+CREATE TABLE IF NOT EXISTS user_sessions (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    ip VARCHAR(45),
+    location VARCHAR(255),
+    device VARCHAR(255),
+    last_active TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
+ALTER TABLE user_sessions DISABLE ROW LEVEL SECURITY;
+
+-- 23. Миграция: 2FA, notification prefs, verification_status на users
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'two_factor_enabled') THEN
+        ALTER TABLE users ADD COLUMN two_factor_enabled BOOLEAN DEFAULT FALSE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'two_factor_secret') THEN
+        ALTER TABLE users ADD COLUMN two_factor_secret VARCHAR(64);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'notify_transactions') THEN
+        ALTER TABLE users ADD COLUMN notify_transactions BOOLEAN DEFAULT TRUE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'notify_balance') THEN
+        ALTER TABLE users ADD COLUMN notify_balance BOOLEAN DEFAULT TRUE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'notify_security') THEN
+        ALTER TABLE users ADD COLUMN notify_security BOOLEAN DEFAULT TRUE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'verification_status') THEN
+        ALTER TABLE users ADD COLUMN verification_status VARCHAR(20) DEFAULT 'pending';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'display_name') THEN
+        ALTER TABLE users ADD COLUMN display_name VARCHAR(255);
+    END IF;
+END $$;
+
+-- 24. Миграция: support_tickets — добавляем email и message для полноценной поддержки
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'support_tickets' AND column_name = 'email') THEN
+        ALTER TABLE support_tickets ADD COLUMN email VARCHAR(255);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'support_tickets' AND column_name = 'message') THEN
+        ALTER TABLE support_tickets ADD COLUMN message TEXT;
+    END IF;
+END $$;

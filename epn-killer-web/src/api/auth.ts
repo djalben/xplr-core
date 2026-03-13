@@ -17,6 +17,9 @@ export interface AuthResponse {
     email: string;
     balance: string;
     status: string;
+    is_admin?: boolean;
+    role?: string;
+    is_verified?: boolean;
   };
 }
 

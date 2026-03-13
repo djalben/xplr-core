@@ -9,7 +9,7 @@
     "support": "Destek",
     "settings": "Ayarlar",
     "personal": "KİŞİSEL",
-    "arbitrage": "ARBİTRAJ",
+    "arbitrage": "İŞ",
     "logout": "Çıkış",
     "owner": "Sahip",
     "member": "Üye"
@@ -18,7 +18,7 @@
     "welcome": "Hoş geldiniz!",
     "hello": "Merhaba, {{name}}!",
     "personalSubtitle": "Finanslarınızı yönetmek için harika bir gün",
-    "arbitrageSubtitle": "Arbitraj paneliniz hazır",
+    "arbitrageSubtitle": "İş paneliniz hazır",
     "balance": "Bakiye",
     "activeCards": "Aktif Kartlar",
     "transactions": "İşlemler",

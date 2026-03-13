@@ -9,7 +9,7 @@
     "support": "Soporte",
     "settings": "Ajustes",
     "personal": "PERSONAL",
-    "arbitrage": "ARBITRAJE",
+    "arbitrage": "NEGOCIO",
     "logout": "Cerrar sesión",
     "owner": "Propietario",
     "member": "Miembro"
@@ -18,7 +18,7 @@
     "welcome": "¡Bienvenido!",
     "hello": "¡Hola, {{name}}!",
     "personalSubtitle": "Un gran día para gestionar tus finanzas",
-    "arbitrageSubtitle": "Tu panel de arbitraje está listo",
+    "arbitrageSubtitle": "Tu panel de negocios está listo",
     "balance": "Saldo",
     "activeCards": "Tarjetas activas",
     "transactions": "Transacciones",

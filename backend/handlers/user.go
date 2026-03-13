@@ -167,12 +167,17 @@ func GetMeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 2. Получение данных пользователя из БД
+	// 2. Получение данных пользователя из БД (с fallback)
 	user, err := repository.GetUserByID(userID)
 	if err != nil {
-		log.Printf("Error fetching user %d data: %v", userID, err)
-		http.Error(w, "Failed to fetch user data", http.StatusInternalServerError)
-		return
+		log.Printf("[/me] Full query failed for user %d: %v — trying basic fallback", userID, err)
+		user, err = repository.GetUserByIDBasic(userID)
+		if err != nil {
+			log.Printf("[/me] ❌ Basic fallback also failed for user %d: %v", userID, err)
+			http.Error(w, "Failed to fetch user data", http.StatusInternalServerError)
+			return
+		}
+		log.Printf("[/me] ✅ Basic fallback succeeded for user %d (%s)", user.ID, user.Email)
 	}
 
 	// 3. Получение API Key (для отображения в профиле)
@@ -203,6 +208,9 @@ func GetMeHandler(w http.ResponseWriter, r *http.Request) {
 		APIKey     string `json:"api_key"`
 		Grade      string `json:"grade"`
 		FeePercent string `json:"fee_percent"`
+		Role       string `json:"role"`
+		IsAdmin    bool   `json:"is_admin"`
+		IsVerified bool   `json:"is_verified"`
 	}{
 		ID:         user.ID,
 		Email:      user.Email,
@@ -211,6 +219,9 @@ func GetMeHandler(w http.ResponseWriter, r *http.Request) {
 		APIKey:     apiKey,
 		Grade:      gradeInfo.Grade,
 		FeePercent: gradeInfo.FeePercent.String(),
+		Role:       user.Role,
+		IsAdmin:    user.IsAdmin || user.Role == "admin",
+		IsVerified: user.IsVerified,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

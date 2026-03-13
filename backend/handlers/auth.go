@@ -10,6 +10,7 @@ import (
 	"github.com/djalben/xplr-core/backend/repository"
 	"github.com/djalben/xplr-core/backend/service"
 	"github.com/djalben/xplr-core/backend/utils"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/shopspring/decimal"
 )
 
@@ -99,8 +100,28 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Отправка приветственного письма (async)
+	go func(email string) {
+		if err := service.SendWelcomeEmail(email); err != nil {
+			log.Printf("Warning: Failed to send welcome email to %s: %v", email, err)
+		}
+	}(createdUser.Email)
+
+	// Admin bootstrap: если в системе нет ни одного админа, первый пользователь становится админом
+	isAdmin := false
+	userRole := "user"
+	if !repository.HasAnyAdmin() {
+		log.Printf("[BOOTSTRAP] 🚀 No admins found — promoting first user %d (%s) to admin", createdUser.ID, createdUser.Email)
+		if err := repository.PromoteToAdmin(createdUser.ID); err != nil {
+			log.Printf("[BOOTSTRAP] Warning: failed to auto-promote: %v", err)
+		} else {
+			isAdmin = true
+			userRole = "admin"
+		}
+	}
+
 	// Генерация JWT токена (авто-логин после регистрации)
-	token, err := utils.GenerateJWT(createdUser.ID)
+	token, err := utils.GenerateJWT(createdUser.ID, isAdmin, userRole)
 	if err != nil {
 		log.Printf("Error generating JWT: %v", err)
 		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
@@ -116,6 +137,8 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 			"balance":     createdUser.BalanceRub.String(),
 			"status":      "ACTIVE",
 			"is_verified": false,
+			"is_admin":    isAdmin,
+			"role":        userRole,
 			"created_at":  createdUser.CreatedAt,
 		},
 	}
@@ -249,6 +272,7 @@ func ResetPasswordHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // LoginHandler - Вход пользователя в систему
+// Self-healing: при ошибках БД пробует минимальный запрос, авто-создаёт недостающие данные.
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var req models.LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -257,40 +281,103 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Валидация входных данных
-	if strings.TrimSpace(req.Email) == "" {
+	email := strings.TrimSpace(req.Email)
+	if email == "" {
 		http.Error(w, "Email cannot be empty", http.StatusBadRequest)
 		return
 	}
-
 	if strings.TrimSpace(req.Password) == "" {
 		http.Error(w, "Password cannot be empty", http.StatusBadRequest)
 		return
 	}
 
-	// Получение пользователя по email
-	user, err := repository.GetUserByEmail(req.Email)
+	// ── Шаг 1: попробовать полный запрос ──
+	user, err := repository.GetUserByEmail(email)
+	usedFallback := false
+
 	if err != nil {
-		log.Printf("Login failed for email %s: %v", req.Email, err)
-		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
-		return
+		errMsg := err.Error()
+		isNotFound := strings.Contains(errMsg, "не найден") || strings.Contains(errMsg, "not found")
+
+		if isNotFound {
+			log.Printf("[LOGIN] User not found: %s", email)
+			http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+			return
+		}
+
+		// ── Шаг 1b: DB error → self-heal schema, then retry full query ──
+		log.Printf("[LOGIN] ⚠️  Full query failed for %s: %v — running schema guard", email, err)
+		repository.RunSchemaGuard()
+
+		// Retry full query after heal
+		user, err = repository.GetUserByEmail(email)
+		if err != nil {
+			// Still failing → fallback to basic
+			log.Printf("[LOGIN] ⚠️  Retry failed, using basic fallback for %s: %v", email, err)
+			user, err = repository.GetUserByEmailBasic(email)
+			if err != nil {
+				if strings.Contains(err.Error(), "не найден") || strings.Contains(err.Error(), "not found") {
+					log.Printf("[LOGIN] User not found (fallback): %s", email)
+				} else {
+					log.Printf("[LOGIN] ❌ CRITICAL DB ERROR for %s: %v", email, err)
+				}
+				http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+				return
+			}
+			usedFallback = true
+		}
 	}
 
-	// Проверка пароля
+	// ── Шаг 2: проверка пароля ──
 	if !utils.CheckPasswordHash(req.Password, user.PasswordHash) {
-		log.Printf("Invalid password for email %s", req.Email)
+		log.Printf("[LOGIN] Wrong password for %s (user_id=%d)", email, user.ID)
 		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
 		return
 	}
 
-	// Генерация JWT токена
-	token, err := utils.GenerateJWT(user.ID)
+	// ── Шаг 3: Авто-создание Grade если отсутствует ──
+	if _, gradeErr := repository.GetUserGradeInfo(user.ID); gradeErr != nil {
+		log.Printf("[LOGIN] Auto-creating grade for user %d", user.ID)
+		if _, err := repository.CreateUserGrade(user.ID); err != nil {
+			log.Printf("[LOGIN] Warning: failed to auto-create grade for user %d: %v", user.ID, err)
+		}
+	}
+
+	// ── Шаг 4: Admin bootstrap — если нет ни одного админа, назначаем текущего ──
+	if !repository.HasAnyAdmin() {
+		log.Printf("[BOOTSTRAP] 🚀 No admins in system — promoting user %d (%s) to admin", user.ID, user.Email)
+		if err := repository.PromoteToAdmin(user.ID); err != nil {
+			log.Printf("[BOOTSTRAP] Warning: auto-promote failed: %v", err)
+		} else {
+			user.IsAdmin = true
+			user.Role = "admin"
+		}
+	}
+
+	// ── Шаг 5: If used fallback, re-read full user to get is_admin/role ──
+	if usedFallback {
+		if fullUser, err := repository.GetUserByID(user.ID); err == nil {
+			user = fullUser
+		}
+	}
+
+	// ── Шаг 6: генерация JWT с ролевой информацией ──
+	isAdmin := user.IsAdmin || user.Role == "admin"
+	role := user.Role
+	if role == "" {
+		role = "user"
+	}
+	token, err := utils.GenerateJWT(user.ID, isAdmin, role)
 	if err != nil {
-		log.Printf("Error generating JWT for user %d: %v", user.ID, err)
+		log.Printf("[LOGIN] ❌ JWT generation failed for user %d: %v", user.ID, err)
 		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 		return
 	}
 
-	// Успешный ответ
+	log.Printf("[LOGIN] ✅ Success: %s (user_id=%d, is_admin=%v, role=%s, fallback=%v)",
+		user.Email, user.ID, isAdmin, role, usedFallback)
+
+	// Успешный ответ — включает is_admin и role для фронтенда
 	response := map[string]interface{}{
 		"token": token,
 		"user": map[string]interface{}{
@@ -299,10 +386,84 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 			"balance":     user.BalanceRub.String(),
 			"status":      user.Status,
 			"is_verified": user.IsVerified,
+			"is_admin":    isAdmin,
+			"role":        role,
 		},
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
+}
+
+// RefreshTokenHandler — POST /api/v1/auth/refresh-token
+// Re-reads user from DB and issues a fresh JWT with current is_admin/role.
+// Requires valid existing JWT in Authorization header.
+func RefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+		http.Error(w, "Authorization required", http.StatusUnauthorized)
+		return
+	}
+
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+
+	// Parse existing token to get user_id
+	parsedToken, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		return utils.GetJWTSecret(), nil
+	})
+	if err != nil || !parsedToken.Valid {
+		http.Error(w, "Invalid token", http.StatusUnauthorized)
+		return
+	}
+
+	claims, ok := parsedToken.Claims.(jwt.MapClaims)
+	if !ok {
+		http.Error(w, "Invalid claims", http.StatusUnauthorized)
+		return
+	}
+
+	userIDFloat, ok := claims["user_id"].(float64)
+	if !ok {
+		http.Error(w, "Invalid user_id in token", http.StatusUnauthorized)
+		return
+	}
+
+	userID := int(userIDFloat)
+
+	// Re-read user from DB (fresh data)
+	user, err := repository.GetUserByID(userID)
+	if err != nil {
+		user, err = repository.GetUserByIDBasic(userID)
+		if err != nil {
+			log.Printf("[REFRESH] User %d not found: %v", userID, err)
+			http.Error(w, "User not found", http.StatusUnauthorized)
+			return
+		}
+	}
+
+	isAdmin := user.IsAdmin || user.Role == "admin"
+	role := user.Role
+	if role == "" {
+		role = "user"
+	}
+
+	newToken, err := utils.GenerateJWT(user.ID, isAdmin, role)
+	if err != nil {
+		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("[REFRESH] ✅ Token refreshed for %s (is_admin=%v, role=%s)", user.Email, isAdmin, role)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"token": newToken,
+		"user": map[string]interface{}{
+			"id":       user.ID,
+			"email":    user.Email,
+			"is_admin": isAdmin,
+			"role":     role,
+		},
+	})
 }

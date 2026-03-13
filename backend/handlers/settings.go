@@ -1,0 +1,271 @@
+package handlers
+
+import (
+	"crypto/rand"
+	"encoding/base32"
+	"encoding/json"
+	"log"
+	"net/http"
+	"strings"
+
+	"github.com/djalben/xplr-core/backend/middleware"
+	"github.com/djalben/xplr-core/backend/repository"
+	"golang.org/x/crypto/bcrypt"
+)
+
+// ── GET /api/v1/user/settings/profile ──
+func GetSettingsProfileHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	me, err := repository.GetMeExtended(userID)
+	if err != nil {
+		http.Error(w, "Failed to fetch profile", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(me)
+}
+
+// ── PATCH /api/v1/user/settings/profile ──
+func UpdateProfileHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var req struct {
+		DisplayName string `json:"display_name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid body", http.StatusBadRequest)
+		return
+	}
+	name := strings.TrimSpace(req.DisplayName)
+	if name == "" {
+		http.Error(w, "Display name cannot be empty", http.StatusBadRequest)
+		return
+	}
+	if err := repository.UpdateDisplayName(userID, name); err != nil {
+		http.Error(w, "Failed to update profile", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"display_name": name})
+}
+
+// ── POST /api/v1/user/settings/change-password ──
+func ChangePasswordHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var req struct {
+		OldPassword string `json:"old_password"`
+		NewPassword string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid body", http.StatusBadRequest)
+		return
+	}
+	if len(req.NewPassword) < 8 {
+		http.Error(w, "New password must be at least 8 characters", http.StatusBadRequest)
+		return
+	}
+
+	// Verify old password
+	hash, err := repository.GetPasswordHash(userID)
+	if err != nil {
+		http.Error(w, "Failed to verify password", http.StatusInternalServerError)
+		return
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.OldPassword)); err != nil {
+		http.Error(w, "Incorrect current password", http.StatusForbidden)
+		return
+	}
+
+	// Hash new password
+	newHash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		http.Error(w, "Failed to hash password", http.StatusInternalServerError)
+		return
+	}
+	if err := repository.UpdatePasswordHash(userID, string(newHash)); err != nil {
+		http.Error(w, "Failed to update password", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("[SETTINGS] Password changed for user %d", userID)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"message": "Password changed successfully"})
+}
+
+// ── GET /api/v1/user/settings/sessions ──
+func GetSessionsHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	sessions, err := repository.GetRecentSessions(userID, 5)
+	if err != nil {
+		http.Error(w, "Failed to fetch sessions", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(sessions)
+}
+
+// ── POST /api/v1/user/settings/logout-all ──
+func LogoutAllSessionsHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if err := repository.DeleteAllUserSessions(userID); err != nil {
+		http.Error(w, "Failed to logout all sessions", http.StatusInternalServerError)
+		return
+	}
+	log.Printf("[SETTINGS] User %d logged out from all devices", userID)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"message": "All sessions terminated"})
+}
+
+// ── GET /api/v1/user/settings/notifications ──
+func GetNotificationPrefsHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	prefs, err := repository.GetNotificationPrefs(userID)
+	if err != nil {
+		http.Error(w, "Failed to fetch notifications", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(prefs)
+}
+
+// ── PATCH /api/v1/user/settings/notifications ──
+func UpdateNotificationPrefsHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var req repository.NotificationPrefs
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid body", http.StatusBadRequest)
+		return
+	}
+	if err := repository.UpdateNotificationPrefs(userID, req); err != nil {
+		http.Error(w, "Failed to update notifications", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(req)
+}
+
+// ── POST /api/v1/user/settings/2fa/setup ──
+func Setup2FAHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Generate random secret
+	secret := make([]byte, 20)
+	if _, err := rand.Read(secret); err != nil {
+		http.Error(w, "Failed to generate secret", http.StatusInternalServerError)
+		return
+	}
+	secretB32 := base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(secret)
+
+	// Store secret (not yet enabled)
+	if err := repository.SetTwoFactorSecret(userID, secretB32); err != nil {
+		http.Error(w, "Failed to save secret", http.StatusInternalServerError)
+		return
+	}
+
+	// Get user email for the TOTP URI
+	me, err := repository.GetMeExtended(userID)
+	if err != nil {
+		http.Error(w, "Failed to fetch user", http.StatusInternalServerError)
+		return
+	}
+
+	// otpauth URI for Google Authenticator
+	otpURI := "otpauth://totp/XPLR:" + me.Email + "?secret=" + secretB32 + "&issuer=XPLR&digits=6&period=30"
+
+	log.Printf("[2FA] Setup initiated for user %d", userID)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"secret":  secretB32,
+		"otp_uri": otpURI,
+	})
+}
+
+// ── POST /api/v1/user/settings/2fa/verify ──
+func Verify2FAHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var req struct {
+		Code string `json:"code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid body", http.StatusBadRequest)
+		return
+	}
+
+	code := strings.TrimSpace(req.Code)
+	if len(code) != 6 {
+		http.Error(w, "Code must be 6 digits", http.StatusBadRequest)
+		return
+	}
+
+	secret, _, err := repository.GetTwoFactorSecret(userID)
+	if err != nil || secret == "" {
+		http.Error(w, "2FA not set up", http.StatusBadRequest)
+		return
+	}
+
+	// Verify TOTP code
+	if !verifyTOTP(secret, code) {
+		http.Error(w, "Invalid code", http.StatusForbidden)
+		return
+	}
+
+	if err := repository.EnableTwoFactor(userID); err != nil {
+		http.Error(w, "Failed to enable 2FA", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("[2FA] ✅ Enabled for user %d", userID)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"two_factor_enabled": true})
+}
+
+// ── POST /api/v1/user/settings/2fa/disable ──
+func Disable2FAHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if err := repository.DisableTwoFactor(userID); err != nil {
+		http.Error(w, "Failed to disable 2FA", http.StatusInternalServerError)
+		return
+	}
+	log.Printf("[2FA] Disabled for user %d", userID)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"two_factor_enabled": false})
+}

@@ -1,125 +1,343 @@
 package service
 
 import (
+	"crypto/tls"
 	"fmt"
 	"log"
+	"net"
 	"net/smtp"
 	"os"
+	"strings"
 )
 
-// SendVerificationEmail — отправляет письмо с ссылкой подтверждения email.
-// Настройки SMTP берутся из переменных окружения:
-//   - SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
-//   - APP_DOMAIN — домен фронтенда для формирования ссылки верификации
-func SendVerificationEmail(toEmail, token string) error {
-	host := os.Getenv("SMTP_HOST")
-	port := os.Getenv("SMTP_PORT")
-	user := os.Getenv("SMTP_USER")
-	pass := os.Getenv("SMTP_PASS")
-	from := os.Getenv("SMTP_FROM")
-	domain := os.Getenv("APP_DOMAIN")
+// ═══════════════════════════════════════════════════
+// SMTP transport — supports both port 465 (implicit TLS)
+// and port 587 (STARTTLS).
+// Env vars: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM, APP_DOMAIN
+// ═══════════════════════════════════════════════════
 
-	if host == "" || port == "" {
-		log.Printf("[EMAIL] SMTP not configured (SMTP_HOST/SMTP_PORT missing). Verification email for %s skipped. Token: %s", toEmail, token)
+type smtpConfig struct {
+	Host   string
+	Port   string
+	User   string
+	Pass   string
+	From   string
+	Domain string
+}
+
+func loadSMTPConfig() *smtpConfig {
+	c := &smtpConfig{
+		Host:   os.Getenv("SMTP_HOST"),
+		Port:   os.Getenv("SMTP_PORT"),
+		User:   os.Getenv("SMTP_USER"),
+		Pass:   os.Getenv("SMTP_PASS"),
+		From:   os.Getenv("SMTP_FROM"),
+		Domain: os.Getenv("APP_DOMAIN"),
+	}
+	if c.From == "" {
+		if c.User != "" {
+			c.From = c.User
+		} else {
+			c.From = "admin@xplr.pro"
+		}
+	}
+	if c.Domain == "" {
+		c.Domain = "https://xplr.pro"
+	}
+	return c
+}
+
+// sendMail — unified sender. Uses implicit TLS for port 465, STARTTLS for 587.
+func sendMail(to, subject, htmlBody string) error {
+	cfg := loadSMTPConfig()
+	if cfg.Host == "" || cfg.Port == "" {
+		log.Printf("[EMAIL] SMTP not configured. Email to %s skipped.", to)
 		return nil
 	}
 
-	if from == "" {
-		if user != "" {
-			from = user
-		} else {
-			from = "concierge@xplr.com"
-		}
+	headers := fmt.Sprintf(
+		"From: XPLR <%s>\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n",
+		cfg.From, to, subject,
+	)
+	msg := []byte(headers + htmlBody)
+	addr := fmt.Sprintf("%s:%s", cfg.Host, cfg.Port)
+
+	if cfg.Port == "465" {
+		return sendImplicitTLS(cfg, addr, to, msg)
 	}
-	if domain == "" {
-		domain = "https://xplr-web.vercel.app"
+	// Fallback: STARTTLS (port 587 etc.)
+	auth := smtp.PlainAuth("", cfg.User, cfg.Pass, cfg.Host)
+	return smtp.SendMail(addr, auth, cfg.From, []string{to}, msg)
+}
+
+// sendImplicitTLS — connects with TLS first, then authenticates (Zoho, port 465).
+func sendImplicitTLS(cfg *smtpConfig, addr, to string, msg []byte) error {
+	tlsConfig := &tls.Config{ServerName: cfg.Host}
+	conn, err := tls.Dial("tcp", addr, tlsConfig)
+	if err != nil {
+		return fmt.Errorf("tls dial: %w", err)
 	}
+	defer conn.Close()
 
-	verifyURL := fmt.Sprintf("%s/verify?token=%s", domain, token)
+	host, _, _ := net.SplitHostPort(addr)
+	client, err := smtp.NewClient(conn, host)
+	if err != nil {
+		return fmt.Errorf("smtp new client: %w", err)
+	}
+	defer client.Quit()
 
-	subject := "XPLR — Подтверждение email"
-	body := fmt.Sprintf(`Здравствуйте!
+	auth := smtp.PlainAuth("", cfg.User, cfg.Pass, cfg.Host)
+	if err = client.Auth(auth); err != nil {
+		return fmt.Errorf("smtp auth: %w", err)
+	}
+	if err = client.Mail(cfg.From); err != nil {
+		return fmt.Errorf("smtp mail from: %w", err)
+	}
+	if err = client.Rcpt(to); err != nil {
+		return fmt.Errorf("smtp rcpt to: %w", err)
+	}
+	w, err := client.Data()
+	if err != nil {
+		return fmt.Errorf("smtp data: %w", err)
+	}
+	if _, err = w.Write(msg); err != nil {
+		return fmt.Errorf("smtp write: %w", err)
+	}
+	return w.Close()
+}
 
-Для подтверждения вашего email перейдите по ссылке:
+// ═══════════════════════════════════════════════════
+// Shared HTML template wrapper
+// ═══════════════════════════════════════════════════
 
-%s
+func wrapHTML(title, content string) string {
+	return fmt.Sprintf(`<!DOCTYPE html>
+<html lang="ru">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#0a0a0f;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<table width="100%%" cellpadding="0" cellspacing="0" style="background:#0a0a0f;padding:40px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg,#111118 0%%,#0d0d15 100%%);border-radius:16px;border:1px solid rgba(255,255,255,0.06);overflow:hidden;">
+  <!-- Header -->
+  <tr><td style="padding:32px 40px 20px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.06);">
+    <div style="display:inline-block;background:linear-gradient(135deg,#3b82f6,#8b5cf6);border-radius:12px;width:48px;height:48px;line-height:48px;text-align:center;color:#fff;font-size:22px;font-weight:bold;">X</div>
+    <h1 style="margin:12px 0 0;color:#fff;font-size:20px;font-weight:700;letter-spacing:-0.3px;">%s</h1>
+  </td></tr>
+  <!-- Body -->
+  <tr><td style="padding:32px 40px;">%s</td></tr>
+  <!-- Footer -->
+  <tr><td style="padding:20px 40px 32px;text-align:center;border-top:1px solid rgba(255,255,255,0.06);">
+    <p style="margin:0;color:#475569;font-size:11px;">© XPLR — Premium Financial Services</p>
+    <p style="margin:4px 0 0;color:#334155;font-size:10px;">Это автоматическое письмо, не отвечайте на него.</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>`, title, content)
+}
 
-Ссылка действительна 24 часа.
+// ═══════════════════════════════════════════════════
+// Email functions
+// ═══════════════════════════════════════════════════
 
-Если вы не регистрировались на XPLR — просто проигнорируйте это письмо.
+// SendVerificationEmail — ссылка подтверждения email.
+func SendVerificationEmail(toEmail, token string) error {
+	cfg := loadSMTPConfig()
+	verifyURL := fmt.Sprintf("%s/verify?token=%s", cfg.Domain, token)
 
-—
-XPLR Team`, verifyURL)
+	content := fmt.Sprintf(`
+    <p style="color:#cbd5e1;font-size:15px;line-height:1.6;margin:0 0 20px;">Здравствуйте!</p>
+    <p style="color:#94a3b8;font-size:14px;line-height:1.6;margin:0 0 24px;">Для подтверждения вашего email нажмите на кнопку ниже:</p>
+    <div style="text-align:center;margin:0 0 24px;">
+      <a href="%s" style="display:inline-block;padding:14px 40px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:#fff;text-decoration:none;border-radius:12px;font-size:14px;font-weight:600;">Подтвердить email</a>
+    </div>
+    <p style="color:#64748b;font-size:12px;line-height:1.5;margin:0;">Ссылка действительна 24 часа. Если вы не регистрировались на XPLR — проигнорируйте это письмо.</p>`, verifyURL)
 
-	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s",
-		from, toEmail, subject, body)
+	html := wrapHTML("Подтверждение email", content)
 
-	auth := smtp.PlainAuth("", user, pass, host)
-	addr := fmt.Sprintf("%s:%s", host, port)
-
-	if err := smtp.SendMail(addr, auth, from, []string{toEmail}, []byte(msg)); err != nil {
+	if err := sendMail(toEmail, "XPLR — Подтверждение email", html); err != nil {
 		log.Printf("[EMAIL] Failed to send verification email to %s: %v", toEmail, err)
-		return fmt.Errorf("failed to send email: %w", err)
+		return err
 	}
-
 	log.Printf("[EMAIL] Verification email sent to %s", toEmail)
 	return nil
 }
 
-// SendPasswordResetEmail — отправляет письмо со ссылкой для сброса пароля.
+// SendPasswordResetEmail — ссылка сброса пароля.
 func SendPasswordResetEmail(toEmail, token string) error {
-	host := os.Getenv("SMTP_HOST")
-	port := os.Getenv("SMTP_PORT")
-	user := os.Getenv("SMTP_USER")
-	pass := os.Getenv("SMTP_PASS")
-	from := os.Getenv("SMTP_FROM")
-	domain := os.Getenv("APP_DOMAIN")
+	cfg := loadSMTPConfig()
+	resetURL := fmt.Sprintf("%s/reset-password?token=%s", cfg.Domain, token)
 
-	if host == "" || port == "" {
-		log.Printf("[EMAIL] SMTP not configured. Password reset email for %s skipped. Token: %s", toEmail, token)
-		return nil
-	}
+	content := fmt.Sprintf(`
+    <p style="color:#cbd5e1;font-size:15px;line-height:1.6;margin:0 0 20px;">Здравствуйте!</p>
+    <p style="color:#94a3b8;font-size:14px;line-height:1.6;margin:0 0 24px;">Вы запросили сброс пароля для вашего аккаунта XPLR.</p>
+    <div style="text-align:center;margin:0 0 24px;">
+      <a href="%s" style="display:inline-block;padding:14px 40px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:#fff;text-decoration:none;border-radius:12px;font-size:14px;font-weight:600;">Сбросить пароль</a>
+    </div>
+    <p style="color:#64748b;font-size:12px;line-height:1.5;margin:0;">Ссылка действительна 1 час. Если вы не запрашивали сброс — проигнорируйте это письмо.</p>`, resetURL)
 
-	if from == "" {
-		if user != "" {
-			from = user
-		} else {
-			from = "concierge@xplr.com"
-		}
-	}
-	if domain == "" {
-		domain = "https://xplr-web.vercel.app"
-	}
+	html := wrapHTML("Сброс пароля", content)
 
-	resetURL := fmt.Sprintf("%s/reset-password?token=%s", domain, token)
-
-	subject := "XPLR — Сброс пароля"
-	body := fmt.Sprintf(`Здравствуйте!
-
-Вы запросили сброс пароля для вашего аккаунта XPLR.
-
-Перейдите по ссылке для установки нового пароля:
-
-%s
-
-Ссылка действительна 1 час.
-
-Если вы не запрашивали сброс пароля — просто проигнорируйте это письмо.
-
-—
-XPLR Team`, resetURL)
-
-	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s",
-		from, toEmail, subject, body)
-
-	auth := smtp.PlainAuth("", user, pass, host)
-	addr := fmt.Sprintf("%s:%s", host, port)
-
-	if err := smtp.SendMail(addr, auth, from, []string{toEmail}, []byte(msg)); err != nil {
+	if err := sendMail(toEmail, "XPLR — Сброс пароля", html); err != nil {
 		log.Printf("[EMAIL] Failed to send password reset email to %s: %v", toEmail, err)
-		return fmt.Errorf("failed to send email: %w", err)
+		return err
+	}
+	log.Printf("[EMAIL] Password reset email sent to %s", toEmail)
+	return nil
+}
+
+// SendWelcomeEmail — приветственное письмо после регистрации.
+func SendWelcomeEmail(toEmail string) error {
+	cfg := loadSMTPConfig()
+
+	content := fmt.Sprintf(`
+    <p style="color:#cbd5e1;font-size:16px;line-height:1.6;margin:0 0 8px;">Добро пожаловать в <strong style="color:#fff;">XPLR</strong>! 🎉</p>
+    <p style="color:#94a3b8;font-size:14px;line-height:1.7;margin:0 0 24px;">
+      Ваш аккаунт успешно создан. Теперь вам доступны:<br/>
+      — Выпуск виртуальных карт для онлайн-покупок<br/>
+      — Управление балансом и пополнение кошелька<br/>
+      — Реферальная программа с бонусами<br/>
+      — Персональные условия с ростом грейда
+    </p>
+    <div style="text-align:center;margin:0 0 24px;">
+      <a href="%s/dashboard" style="display:inline-block;padding:14px 40px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:#fff;text-decoration:none;border-radius:12px;font-size:14px;font-weight:600;">Перейти в личный кабинет</a>
+    </div>
+    <p style="color:#64748b;font-size:12px;line-height:1.5;margin:0;">Если у вас есть вопросы — напишите в поддержку через личный кабинет.</p>`, cfg.Domain)
+
+	html := wrapHTML("Добро пожаловать!", content)
+
+	if err := sendMail(toEmail, "Добро пожаловать в XPLR! 🎉", html); err != nil {
+		log.Printf("[EMAIL] Failed to send welcome email to %s: %v", toEmail, err)
+		return err
+	}
+	log.Printf("[EMAIL] Welcome email sent to %s", toEmail)
+	return nil
+}
+
+// SendGradeChangeEmail — уведомление о смене грейда.
+func SendGradeChangeEmail(toEmail, newGrade string) error {
+	gradeColors := map[string]string{
+		"STANDARD": "#94a3b8",
+		"SILVER":   "#c0c0c0",
+		"GOLD":     "#fbbf24",
+		"PLATINUM": "#a78bfa",
+		"BLACK":    "#fff",
+	}
+	gradeEmoji := map[string]string{
+		"STANDARD": "⚪",
+		"SILVER":   "🥈",
+		"GOLD":     "🥇",
+		"PLATINUM": "💎",
+		"BLACK":    "🖤",
+	}
+	gradeBg := map[string]string{
+		"STANDARD": "linear-gradient(135deg,#475569,#64748b)",
+		"SILVER":   "linear-gradient(135deg,#9ca3af,#d1d5db)",
+		"GOLD":     "linear-gradient(135deg,#f59e0b,#fbbf24)",
+		"PLATINUM": "linear-gradient(135deg,#8b5cf6,#a78bfa)",
+		"BLACK":    "linear-gradient(135deg,#1e1e2e,#000)",
+	}
+	gradeBenefit := map[string]string{
+		"STANDARD": "Базовая комиссия 6.70%",
+		"SILVER":   "Сниженная комиссия 5.50%",
+		"GOLD":     "Выгодная комиссия 4.50%",
+		"PLATINUM": "Премиальная комиссия 3.50%",
+		"BLACK":    "Минимальная комиссия 2.50% • Приоритетная поддержка • Эксклюзивные лимиты",
 	}
 
-	log.Printf("[EMAIL] Password reset email sent to %s", toEmail)
+	g := strings.ToUpper(newGrade)
+	color := gradeColors[g]
+	if color == "" {
+		color = "#94a3b8"
+	}
+	emoji := gradeEmoji[g]
+	bg := gradeBg[g]
+	if bg == "" {
+		bg = "linear-gradient(135deg,#475569,#64748b)"
+	}
+	benefit := gradeBenefit[g]
+
+	cfg := loadSMTPConfig()
+
+	content := fmt.Sprintf(`
+    <p style="color:#cbd5e1;font-size:15px;line-height:1.6;margin:0 0 20px;">Здравствуйте!</p>
+    <p style="color:#94a3b8;font-size:14px;line-height:1.6;margin:0 0 24px;">Ваш статус в XPLR был обновлён:</p>
+    <!-- Grade badge -->
+    <div style="text-align:center;margin:0 0 24px;">
+      <div style="display:inline-block;padding:20px 48px;background:%s;border-radius:16px;border:1px solid rgba(255,255,255,0.1);">
+        <span style="font-size:32px;">%s</span>
+        <p style="margin:8px 0 0;color:%s;font-size:22px;font-weight:800;letter-spacing:2px;">%s</p>
+      </div>
+    </div>
+    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px 20px;margin:0 0 24px;">
+      <p style="color:#94a3b8;font-size:13px;margin:0;">Ваши привилегии: <strong style="color:#e2e8f0;">%s</strong></p>
+    </div>
+    <div style="text-align:center;margin:0 0 24px;">
+      <a href="%s/dashboard" style="display:inline-block;padding:14px 40px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:#fff;text-decoration:none;border-radius:12px;font-size:14px;font-weight:600;">Открыть личный кабинет</a>
+    </div>`,
+		bg, emoji, color, g, benefit, cfg.Domain)
+
+	html := wrapHTML("Ваш грейд обновлён", content)
+	subject := fmt.Sprintf("XPLR — Ваш грейд: %s %s", g, emoji)
+
+	if err := sendMail(toEmail, subject, html); err != nil {
+		log.Printf("[EMAIL] Failed to send grade change email to %s: %v", toEmail, err)
+		return err
+	}
+	log.Printf("[EMAIL] Grade change email sent to %s (grade=%s)", toEmail, g)
+	return nil
+}
+
+// SendSupportTicketNotification — дублирует тикет на support@xplr.pro через Zoho SMTP.
+func SendSupportTicketNotification(ticketID int, userEmail, subject, message string) error {
+	content := fmt.Sprintf(`
+    <p style="color:#cbd5e1;font-size:15px;line-height:1.6;margin:0 0 20px;">Новый тикет поддержки</p>
+    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px 20px;margin:0 0 20px;">
+      <p style="color:#94a3b8;font-size:13px;margin:0 0 8px;"><strong style="color:#e2e8f0;">Тикет:</strong> #%d</p>
+      <p style="color:#94a3b8;font-size:13px;margin:0 0 8px;"><strong style="color:#e2e8f0;">Email:</strong> %s</p>
+      <p style="color:#94a3b8;font-size:13px;margin:0 0 8px;"><strong style="color:#e2e8f0;">Тема:</strong> %s</p>
+    </div>
+    <div style="background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.15);border-radius:12px;padding:16px 20px;margin:0 0 20px;">
+      <p style="color:#94a3b8;font-size:13px;margin:0 0 4px;"><strong style="color:#e2e8f0;">Сообщение:</strong></p>
+      <p style="color:#cbd5e1;font-size:14px;line-height:1.6;margin:0;white-space:pre-wrap;">%s</p>
+    </div>
+    <p style="color:#64748b;font-size:12px;">Ответьте пользователю через админ-панель или напрямую на email.</p>`,
+		ticketID, userEmail, subject, message)
+
+	html := wrapHTML("Новый тикет поддержки", content)
+	emailSubject := fmt.Sprintf("XPLR Тикет #%d — %s", ticketID, subject)
+
+	if err := sendMail("support@xplr.pro", emailSubject, html); err != nil {
+		log.Printf("[EMAIL] Failed to send support ticket notification: %v", err)
+		return err
+	}
+	log.Printf("[EMAIL] Support ticket #%d notification sent to support@xplr.pro", ticketID)
+	return nil
+}
+
+// SendEmergencyFreezeNotification — уведомление о блокировке аккаунта.
+func SendEmergencyFreezeNotification(toEmail string, frozenCards int) error {
+	content := fmt.Sprintf(`
+    <div style="text-align:center;margin:0 0 24px;">
+      <div style="display:inline-block;width:64px;height:64px;background:linear-gradient(135deg,#ef4444,#dc2626);border-radius:50%%;line-height:64px;font-size:28px;">🔒</div>
+    </div>
+    <p style="color:#fca5a5;font-size:16px;line-height:1.6;margin:0 0 12px;text-align:center;font-weight:700;">Ваш аккаунт заблокирован</p>
+    <p style="color:#94a3b8;font-size:14px;line-height:1.7;margin:0 0 24px;text-align:center;">
+      В целях безопасности все операции по вашему аккаунту приостановлены.
+    </p>
+    <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:12px;padding:16px 20px;margin:0 0 24px;">
+      <p style="color:#fca5a5;font-size:13px;margin:0 0 4px;">Что произошло:</p>
+      <p style="color:#94a3b8;font-size:13px;margin:0;">— Заморожено карт: <strong style="color:#fff;">%d</strong></p>
+      <p style="color:#94a3b8;font-size:13px;margin:0;">— Статус аккаунта: <strong style="color:#ef4444;">BANNED</strong></p>
+      <p style="color:#94a3b8;font-size:13px;margin:0;">— Баланс кошелька: <strong style="color:#ef4444;">обнулён</strong></p>
+    </div>
+    <p style="color:#64748b;font-size:12px;line-height:1.5;margin:0;text-align:center;">Если вы считаете, что это ошибка — свяжитесь с нами: admin@xplr.pro</p>`, frozenCards)
+
+	html := wrapHTML("Аккаунт заблокирован", content)
+
+	if err := sendMail(toEmail, "XPLR — Ваш аккаунт заблокирован 🔒", html); err != nil {
+		log.Printf("[EMAIL] Failed to send freeze notification to %s: %v", toEmail, err)
+		return err
+	}
+	log.Printf("[EMAIL] Emergency freeze notification sent to %s", toEmail)
 	return nil
 }

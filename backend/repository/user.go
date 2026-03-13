@@ -50,6 +50,25 @@ func CreateUser(user models.User) (models.User, error) {
 	return createdUser, nil
 }
 
+// GetUserByEmailBasic fetches only the essential columns needed for password verification.
+// Used as a fallback when the full GetUserByEmail fails due to schema issues.
+func GetUserByEmailBasic(email string) (models.User, error) {
+	if GlobalDB == nil {
+		return models.User{}, fmt.Errorf("database connection not initialized")
+	}
+
+	query := `SELECT id, email, password_hash, COALESCE(status, 'ACTIVE') FROM users WHERE email = $1`
+	var user models.User
+	err := GlobalDB.QueryRow(query, email).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Status)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.User{}, errors.New("пользователь не найден")
+		}
+		return models.User{}, err
+	}
+	return user, nil
+}
+
 // GetUserByEmail - Находит пользователя по email.
 func GetUserByEmail(email string) (models.User, error) {
 	if GlobalDB == nil {

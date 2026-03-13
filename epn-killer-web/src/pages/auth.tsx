@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Wifi, Eye, EyeOff, Lock, Mail, ChevronRight, ArrowLeft, Check, X } from 'lucide-react';
 import { login, register } from '../api/auth';
+import { useAuth } from '../store/auth-context';
 
 type AuthMode = 'login' | 'register';
 
@@ -34,6 +35,7 @@ const translateError = (raw: string): string => {
 export const AuthPage = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { setUser } = useAuth();
   const [mode, setMode] = useState<AuthMode>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
@@ -73,14 +75,25 @@ export const AuthPage = () => {
     setIsLoading(true);
     try {
       const payload = { email, password };
-      console.log('[Auth] Sending registration data:', { mode, email, password: '***' });
+      console.log('[Auth] Sending auth request:', { mode, email });
 
-      if (mode === 'login') {
-        const res = await login(payload);
-        console.log('[Auth] Login response:', res);
-      } else {
-        const res = await register(payload);
-        console.log('[Auth] Register response:', res);
+      const res = mode === 'login' ? await login(payload) : await register(payload);
+      console.log('[Auth] Response:', { token: res.token ? 'yes' : 'NO', user: res.user });
+
+      // Immediately apply user data to auth context (including is_admin/role)
+      if (res.user) {
+        const u = res.user;
+        const adminFlag = u.is_admin === true || u.role === 'admin';
+        console.log('[Auth] Setting user context: is_admin=', adminFlag, 'role=', u.role);
+        setUser({
+          id: String(u.id),
+          email: u.email,
+          name: u.email?.split('@')[0] || '',
+          role: 'OWNER',
+          avatar: (u.email || '??').substring(0, 2).toUpperCase(),
+          isAdmin: adminFlag,
+          serverRole: u.role || 'user',
+        });
       }
 
       const savedToken = localStorage.getItem('token');

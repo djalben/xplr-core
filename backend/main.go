@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	"github.com/rs/cors"
 
@@ -26,6 +27,12 @@ import (
 var DB *sql.DB
 
 func main() {
+	// 0. Загрузка .env файла (если существует)
+	if err := godotenv.Load("backend/.env"); err != nil {
+		// Попробовать из текущей директории
+		_ = godotenv.Load()
+	}
+
 	// 1. Инициализация базы данных
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
@@ -50,6 +57,9 @@ func main() {
 	repository.GlobalDB = DB
 
 	log.Println("Successfully connected to the database!")
+
+	// 1.1. Schema Integrity Guard — проверяет и создаёт отсутствующие колонки
+	repository.RunSchemaGuard()
 
 	// Тест "Дыхания" — проверка таблицы services в Supabase
 	log.Println("Testing Supabase connection: SELECT slug FROM services...")
@@ -123,6 +133,7 @@ func main() {
 	resetLimiter := middleware.NewRateLimiter(5, 15*time.Minute)
 	router.HandleFunc("/api/v1/auth/reset-password-request", resetLimiter.Limit(handlers.ResetPasswordRequestHandler)).Methods("POST")
 	router.HandleFunc("/api/v1/auth/reset-password", handlers.ResetPasswordHandler).Methods("POST")
+	router.HandleFunc("/api/v1/auth/refresh-token", handlers.RefreshTokenHandler).Methods("POST")
 
 	// Webhook от Wallester (публичный, без middleware)
 	router.HandleFunc("/api/v1/webhooks/wallester", handlers.WallesterWebhookHandler).Methods("POST")
@@ -177,6 +188,21 @@ func main() {
 	// Привязка Telegram Chat ID для уведомлений
 	protectedRouter.HandleFunc("/settings/telegram", handlers.UpdateTelegramChatIDHandler).Methods("POST")
 
+	// Поддержка — отправка тикета
+	protectedRouter.HandleFunc("/support", handlers.SubmitSupportTicketHandler).Methods("POST")
+
+	// Настройки профиля
+	protectedRouter.HandleFunc("/settings/profile", handlers.GetSettingsProfileHandler).Methods("GET")
+	protectedRouter.HandleFunc("/settings/profile", handlers.UpdateProfileHandler).Methods("PATCH")
+	protectedRouter.HandleFunc("/settings/change-password", handlers.ChangePasswordHandler).Methods("POST")
+	protectedRouter.HandleFunc("/settings/sessions", handlers.GetSessionsHandler).Methods("GET")
+	protectedRouter.HandleFunc("/settings/logout-all", handlers.LogoutAllSessionsHandler).Methods("POST")
+	protectedRouter.HandleFunc("/settings/notifications", handlers.GetNotificationPrefsHandler).Methods("GET")
+	protectedRouter.HandleFunc("/settings/notifications", handlers.UpdateNotificationPrefsHandler).Methods("PATCH")
+	protectedRouter.HandleFunc("/settings/2fa/setup", handlers.Setup2FAHandler).Methods("POST")
+	protectedRouter.HandleFunc("/settings/2fa/verify", handlers.Verify2FAHandler).Methods("POST")
+	protectedRouter.HandleFunc("/settings/2fa/disable", handlers.Disable2FAHandler).Methods("POST")
+
 	// --- ADMIN ROUTES (JWT + AdminOnly) ---
 	adminRouter := router.PathPrefix("/api/v1/admin").Subrouter()
 	adminRouter.Use(middleware.JWTAuthMiddleware)
@@ -186,9 +212,18 @@ func main() {
 	adminRouter.HandleFunc("/users/{id}/role", handlers.AdminToggleRoleHandler).Methods("PATCH")
 	adminRouter.HandleFunc("/users/{id}/status", handlers.AdminSetUserStatusHandler).Methods("PATCH")
 	adminRouter.HandleFunc("/stats", handlers.AdminStatsHandler).Methods("GET")
+	adminRouter.HandleFunc("/dashboard", handlers.AdminDashboardStatsHandler).Methods("GET")
 	adminRouter.HandleFunc("/rates", handlers.AdminGetExchangeRatesHandler).Methods("GET")
 	adminRouter.HandleFunc("/rates/{id}/markup", handlers.AdminUpdateMarkupHandler).Methods("PATCH")
 	adminRouter.HandleFunc("/report", handlers.GetAdminTransactionReportHandler).Methods("GET")
+	adminRouter.HandleFunc("/users/search", handlers.AdminSearchUsersHandler).Methods("GET")
+	adminRouter.HandleFunc("/users/{id}/grade", handlers.AdminUpdateUserGradeHandler).Methods("PATCH")
+	adminRouter.HandleFunc("/commissions", handlers.AdminGetCommissionConfigHandler).Methods("GET")
+	adminRouter.HandleFunc("/commissions/{id}", handlers.AdminUpdateCommissionConfigHandler).Methods("PATCH")
+	adminRouter.HandleFunc("/tickets", handlers.AdminGetSupportTicketsHandler).Methods("GET")
+	adminRouter.HandleFunc("/tickets/{id}", handlers.AdminUpdateTicketStatusHandler).Methods("PATCH")
+	adminRouter.HandleFunc("/users/{id}/emergency-freeze", handlers.AdminEmergencyFreezeHandler).Methods("POST")
+	adminRouter.HandleFunc("/logs", handlers.AdminGetLogsHandler).Methods("GET")
 	// --------------------------------------------------------
 
 	// CORS: dynamic origins from ALLOWED_ORIGINS env var (comma-separated)
