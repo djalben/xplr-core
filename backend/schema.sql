@@ -386,3 +386,14 @@ ALTER TABLE password_reset_tokens DISABLE ROW LEVEL SECURITY;
 ALTER TABLE support_tickets DISABLE ROW LEVEL SECURITY;
 ALTER TABLE admin_logs DISABLE ROW LEVEL SECURITY;
 ALTER TABLE commission_config DISABLE ROW LEVEL SECURITY;
+
+-- 22. Миграция: support_tickets — добавляем email и message для полноценной поддержки
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'support_tickets' AND column_name = 'email') THEN
+        ALTER TABLE support_tickets ADD COLUMN email VARCHAR(255);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'support_tickets' AND column_name = 'message') THEN
+        ALTER TABLE support_tickets ADD COLUMN message TEXT;
+    END IF;
+END $$;

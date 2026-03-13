@@ -374,6 +374,7 @@ type SupportTicketRow struct {
 	UserID    int    `json:"user_id"`
 	Email     string `json:"email"`
 	Subject   string `json:"subject"`
+	Message   string `json:"message"`
 	Status    string `json:"status"`
 	TgChatID  *int64 `json:"tg_chat_id"`
 	CreatedAt string `json:"created_at"`
@@ -383,7 +384,7 @@ func GetAllSupportTickets(statusFilter string) ([]SupportTicketRow, error) {
 	if GlobalDB == nil {
 		return nil, fmt.Errorf("database connection not initialized")
 	}
-	q := `SELECT st.id, st.user_id, u.email, st.subject, st.status, st.tg_chat_id, st.created_at
+	q := `SELECT st.id, st.user_id, COALESCE(st.email, u.email), st.subject, COALESCE(st.message, ''), st.status, st.tg_chat_id, st.created_at
 	      FROM support_tickets st JOIN users u ON u.id = st.user_id`
 	var args []interface{}
 	if statusFilter != "" {
@@ -400,7 +401,7 @@ func GetAllSupportTickets(statusFilter string) ([]SupportTicketRow, error) {
 	for rows.Next() {
 		var t SupportTicketRow
 		var createdAt time.Time
-		if err := rows.Scan(&t.ID, &t.UserID, &t.Email, &t.Subject, &t.Status, &t.TgChatID, &createdAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.UserID, &t.Email, &t.Subject, &t.Message, &t.Status, &t.TgChatID, &createdAt); err != nil {
 			continue
 		}
 		t.CreatedAt = createdAt.Format(time.RFC3339)
@@ -410,6 +411,23 @@ func GetAllSupportTickets(statusFilter string) ([]SupportTicketRow, error) {
 		tickets = []SupportTicketRow{}
 	}
 	return tickets, nil
+}
+
+// CreateSupportTicket inserts a new support ticket and returns its ID.
+func CreateSupportTicket(userID int, email, subject, message string) (int, error) {
+	if GlobalDB == nil {
+		return 0, fmt.Errorf("database connection not initialized")
+	}
+	var id int
+	err := GlobalDB.QueryRow(
+		`INSERT INTO support_tickets (user_id, email, subject, message, status) VALUES ($1, $2, $3, $4, 'open') RETURNING id`,
+		userID, email, subject, message,
+	).Scan(&id)
+	if err != nil {
+		return 0, err
+	}
+	log.Printf("[SUPPORT] Ticket #%d created by user %d (%s)", id, userID, email)
+	return id, nil
 }
 
 func UpdateSupportTicketStatus(ticketID int, status string) error {

@@ -7,9 +7,9 @@ import (
 
 // requiredColumn defines a column that must exist on a table.
 type requiredColumn struct {
-	Table        string
-	Column       string
-	Definition   string // e.g. "NUMERIC(20,4) DEFAULT 0.0000"
+	Table      string
+	Column     string
+	Definition string // e.g. "NUMERIC(20,4) DEFAULT 0.0000"
 }
 
 // allRequiredColumns is the single source of truth for columns the backend needs.
@@ -44,6 +44,9 @@ var allRequiredColumns = []requiredColumn{
 	{"transactions", "provider_tx_id", "VARCHAR(255)"},
 	// --- internal_balances ---
 	{"internal_balances", "auto_topup_enabled", "BOOLEAN DEFAULT FALSE"},
+	// --- support_tickets ---
+	{"support_tickets", "email", "VARCHAR(255)"},
+	{"support_tickets", "message", "TEXT"},
 }
 
 // RunSchemaGuard checks all required columns exist and creates missing ones.

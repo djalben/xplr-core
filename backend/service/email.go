@@ -287,6 +287,33 @@ func SendGradeChangeEmail(toEmail, newGrade string) error {
 	return nil
 }
 
+// SendSupportTicketNotification — дублирует тикет на support@xplr.pro через Zoho SMTP.
+func SendSupportTicketNotification(ticketID int, userEmail, subject, message string) error {
+	content := fmt.Sprintf(`
+    <p style="color:#cbd5e1;font-size:15px;line-height:1.6;margin:0 0 20px;">Новый тикет поддержки</p>
+    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px 20px;margin:0 0 20px;">
+      <p style="color:#94a3b8;font-size:13px;margin:0 0 8px;"><strong style="color:#e2e8f0;">Тикет:</strong> #%d</p>
+      <p style="color:#94a3b8;font-size:13px;margin:0 0 8px;"><strong style="color:#e2e8f0;">Email:</strong> %s</p>
+      <p style="color:#94a3b8;font-size:13px;margin:0 0 8px;"><strong style="color:#e2e8f0;">Тема:</strong> %s</p>
+    </div>
+    <div style="background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.15);border-radius:12px;padding:16px 20px;margin:0 0 20px;">
+      <p style="color:#94a3b8;font-size:13px;margin:0 0 4px;"><strong style="color:#e2e8f0;">Сообщение:</strong></p>
+      <p style="color:#cbd5e1;font-size:14px;line-height:1.6;margin:0;white-space:pre-wrap;">%s</p>
+    </div>
+    <p style="color:#64748b;font-size:12px;">Ответьте пользователю через админ-панель или напрямую на email.</p>`,
+		ticketID, userEmail, subject, message)
+
+	html := wrapHTML("Новый тикет поддержки", content)
+	emailSubject := fmt.Sprintf("XPLR Тикет #%d — %s", ticketID, subject)
+
+	if err := sendMail("support@xplr.pro", emailSubject, html); err != nil {
+		log.Printf("[EMAIL] Failed to send support ticket notification: %v", err)
+		return err
+	}
+	log.Printf("[EMAIL] Support ticket #%d notification sent to support@xplr.pro", ticketID)
+	return nil
+}
+
 // SendEmergencyFreezeNotification — уведомление о блокировке аккаунта.
 func SendEmergencyFreezeNotification(toEmail string, frozenCards int) error {
 	content := fmt.Sprintf(`

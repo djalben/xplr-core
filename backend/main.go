@@ -188,6 +188,9 @@ func main() {
 	// Привязка Telegram Chat ID для уведомлений
 	protectedRouter.HandleFunc("/settings/telegram", handlers.UpdateTelegramChatIDHandler).Methods("POST")
 
+	// Поддержка — отправка тикета
+	protectedRouter.HandleFunc("/support", handlers.SubmitSupportTicketHandler).Methods("POST")
+
 	// --- ADMIN ROUTES (JWT + AdminOnly) ---
 	adminRouter := router.PathPrefix("/api/v1/admin").Subrouter()
 	adminRouter.Use(middleware.JWTAuthMiddleware)

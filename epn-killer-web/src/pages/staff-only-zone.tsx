@@ -20,7 +20,7 @@ import {
   Zap,
 } from 'lucide-react';
 
-type Tab = 'dashboard' | 'users' | 'finances' | 'commissions' | 'logs';
+type Tab = 'dashboard' | 'users' | 'finances' | 'commissions' | 'tickets' | 'logs';
 
 interface DashboardStats {
   total_users: number;
@@ -56,6 +56,16 @@ interface AdminLog {
   admin_id: number;
   admin_email: string;
   action: string;
+  created_at: string;
+}
+
+interface SupportTicket {
+  id: number;
+  user_id: number;
+  email: string;
+  subject: string;
+  message: string;
+  status: string;
   created_at: string;
 }
 
@@ -112,6 +122,8 @@ export const StaffOnlyZone = () => {
   const [commissions, setCommissions] = useState<CommissionRow[]>([]);
   const [editingCommission, setEditingCommission] = useState<{ id: number; value: string } | null>(null);
   const [logs, setLogs] = useState<AdminLog[]>([]);
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [ticketFilter, setTicketFilter] = useState('');
   const [saving, setSaving] = useState(false);
   const [freezeConfirm, setFreezeConfirm] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
@@ -167,6 +179,27 @@ export const StaffOnlyZone = () => {
     } catch { /* ignore */ }
   }, []);
 
+  // ── Support tickets ──
+  const loadTickets = useCallback(async () => {
+    try {
+      const params: Record<string, string> = {};
+      if (ticketFilter) params.status = ticketFilter;
+      const res = await apiClient.get('/admin/tickets', { params });
+      setTickets(res.data || []);
+    } catch { /* ignore */ }
+  }, [ticketFilter]);
+
+  const updateTicketStatus = async (id: number, status: string) => {
+    try {
+      await apiClient.patch(`/admin/tickets/${id}`, { status });
+      showToast(`Тикет #${id} → ${status}`);
+      loadTickets();
+      fetchStats();
+    } catch {
+      showToast('Ошибка обновления тикета', 'err');
+    }
+  };
+
   useEffect(() => {
     fetchStats();
   }, [fetchStats]);
@@ -174,8 +207,9 @@ export const StaffOnlyZone = () => {
   useEffect(() => {
     if (tab === 'users') loadAllUsers();
     if (tab === 'commissions') loadCommissions();
+    if (tab === 'tickets') loadTickets();
     if (tab === 'logs') loadLogs();
-  }, [tab, loadAllUsers, loadCommissions, loadLogs]);
+  }, [tab, loadAllUsers, loadCommissions, loadTickets, loadLogs]);
 
   // ── Emergency Freeze ──
   const handleEmergencyFreeze = async () => {
@@ -288,6 +322,7 @@ export const StaffOnlyZone = () => {
           <TabBtn id="users" icon={Users} label="Юзеры" />
           <TabBtn id="finances" icon={TrendingUp} label="Финансы" />
           <TabBtn id="commissions" icon={Settings} label="Комиссии" />
+          <TabBtn id="tickets" icon={MessageSquare} label="Тикеты" />
           <TabBtn id="logs" icon={Clock} label="Логи" />
         </div>
 
@@ -550,6 +585,78 @@ export const StaffOnlyZone = () => {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* ════════════ TICKETS TAB ════════════ */}
+        {tab === 'tickets' && (
+          <div className="space-y-4">
+            {/* Filter */}
+            <div className="flex gap-2 flex-wrap">
+              {['', 'open', 'in_progress', 'resolved', 'closed'].map(f => (
+                <button
+                  key={f}
+                  onClick={() => setTicketFilter(f)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                    ticketFilter === f
+                      ? 'border-blue-500 bg-blue-500/20 text-blue-400'
+                      : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
+                  }`}
+                >
+                  {f === '' ? 'Все' : f === 'open' ? 'Открытые' : f === 'in_progress' ? 'В работе' : f === 'resolved' ? 'Решено' : 'Закрыто'}
+                </button>
+              ))}
+            </div>
+
+            {/* Tickets list */}
+            <div className="space-y-3">
+              {tickets.map(t => (
+                <div key={t.id} className="glass-card p-5">
+                  <div className="flex items-start justify-between gap-4 mb-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs text-slate-500 font-mono">#{t.id}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                          t.status === 'open' ? 'bg-orange-500/20 text-orange-400'
+                          : t.status === 'in_progress' ? 'bg-blue-500/20 text-blue-400'
+                          : t.status === 'resolved' ? 'bg-emerald-500/20 text-emerald-400'
+                          : 'bg-slate-500/20 text-slate-400'
+                        }`}>
+                          {t.status === 'open' ? 'Открыт' : t.status === 'in_progress' ? 'В работе' : t.status === 'resolved' ? 'Решено' : 'Закрыт'}
+                        </span>
+                        <span className="text-xs text-slate-500">{t.created_at ? new Date(t.created_at).toLocaleString('ru-RU') : ''}</span>
+                      </div>
+                      <p className="text-sm text-slate-300 mb-1">
+                        <strong className="text-white">{t.email}</strong>
+                      </p>
+                      <p className="text-sm text-slate-400 whitespace-pre-wrap break-words">{t.message || t.subject}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    {t.status !== 'in_progress' && (
+                      <button onClick={() => updateTicketStatus(t.id, 'in_progress')} className="px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-lg text-xs font-medium transition-all">
+                        В работу
+                      </button>
+                    )}
+                    {t.status !== 'resolved' && (
+                      <button onClick={() => updateTicketStatus(t.id, 'resolved')} className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-lg text-xs font-medium transition-all">
+                        Решено
+                      </button>
+                    )}
+                    {t.status !== 'closed' && (
+                      <button onClick={() => updateTicketStatus(t.id, 'closed')} className="px-3 py-1.5 bg-slate-500/10 hover:bg-slate-500/20 border border-slate-500/30 text-slate-400 rounded-lg text-xs font-medium transition-all">
+                        Закрыть
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {tickets.length === 0 && (
+                <div className="glass-card p-8 text-center text-slate-500 text-sm">
+                  Нет тикетов{ticketFilter ? ` со статусом "${ticketFilter}"` : ''}
+                </div>
+              )}
             </div>
           </div>
         )}
