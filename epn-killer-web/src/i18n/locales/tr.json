@@ -200,7 +200,9 @@
       "connected": "Bağlı",
       "disconnect": "Bağlantıyı kes",
       "linkDesc": "Bildirimler ve 2FA için Telegram'ı bağlayın",
-      "link": "Bağla"
+      "link": "Telegram Bağla",
+      "linkedSuccess": "Telegram başarıyla bağlandı!",
+      "linkError": "Bağlantı oluşturulamadı"
     },
     "password": {
       "title": "Şifre değiştir",

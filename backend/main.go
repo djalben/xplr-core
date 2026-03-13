@@ -141,6 +141,9 @@ func main() {
 	// Webhook от зарубежной организации — подтверждение пополнения (публичный)
 	router.HandleFunc("/api/v1/webhooks/external-topup", handlers.ExternalTopUpWebhookHandler).Methods("POST")
 
+	// Telegram Bot Webhook (публичный — Telegram вызывает напрямую)
+	router.HandleFunc("/api/v1/telegram/webhook", handlers.TelegramWebhookHandler).Methods("POST")
+
 	// --- НАСТРОЙКА ЗАЩИЩЕННЫХ МАРШРУТОВ (Protected Routes) ---
 	// Создаем Subrouter с префиксом /api/v1/user
 	protectedRouter := router.PathPrefix("/api/v1/user").Subrouter()
@@ -187,6 +190,7 @@ func main() {
 
 	// Привязка Telegram Chat ID для уведомлений
 	protectedRouter.HandleFunc("/settings/telegram", handlers.UpdateTelegramChatIDHandler).Methods("POST")
+	protectedRouter.HandleFunc("/settings/telegram-link", handlers.GetTelegramLinkHandler).Methods("GET")
 
 	// Поддержка — отправка тикета
 	protectedRouter.HandleFunc("/support", handlers.SubmitSupportTicketHandler).Methods("POST")

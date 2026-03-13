@@ -200,7 +200,9 @@
       "connected": "Conectado",
       "disconnect": "Desconectar",
       "linkDesc": "Vincule o Telegram para notificações e 2FA",
-      "link": "Vincular"
+      "link": "Conectar Telegram",
+      "linkedSuccess": "Telegram vinculado com sucesso!",
+      "linkError": "Falha ao gerar o link"
     },
     "password": {
       "title": "Alterar senha",

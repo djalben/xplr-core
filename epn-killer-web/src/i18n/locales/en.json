@@ -195,7 +195,9 @@
       "connected": "Connected",
       "disconnect": "Disconnect",
       "linkDesc": "Link Telegram for notifications and 2FA",
-      "link": "Link"
+      "link": "Connect Telegram",
+      "linkedSuccess": "Telegram linked successfully!",
+      "linkError": "Failed to generate link"
     },
     "password": {
       "title": "Change Password",

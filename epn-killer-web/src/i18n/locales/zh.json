@@ -200,7 +200,9 @@
       "connected": "已连接",
       "disconnect": "断开",
       "linkDesc": "绑定Telegram以接收通知和2FA",
-      "link": "绑定"
+      "link": "连接 Telegram",
+      "linkedSuccess": "Telegram 绑定成功！",
+      "linkError": "生成链接失败"
     },
     "password": {
       "title": "修改密码",

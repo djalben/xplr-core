@@ -195,7 +195,9 @@
       "connected": "Подключен",
       "disconnect": "Отключить",
       "linkDesc": "Привяжите Telegram для уведомлений и 2FA",
-      "link": "Привязать"
+      "link": "Подключить Telegram",
+      "linkedSuccess": "Telegram успешно привязан!",
+      "linkError": "Не удалось сгенерировать ссылку"
     },
     "password": {
       "title": "Смена пароля",

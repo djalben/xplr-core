@@ -136,6 +136,13 @@ func ensureDB() {
 			description TEXT,
 			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 		)`,
+		// Telegram link codes (for /start UUID deep linking)
+		`CREATE TABLE IF NOT EXISTS telegram_link_codes (
+			id SERIAL PRIMARY KEY,
+			user_id INTEGER REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+			code VARCHAR(64) NOT NULL,
+			expires_at TIMESTAMP WITH TIME ZONE NOT NULL
+		)`,
 		// User sessions
 		`CREATE TABLE IF NOT EXISTS user_sessions (
 			id SERIAL PRIMARY KEY,
@@ -232,6 +239,9 @@ func buildRouter() *mux.Router {
 	r.HandleFunc("/api/v1/webhooks/wallester", handlers.WallesterWebhookHandler).Methods("POST")
 	r.HandleFunc("/api/v1/webhooks/external-topup", handlers.ExternalTopUpWebhookHandler).Methods("POST")
 
+	// Telegram Bot Webhook (public — Telegram calls directly)
+	r.HandleFunc("/api/v1/telegram/webhook", handlers.TelegramWebhookHandler).Methods("POST")
+
 	// Public card types endpoint
 	r.HandleFunc("/api/v1/cards/types", handlers.GetCardTypesHandler).Methods("GET")
 
@@ -280,6 +290,7 @@ func buildRouter() *mux.Router {
 
 	// Settings — Telegram
 	protected.HandleFunc("/settings/telegram", handlers.UpdateTelegramChatIDHandler).Methods("POST")
+	protected.HandleFunc("/settings/telegram-link", handlers.GetTelegramLinkHandler).Methods("GET")
 
 	// Support
 	protected.HandleFunc("/support", handlers.SubmitSupportTicketHandler).Methods("POST")

@@ -56,6 +56,65 @@ const Toast = ({ msg, type }: { msg: string; type: 'ok' | 'err' }) => (
 );
 
 // ══════════════════════════════════════
+// TELEGRAM CARD (used inside ProfileTab)
+// ══════════════════════════════════════
+const TelegramCard = ({ profile, reload, showToast }: { profile: ProfileData | null; reload: () => void; showToast: (m: string, t: 'ok' | 'err') => void }) => {
+  const { t } = useTranslation();
+  const [linking, setLinking] = useState(false);
+
+  const handleLink = async () => {
+    setLinking(true);
+    try {
+      const res = await apiClient.get('/user/settings/telegram-link');
+      const link = res.data?.link;
+      if (link) {
+        window.open(link, '_blank', 'noopener,noreferrer');
+        // Poll for status update after user completes linking in Telegram
+        let attempts = 0;
+        const poll = setInterval(async () => {
+          attempts++;
+          if (attempts > 20) { clearInterval(poll); return; }
+          try {
+            const me = await apiClient.get('/user/settings/profile');
+            if (me.data?.telegram_linked) {
+              clearInterval(poll);
+              showToast(t('settings.telegram.linkedSuccess'), 'ok');
+              reload();
+            }
+          } catch { /* ignore */ }
+        }, 3000);
+      }
+    } catch {
+      showToast(t('settings.telegram.linkError'), 'err');
+    } finally {
+      setLinking(false);
+    }
+  };
+
+  return (
+    <div className="glass-card p-6">
+      <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><MessageCircle className="w-5 h-5 text-blue-400" />{t('settings.telegram.title')}</h3>
+      <div className="flex items-center justify-between">
+        {profile?.telegram_linked ? (
+          <>
+            <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-400" /><p className="text-white font-medium">{t('settings.telegram.connected')}</p></div>
+            <span className="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 text-xs font-medium rounded-lg">{t('settings.telegram.connected')}</span>
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-slate-400">{t('settings.telegram.linkDesc')}</p>
+            <button onClick={handleLink} disabled={linking} className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap">
+              {linking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
+              {t('settings.telegram.link')}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ══════════════════════════════════════
 // PROFILE TAB
 // ══════════════════════════════════════
 const ProfileTab = ({ profile, reload, showToast, setActiveTab }: { profile: ProfileData | null; reload: () => void; showToast: (m: string, t: 'ok' | 'err') => void; setActiveTab: (tab: SettingsTab) => void }) => {
@@ -145,22 +204,7 @@ const ProfileTab = ({ profile, reload, showToast, setActiveTab }: { profile: Pro
         </div>
       </div>
 
-      <div className="glass-card p-6">
-        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><MessageCircle className="w-5 h-5 text-blue-400" />{t('settings.telegram.title')}</h3>
-        <div className="flex items-center justify-between">
-          {profile?.telegram_linked ? (
-            <>
-              <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-400" /><p className="text-white font-medium">{t('settings.telegram.connected')}</p></div>
-              <button className="px-4 py-2 glass-card hover:bg-white/10 text-slate-300 text-sm rounded-lg transition-colors">{t('settings.telegram.disconnect')}</button>
-            </>
-          ) : (
-            <>
-              <p className="text-sm text-slate-400">{t('settings.telegram.linkDesc')}</p>
-              <a href="https://t.me/xplr_notify_bot" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors">{t('settings.telegram.link')} <ExternalLink className="w-3.5 h-3.5" /></a>
-            </>
-          )}
-        </div>
-      </div>
+      <TelegramCard profile={profile} reload={reload} showToast={showToast} />
 
       {/* Email Verification Modal */}
       {emailVerifyOpen && (
