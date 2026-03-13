@@ -196,6 +196,7 @@ func main() {
 	adminRouter.HandleFunc("/commissions/{id}", handlers.AdminUpdateCommissionConfigHandler).Methods("PATCH")
 	adminRouter.HandleFunc("/tickets", handlers.AdminGetSupportTicketsHandler).Methods("GET")
 	adminRouter.HandleFunc("/tickets/{id}", handlers.AdminUpdateTicketStatusHandler).Methods("PATCH")
+	adminRouter.HandleFunc("/users/{id}/emergency-freeze", handlers.AdminEmergencyFreezeHandler).Methods("POST")
 	adminRouter.HandleFunc("/logs", handlers.AdminGetLogsHandler).Methods("GET")
 	// --------------------------------------------------------
 

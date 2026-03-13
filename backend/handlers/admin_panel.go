@@ -142,6 +142,30 @@ func AdminUpdateTicketStatusHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{"id": ticketID, "status": req.Status})
 }
 
+// AdminEmergencyFreezeHandler - POST /api/v1/admin/users/{id}/emergency-freeze
+func AdminEmergencyFreezeHandler(w http.ResponseWriter, r *http.Request) {
+	adminID, _ := r.Context().Value(middleware.UserIDKey).(int)
+	vars := mux.Vars(r)
+	targetID, err := strconv.Atoi(vars["id"])
+	if err != nil || targetID <= 0 {
+		http.Error(w, "invalid user id", http.StatusBadRequest)
+		return
+	}
+	frozenCards, err := repository.EmergencyFreezeUser(targetID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	repository.WriteAdminLog(adminID, fmt.Sprintf("🚨 EMERGENCY FREEZE юзера %d — %d карт заморожено, статус BANNED, баланс обнулён", targetID, frozenCards))
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"user_id":      targetID,
+		"frozen_cards": frozenCards,
+		"status":       "BANNED",
+		"balance":      "0",
+	})
+}
+
 // AdminGetLogsHandler - GET /api/v1/admin/logs
 func AdminGetLogsHandler(w http.ResponseWriter, r *http.Request) {
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))

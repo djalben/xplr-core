@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useRates } from '../store/rates-context';
@@ -15,18 +15,35 @@ import {
   Settings,
   Bell,
   DollarSign,
-  HelpCircle
+  HelpCircle,
+  Lock
 } from 'lucide-react';
 
-const Logo = () => (
-  <div className="flex items-center gap-3 px-2">
-    <div className="relative w-11 h-11 rounded-xl gradient-accent flex items-center justify-center overflow-hidden shadow-lg shadow-blue-500/30">
-      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/20 to-transparent" />
-      <span className="text-white font-bold text-xl tracking-tighter">X</span>
+const Logo = ({ onTripleClick }: { onTripleClick?: () => void }) => {
+  const clickRef = useRef<{ count: number; timer: ReturnType<typeof setTimeout> | null }>({ count: 0, timer: null });
+
+  const handleClick = useCallback(() => {
+    const c = clickRef.current;
+    c.count += 1;
+    if (c.timer) clearTimeout(c.timer);
+    if (c.count >= 3) {
+      c.count = 0;
+      onTripleClick?.();
+    } else {
+      c.timer = setTimeout(() => { c.count = 0; }, 600);
+    }
+  }, [onTripleClick]);
+
+  return (
+    <div className="flex items-center gap-3 px-2 select-none" onClick={handleClick}>
+      <div className="relative w-11 h-11 rounded-xl gradient-accent flex items-center justify-center overflow-hidden shadow-lg shadow-blue-500/30">
+        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/20 to-transparent" />
+        <span className="text-white font-bold text-xl tracking-tighter">X</span>
+      </div>
+      <span className="text-2xl font-bold tracking-tight gradient-text">XPLR</span>
     </div>
-    <span className="text-2xl font-bold tracking-tight gradient-text">XPLR</span>
-  </div>
-);
+  );
+};
 
 const CurrencyRates = () => {
   const { rates } = useRates();
@@ -120,11 +137,80 @@ const BottomNavItem = ({ href, icon, label, isActive }: { href: string; icon: Re
   </Link>
 );
 
+// ── Staff PIN Modal ──
+const STAFF_PIN = '1337';
+
+const StaffPinModal = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState(false);
+  const navigate = useNavigate();
+
+  if (!open) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pin === STAFF_PIN) {
+      sessionStorage.setItem('_xplr_staff', 'granted');
+      setPin('');
+      setError(false);
+      onClose();
+      navigate('/staff-only-zone');
+    } else {
+      setError(true);
+      setPin('');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
+      <form
+        onSubmit={handleSubmit}
+        onClick={e => e.stopPropagation()}
+        className="glass-card p-6 w-full max-w-xs mx-4 space-y-4"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-purple-600 flex items-center justify-center">
+            <Lock className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-white">Staff Access</p>
+            <p className="text-xs text-slate-500">Enter PIN to continue</p>
+          </div>
+        </div>
+        <input
+          type="password"
+          maxLength={8}
+          value={pin}
+          onChange={e => { setPin(e.target.value); setError(false); }}
+          placeholder="PIN"
+          autoFocus
+          className={`w-full px-4 py-3 bg-white/5 border rounded-xl text-white text-center text-lg tracking-[0.3em] font-mono placeholder-slate-600 outline-none transition-colors ${
+            error ? 'border-red-500/60 shake' : 'border-white/10 focus:border-blue-500/50'
+          }`}
+        />
+        {error && <p className="text-xs text-red-400 text-center">Invalid PIN</p>}
+        <button
+          type="submit"
+          className="w-full py-2.5 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
+        >
+          Authenticate
+        </button>
+      </form>
+    </div>
+  );
+};
+
 export const Sidebar = () => {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [staffModalOpen, setStaffModalOpen] = useState(false);
+  const { isAdmin } = useAuth();
 
   const { t } = useTranslation();
+
+  const handleLogoTripleClick = useCallback(() => {
+    if (isAdmin) setStaffModalOpen(true);
+  }, [isAdmin]);
 
   const navItems = [
     { href: '/dashboard', icon: <LayoutDashboard className="w-5 h-5" />, label: t('nav.home') },
@@ -145,7 +231,7 @@ export const Sidebar = () => {
 
         <div className="relative flex flex-col h-full p-4">
           <div className="mb-6 pt-2">
-            <Logo />
+            <Logo onTripleClick={handleLogoTripleClick} />
           </div>
           <div className="mb-4">
             <CurrencyRates />
@@ -171,7 +257,7 @@ export const Sidebar = () => {
       {/* Mobile Header */}
       <header className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-[#0a0a0f]/90 backdrop-blur-xl border-b border-white/[0.08]" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="flex items-center justify-between px-4 py-3">
-          <Logo />
+          <Logo onTripleClick={handleLogoTripleClick} />
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -224,6 +310,9 @@ export const Sidebar = () => {
           ))}
         </div>
       </nav>
+
+      {/* Staff PIN Modal */}
+      <StaffPinModal open={staffModalOpen} onClose={() => setStaffModalOpen(false)} />
     </>
   );
 };

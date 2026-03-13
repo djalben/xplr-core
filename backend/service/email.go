@@ -28,11 +28,11 @@ func SendVerificationEmail(toEmail, token string) error {
 		if user != "" {
 			from = user
 		} else {
-			from = "concierge@xplr.com"
+			from = "concierge@xplr.pro"
 		}
 	}
 	if domain == "" {
-		domain = "https://xplr-web.vercel.app"
+		domain = "https://xplr.pro"
 	}
 
 	verifyURL := fmt.Sprintf("%s/verify?token=%s", domain, token)
@@ -84,11 +84,11 @@ func SendPasswordResetEmail(toEmail, token string) error {
 		if user != "" {
 			from = user
 		} else {
-			from = "concierge@xplr.com"
+			from = "concierge@xplr.pro"
 		}
 	}
 	if domain == "" {
-		domain = "https://xplr-web.vercel.app"
+		domain = "https://xplr.pro"
 	}
 
 	resetURL := fmt.Sprintf("%s/reset-password?token=%s", domain, token)

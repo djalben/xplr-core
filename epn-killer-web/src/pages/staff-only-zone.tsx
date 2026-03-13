@@ -17,6 +17,7 @@ import {
   Clock,
   UserCheck,
   Loader2,
+  Zap,
 } from 'lucide-react';
 
 type Tab = 'dashboard' | 'users' | 'finances' | 'commissions' | 'logs';
@@ -112,6 +113,7 @@ export const StaffOnlyZone = () => {
   const [editingCommission, setEditingCommission] = useState<{ id: number; value: string } | null>(null);
   const [logs, setLogs] = useState<AdminLog[]>([]);
   const [saving, setSaving] = useState(false);
+  const [freezeConfirm, setFreezeConfirm] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
 
   const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
@@ -174,6 +176,24 @@ export const StaffOnlyZone = () => {
     if (tab === 'commissions') loadCommissions();
     if (tab === 'logs') loadLogs();
   }, [tab, loadAllUsers, loadCommissions, loadLogs]);
+
+  // ── Emergency Freeze ──
+  const handleEmergencyFreeze = async () => {
+    if (!selectedUser) return;
+    setSaving(true);
+    try {
+      const res = await apiClient.post(`/admin/users/${selectedUser.id}/emergency-freeze`);
+      showToast(`FREEZE: ${selectedUser.email} — ${res.data.frozen_cards} cards frozen, BANNED`);
+      setSelectedUser(null);
+      setFreezeConfirm(false);
+      loadAllUsers();
+      fetchStats();
+    } catch {
+      showToast('Emergency Freeze failed', 'err');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // ── Update grade ──
   const handleUpdateGrade = async () => {
@@ -391,6 +411,36 @@ export const StaffOnlyZone = () => {
                       <button onClick={handleUpdateGrade} disabled={saving} className="mt-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5">
                         <Save className="w-3 h-3" />{saving ? 'Saving...' : 'Сохранить грейд'}
                       </button>
+                    )}
+                  </div>
+                  {/* Emergency Freeze */}
+                  <div className="pt-2 border-t border-white/10">
+                    {!freezeConfirm ? (
+                      <button
+                        onClick={() => setFreezeConfirm(true)}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 rounded-xl text-xs font-medium transition-all"
+                      >
+                        <Zap className="w-3.5 h-3.5" /> Emergency Freeze
+                      </button>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-xs text-red-400 text-center">Все карты будут заморожены, аккаунт заблокирован, баланс обнулён. Продолжить?</p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleEmergencyFreeze}
+                            disabled={saving}
+                            className="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50"
+                          >
+                            {saving ? 'Freezing...' : 'CONFIRM FREEZE'}
+                          </button>
+                          <button
+                            onClick={() => setFreezeConfirm(false)}
+                            className="px-4 py-2 bg-white/10 hover:bg-white/20 text-slate-300 rounded-lg text-xs transition-colors"
+                          >
+                            Отмена
+                          </button>
+                        </div>
+                      </div>
                     )}
                   </div>
                   {/* Status */}

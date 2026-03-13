@@ -31,12 +31,13 @@ const ProtectedRoute: React.FC<GuardProps> = ({ children }) => {
   return <>{children}</>;
 };
 
-/* ── Requires admin role ── */
+/* ── Requires admin role + session secret ── */
 const AdminRoute: React.FC<GuardProps> = ({ children }) => {
   const token = localStorage.getItem('token');
   if (!token) return <Navigate to="/auth" replace />;
   const { isAdmin } = useAuth();
-  if (!isAdmin) return <Navigate to="/dashboard" replace />;
+  const hasAccess = sessionStorage.getItem('_xplr_staff') === 'granted';
+  if (!isAdmin || !hasAccess) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 };
 

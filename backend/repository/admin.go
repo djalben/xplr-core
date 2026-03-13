@@ -423,6 +423,37 @@ func UpdateSupportTicketStatus(ticketID int, status string) error {
 	return err
 }
 
+// --- Emergency Freeze ---
+
+// EmergencyFreezeUser freezes all cards and zeroes wallet for a user.
+func EmergencyFreezeUser(userID int) (int, error) {
+	if GlobalDB == nil {
+		return 0, fmt.Errorf("database connection not initialized")
+	}
+	// 1. Freeze all active cards
+	res, err := GlobalDB.Exec(
+		`UPDATE cards SET card_status = 'FROZEN' WHERE user_id = $1 AND card_status = 'ACTIVE'`,
+		userID,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("failed to freeze cards: %w", err)
+	}
+	frozenCount, _ := res.RowsAffected()
+
+	// 2. Ban user
+	_, err = GlobalDB.Exec(`UPDATE users SET status = 'BANNED' WHERE id = $1`, userID)
+	if err != nil {
+		return int(frozenCount), fmt.Errorf("cards frozen but failed to ban user: %w", err)
+	}
+
+	// 3. Zero out wallet balance
+	_, _ = GlobalDB.Exec(`UPDATE internal_balances SET master_balance = 0, updated_at = NOW() WHERE user_id = $1`, userID)
+	_, _ = GlobalDB.Exec(`UPDATE users SET balance_rub = 0 WHERE id = $1`, userID)
+
+	log.Printf("🚨 EMERGENCY FREEZE: user %d — %d cards frozen, status=BANNED, balance zeroed", userID, frozenCount)
+	return int(frozenCount), nil
+}
+
 // --- Enhanced Admin Stats ---
 
 type AdminDashboardStats struct {
