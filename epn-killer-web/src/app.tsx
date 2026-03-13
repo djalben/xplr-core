@@ -35,7 +35,9 @@ const ProtectedRoute: React.FC<GuardProps> = ({ children }) => {
 const AdminRoute: React.FC<GuardProps> = ({ children }) => {
   const token = localStorage.getItem('token');
   if (!token) return <Navigate to="/auth" replace />;
-  const { isAdmin } = useAuth();
+  const { isAdmin, authReady } = useAuth();
+  // Wait for /me to finish before deciding — prevents false redirect
+  if (!authReady) return null;
   const hasAccess = sessionStorage.getItem('_xplr_staff') === 'granted';
   if (!isAdmin || !hasAccess) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;

@@ -20,6 +20,7 @@ interface AuthContextType {
   isOwner: boolean;
   isMember: boolean;
   isAdmin: boolean;
+  authReady: boolean;
   userMode: UserMode;
   onboardingComplete: boolean;
   setUser: (user: UserProfile) => void;
@@ -33,20 +34,24 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUserState] = useState<UserProfile>({
     id: '1',
-    name: 'Алексей Петров',
-    email: 'alex@xplr.io',
+    name: '',
+    email: '',
     role: 'OWNER',
-    avatar: 'АП',
+    avatar: '',
     isAdmin: false,
     serverRole: 'user',
   });
+  const [authReady, setAuthReady] = useState(false);
 
   const userMode: UserMode = 'personal';
   const onboardingComplete = true;
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (!token) return;
+    if (!token) {
+      setAuthReady(true);
+      return;
+    }
     apiClient.get('/user/me').then(res => {
       const d = res.data;
       setUserState(prev => ({
@@ -58,7 +63,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isAdmin: d.is_admin === true || d.role === 'admin',
         serverRole: d.role || 'user',
       }));
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => {
+      setAuthReady(true);
+    });
   }, []);
 
   const setUser = useCallback((newUser: UserProfile) => {
@@ -78,7 +85,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isAdmin = user.isAdmin === true;
 
   return (
-    <AuthContext.Provider value={{ user, role, isOwner, isMember, isAdmin, userMode, onboardingComplete, setUser, setUserMode, completeOnboarding, logout }}>
+    <AuthContext.Provider value={{ user, role, isOwner, isMember, isAdmin, authReady, userMode, onboardingComplete, setUser, setUserMode, completeOnboarding, logout }}>
       {children}
     </AuthContext.Provider>
   );
