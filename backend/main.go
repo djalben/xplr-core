@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	"github.com/rs/cors"
 
@@ -26,6 +27,12 @@ import (
 var DB *sql.DB
 
 func main() {
+	// 0. Загрузка .env файла (если существует)
+	if err := godotenv.Load("backend/.env"); err != nil {
+		// Попробовать из текущей директории
+		_ = godotenv.Load()
+	}
+
 	// 1. Инициализация базы данных
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
