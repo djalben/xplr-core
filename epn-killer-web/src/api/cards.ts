@@ -1,7 +1,5 @@
 import apiClient from './axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
-
 export interface Card {
   id: number;
   user_id: number;
@@ -58,7 +56,7 @@ export interface MassIssueResponse {
 
 // Выпустить виртуальные карты
 export const issueCards = async (data: MassIssueRequest): Promise<MassIssueResponse> => {
-  const response = await apiClient.post<MassIssueResponse>(`${API_BASE_URL}/user/cards/issue`, data);
+  const response = await apiClient.post<MassIssueResponse>('/user/cards/issue', data);
   return response.data;
 };
 
@@ -94,7 +92,7 @@ export const issuePersonalCard = async (
 
 // Получить список карт пользователя
 export const getUserCards = async (): Promise<Card[]> => {
-  const response = await apiClient.get<Card[]>(`${API_BASE_URL}/user/cards`);
+  const response = await apiClient.get<Card[]>('/user/cards');
   return response.data;
 };
 
@@ -108,7 +106,7 @@ export const getCardDetails = async (cardId: number): Promise<{
   bin: string;
   last_4: string;
 }> => {
-  const response = await apiClient.get(`${API_BASE_URL}/user/cards/${cardId}/details`);
+  const response = await apiClient.get(`/user/cards/${cardId}/details`);
   return response.data;
 };
 
@@ -117,17 +115,17 @@ export const setCardAutoReplenishment = async (
   cardId: number,
   data: { enabled: boolean; threshold: number; amount: number }
 ) => {
-  const response = await apiClient.post(`${API_BASE_URL}/user/cards/${cardId}/auto-replenishment`, data);
+  const response = await apiClient.post(`/user/cards/${cardId}/auto-replenishment`, data);
   return response.data;
 };
 
 // Отключить автопополнение карты
 export const unsetCardAutoReplenishment = async (cardId: number) => {
-  const response = await apiClient.delete(`${API_BASE_URL}/user/cards/${cardId}/auto-replenishment`);
+  const response = await apiClient.delete(`/user/cards/${cardId}/auto-replenishment`);
   return response.data;
 };
 
 // Изменить статус карты
 export const updateCardStatus = async (cardId: number, status: string): Promise<void> => {
-  await apiClient.patch(`${API_BASE_URL}/user/cards/${cardId}/status`, { status });
+  await apiClient.patch(`/user/cards/${cardId}/status`, { status });
 };

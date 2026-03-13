@@ -125,9 +125,14 @@ func buildRouter() *mux.Router {
 	// Public auth routes
 	r.HandleFunc("/api/v1/auth/register", handlers.RegisterHandler).Methods("POST")
 	r.HandleFunc("/api/v1/auth/login", handlers.LoginHandler).Methods("POST")
+	r.HandleFunc("/api/v1/auth/verify", handlers.VerifyEmailHandler).Methods("GET")
+	r.HandleFunc("/api/v1/auth/reset-password-request", handlers.ResetPasswordRequestHandler).Methods("POST")
+	r.HandleFunc("/api/v1/auth/reset-password", handlers.ResetPasswordHandler).Methods("POST")
+	r.HandleFunc("/api/v1/auth/refresh-token", handlers.RefreshTokenHandler).Methods("POST")
 
-	// Wallester webhook (public)
+	// Webhooks (public)
 	r.HandleFunc("/api/v1/webhooks/wallester", handlers.WallesterWebhookHandler).Methods("POST")
+	r.HandleFunc("/api/v1/webhooks/external-topup", handlers.ExternalTopUpWebhookHandler).Methods("POST")
 
 	// Public card types endpoint
 	r.HandleFunc("/api/v1/cards/types", handlers.GetCardTypesHandler).Methods("GET")
@@ -154,7 +159,12 @@ func buildRouter() *mux.Router {
 	protected.HandleFunc("/cards/{id}/mock-details", handlers.MockCardDetailsHandler).Methods("GET")
 	protected.HandleFunc("/cards/{id}/limit", handlers.UpdateCardSpendLimitHandler).Methods("PATCH")
 	protected.HandleFunc("/cards/{id}/sync-balance", handlers.SyncCardBalanceHandler).Methods("POST")
+	protected.HandleFunc("/cards/{id}/spending-limit", handlers.SetSpendingLimitHandler).Methods("PATCH")
+	protected.HandleFunc("/wallet", handlers.GetWalletHandler).Methods("GET")
+	protected.HandleFunc("/wallet/topup", handlers.TopUpWalletHandler).Methods("POST")
+	protected.HandleFunc("/wallet/auto-topup", handlers.SetAutoTopupHandler).Methods("PATCH")
 	protected.HandleFunc("/report", handlers.GetUserTransactionReportHandler).Methods("GET")
+	protected.HandleFunc("/transactions", handlers.GetUnifiedTransactionsHandler).Methods("GET")
 	protected.HandleFunc("/api-key", handlers.CreateAPIKeyHandler).Methods("POST")
 
 	// Teams
@@ -167,10 +177,30 @@ func buildRouter() *mux.Router {
 
 	// Referrals
 	protected.HandleFunc("/referrals", handlers.GetReferralStatsHandler).Methods("GET")
+	protected.HandleFunc("/referrals/info", handlers.GetReferralInfoHandler).Methods("GET")
 	protected.HandleFunc("/referrals/list", handlers.GetReferralListHandler).Methods("GET")
 
-	// Settings
+	// Settings — Telegram
 	protected.HandleFunc("/settings/telegram", handlers.UpdateTelegramChatIDHandler).Methods("POST")
+
+	// Support
+	protected.HandleFunc("/support", handlers.SubmitSupportTicketHandler).Methods("POST")
+
+	// Settings — Profile, Password, Sessions, Notifications, 2FA, Email Verify, KYC
+	protected.HandleFunc("/settings/profile", handlers.GetSettingsProfileHandler).Methods("GET")
+	protected.HandleFunc("/settings/profile", handlers.UpdateProfileHandler).Methods("PATCH")
+	protected.HandleFunc("/settings/change-password", handlers.ChangePasswordHandler).Methods("POST")
+	protected.HandleFunc("/settings/sessions", handlers.GetSessionsHandler).Methods("GET")
+	protected.HandleFunc("/settings/logout-all", handlers.LogoutAllSessionsHandler).Methods("POST")
+	protected.HandleFunc("/settings/notifications", handlers.GetNotificationPrefsHandler).Methods("GET")
+	protected.HandleFunc("/settings/notifications", handlers.UpdateNotificationPrefsHandler).Methods("PATCH")
+	protected.HandleFunc("/settings/2fa/setup", handlers.Setup2FAHandler).Methods("POST")
+	protected.HandleFunc("/settings/2fa/verify", handlers.Verify2FAHandler).Methods("POST")
+	protected.HandleFunc("/settings/2fa/disable", handlers.Disable2FAHandler).Methods("POST")
+	protected.HandleFunc("/settings/verify-email-request", handlers.RequestEmailVerifyHandler).Methods("POST")
+	protected.HandleFunc("/settings/verify-email-confirm", handlers.ConfirmEmailVerifyHandler).Methods("POST")
+	protected.HandleFunc("/settings/kyc", handlers.SubmitKYCHandler).Methods("POST")
+	protected.HandleFunc("/settings/kyc", handlers.GetKYCHandler).Methods("GET")
 
 	// Admin routes (JWT + AdminOnly)
 	admin := r.PathPrefix("/api/v1/admin").Subrouter()
@@ -181,8 +211,18 @@ func buildRouter() *mux.Router {
 	admin.HandleFunc("/users/{id}/balance", handlers.AdminAdjustBalanceHandler).Methods("PATCH")
 	admin.HandleFunc("/users/{id}/role", handlers.AdminToggleRoleHandler).Methods("PATCH")
 	admin.HandleFunc("/users/{id}/status", handlers.AdminSetUserStatusHandler).Methods("PATCH")
+	admin.HandleFunc("/dashboard", handlers.AdminDashboardStatsHandler).Methods("GET")
 	admin.HandleFunc("/rates", handlers.AdminGetExchangeRatesHandler).Methods("GET")
 	admin.HandleFunc("/rates/{id}/markup", handlers.AdminUpdateMarkupHandler).Methods("PATCH")
+	admin.HandleFunc("/report", handlers.GetAdminTransactionReportHandler).Methods("GET")
+	admin.HandleFunc("/users/search", handlers.AdminSearchUsersHandler).Methods("GET")
+	admin.HandleFunc("/users/{id}/grade", handlers.AdminUpdateUserGradeHandler).Methods("PATCH")
+	admin.HandleFunc("/commissions", handlers.AdminGetCommissionConfigHandler).Methods("GET")
+	admin.HandleFunc("/commissions/{id}", handlers.AdminUpdateCommissionConfigHandler).Methods("PATCH")
+	admin.HandleFunc("/tickets", handlers.AdminGetSupportTicketsHandler).Methods("GET")
+	admin.HandleFunc("/tickets/{id}", handlers.AdminUpdateTicketStatusHandler).Methods("PATCH")
+	admin.HandleFunc("/users/{id}/emergency-freeze", handlers.AdminEmergencyFreezeHandler).Methods("POST")
+	admin.HandleFunc("/logs", handlers.AdminGetLogsHandler).Methods("GET")
 
 	return r
 }
