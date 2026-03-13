@@ -10,6 +10,7 @@ import (
 
 	"github.com/djalben/xplr-core/backend/middleware"
 	"github.com/djalben/xplr-core/backend/repository"
+	"github.com/djalben/xplr-core/backend/service"
 	"github.com/gorilla/mux"
 	"github.com/shopspring/decimal"
 )
@@ -65,6 +66,19 @@ func AdminUpdateUserGradeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	repository.WriteAdminLog(adminID, fmt.Sprintf("Изменен грейд юзера %d на %s", targetID, grade))
+
+	// Отправка уведомления о смене грейда (async)
+	go func(uid int, g string) {
+		targetUser, err := repository.GetUserByID(uid)
+		if err != nil {
+			log.Printf("[EMAIL] Cannot fetch user %d for grade email: %v", uid, err)
+			return
+		}
+		if err := service.SendGradeChangeEmail(targetUser.Email, g); err != nil {
+			log.Printf("[EMAIL] Failed to send grade change email to user %d: %v", uid, err)
+		}
+	}(targetID, grade)
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{"user_id": targetID, "grade": grade})
 }
@@ -157,6 +171,19 @@ func AdminEmergencyFreezeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	repository.WriteAdminLog(adminID, fmt.Sprintf("🚨 EMERGENCY FREEZE юзера %d — %d карт заморожено, статус BANNED, баланс обнулён", targetID, frozenCards))
+
+	// Уведомление пользователю о блокировке (async)
+	go func(uid, cards int) {
+		targetUser, err := repository.GetUserByID(uid)
+		if err != nil {
+			log.Printf("[EMAIL] Cannot fetch user %d for freeze notification: %v", uid, err)
+			return
+		}
+		if err := service.SendEmergencyFreezeNotification(targetUser.Email, cards); err != nil {
+			log.Printf("[EMAIL] Failed to send freeze notification to user %d: %v", uid, err)
+		}
+	}(targetID, frozenCards)
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"user_id":      targetID,

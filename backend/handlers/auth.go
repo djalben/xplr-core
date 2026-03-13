@@ -99,6 +99,13 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Отправка приветственного письма (async)
+	go func(email string) {
+		if err := service.SendWelcomeEmail(email); err != nil {
+			log.Printf("Warning: Failed to send welcome email to %s: %v", email, err)
+		}
+	}(createdUser.Email)
+
 	// Генерация JWT токена (авто-логин после регистрации)
 	token, err := utils.GenerateJWT(createdUser.ID)
 	if err != nil {
