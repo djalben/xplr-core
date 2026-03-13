@@ -186,9 +186,17 @@ func main() {
 	adminRouter.HandleFunc("/users/{id}/role", handlers.AdminToggleRoleHandler).Methods("PATCH")
 	adminRouter.HandleFunc("/users/{id}/status", handlers.AdminSetUserStatusHandler).Methods("PATCH")
 	adminRouter.HandleFunc("/stats", handlers.AdminStatsHandler).Methods("GET")
+	adminRouter.HandleFunc("/dashboard", handlers.AdminDashboardStatsHandler).Methods("GET")
 	adminRouter.HandleFunc("/rates", handlers.AdminGetExchangeRatesHandler).Methods("GET")
 	adminRouter.HandleFunc("/rates/{id}/markup", handlers.AdminUpdateMarkupHandler).Methods("PATCH")
 	adminRouter.HandleFunc("/report", handlers.GetAdminTransactionReportHandler).Methods("GET")
+	adminRouter.HandleFunc("/users/search", handlers.AdminSearchUsersHandler).Methods("GET")
+	adminRouter.HandleFunc("/users/{id}/grade", handlers.AdminUpdateUserGradeHandler).Methods("PATCH")
+	adminRouter.HandleFunc("/commissions", handlers.AdminGetCommissionConfigHandler).Methods("GET")
+	adminRouter.HandleFunc("/commissions/{id}", handlers.AdminUpdateCommissionConfigHandler).Methods("PATCH")
+	adminRouter.HandleFunc("/tickets", handlers.AdminGetSupportTicketsHandler).Methods("GET")
+	adminRouter.HandleFunc("/tickets/{id}", handlers.AdminUpdateTicketStatusHandler).Methods("PATCH")
+	adminRouter.HandleFunc("/logs", handlers.AdminGetLogsHandler).Methods("GET")
 	// --------------------------------------------------------
 
 	// CORS: dynamic origins from ALLOWED_ORIGINS env var (comma-separated)

@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import apiClient from '../api/axios';
 
 export type UserRole = 'OWNER' | 'MEMBER';
 export type UserMode = 'personal';
@@ -9,6 +10,8 @@ export interface UserProfile {
   email: string;
   role: UserRole;
   avatar: string;
+  isAdmin?: boolean;
+  serverRole?: string;
 }
 
 interface AuthContextType {
@@ -16,6 +19,7 @@ interface AuthContextType {
   role: UserRole;
   isOwner: boolean;
   isMember: boolean;
+  isAdmin: boolean;
   userMode: UserMode;
   onboardingComplete: boolean;
   setUser: (user: UserProfile) => void;
@@ -33,10 +37,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     email: 'alex@xplr.io',
     role: 'OWNER',
     avatar: 'АП',
+    isAdmin: false,
+    serverRole: 'user',
   });
 
   const userMode: UserMode = 'personal';
   const onboardingComplete = true;
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    apiClient.get('/user/me').then(res => {
+      const d = res.data;
+      setUserState(prev => ({
+        ...prev,
+        id: String(d.id),
+        email: d.email || prev.email,
+        name: d.email?.split('@')[0] || prev.name,
+        avatar: (d.email || '??').substring(0, 2).toUpperCase(),
+        isAdmin: d.is_admin === true || d.role === 'admin',
+        serverRole: d.role || 'user',
+      }));
+    }).catch(() => {});
+  }, []);
 
   const setUser = useCallback((newUser: UserProfile) => {
     setUserState(newUser);
@@ -52,9 +75,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const role = user.role;
   const isOwner = role === 'OWNER';
   const isMember = role === 'MEMBER';
+  const isAdmin = user.isAdmin === true;
 
   return (
-    <AuthContext.Provider value={{ user, role, isOwner, isMember, userMode, onboardingComplete, setUser, setUserMode, completeOnboarding, logout }}>
+    <AuthContext.Provider value={{ user, role, isOwner, isMember, isAdmin, userMode, onboardingComplete, setUser, setUserMode, completeOnboarding, logout }}>
       {children}
     </AuthContext.Provider>
   );

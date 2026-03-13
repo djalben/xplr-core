@@ -203,6 +203,9 @@ func GetMeHandler(w http.ResponseWriter, r *http.Request) {
 		APIKey     string `json:"api_key"`
 		Grade      string `json:"grade"`
 		FeePercent string `json:"fee_percent"`
+		Role       string `json:"role"`
+		IsAdmin    bool   `json:"is_admin"`
+		IsVerified bool   `json:"is_verified"`
 	}{
 		ID:         user.ID,
 		Email:      user.Email,
@@ -211,6 +214,9 @@ func GetMeHandler(w http.ResponseWriter, r *http.Request) {
 		APIKey:     apiKey,
 		Grade:      gradeInfo.Grade,
 		FeePercent: gradeInfo.FeePercent.String(),
+		Role:       user.Role,
+		IsAdmin:    user.IsAdmin || user.Role == "admin",
+		IsVerified: user.IsVerified,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

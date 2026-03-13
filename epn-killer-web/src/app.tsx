@@ -15,8 +15,10 @@ import { LandingPage } from './pages/landing';
 import { AdminRatesPage } from './pages/admin-rates';
 import { ForgotPasswordPage } from './pages/forgot-password';
 import { ResetPasswordPage } from './pages/reset-password';
+import { StaffOnlyZone } from './pages/staff-only-zone';
 import { PWAInstallPrompt } from './components/pwa-install-prompt';
 import { NeuralBackground } from './components/neural-background';
+import { useAuth } from './store/auth-context';
 
 interface GuardProps {
   children: React.ReactNode;
@@ -26,6 +28,15 @@ interface GuardProps {
 const ProtectedRoute: React.FC<GuardProps> = ({ children }) => {
   const token = localStorage.getItem('token');
   if (!token) return <Navigate to="/auth" replace />;
+  return <>{children}</>;
+};
+
+/* ── Requires admin role ── */
+const AdminRoute: React.FC<GuardProps> = ({ children }) => {
+  const token = localStorage.getItem('token');
+  if (!token) return <Navigate to="/auth" replace />;
+  const { isAdmin } = useAuth();
+  if (!isAdmin) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 };
 
@@ -61,6 +72,8 @@ function App() {
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="/support" element={<ProtectedRoute><SupportPage /></ProtectedRoute>} />
         <Route path="/admin/rates" element={<ProtectedRoute><AdminRatesPage /></ProtectedRoute>} />
+        <Route path="/staff-only-zone" element={<AdminRoute><StaffOnlyZone /></AdminRoute>} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </RatesProvider>
     </ModeProvider>

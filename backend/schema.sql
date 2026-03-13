@@ -288,3 +288,45 @@ BEGIN
     END IF;
 END $$;
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+
+-- 16. Таблица тикетов поддержки
+CREATE TABLE IF NOT EXISTS support_tickets (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    subject VARCHAR(500) NOT NULL,
+    status VARCHAR(50) DEFAULT 'open', -- 'open', 'in_progress', 'resolved', 'closed'
+    tg_chat_id BIGINT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_support_tickets_user_id ON support_tickets(user_id);
+CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets(status);
+
+-- 17. Лог действий администраторов
+CREATE TABLE IF NOT EXISTS admin_logs (
+    id SERIAL PRIMARY KEY,
+    admin_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    action TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_admin_logs_admin_id ON admin_logs(admin_id);
+
+-- 18. Конфигурация комиссий (управляется через админку)
+CREATE TABLE IF NOT EXISTS commission_config (
+    id SERIAL PRIMARY KEY,
+    key VARCHAR(100) UNIQUE NOT NULL,       -- e.g. 'fee_standard', 'fee_silver', 'referral_percent'
+    value NUMERIC(20, 4) NOT NULL,
+    description TEXT,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+-- Seed defaults (idempotent)
+INSERT INTO commission_config (key, value, description)
+VALUES
+    ('fee_standard', 6.70, 'Комиссия для грейда STANDARD (%)'),
+    ('fee_silver',   5.50, 'Комиссия для грейда SILVER (%)'),
+    ('fee_gold',     4.50, 'Комиссия для грейда GOLD (%)'),
+    ('fee_platinum', 3.50, 'Комиссия для грейда PLATINUM (%)'),
+    ('fee_black',    2.50, 'Комиссия для грейда BLACK (%)'),
+    ('referral_percent', 5.00, 'Процент реферальной комиссии'),
+    ('card_issue_fee', 2.00, 'Стоимость выпуска карты ($)')
+ON CONFLICT (key) DO NOTHING;
