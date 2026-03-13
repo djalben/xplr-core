@@ -1,7 +1,10 @@
 package telegram
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -116,5 +119,121 @@ func SendMessageHTML(chatID int64, message string) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("Telegram SendMessageHTML failed (Chat %d): API returned %d", chatID, resp.StatusCode)
+	}
+}
+
+// ── Inline Keyboard helpers ──
+
+type inlineKeyboardButton struct {
+	Text         string `json:"text"`
+	CallbackData string `json:"callback_data"`
+}
+
+type sendMessagePayload struct {
+	ChatID      int64                 `json:"chat_id"`
+	Text        string                `json:"text"`
+	ParseMode   string                `json:"parse_mode,omitempty"`
+	ReplyMarkup *inlineKeyboardMarkup `json:"reply_markup,omitempty"`
+}
+
+type inlineKeyboardMarkup struct {
+	InlineKeyboard [][]inlineKeyboardButton `json:"inline_keyboard"`
+}
+
+type editMessagePayload struct {
+	ChatID      int64                 `json:"chat_id"`
+	MessageID   int64                 `json:"message_id"`
+	Text        string                `json:"text"`
+	ParseMode   string                `json:"parse_mode,omitempty"`
+	ReplyMarkup *inlineKeyboardMarkup `json:"reply_markup,omitempty"`
+}
+
+type answerCallbackPayload struct {
+	CallbackQueryID string `json:"callback_query_id"`
+	Text            string `json:"text,omitempty"`
+	ShowAlert       bool   `json:"show_alert,omitempty"`
+}
+
+// postJSON sends a JSON POST to the Telegram Bot API.
+func postJSON(method string, payload interface{}) error {
+	if botToken == "" {
+		return fmt.Errorf("bot token not set")
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal error: %w", err)
+	}
+	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/%s", botToken, method)
+	resp, err := http.Post(apiURL, "application/json", bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("HTTP error: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("API %s returned %d: %s", method, resp.StatusCode, string(respBody))
+	}
+	return nil
+}
+
+// SendTransactionAlert отправляет уведомление о транзакции с кнопкой блокировки карты.
+// cardID используется в callback_data для идентификации карты.
+func SendTransactionAlert(chatID int64, amount string, merchant string, last4 string, balance string, cardID int) {
+	if botToken == "" || chatID == 0 {
+		return
+	}
+
+	text := fmt.Sprintf(
+		"🔴 <b>Попытка списания</b>\n\n"+
+			"💰 <b>Сумма:</b> %s\n"+
+			"🏪 <b>Мерчант:</b> %s\n"+
+			"💳 <b>Карта:</b> •••• %s\n"+
+			"💵 <b>Баланс:</b> %s",
+		amount, merchant, last4, balance,
+	)
+
+	payload := sendMessagePayload{
+		ChatID:    chatID,
+		Text:      text,
+		ParseMode: "HTML",
+		ReplyMarkup: &inlineKeyboardMarkup{
+			InlineKeyboard: [][]inlineKeyboardButton{
+				{
+					{
+						Text:         "❌ ЗАБЛОКИРОВАТЬ КАРТУ",
+						CallbackData: fmt.Sprintf("block_card:%d", cardID),
+					},
+				},
+			},
+		},
+	}
+
+	if err := postJSON("sendMessage", payload); err != nil {
+		log.Printf("[TELEGRAM] SendTransactionAlert failed (Chat %d, Card %d): %v", chatID, cardID, err)
+	} else {
+		log.Printf("[TELEGRAM] Transaction alert sent to chat %d for card %d", chatID, cardID)
+	}
+}
+
+// EditMessageText изменяет текст существующего сообщения (убирает inline-кнопки).
+func EditMessageText(chatID int64, messageID int64, newText string) error {
+	payload := editMessagePayload{
+		ChatID:    chatID,
+		MessageID: messageID,
+		Text:      newText,
+		ParseMode: "HTML",
+	}
+	return postJSON("editMessageText", payload)
+}
+
+// AnswerCallbackQuery отвечает на callback_query (убирает «часики» в Telegram).
+func AnswerCallbackQuery(callbackQueryID string, text string) {
+	payload := answerCallbackPayload{
+		CallbackQueryID: callbackQueryID,
+		Text:            text,
+		ShowAlert:       false,
+	}
+	if err := postJSON("answerCallbackQuery", payload); err != nil {
+		log.Printf("[TELEGRAM] AnswerCallbackQuery failed: %v", err)
 	}
 }

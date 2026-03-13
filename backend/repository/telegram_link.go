@@ -62,6 +62,22 @@ func DeleteTelegramLinkCode(code string) {
 	_, _ = GlobalDB.Exec(`DELETE FROM telegram_link_codes WHERE code = $1`, code)
 }
 
+// GetUserIDByChatID returns the user ID linked to a given Telegram chat_id.
+// Returns 0 if no user is linked.
+func GetUserIDByChatID(chatID int64) (int, error) {
+	if GlobalDB == nil {
+		return 0, fmt.Errorf("database connection not initialized")
+	}
+	var userID int
+	err := GlobalDB.QueryRow(
+		`SELECT id FROM users WHERE telegram_chat_id = $1`, chatID,
+	).Scan(&userID)
+	if err != nil {
+		return 0, err
+	}
+	return userID, nil
+}
+
 // GetUserEmailByChatID returns the email of the user linked to a given Telegram chat_id.
 // Returns empty string if no user is linked.
 func GetUserEmailByChatID(chatID int64) (string, error) {

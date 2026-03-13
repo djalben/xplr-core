@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/djalben/xplr-core/backend/middleware"
@@ -41,15 +43,28 @@ func GetTelegramLinkHandler(w http.ResponseWriter, r *http.Request) {
 
 // Telegram Update structures (minimal, only what we need)
 type tgUpdate struct {
-	Message *tgMessage `json:"message"`
+	Message       *tgMessage       `json:"message"`
+	CallbackQuery *tgCallbackQuery `json:"callback_query"`
 }
 
 type tgMessage struct {
-	Chat tgChat `json:"chat"`
-	Text string `json:"text"`
+	MessageID int64  `json:"message_id"`
+	Chat      tgChat `json:"chat"`
+	Text      string `json:"text"`
 }
 
 type tgChat struct {
+	ID int64 `json:"id"`
+}
+
+type tgCallbackQuery struct {
+	ID      string     `json:"id"`
+	From    tgUser     `json:"from"`
+	Message *tgMessage `json:"message"`
+	Data    string     `json:"data"`
+}
+
+type tgUser struct {
 	ID int64 `json:"id"`
 }
 
@@ -58,6 +73,13 @@ func TelegramWebhookHandler(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
 		log.Printf("[TG-WEBHOOK] Failed to decode update: %v", err)
 		// Always return 200 to Telegram so it doesn't retry
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// ── Handle callback_query (inline button presses) ──
+	if update.CallbackQuery != nil {
+		handleCallbackQuery(update.CallbackQuery)
 		w.WriteHeader(http.StatusOK)
 		return
 	}
@@ -165,4 +187,65 @@ func TelegramWebhookHandler(w http.ResponseWriter, r *http.Request) {
 			"/help — помощь\n\n"+
 			"Поддержка: <a href=\"https://xplr.pro/support\">xplr.pro/support</a>")
 	w.WriteHeader(http.StatusOK)
+}
+
+// ── Callback Query Handler (inline button presses) ──
+
+func handleCallbackQuery(cb *tgCallbackQuery) {
+	if cb == nil {
+		return
+	}
+
+	callerChatID := cb.From.ID
+	data := cb.Data
+
+	log.Printf("[TG-CALLBACK] chat_id=%d, data=%q", callerChatID, data)
+
+	// Always answer the callback to remove the loading spinner
+	defer telegram.AnswerCallbackQuery(cb.ID, "")
+
+	// Handle block_card:<cardID>
+	if strings.HasPrefix(data, "block_card:") {
+		cardIDStr := strings.TrimPrefix(data, "block_card:")
+		cardID, err := strconv.Atoi(cardIDStr)
+		if err != nil || cardID <= 0 {
+			log.Printf("[TG-CALLBACK] Invalid card ID in callback: %q", cardIDStr)
+			telegram.AnswerCallbackQuery(cb.ID, "Ошибка: неверный ID карты")
+			return
+		}
+
+		// Security: verify that caller's chat_id is the card owner
+		userID, err := repository.GetUserIDByChatID(callerChatID)
+		if err != nil || userID == 0 {
+			log.Printf("[TG-CALLBACK] Chat %d is not linked to any user", callerChatID)
+			telegram.AnswerCallbackQuery(cb.ID, "Ошибка: аккаунт не привязан")
+			return
+		}
+
+		// Block the card (UpdateCardStatus checks ownership via userID)
+		if err := repository.UpdateCardStatus(cardID, userID, "BLOCKED"); err != nil {
+			log.Printf("[TG-CALLBACK] Failed to block card %d for user %d: %v", cardID, userID, err)
+			telegram.AnswerCallbackQuery(cb.ID, "Ошибка при блокировке карты")
+			return
+		}
+
+		log.Printf("[TG-CALLBACK] ✅ Card %d blocked by user %d via Telegram", cardID, userID)
+
+		// Edit the original message to confirm the block
+		if cb.Message != nil {
+			newText := fmt.Sprintf(
+				"🔒 <b>Карта заблокирована</b>\n\n"+
+					"Карта (ID: %d) заблокирована в целях безопасности.\n\n"+
+					"Разблокировать можно в личном кабинете:\n"+
+					"<a href=\"https://xplr.pro/cards\">xplr.pro/cards</a>",
+				cardID,
+			)
+			if err := telegram.EditMessageText(callerChatID, cb.Message.MessageID, newText); err != nil {
+				log.Printf("[TG-CALLBACK] Failed to edit message: %v", err)
+			}
+		}
+		return
+	}
+
+	log.Printf("[TG-CALLBACK] Unknown callback data: %q", data)
 }
