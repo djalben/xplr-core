@@ -277,16 +277,30 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	// Получение пользователя по email
 	user, err := repository.GetUserByEmail(req.Email)
 	if err != nil {
-		log.Printf("Login failed for email %s: %v", req.Email, err)
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "не найден") || strings.Contains(errMsg, "not found") {
+			log.Printf("[LOGIN] User not found: %s", req.Email)
+		} else {
+			// DB error (e.g. missing column, connection issue) — log details
+			log.Printf("[LOGIN] DB ERROR for email %s: %v", req.Email, err)
+		}
 		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
 		return
 	}
 
 	// Проверка пароля
 	if !utils.CheckPasswordHash(req.Password, user.PasswordHash) {
-		log.Printf("Invalid password for email %s", req.Email)
+		log.Printf("[LOGIN] Wrong password for email %s (user_id=%d)", req.Email, user.ID)
 		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
 		return
+	}
+
+	// Убедиться что у пользователя есть Grade (auto-repair)
+	if _, gradeErr := repository.GetUserGradeInfo(user.ID); gradeErr != nil {
+		log.Printf("[LOGIN] Auto-creating grade for user %d", user.ID)
+		if _, err := repository.CreateUserGrade(user.ID); err != nil {
+			log.Printf("[LOGIN] Warning: failed to auto-create grade for user %d: %v", user.ID, err)
+		}
 	}
 
 	// Генерация JWT токена
@@ -296,6 +310,8 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 		return
 	}
+
+	log.Printf("[LOGIN] Success: %s (user_id=%d)", user.Email, user.ID)
 
 	// Успешный ответ
 	response := map[string]interface{}{

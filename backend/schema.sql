@@ -331,7 +331,44 @@ VALUES
     ('card_issue_fee', 2.00, 'Стоимость выпуска карты ($)')
 ON CONFLICT (key) DO NOTHING;
 
--- 19. Row Level Security — отключаем RLS на ключевых таблицах,
+-- 19. Миграция: balance_arbitrage и balance_personal (кошельки по режимам)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'balance_arbitrage') THEN
+        ALTER TABLE users ADD COLUMN balance_arbitrage NUMERIC(20, 4) DEFAULT 0.0000;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'balance_personal') THEN
+        ALTER TABLE users ADD COLUMN balance_personal NUMERIC(20, 4) DEFAULT 0.0000;
+    END IF;
+END $$;
+
+-- 20. Триггер: синхронизация auth.users → public.users (Supabase Auth)
+-- Если пользователь регистрируется через Supabase Auth,
+-- автоматически создаём запись в public.users с базовыми данными.
+CREATE OR REPLACE FUNCTION public.handle_new_auth_user()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO public.users (email, password_hash, balance, balance_rub, status)
+    VALUES (
+        NEW.email,
+        COALESCE(NEW.encrypted_password, ''),
+        0.0000,
+        0.0000,
+        'ACTIVE'
+    )
+    ON CONFLICT (email) DO NOTHING;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Удалить старый триггер если существует, затем создать новый
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW
+    EXECUTE FUNCTION public.handle_new_auth_user();
+
+-- 21. Row Level Security — отключаем RLS на ключевых таблицах,
 -- чтобы Supabase SQL Editor (и Service Role) мог обновлять данные.
 -- Безопасность обеспечивается JWT + middleware на уровне бэкенда.
 ALTER TABLE users DISABLE ROW LEVEL SECURITY;
