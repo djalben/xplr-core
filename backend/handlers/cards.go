@@ -79,10 +79,11 @@ func MockCardDetailsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate deterministic mock data from card ID and BIN
-	fullNumber := card.BIN + "00" + strings.Repeat("0", 6-len(card.Last4Digits)) + card.Last4Digits
+	// Generate deterministic mock data from card provider_card_id (which is the full 16-digit PAN)
+	fullNumber := card.ProviderCardID
 	if len(fullNumber) < 16 {
-		fullNumber = fullNumber + strings.Repeat("0", 16-len(fullNumber))
+		// Fallback: reconstruct from BIN + padding + last4
+		fullNumber = card.BIN + strings.Repeat("0", 16-len(card.BIN)-len(card.Last4Digits)) + card.Last4Digits
 	}
 	if len(fullNumber) > 16 {
 		fullNumber = fullNumber[:16]
