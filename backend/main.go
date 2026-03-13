@@ -58,6 +58,9 @@ func main() {
 
 	log.Println("Successfully connected to the database!")
 
+	// 1.1. Schema Integrity Guard — проверяет и создаёт отсутствующие колонки
+	repository.RunSchemaGuard()
+
 	// Тест "Дыхания" — проверка таблицы services в Supabase
 	log.Println("Testing Supabase connection: SELECT slug FROM services...")
 	rows, err := DB.Query("SELECT slug FROM services")

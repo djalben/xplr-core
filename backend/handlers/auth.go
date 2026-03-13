@@ -256,6 +256,7 @@ func ResetPasswordHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // LoginHandler - Вход пользователя в систему
+// Self-healing: при ошибках БД пробует минимальный запрос, авто-создаёт недостающие данные.
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var req models.LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -264,38 +265,63 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Валидация входных данных
-	if strings.TrimSpace(req.Email) == "" {
+	email := strings.TrimSpace(req.Email)
+	if email == "" {
 		http.Error(w, "Email cannot be empty", http.StatusBadRequest)
 		return
 	}
-
 	if strings.TrimSpace(req.Password) == "" {
 		http.Error(w, "Password cannot be empty", http.StatusBadRequest)
 		return
 	}
 
-	// Получение пользователя по email
-	user, err := repository.GetUserByEmail(req.Email)
+	// ── Шаг 1: попробовать полный запрос ──
+	user, err := repository.GetUserByEmail(email)
+	usedFallback := false
+
 	if err != nil {
 		errMsg := err.Error()
-		if strings.Contains(errMsg, "не найден") || strings.Contains(errMsg, "not found") {
-			log.Printf("[LOGIN] User not found: %s", req.Email)
-		} else {
-			// DB error (e.g. missing column, connection issue) — log details
-			log.Printf("[LOGIN] DB ERROR for email %s: %v", req.Email, err)
+		isNotFound := strings.Contains(errMsg, "не найден") || strings.Contains(errMsg, "not found")
+
+		if isNotFound {
+			// Пользователь реально не существует
+			log.Printf("[LOGIN] User not found: %s", email)
+			http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+			return
 		}
-		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
-		return
+
+		// ── Шаг 2: DB error — попробовать минимальный fallback-запрос ──
+		log.Printf("[LOGIN] ⚠️  Full query failed for %s: %v — trying fallback", email, err)
+
+		user, err = repository.GetUserByEmailBasic(email)
+		if err != nil {
+			errMsg2 := err.Error()
+			if strings.Contains(errMsg2, "не найден") || strings.Contains(errMsg2, "not found") {
+				log.Printf("[LOGIN] User not found (fallback): %s", email)
+			} else {
+				log.Printf("[LOGIN] ❌ CRITICAL DB ERROR for %s: %v", email, err)
+			}
+			http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+			return
+		}
+		usedFallback = true
+		log.Printf("[LOGIN] ✅ Fallback query succeeded for %s (user_id=%d)", email, user.ID)
 	}
 
-	// Проверка пароля
+	// ── Шаг 3: проверка пароля ──
 	if !utils.CheckPasswordHash(req.Password, user.PasswordHash) {
-		log.Printf("[LOGIN] Wrong password for email %s (user_id=%d)", req.Email, user.ID)
+		log.Printf("[LOGIN] Wrong password for %s (user_id=%d)", email, user.ID)
 		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
 		return
 	}
 
-	// Убедиться что у пользователя есть Grade (auto-repair)
+	// ── Шаг 4: Self-healing — если использован fallback, попробовать починить схему ──
+	if usedFallback {
+		log.Printf("[LOGIN] 🔧 Running schema guard for self-healing (triggered by %s)", email)
+		go repository.RunSchemaGuard()
+	}
+
+	// ── Шаг 5: Авто-создание Grade если отсутствует ──
 	if _, gradeErr := repository.GetUserGradeInfo(user.ID); gradeErr != nil {
 		log.Printf("[LOGIN] Auto-creating grade for user %d", user.ID)
 		if _, err := repository.CreateUserGrade(user.ID); err != nil {
@@ -303,15 +329,15 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Генерация JWT токена
+	// ── Шаг 6: генерация JWT ──
 	token, err := utils.GenerateJWT(user.ID)
 	if err != nil {
-		log.Printf("Error generating JWT for user %d: %v", user.ID, err)
+		log.Printf("[LOGIN] ❌ JWT generation failed for user %d: %v", user.ID, err)
 		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 		return
 	}
 
-	log.Printf("[LOGIN] Success: %s (user_id=%d)", user.Email, user.ID)
+	log.Printf("[LOGIN] ✅ Success: %s (user_id=%d, fallback=%v)", user.Email, user.ID, usedFallback)
 
 	// Успешный ответ
 	response := map[string]interface{}{
