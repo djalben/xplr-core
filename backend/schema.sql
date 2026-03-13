@@ -387,7 +387,46 @@ ALTER TABLE support_tickets DISABLE ROW LEVEL SECURITY;
 ALTER TABLE admin_logs DISABLE ROW LEVEL SECURITY;
 ALTER TABLE commission_config DISABLE ROW LEVEL SECURITY;
 
--- 22. Миграция: support_tickets — добавляем email и message для полноценной поддержки
+-- 22. Таблица сессий пользователей
+CREATE TABLE IF NOT EXISTS user_sessions (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    ip VARCHAR(45),
+    location VARCHAR(255),
+    device VARCHAR(255),
+    last_active TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
+ALTER TABLE user_sessions DISABLE ROW LEVEL SECURITY;
+
+-- 23. Миграция: 2FA, notification prefs, verification_status на users
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'two_factor_enabled') THEN
+        ALTER TABLE users ADD COLUMN two_factor_enabled BOOLEAN DEFAULT FALSE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'two_factor_secret') THEN
+        ALTER TABLE users ADD COLUMN two_factor_secret VARCHAR(64);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'notify_transactions') THEN
+        ALTER TABLE users ADD COLUMN notify_transactions BOOLEAN DEFAULT TRUE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'notify_balance') THEN
+        ALTER TABLE users ADD COLUMN notify_balance BOOLEAN DEFAULT TRUE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'notify_security') THEN
+        ALTER TABLE users ADD COLUMN notify_security BOOLEAN DEFAULT TRUE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'verification_status') THEN
+        ALTER TABLE users ADD COLUMN verification_status VARCHAR(20) DEFAULT 'pending';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'display_name') THEN
+        ALTER TABLE users ADD COLUMN display_name VARCHAR(255);
+    END IF;
+END $$;
+
+-- 24. Миграция: support_tickets — добавляем email и message для полноценной поддержки
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'support_tickets' AND column_name = 'email') THEN

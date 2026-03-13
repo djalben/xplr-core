@@ -9,7 +9,7 @@
     "support": "支持",
     "settings": "设置",
     "personal": "个人",
-    "arbitrage": "套利",
+    "arbitrage": "商业",
     "logout": "退出",
     "owner": "所有者",
     "member": "成员"
@@ -18,7 +18,7 @@
     "welcome": "欢迎！",
     "hello": "你好，{{name}}！",
     "personalSubtitle": "管理财务的好日子",
-    "arbitrageSubtitle": "您的套利面板已就绪",
+    "arbitrageSubtitle": "您的商业面板已就绪",
     "balance": "余额",
     "activeCards": "活跃卡片",
     "transactions": "交易",

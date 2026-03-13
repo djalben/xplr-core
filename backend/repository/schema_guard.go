@@ -47,6 +47,14 @@ var allRequiredColumns = []requiredColumn{
 	// --- support_tickets ---
 	{"support_tickets", "email", "VARCHAR(255)"},
 	{"support_tickets", "message", "TEXT"},
+	// --- users: 2FA, notifications, verification ---
+	{"users", "two_factor_enabled", "BOOLEAN DEFAULT FALSE"},
+	{"users", "two_factor_secret", "VARCHAR(64)"},
+	{"users", "notify_transactions", "BOOLEAN DEFAULT TRUE"},
+	{"users", "notify_balance", "BOOLEAN DEFAULT TRUE"},
+	{"users", "notify_security", "BOOLEAN DEFAULT TRUE"},
+	{"users", "verification_status", "VARCHAR(20) DEFAULT 'pending'"},
+	{"users", "display_name", "VARCHAR(255)"},
 }
 
 // RunSchemaGuard checks all required columns exist and creates missing ones.

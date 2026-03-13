@@ -191,6 +191,18 @@ func main() {
 	// Поддержка — отправка тикета
 	protectedRouter.HandleFunc("/support", handlers.SubmitSupportTicketHandler).Methods("POST")
 
+	// Настройки профиля
+	protectedRouter.HandleFunc("/settings/profile", handlers.GetSettingsProfileHandler).Methods("GET")
+	protectedRouter.HandleFunc("/settings/profile", handlers.UpdateProfileHandler).Methods("PATCH")
+	protectedRouter.HandleFunc("/settings/change-password", handlers.ChangePasswordHandler).Methods("POST")
+	protectedRouter.HandleFunc("/settings/sessions", handlers.GetSessionsHandler).Methods("GET")
+	protectedRouter.HandleFunc("/settings/logout-all", handlers.LogoutAllSessionsHandler).Methods("POST")
+	protectedRouter.HandleFunc("/settings/notifications", handlers.GetNotificationPrefsHandler).Methods("GET")
+	protectedRouter.HandleFunc("/settings/notifications", handlers.UpdateNotificationPrefsHandler).Methods("PATCH")
+	protectedRouter.HandleFunc("/settings/2fa/setup", handlers.Setup2FAHandler).Methods("POST")
+	protectedRouter.HandleFunc("/settings/2fa/verify", handlers.Verify2FAHandler).Methods("POST")
+	protectedRouter.HandleFunc("/settings/2fa/disable", handlers.Disable2FAHandler).Methods("POST")
+
 	// --- ADMIN ROUTES (JWT + AdminOnly) ---
 	adminRouter := router.PathPrefix("/api/v1/admin").Subrouter()
 	adminRouter.Use(middleware.JWTAuthMiddleware)
