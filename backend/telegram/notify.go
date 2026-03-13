@@ -8,6 +8,7 @@ import (
 )
 
 var botToken string
+
 // var chatID string // УДАЛЕНО: Глобальный ChatID больше не нужен
 
 // SetBotToken устанавливает токен бота.
@@ -20,7 +21,6 @@ func SetChatID(id string) {
 	log.Printf("DEPRECATED: Global SetChatID called with ID: %s. This function should be removed from main.go.", id)
 }
 
-
 // NotifyDepositToChat отправляет уведомление о пополнении через API Telegram на указанный ChatID.
 // Принимает ChatID как int64, так как он приходит из БД.
 func NotifyDepositToChat(chatID int64, userID int, amount float64, newBalance float64) {
@@ -28,15 +28,15 @@ func NotifyDepositToChat(chatID int64, userID int, amount float64, newBalance fl
 		log.Println("Telegram notification skipped: Bot token is not set.")
 		return
 	}
-    
-    // Преобразование ChatID (int64) в строку для URL
-    chatIDStr := fmt.Sprintf("%d", chatID)
+
+	// Преобразование ChatID (int64) в строку для URL
+	chatIDStr := fmt.Sprintf("%d", chatID)
 
 	// 1. Формирование сообщения
 	message := fmt.Sprintf(
 		"💸 НОВЫЙ ДЕПОЗИТ (User %d)\n\nСумма: %.2f EUR\nНовый баланс: %.2f EUR",
-		userID, 
-		amount, 
+		userID,
+		amount,
 		newBalance,
 	)
 
@@ -46,11 +46,11 @@ func NotifyDepositToChat(chatID int64, userID int, amount float64, newBalance fl
 	// 3. Формирование URL для API Telegram
 	apiURL := fmt.Sprintf(
 		"https://api.telegram.org/bot%s/sendMessage?chat_id=%s&text=%s",
-		botToken, 
+		botToken,
 		chatIDStr, // ИСПОЛЬЗУЕМ ЛОКАЛЬНЫЙ chatIDStr
 		encodedMessage,
 	)
-	
+
 	// 4. Отправка HTTP-запроса
 	resp, err := http.Get(apiURL)
 	if err != nil {
@@ -58,15 +58,14 @@ func NotifyDepositToChat(chatID int64, userID int, amount float64, newBalance fl
 		return
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("Telegram notify failed (User %d, Chat %d): API returned status %d", userID, chatID, resp.StatusCode)
 		return
 	}
-	
+
 	log.Printf("Telegram deposit notification sent successfully to chat %d for user %d.", chatID, userID)
 }
-
 
 // NotifyDeposit - Старая функция, которую нужно удалить.
 func NotifyDeposit(userID int, amount float64, newBalance float64) {
@@ -94,5 +93,28 @@ func SendMessage(chatID int64, message string) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("Telegram SendMessage failed (Chat %d): API returned %d", chatID, resp.StatusCode)
+	}
+}
+
+// SendMessageHTML отправляет сообщение с HTML-разметкой (parse_mode=HTML).
+func SendMessageHTML(chatID int64, message string) {
+	if botToken == "" {
+		return
+	}
+	if chatID == 0 {
+		return
+	}
+	chatIDStr := fmt.Sprintf("%d", chatID)
+	encodedMessage := url.QueryEscape(message)
+	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?chat_id=%s&parse_mode=HTML&text=%s",
+		botToken, chatIDStr, encodedMessage)
+	resp, err := http.Get(apiURL)
+	if err != nil {
+		log.Printf("Telegram SendMessageHTML failed (Chat %d): %v", chatID, err)
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("Telegram SendMessageHTML failed (Chat %d): API returned %d", chatID, resp.StatusCode)
 	}
 }

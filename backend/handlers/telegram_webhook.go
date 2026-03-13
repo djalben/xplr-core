@@ -76,7 +76,7 @@ func TelegramWebhookHandler(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(text, "/start ") {
 		code := strings.TrimSpace(strings.TrimPrefix(text, "/start "))
 		if code == "" {
-			telegram.SendMessage(chatID, "Привет! Чтобы привязать аккаунт, используйте кнопку «Подключить Telegram» в настройках XPLR.")
+			telegram.SendMessageHTML(chatID, "👋 <b>Привет!</b>\n\nЧтобы привязать аккаунт, используйте кнопку «Подключить Telegram» в настройках XPLR.")
 			w.WriteHeader(http.StatusOK)
 			return
 		}
@@ -85,7 +85,7 @@ func TelegramWebhookHandler(w http.ResponseWriter, r *http.Request) {
 		userID, err := repository.LookupTelegramLinkCode(code)
 		if err != nil || userID == 0 {
 			log.Printf("[TG-WEBHOOK] Invalid or expired link code: %q (err=%v)", code, err)
-			telegram.SendMessage(chatID, "❌ Ссылка недействительна или истекла. Пожалуйста, сгенерируйте новую в настройках XPLR.")
+			telegram.SendMessageHTML(chatID, "❌ <b>Ссылка недействительна или истекла.</b>\n\nПожалуйста, сгенерируйте новую в настройках XPLR.")
 			w.WriteHeader(http.StatusOK)
 			return
 		}
@@ -93,7 +93,7 @@ func TelegramWebhookHandler(w http.ResponseWriter, r *http.Request) {
 		// Save chat_id to user
 		if err := repository.UpdateTelegramChatIDInt64(userID, chatID); err != nil {
 			log.Printf("[TG-WEBHOOK] Failed to save chat_id for user %d: %v", userID, err)
-			telegram.SendMessage(chatID, "❌ Произошла ошибка при привязке. Попробуйте ещё раз.")
+			telegram.SendMessageHTML(chatID, "❌ <b>Произошла ошибка при привязке.</b>\n\nПопробуйте ещё раз.")
 			w.WriteHeader(http.StatusOK)
 			return
 		}
@@ -102,7 +102,14 @@ func TelegramWebhookHandler(w http.ResponseWriter, r *http.Request) {
 		repository.DeleteTelegramLinkCode(code)
 
 		// Send welcome message
-		telegram.SendMessage(chatID, "✅ Добро пожаловать в XPLR!\n\nТеперь вы будете получать уведомления о своих картах здесь.\n\n💳 Транзакции\n💰 Пополнения\n🔒 Безопасность\n\nУправлять уведомлениями можно в настройках: xplr.pro/settings")
+		telegram.SendMessageHTML(chatID,
+			"✅ <b>Добро пожаловать в XPLR!</b>\n\n"+
+				"Теперь вы будете получать уведомления здесь:\n\n"+
+				"💳 <b>Транзакции</b> — списания и пополнения карт\n"+
+				"💰 <b>Пополнения</b> — зачисления на баланс\n"+
+				"� <b>Безопасность</b> — коды 2FA и оповещения\n"+
+				"💬 <b>Поддержка</b> — ответы на ваши тикеты\n\n"+
+				"Управлять уведомлениями: <a href=\"https://xplr.pro/settings\">xplr.pro/settings</a>")
 
 		log.Printf("[TG-WEBHOOK] ✅ User %d linked to chat %d", userID, chatID)
 		w.WriteHeader(http.StatusOK)
@@ -111,12 +118,51 @@ func TelegramWebhookHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Handle bare /start (no code)
 	if text == "/start" {
-		telegram.SendMessage(chatID, "Привет! 👋\n\nЯ бот уведомлений XPLR.\n\nЧтобы привязать аккаунт, нажмите «Подключить Telegram» в настройках:\nhttps://xplr.pro/settings")
+		telegram.SendMessageHTML(chatID,
+			"👋 <b>Привет!</b>\n\n"+
+				"Я бот уведомлений <b>XPLR</b>.\n\n"+
+				"Чтобы привязать аккаунт, нажмите «Подключить Telegram» в настройках:\n"+
+				"<a href=\"https://xplr.pro/settings\">xplr.pro/settings</a>")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// Handle /help
+	if text == "/help" {
+		telegram.SendMessageHTML(chatID,
+			"🆘 <b>Помощь и команды XPLR</b>\n\n"+
+				"👤 <b>Профиль:</b> Используйте /status, чтобы проверить привязку.\n"+
+				"💳 <b>Карты:</b> Уведомления о транзакциях приходят автоматически.\n"+
+				"🔐 <b>Безопасность:</b> Коды 2FA приходят сюда.\n"+
+				"💬 <b>Поддержка:</b> Уведомления об ответах на тикеты приходят сюда.")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// Handle /status
+	if text == "/status" {
+		email, err := repository.GetUserEmailByChatID(chatID)
+		if err != nil || email == "" {
+			telegram.SendMessageHTML(chatID,
+				"❌ <b>Аккаунт не привязан.</b>\n\n"+
+					"Чтобы привязать, нажмите «Подключить Telegram» в настройках:\n"+
+					"<a href=\"https://xplr.pro/settings\">xplr.pro/settings</a>")
+		} else {
+			telegram.SendMessageHTML(chatID,
+				"✅ <b>Аккаунт привязан</b>\n\n"+
+					"📧 <b>Email:</b> "+email+"\n\n"+
+					"Вы получаете уведомления в этот чат.")
+		}
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 
 	// Any other message
-	telegram.SendMessage(chatID, "Я бот уведомлений XPLR.\n\nЕсли вам нужна помощь — напишите в поддержку через личный кабинет: https://xplr.pro/support")
+	telegram.SendMessageHTML(chatID,
+		"🤖 Я бот уведомлений <b>XPLR</b>.\n\n"+
+			"Доступные команды:\n"+
+			"/status — проверить привязку\n"+
+			"/help — помощь\n\n"+
+			"Поддержка: <a href=\"https://xplr.pro/support\">xplr.pro/support</a>")
 	w.WriteHeader(http.StatusOK)
 }
