@@ -314,6 +314,28 @@ func SendSupportTicketNotification(ticketID int, userEmail, subject, message str
 	return nil
 }
 
+// SendEmailVerifyCode — отправка 6-значного кода подтверждения email.
+func SendEmailVerifyCode(toEmail, code string) error {
+	content := fmt.Sprintf(`
+    <p style="color:#cbd5e1;font-size:15px;line-height:1.6;margin:0 0 20px;">Здравствуйте!</p>
+    <p style="color:#94a3b8;font-size:14px;line-height:1.6;margin:0 0 24px;">Ваш код подтверждения email:</p>
+    <div style="text-align:center;margin:0 0 24px;">
+      <div style="display:inline-block;padding:20px 48px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);border-radius:16px;border:1px solid rgba(255,255,255,0.1);">
+        <p style="margin:0;color:#fff;font-size:36px;font-weight:800;letter-spacing:8px;">%s</p>
+      </div>
+    </div>
+    <p style="color:#64748b;font-size:12px;line-height:1.5;margin:0;">Код действителен 15 минут. Если вы не запрашивали подтверждение — проигнорируйте это письмо.</p>`, code)
+
+	html := wrapHTML("Подтверждение email", content)
+
+	if err := sendMail(toEmail, "XPLR — Код подтверждения email", html); err != nil {
+		log.Printf("[EMAIL] Failed to send verify code to %s: %v", toEmail, err)
+		return err
+	}
+	log.Printf("[EMAIL] Verify code sent to %s", toEmail)
+	return nil
+}
+
 // SendEmergencyFreezeNotification — уведомление о блокировке аккаунта.
 func SendEmergencyFreezeNotification(toEmail string, frozenCards int) error {
 	content := fmt.Sprintf(`

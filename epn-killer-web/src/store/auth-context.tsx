@@ -24,6 +24,7 @@ interface AuthContextType {
   userMode: UserMode;
   onboardingComplete: boolean;
   setUser: (user: UserProfile) => void;
+  updateUserName: (name: string) => void;
   setUserMode: (mode: UserMode) => void;
   completeOnboarding: (mode: UserMode) => void;
   refreshSession: () => Promise<void>;
@@ -50,16 +51,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Helper: apply server data to local user state
   const applyServerData = useCallback((d: Record<string, unknown>) => {
     const adminFlag = d.is_admin === true || d.role === 'admin';
+    const displayName = (d.display_name as string) || '';
+    const emailStr = (d.email as string) || '';
+    const resolvedName = displayName || emailStr.split('@')[0] || '';
     console.log('[AUTH-CONTEXT] Server data received:', {
-      id: d.id, email: d.email, is_admin: d.is_admin, role: d.role,
-      computed_isAdmin: adminFlag,
+      id: d.id, email: d.email, display_name: d.display_name, is_admin: d.is_admin, role: d.role,
+      computed_isAdmin: adminFlag, resolvedName,
     });
     setUserState(prev => ({
       ...prev,
       id: String(d.id ?? prev.id),
-      email: (d.email as string) || prev.email,
-      name: (d.email as string)?.split('@')[0] || prev.name,
-      avatar: ((d.email as string) || '??').substring(0, 2).toUpperCase(),
+      email: emailStr || prev.email,
+      name: resolvedName || prev.name,
+      avatar: (resolvedName || emailStr || '??').substring(0, 2).toUpperCase(),
       isAdmin: adminFlag,
       serverRole: (d.role as string) || 'user',
     }));
@@ -98,6 +102,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUserState(newUser);
   }, []);
 
+  const updateUserName = useCallback((name: string) => {
+    setUserState(prev => ({
+      ...prev,
+      name: name || prev.name,
+      avatar: (name || prev.name || '??').substring(0, 2).toUpperCase(),
+    }));
+  }, []);
+
   const setUserMode = useCallback((_mode: UserMode) => {}, []);
   const completeOnboarding = useCallback((_mode: UserMode) => {}, []);
 
@@ -128,7 +140,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isAdmin = user.isAdmin === true;
 
   return (
-    <AuthContext.Provider value={{ user, role, isOwner, isMember, isAdmin, authReady, userMode, onboardingComplete, setUser, setUserMode, completeOnboarding, refreshSession, logout }}>
+    <AuthContext.Provider value={{ user, role, isOwner, isMember, isAdmin, authReady, userMode, onboardingComplete, setUser, updateUserName, setUserMode, completeOnboarding, refreshSession, logout }}>
       {children}
     </AuthContext.Provider>
   );

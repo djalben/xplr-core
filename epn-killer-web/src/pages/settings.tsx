@@ -4,10 +4,11 @@ import { LANG_KEY } from '../i18n';
 import { DashboardLayout } from '../components/dashboard-layout';
 import { BackButton } from '../components/back-button';
 import apiClient from '../api/axios';
+import { useAuth } from '../store/auth-context';
 import { 
-  User, Lock, Bell, Shield, Eye, EyeOff, Save, Check, Smartphone, Globe,
+  User, Lock, Bell, Shield, Eye, EyeOff, Save, Check, Smartphone, Globe, Mail,
   FileText, Upload, CheckCircle, AlertCircle, MessageCircle, LogOut, Loader2,
-  MonitorSmartphone, ShieldCheck, ShieldAlert, ExternalLink, Clock
+  MonitorSmartphone, ShieldCheck, ShieldAlert, ExternalLink, Clock, X
 } from 'lucide-react';
 
 type SettingsTab = 'profile' | 'security' | 'notifications' | 'kyc' | 'language';
@@ -57,10 +58,15 @@ const Toast = ({ msg, type }: { msg: string; type: 'ok' | 'err' }) => (
 // ══════════════════════════════════════
 // PROFILE TAB
 // ══════════════════════════════════════
-const ProfileTab = ({ profile, reload, showToast }: { profile: ProfileData | null; reload: () => void; showToast: (m: string, t: 'ok' | 'err') => void }) => {
+const ProfileTab = ({ profile, reload, showToast, setActiveTab }: { profile: ProfileData | null; reload: () => void; showToast: (m: string, t: 'ok' | 'err') => void; setActiveTab: (tab: SettingsTab) => void }) => {
   const { t } = useTranslation();
+  const { updateUserName } = useAuth();
   const [displayName, setDisplayName] = useState(profile?.display_name || '');
   const [saving, setSaving] = useState(false);
+  const [emailVerifyOpen, setEmailVerifyOpen] = useState(false);
+  const [emailCode, setEmailCode] = useState('');
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailVerifying, setEmailVerifying] = useState(false);
   useEffect(() => { if (profile) setDisplayName(profile.display_name || ''); }, [profile]);
 
   const handleSave = async () => {
@@ -68,10 +74,34 @@ const ProfileTab = ({ profile, reload, showToast }: { profile: ProfileData | nul
     setSaving(true);
     try {
       await apiClient.patch('/user/settings/profile', { display_name: displayName.trim() });
+      updateUserName(displayName.trim());
       showToast(t('settings.profileSection.profileUpdated'), 'ok');
       reload();
     } catch { showToast(t('settings.profileSection.saveError'), 'err'); }
     finally { setSaving(false); }
+  };
+
+  const handleRequestEmailCode = async () => {
+    setEmailSending(true);
+    try {
+      await apiClient.post('/user/settings/verify-email-request');
+      setEmailVerifyOpen(true);
+      showToast(t('settings.emailVerify.codeSent'), 'ok');
+    } catch { showToast(t('settings.emailVerify.sendError'), 'err'); }
+    finally { setEmailSending(false); }
+  };
+
+  const handleConfirmEmailCode = async () => {
+    if (emailCode.length !== 6) return;
+    setEmailVerifying(true);
+    try {
+      await apiClient.post('/user/settings/verify-email-confirm', { code: emailCode });
+      showToast(t('settings.emailVerify.verified'), 'ok');
+      setEmailVerifyOpen(false);
+      setEmailCode('');
+      reload();
+    } catch { showToast(t('settings.emailVerify.invalidCode'), 'err'); }
+    finally { setEmailVerifying(false); }
   };
 
   const verStatus = profile?.verification_status || 'pending';
@@ -89,7 +119,9 @@ const ProfileTab = ({ profile, reload, showToast }: { profile: ProfileData | nul
               <input type="text" value={profile?.email || ''} readOnly className="xplr-input w-full bg-white/[0.02] cursor-not-allowed" />
               {profile?.is_verified
                 ? <span className="flex items-center gap-1 text-xs text-emerald-400 whitespace-nowrap"><CheckCircle className="w-3.5 h-3.5" />{t('settings.profileSection.verified')}</span>
-                : <span className="flex items-center gap-1 text-xs text-red-400 whitespace-nowrap"><AlertCircle className="w-3.5 h-3.5" />{t('settings.profileSection.notVerified')}</span>}
+                : <button onClick={handleRequestEmailCode} disabled={emailSending} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 text-blue-400 text-xs font-medium rounded-lg transition-colors whitespace-nowrap">
+                    {emailSending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />}{t('settings.emailVerify.verify')}
+                  </button>}
             </div>
           </div>
           <div>
@@ -109,7 +141,7 @@ const ProfileTab = ({ profile, reload, showToast }: { profile: ProfileData | nul
             <span className={`px-3 py-1 rounded-full text-xs font-medium ${verColors[verStatus] || verColors.pending}`}>{verLabel}</span>
             <p className="text-sm text-slate-400">{verStatus === 'verified' ? t('settings.verification.accountVerified') : t('settings.verification.needVerification')}</p>
           </div>
-          {verStatus !== 'verified' && <button className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap">{t('settings.verification.startVerification')}</button>}
+          {verStatus !== 'verified' && <button onClick={() => setActiveTab('kyc')} className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap">{t('settings.verification.startVerification')}</button>}
         </div>
       </div>
 
@@ -129,6 +161,40 @@ const ProfileTab = ({ profile, reload, showToast }: { profile: ProfileData | nul
           )}
         </div>
       </div>
+
+      {/* Email Verification Modal */}
+      {emailVerifyOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="glass-card p-8 max-w-sm w-full mx-4 relative">
+            <button onClick={() => { setEmailVerifyOpen(false); setEmailCode(''); }} className="absolute top-4 right-4 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+            <div className="text-center mb-6">
+              <Mail className="w-12 h-12 text-blue-400 mx-auto mb-3" />
+              <h3 className="text-lg font-bold text-white mb-1">{t('settings.emailVerify.title')}</h3>
+              <p className="text-sm text-slate-400">{t('settings.emailVerify.description')}</p>
+            </div>
+            <input
+              type="text"
+              value={emailCode}
+              onChange={e => setEmailCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="000000"
+              className="xplr-input w-full text-center tracking-[0.5em] text-2xl font-bold mb-4"
+              maxLength={6}
+              autoFocus
+            />
+            <button
+              onClick={handleConfirmEmailCode}
+              disabled={emailVerifying || emailCode.length !== 6}
+              className="w-full px-4 py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+            >
+              {emailVerifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+              {t('settings.emailVerify.confirm')}
+            </button>
+            <button onClick={handleRequestEmailCode} disabled={emailSending} className="w-full mt-3 text-sm text-slate-400 hover:text-blue-400 transition-colors">
+              {emailSending ? t('settings.emailVerify.resending') : t('settings.emailVerify.resend')}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -552,7 +618,7 @@ export const SettingsPage = () => {
             }`}><tab.icon className="w-4 h-4" />{tab.label}</button>
           ))}
         </div>
-        {activeTab === 'profile' && <ProfileTab profile={profile} reload={loadProfile} showToast={showToast} />}
+        {activeTab === 'profile' && <ProfileTab profile={profile} reload={loadProfile} showToast={showToast} setActiveTab={setActiveTab} />}
         {activeTab === 'security' && <SecurityTab profile={profile} reload={loadProfile} showToast={showToast} />}
         {activeTab === 'notifications' && <NotificationsTab showToast={showToast} />}
         {activeTab === 'kyc' && <KYCTab profile={profile} reload={loadProfile} showToast={showToast} />}

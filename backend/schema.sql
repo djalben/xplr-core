@@ -424,6 +424,12 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'display_name') THEN
         ALTER TABLE users ADD COLUMN display_name VARCHAR(255);
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'email_verify_code') THEN
+        ALTER TABLE users ADD COLUMN email_verify_code VARCHAR(6);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'email_verify_expires') THEN
+        ALTER TABLE users ADD COLUMN email_verify_expires TIMESTAMP WITH TIME ZONE;
+    END IF;
 END $$;
 
 -- 24. Таблица KYC-заявок

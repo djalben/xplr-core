@@ -273,7 +273,19 @@
       "submitError": "Failed to submit request",
       "fillRequired": "Fill in all required fields"
     },
-    "error": "Error"
+    "error": "Error",
+    "emailVerify": {
+      "verify": "Verify",
+      "title": "Email Verification",
+      "description": "Enter the 6-digit code sent to your email",
+      "codeSent": "Code sent to your email",
+      "sendError": "Failed to send code",
+      "confirm": "Confirm",
+      "verified": "Email verified!",
+      "invalidCode": "Invalid or expired code",
+      "resend": "Resend code",
+      "resending": "Sending..."
+    }
   },
   "support": {
     "title": "Support",

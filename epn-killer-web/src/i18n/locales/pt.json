@@ -278,7 +278,19 @@
       "submitError": "Erro ao enviar solicitação",
       "fillRequired": "Preencha todos os campos obrigatórios"
     },
-    "error": "Erro"
+    "error": "Erro",
+    "emailVerify": {
+      "verify": "Verificar",
+      "title": "Verificação de email",
+      "description": "Insira o código de 6 dígitos enviado para seu email",
+      "codeSent": "Código enviado para seu email",
+      "sendError": "Erro ao enviar código",
+      "confirm": "Confirmar",
+      "verified": "Email verificado!",
+      "invalidCode": "Código inválido ou expirado",
+      "resend": "Reenviar código",
+      "resending": "Enviando..."
+    }
   },
   "support": {
     "title": "Suporte",

@@ -278,7 +278,19 @@
       "submitError": "提交申请失败",
       "fillRequired": "请填写所有必填字段"
     },
-    "error": "错误"
+    "error": "错误",
+    "emailVerify": {
+      "verify": "验证",
+      "title": "邮箱验证",
+      "description": "输入发送到您邮箱的6位验证码",
+      "codeSent": "验证码已发送到您的邮箱",
+      "sendError": "发送验证码失败",
+      "confirm": "确认",
+      "verified": "邮箱已验证！",
+      "invalidCode": "验证码无效或已过期",
+      "resend": "重新发送验证码",
+      "resending": "发送中..."
+    }
   },
   "support": {
     "title": "支持",

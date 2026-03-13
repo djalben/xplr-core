@@ -278,7 +278,19 @@
       "submitError": "Talep gönderme hatası",
       "fillRequired": "Tüm gerekli alanları doldurun"
     },
-    "error": "Hata"
+    "error": "Hata",
+    "emailVerify": {
+      "verify": "Doğrula",
+      "title": "Email Doğrulama",
+      "description": "E-postanıza gönderilen 6 haneli kodu girin",
+      "codeSent": "Kod e-postanıza gönderildi",
+      "sendError": "Kod gönderme hatası",
+      "confirm": "Onayla",
+      "verified": "Email doğrulandı!",
+      "invalidCode": "Geçersiz veya süresi dolmuş kod",
+      "resend": "Kodu yeniden gönder",
+      "resending": "Gönderiliyor..."
+    }
   },
   "support": {
     "title": "Destek",
