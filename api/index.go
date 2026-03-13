@@ -186,6 +186,24 @@ func ensureDB() {
 	repository.SeedDefaultExchangeRates()
 	go service.StartExchangeRateFetcher()
 
+	// 10. SMTP diagnostics (log config status, never log passwords)
+	smtpHost := os.Getenv("SMTP_HOST")
+	smtpPort := os.Getenv("SMTP_PORT")
+	smtpUser := os.Getenv("SMTP_USER")
+	smtpPass := os.Getenv("SMTP_PASS")
+	smtpSupportUser := os.Getenv("SMTP_SUPPORT_USER")
+	if smtpHost != "" && smtpUser != "" && smtpPass != "" {
+		log.Printf("[SMTP] ✅ Configured: host=%s, port=%s, user=%s", smtpHost, smtpPort, smtpUser)
+	} else {
+		log.Printf("[SMTP] ⚠️  NOT configured! host=%q, port=%q, user=%q, pass_len=%d — emails will FAIL",
+			smtpHost, smtpPort, smtpUser, len(smtpPass))
+	}
+	if smtpSupportUser != "" {
+		log.Printf("[SMTP] ✅ Support account: %s", smtpSupportUser)
+	} else {
+		log.Printf("[SMTP] ℹ️  No SMTP_SUPPORT_USER — support emails will use main SMTP account")
+	}
+
 	dbReady = true
 	log.Println("Serverless handler initialized successfully")
 }
