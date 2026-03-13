@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import apiClient, { API_BASE_URL } from '../api/axios';
+import apiClient from '../api/axios';
 import { DashboardLayout } from '../components/dashboard-layout';
 import { BackButton } from '../components/back-button';
 import { ShareModal } from '../components/share-modal';
@@ -129,7 +129,7 @@ export const ReferralsPage = () => {
   useEffect(() => {
     const fetchReferralData = async () => {
       try {
-        const res = await apiClient.get(`${API_BASE_URL}/user/referrals/info`);
+        const res = await apiClient.get('/user/referrals/info');
         const data = res.data;
         setReferralCode(data.referral_code || '');
         setReferralLink(data.referral_link || '');

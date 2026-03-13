@@ -102,7 +102,43 @@ func ensureDB() {
 		}
 	}
 
-	// 7. Seed default exchange rates & start fetcher
+	// 7. Create tables that schema_guard doesn't cover (tables, not columns)
+	tableMigrations := []string{
+		`CREATE TABLE IF NOT EXISTS user_sessions (
+			id SERIAL PRIMARY KEY,
+			user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+			ip VARCHAR(50) DEFAULT '',
+			device TEXT DEFAULT '',
+			location TEXT DEFAULT '',
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			last_active TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		`CREATE TABLE IF NOT EXISTS kyc_requests (
+			id SERIAL PRIMARY KEY,
+			user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+			country VARCHAR(10) NOT NULL,
+			first_name VARCHAR(255) NOT NULL,
+			last_name VARCHAR(255) NOT NULL,
+			birth_date VARCHAR(20),
+			address TEXT,
+			doc_passport VARCHAR(500),
+			doc_address VARCHAR(500),
+			doc_selfie VARCHAR(500),
+			status VARCHAR(20) DEFAULT 'pending',
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+	}
+	for _, m := range tableMigrations {
+		if _, err := db.Exec(m); err != nil {
+			log.Printf("Warning: table migration failed: %v", err)
+		}
+	}
+
+	// 8. Run SchemaGuard to ensure all required columns exist
+	repository.RunSchemaGuard()
+
+	// 9. Seed default exchange rates & start fetcher
 	repository.SeedDefaultExchangeRates()
 	go service.StartExchangeRateFetcher()
 

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useRates } from '../store/rates-context';
 import { DashboardLayout } from '../components/dashboard-layout';
 import { BackButton } from '../components/back-button';
-import apiClient, { API_BASE_URL } from '../api/axios';
+import apiClient from '../api/axios';
 import { DollarSign, Save, RefreshCw, Check, AlertTriangle } from 'lucide-react';
 
 export const AdminRatesPage = () => {
@@ -26,7 +26,7 @@ export const AdminRatesPage = () => {
     setError('');
 
     try {
-      await apiClient.put(`${API_BASE_URL}/rates`, { usd, eur });
+      await apiClient.put('/rates', { usd, eur });
       setRates({ usd, eur });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
