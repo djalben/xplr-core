@@ -330,3 +330,22 @@ VALUES
     ('referral_percent', 5.00, 'Процент реферальной комиссии'),
     ('card_issue_fee', 2.00, 'Стоимость выпуска карты ($)')
 ON CONFLICT (key) DO NOTHING;
+
+-- 19. Row Level Security — отключаем RLS на ключевых таблицах,
+-- чтобы Supabase SQL Editor (и Service Role) мог обновлять данные.
+-- Безопасность обеспечивается JWT + middleware на уровне бэкенда.
+ALTER TABLE users DISABLE ROW LEVEL SECURITY;
+ALTER TABLE cards DISABLE ROW LEVEL SECURITY;
+ALTER TABLE transactions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE user_grades DISABLE ROW LEVEL SECURITY;
+ALTER TABLE internal_balances DISABLE ROW LEVEL SECURITY;
+ALTER TABLE api_keys DISABLE ROW LEVEL SECURITY;
+ALTER TABLE teams DISABLE ROW LEVEL SECURITY;
+ALTER TABLE team_members DISABLE ROW LEVEL SECURITY;
+ALTER TABLE referrals DISABLE ROW LEVEL SECURITY;
+ALTER TABLE referral_commissions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE verification_tokens DISABLE ROW LEVEL SECURITY;
+ALTER TABLE password_reset_tokens DISABLE ROW LEVEL SECURITY;
+ALTER TABLE support_tickets DISABLE ROW LEVEL SECURITY;
+ALTER TABLE admin_logs DISABLE ROW LEVEL SECURITY;
+ALTER TABLE commission_config DISABLE ROW LEVEL SECURITY;
