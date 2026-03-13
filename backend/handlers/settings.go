@@ -13,6 +13,7 @@ import (
 	"github.com/djalben/xplr-core/backend/middleware"
 	"github.com/djalben/xplr-core/backend/repository"
 	"github.com/djalben/xplr-core/backend/service"
+	"github.com/djalben/xplr-core/backend/telegram"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -387,6 +388,25 @@ func SubmitKYCHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("[KYC] ✅ Request %d submitted by user %d", id, userID)
+
+	// Уведомление админам о новой заявке KYC (async)
+	go func() {
+		email := ""
+		if u, err := repository.GetUserByID(userID); err == nil {
+			email = u.Email
+		}
+		if email == "" {
+			email = fmt.Sprintf("User #%d", userID)
+		}
+		msg := fmt.Sprintf(
+			"📄 <b>Новая заявка на KYC!</b>\n\n"+
+				"👤 <b>Пользователь:</b> %s\n"+
+				"📋 <b>Статус:</b> Ожидает проверки",
+			email,
+		)
+		telegram.NotifyAdmins(msg, "🔍 Проверить документы", "https://xplr.pro/admin/kyc")
+	}()
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"id":     id,

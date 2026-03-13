@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/djalben/xplr-core/backend/models"
 	"github.com/djalben/xplr-core/backend/repository"
 	"github.com/djalben/xplr-core/backend/service"
+	"github.com/djalben/xplr-core/backend/telegram"
 	"github.com/djalben/xplr-core/backend/utils"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/shopspring/decimal"
@@ -105,6 +107,24 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		if err := service.SendWelcomeEmail(email); err != nil {
 			log.Printf("Warning: Failed to send welcome email to %s: %v", email, err)
 		}
+	}(createdUser.Email)
+
+	// Уведомление админам о новом пользователе (async)
+	go func(email string) {
+		ip := r.Header.Get("X-Forwarded-For")
+		if ip == "" {
+			ip = r.Header.Get("X-Real-IP")
+		}
+		if ip == "" {
+			ip = r.RemoteAddr
+		}
+		msg := fmt.Sprintf(
+			"🔥 <b>Новый пользователь!</b>\n\n"+
+				"📧 <b>Email:</b> %s\n"+
+				"🌍 <b>IP:</b> %s",
+			email, ip,
+		)
+		telegram.NotifyAdmins(msg, "👤 Открыть в админке", "https://xplr.pro/admin/users")
 	}(createdUser.Email)
 
 	// Admin bootstrap: если в системе нет ни одного админа, первый пользователь становится админом

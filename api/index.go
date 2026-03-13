@@ -63,6 +63,7 @@ func ensureDB() {
 	// 3. Telegram
 	if token := os.Getenv("TELEGRAM_BOT_TOKEN"); token != "" {
 		telegram.SetBotToken(token)
+		telegram.AdminChatIDsProvider = repository.GetAdminChatIDs
 	}
 
 	// 4. Wallester

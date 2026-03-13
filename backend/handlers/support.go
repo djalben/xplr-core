@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/djalben/xplr-core/backend/middleware"
 	"github.com/djalben/xplr-core/backend/repository"
 	"github.com/djalben/xplr-core/backend/service"
+	"github.com/djalben/xplr-core/backend/telegram"
 )
 
 // SubmitSupportTicketHandler — POST /api/v1/user/support
@@ -64,6 +66,21 @@ func SubmitSupportTicketHandler(w http.ResponseWriter, r *http.Request) {
 		if err := service.SendSupportTicketNotification(ticketID, user.Email, subject, message); err != nil {
 			log.Printf("[SUPPORT] Email notification failed for ticket #%d: %v", ticketID, err)
 		}
+	}()
+
+	// Уведомление админам о новом тикете (async)
+	go func() {
+		preview := message
+		if len(preview) > 100 {
+			preview = preview[:100] + "..."
+		}
+		msg := fmt.Sprintf(
+			"🆘 <b>Новый тикет в поддержку!</b>\n\n"+
+				"📧 <b>От:</b> %s\n"+
+				"📝 <b>Сообщение:</b> %s",
+			user.Email, preview,
+		)
+		telegram.NotifyAdmins(msg, "💬 Ответить", "https://xplr.pro/admin/tickets")
 	}()
 
 	log.Printf("[SUPPORT] ✅ Ticket #%d created by %s (user_id=%d)", ticketID, user.Email, userID)

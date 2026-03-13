@@ -93,6 +93,7 @@ func main() {
 	// Telegram bot token (для реальной отправки уведомлений)
 	if token := os.Getenv("TELEGRAM_BOT_TOKEN"); token != "" {
 		telegram.SetBotToken(token)
+		telegram.AdminChatIDsProvider = repository.GetAdminChatIDs
 		log.Println("Telegram bot token set: real notifications enabled")
 	}
 

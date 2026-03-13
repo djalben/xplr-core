@@ -122,6 +122,51 @@ func SendMessageHTML(chatID int64, message string) {
 	}
 }
 
+// NotifyAdmins отправляет HTML-сообщение всем админам с привязанным Telegram.
+// Если buttonText и buttonURL не пустые — добавляет inline URL-кнопку.
+// adminChatIDs — функция-источник chat_id (инъекция зависимости, чтобы не импортировать repository).
+var AdminChatIDsProvider func() ([]int64, error)
+
+func NotifyAdmins(message string, buttonText string, buttonURL string) {
+	if botToken == "" {
+		return
+	}
+	if AdminChatIDsProvider == nil {
+		log.Println("[TELEGRAM] NotifyAdmins: AdminChatIDsProvider not set")
+		return
+	}
+	ids, err := AdminChatIDsProvider()
+	if err != nil {
+		log.Printf("[TELEGRAM] NotifyAdmins: failed to get admin chat IDs: %v", err)
+		return
+	}
+	if len(ids) == 0 {
+		return
+	}
+
+	for _, chatID := range ids {
+		if buttonText != "" && buttonURL != "" {
+			payload := sendMessageWithURLPayload{
+				ChatID:    chatID,
+				Text:      message,
+				ParseMode: "HTML",
+				ReplyMarkup: &inlineKeyboardURLMarkup{
+					InlineKeyboard: [][]inlineKeyboardURLButton{
+						{
+							{Text: buttonText, URL: buttonURL},
+						},
+					},
+				},
+			}
+			if err := postJSON("sendMessage", payload); err != nil {
+				log.Printf("[TELEGRAM] NotifyAdmins failed (Chat %d): %v", chatID, err)
+			}
+		} else {
+			SendMessageHTML(chatID, message)
+		}
+	}
+}
+
 // ── Inline Keyboard helpers ──
 
 type inlineKeyboardButton struct {
@@ -138,6 +183,23 @@ type sendMessagePayload struct {
 
 type inlineKeyboardMarkup struct {
 	InlineKeyboard [][]inlineKeyboardButton `json:"inline_keyboard"`
+}
+
+// URL button types (for NotifyAdmins — opens a link, no callback)
+type inlineKeyboardURLButton struct {
+	Text string `json:"text"`
+	URL  string `json:"url"`
+}
+
+type inlineKeyboardURLMarkup struct {
+	InlineKeyboard [][]inlineKeyboardURLButton `json:"inline_keyboard"`
+}
+
+type sendMessageWithURLPayload struct {
+	ChatID      int64                    `json:"chat_id"`
+	Text        string                   `json:"text"`
+	ParseMode   string                   `json:"parse_mode,omitempty"`
+	ReplyMarkup *inlineKeyboardURLMarkup `json:"reply_markup,omitempty"`
 }
 
 type editMessagePayload struct {

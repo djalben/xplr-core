@@ -94,6 +94,29 @@ func GetUserEmailByChatID(chatID int64) (string, error) {
 	return email, nil
 }
 
+// GetAdminChatIDs returns Telegram chat_ids of all admin users who have linked Telegram.
+func GetAdminChatIDs() ([]int64, error) {
+	if GlobalDB == nil {
+		return nil, fmt.Errorf("database connection not initialized")
+	}
+	rows, err := GlobalDB.Query(
+		`SELECT telegram_chat_id FROM users WHERE is_admin = TRUE AND telegram_chat_id IS NOT NULL AND telegram_chat_id != 0`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err == nil && id != 0 {
+			ids = append(ids, id)
+		}
+	}
+	return ids, rows.Err()
+}
+
 // UpdateTelegramChatIDInt64 updates the telegram_chat_id for a user (int64 version).
 func UpdateTelegramChatIDInt64(userID int, chatID int64) error {
 	if GlobalDB == nil {
