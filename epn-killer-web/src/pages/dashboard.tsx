@@ -288,7 +288,7 @@ export const DashboardPage = () => {
   }
 
   const balancePers = Number(userData?.balance_personal ?? 0);
-  const userName = userData?.email?.split('@')[0] || 'Пользователь';
+  const userName = userData?.display_name || userData?.email?.split('@')[0] || 'Пользователь';
 
   return (
     <DashboardLayout>

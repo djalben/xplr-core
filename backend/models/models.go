@@ -56,6 +56,7 @@ type User struct {
 	IsAdmin          bool            `json:"is_admin"`
 	IsVerified       bool            `json:"is_verified"`
 	Role             string          `json:"role"`
+	DisplayName      string          `json:"display_name"`
 }
 
 // VerificationToken — токен подтверждения email

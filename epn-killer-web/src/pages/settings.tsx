@@ -8,7 +8,7 @@ import { useAuth } from '../store/auth-context';
 import { 
   User, Lock, Bell, Shield, Eye, EyeOff, Save, Check, Smartphone, Globe, Mail,
   FileText, Upload, CheckCircle, AlertCircle, MessageCircle, LogOut, Loader2,
-  MonitorSmartphone, ShieldCheck, ShieldAlert, ExternalLink, Clock, X
+  MonitorSmartphone, ShieldCheck, ShieldAlert, ExternalLink, Clock, X, Pencil
 } from 'lucide-react';
 
 type SettingsTab = 'profile' | 'security' | 'notifications' | 'kyc' | 'language';
@@ -121,6 +121,7 @@ const ProfileTab = ({ profile, reload, showToast, setActiveTab }: { profile: Pro
   const { t } = useTranslation();
   const { updateUserName } = useAuth();
   const [displayName, setDisplayName] = useState(profile?.display_name || '');
+  const [isEditingName, setIsEditingName] = useState(false);
   const [saving, setSaving] = useState(false);
   const [emailVerifyOpen, setEmailVerifyOpen] = useState(false);
   const [emailCode, setEmailCode] = useState('');
@@ -134,6 +135,7 @@ const ProfileTab = ({ profile, reload, showToast, setActiveTab }: { profile: Pro
     try {
       await apiClient.patch('/user/settings/profile', { display_name: displayName.trim() });
       updateUserName(displayName.trim());
+      setIsEditingName(false);
       showToast(t('settings.profileSection.profileUpdated'), 'ok');
       reload();
     } catch { showToast(t('settings.profileSection.saveError'), 'err'); }
@@ -185,11 +187,38 @@ const ProfileTab = ({ profile, reload, showToast, setActiveTab }: { profile: Pro
           </div>
           <div>
             <label className="block text-sm text-slate-400 mb-2">{t('settings.profileSection.displayName')}</label>
-            <input type="text" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder={t('settings.profileSection.displayNamePlaceholder')} className="xplr-input w-full" />
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={displayName}
+                onChange={e => setDisplayName(e.target.value)}
+                placeholder={t('settings.profileSection.displayNamePlaceholder')}
+                readOnly={!isEditingName}
+                onKeyDown={e => { if (e.key === 'Enter' && isEditingName) handleSave(); if (e.key === 'Escape') { setDisplayName(profile?.display_name || ''); setIsEditingName(false); } }}
+                className={`xplr-input w-full transition-colors ${
+                  isEditingName ? 'border-blue-500/50 bg-white/[0.04]' : 'bg-white/[0.02] cursor-default'
+                }`}
+              />
+              {!isEditingName ? (
+                <button
+                  onClick={() => setIsEditingName(true)}
+                  className="shrink-0 p-2.5 hover:bg-white/10 rounded-xl transition-colors group"
+                  title="Редактировать"
+                >
+                  <Pencil className="w-4 h-4 text-slate-400 group-hover:text-blue-400 transition-colors" />
+                </button>
+              ) : (
+                <button
+                  onClick={handleSave}
+                  disabled={saving || !displayName.trim()}
+                  className="shrink-0 flex items-center gap-1.5 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors whitespace-nowrap"
+                >
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  {t('settings.profileSection.saveProfile')}
+                </button>
+              )}
+            </div>
           </div>
-          <button onClick={handleSave} disabled={saving || !displayName.trim()} className="flex items-center gap-2 px-5 py-2.5 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors">
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}{t('settings.profileSection.saveProfile')}
-          </button>
         </div>
       </div>
 
