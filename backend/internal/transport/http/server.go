@@ -5,8 +5,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/djalben/xplr-core/internal/app"
-	walletApi "github.com/djalben/xplr-core/internal/transport/http/handler/v1/wallet"
+	"github.com/djalben/xplr-core/backend/internal/app"
+	cardApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/card"
+	walletApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/wallet"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -24,7 +25,7 @@ func NewServer(container *app.Container, host string, port int) *Server {
 	s := &Server{
 		router:    chi.NewRouter(),
 		container: container,
-		addr:      host + ":" + strconv.Itoa(port), // ← исправлено, gosec больше не ругается
+		addr:      host + ":" + strconv.Itoa(port),
 	}
 
 	s.setupMiddleware()
@@ -69,7 +70,12 @@ func (s *Server) setupMiddleware() {
 // setupRoutes — регистрирует все маршруты.
 func (s *Server) setupRoutes() {
 	s.router.Route("/v1", func(r chi.Router) {
+		// Wallet
 		walletHandler := walletApi.NewHandler(s.container.WalletUseCase)
 		walletHandler.Register(r)
+
+		// Card
+		cardHandler := cardApi.NewHandler(s.container.CardUseCase)
+		cardHandler.Register(r)
 	})
 }

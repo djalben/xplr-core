@@ -9,10 +9,10 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/djalben/xplr-core/internal/app"
-	"github.com/djalben/xplr-core/internal/config"
-	logHandler "github.com/djalben/xplr-core/internal/infrastructure/logger/handler"
-	httpServer "github.com/djalben/xplr-core/internal/transport/http"
+	"github.com/djalben/xplr-core/backend/internal/app"
+	"github.com/djalben/xplr-core/backend/internal/config"
+	logHandler "github.com/djalben/xplr-core/backend/internal/infrastructure/logger/handler"
+	httpServer "github.com/djalben/xplr-core/backend/internal/transport/http"
 	"gitlab.com/libs-artifex/wrapper/v2"
 )
 

@@ -3,8 +3,8 @@ package postgres
 import (
 	"context"
 
-	"github.com/djalben/xplr-core/internal/domain"
-	"github.com/djalben/xplr-core/internal/ports"
+	"github.com/djalben/xplr-core/backend/internal/domain"
+	"github.com/djalben/xplr-core/backend/internal/ports"
 	"github.com/jmoiron/sqlx"
 	"gitlab.com/libs-artifex/wrapper/v2"
 )

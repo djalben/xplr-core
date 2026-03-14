@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/djalben/xplr-core/internal/infrastructure/logger"
+	"github.com/djalben/xplr-core/backend/internal/infrastructure/logger"
 )
 
 // Create - создание хандлера.

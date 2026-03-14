@@ -1,4 +1,4 @@
-module github.com/djalben/xplr-core
+module github.com/djalben/xplr-core/backend
 
 go 1.26.1
 

@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/djalben/xplr-core/internal/infrastructure/logger"
+	"github.com/djalben/xplr-core/backend/internal/infrastructure/logger"
 )
 
 func TestContextWithGroups(t *testing.T) {

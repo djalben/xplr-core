@@ -29,9 +29,6 @@ CREATE TABLE cards (
     daily_spend_limit NUMERIC(20, 4) DEFAULT 1000.0000,
     failed_auth_count BIGINT DEFAULT 0,
     card_type VARCHAR(20) DEFAULT 'subscriptions',
-    auto_topup_enabled BOOLEAN DEFAULT FALSE,
-    auto_topup_below NUMERIC(20, 4) DEFAULT 0.0000,
-    auto_topup_amount NUMERIC(20, 4) DEFAULT 0.0000,
     balance NUMERIC(20, 4) DEFAULT 0.0000 NOT NULL,
     expiry_date TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -69,6 +66,7 @@ CREATE TABLE wallets (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE,
     balance NUMERIC(20, 4) DEFAULT 0.0000 NOT NULL,
+    auto_topup_enabled BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

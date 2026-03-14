@@ -3,7 +3,7 @@ package ports
 import (
 	"context"
 
-	"github.com/djalben/xplr-core/internal/domain"
+	"github.com/djalben/xplr-core/backend/internal/domain"
 )
 
 type WalletRepository interface {

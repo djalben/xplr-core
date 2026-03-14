@@ -3,19 +3,18 @@ package app
 import (
 	"context"
 
-	"github.com/djalben/xplr-core/internal/application/card"
-	"github.com/djalben/xplr-core/internal/application/commission"
-	"github.com/djalben/xplr-core/internal/application/ticket"
-	"github.com/djalben/xplr-core/internal/application/transaction"
-	"github.com/djalben/xplr-core/internal/application/wallet"
-	"github.com/djalben/xplr-core/internal/config"
-	"github.com/djalben/xplr-core/internal/infrastructure/persistence/postgres"
-	"github.com/djalben/xplr-core/internal/ports"
+	"github.com/djalben/xplr-core/backend/internal/application/card"
+	"github.com/djalben/xplr-core/backend/internal/application/commission"
+	"github.com/djalben/xplr-core/backend/internal/application/ticket"
+	"github.com/djalben/xplr-core/backend/internal/application/transaction"
+	"github.com/djalben/xplr-core/backend/internal/application/wallet"
+	"github.com/djalben/xplr-core/backend/internal/config"
+	"github.com/djalben/xplr-core/backend/internal/infrastructure/persistence/postgres"
+	"github.com/djalben/xplr-core/backend/internal/ports"
 	"github.com/jmoiron/sqlx"
 	"gitlab.com/libs-artifex/wrapper/v2"
 )
 
-// Container — главный DI-контейнер.
 type Container struct {
 	DB *sqlx.DB
 
@@ -33,23 +32,23 @@ type Container struct {
 	CommissionUseCase  *commission.UseCase
 }
 
-// NewContainer — создаёт всё приложение.
-func NewContainer(cfg *config.ENV) (*Container, error) { // ← исправлено на ENV
+func NewContainer(cfg *config.ENV) (*Container, error) {
 	ctx := context.Background()
 
-	// Подключаемся к БД
-	db, err := postgres.Connect(ctx, cfg.PostgresDSN) // ← исправлено
+	db, err := postgres.Connect(ctx, cfg.PostgresDSN)
 	if err != nil {
 		return nil, wrapper.Wrap(err)
 	}
 
-	// Репозитории
 	walletRepo := postgres.NewWalletRepository(db)
 	cardRepo := postgres.NewCardRepository(db)
 	transactionRepo := postgres.NewTransactionRepository(db)
 	ticketRepo := postgres.NewTicketRepository(db)
 	userRepo := postgres.NewUserRepository(db)
 	commissionRepo := postgres.NewCommissionConfigRepository(db)
+
+	// WalletUseCase создаём первым — он нужен для CardUseCase
+	walletUC := wallet.NewUseCase(walletRepo, transactionRepo)
 
 	return &Container{
 		DB: db,
@@ -61,19 +60,17 @@ func NewContainer(cfg *config.ENV) (*Container, error) { // ← исправле
 		UserRepo:        userRepo,
 		CommissionRepo:  commissionRepo,
 
-		WalletUseCase:      wallet.NewUseCase(walletRepo, transactionRepo),
-		CardUseCase:        card.NewUseCase(cardRepo, walletRepo, transactionRepo),
+		WalletUseCase:      walletUC,
+		CardUseCase:        card.NewUseCase(cardRepo, walletRepo, transactionRepo, walletUC),
 		TransactionUseCase: transaction.NewUseCase(transactionRepo),
 		TicketUseCase:      ticket.NewUseCase(ticketRepo),
 		CommissionUseCase:  commission.NewUseCase(commissionRepo),
 	}, nil
 }
 
-// Close — корректное завершение.
 func (c *Container) Close() error {
 	if c.DB != nil {
-		return wrapper.Wrap(c.DB.Close())
+		return c.DB.Close()
 	}
-
 	return nil
 }

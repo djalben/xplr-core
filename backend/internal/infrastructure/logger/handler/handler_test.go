@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/djalben/xplr-core/internal/infrastructure/logger"
+	"github.com/djalben/xplr-core/backend/internal/infrastructure/logger"
 )
 
 func TestGroups(t *testing.T) {

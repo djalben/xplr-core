@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/djalben/xplr-core/internal/domain"
-	"github.com/djalben/xplr-core/internal/ports"
+	"github.com/djalben/xplr-core/backend/internal/domain"
+	"github.com/djalben/xplr-core/backend/internal/ports"
 	"gitlab.com/libs-artifex/wrapper/v2"
 )
 

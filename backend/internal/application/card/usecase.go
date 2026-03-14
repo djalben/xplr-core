@@ -3,8 +3,9 @@ package card
 import (
 	"context"
 
-	"github.com/djalben/xplr-core/internal/domain"
-	"github.com/djalben/xplr-core/internal/ports"
+	"github.com/djalben/xplr-core/backend/internal/application/wallet"
+	"github.com/djalben/xplr-core/backend/internal/domain"
+	"github.com/djalben/xplr-core/backend/internal/ports"
 	"gitlab.com/libs-artifex/wrapper/v2"
 )
 
@@ -12,12 +13,24 @@ type UseCase struct {
 	cardRepo   ports.CardRepository
 	walletRepo ports.WalletRepository
 	txRepo     ports.TransactionRepository
+	walletUC   *wallet.UseCase
 }
 
-func NewUseCase(cr ports.CardRepository, wr ports.WalletRepository, tr ports.TransactionRepository) *UseCase {
-	return &UseCase{cardRepo: cr, walletRepo: wr, txRepo: tr}
+func NewUseCase(
+	cr ports.CardRepository,
+	wr ports.WalletRepository,
+	tr ports.TransactionRepository,
+	walletUC *wallet.UseCase,
+) *UseCase {
+	return &UseCase{
+		cardRepo:   cr,
+		walletRepo: wr,
+		txRepo:     tr,
+		walletUC:   walletUC,
+	}
 }
 
+// BuyCard — выпуск новой карты.
 func (uc *UseCase) BuyCard(ctx context.Context, userID domain.UUID, cardType domain.CardType) (*domain.Card, error) {
 	card, err := domain.NewCard(userID, cardType, "TEMP_PROVIDER_ID")
 	if err != nil {
@@ -29,11 +42,22 @@ func (uc *UseCase) BuyCard(ctx context.Context, userID domain.UUID, cardType dom
 		return nil, wrapper.Wrap(err)
 	}
 
-	tx := domain.NewTransaction(userID, &card.ID, domain.NewNumeric(2.00), domain.NewNumeric(0), "CARD_ISSUE", "COMPLETED", "Выпуск карты")
-
-	return card, wrapper.Wrap(uc.txRepo.Save(ctx, tx))
+	tx := domain.NewTransaction(userID, &card.ID, domain.NewNumeric(2.00), domain.NewNumeric(0),
+		"CARD_ISSUE", "COMPLETED", "Выпуск виртуальной карты")
+	return card, uc.txRepo.Save(ctx, tx)
 }
 
+// GetByID — получение карты по ID.
+func (uc *UseCase) GetByID(ctx context.Context, cardID domain.UUID) (*domain.Card, error) {
+	card, err := uc.cardRepo.GetByID(ctx, cardID)
+	if err != nil {
+		return nil, wrapper.Wrap(err)
+	}
+
+	return card, nil
+}
+
+// TopUpCard — ручное пополнение карты.
 func (uc *UseCase) TopUpCard(ctx context.Context, userID domain.UUID, cardID domain.UUID, amount domain.Numeric) error {
 	wallet, err := uc.walletRepo.GetByUserID(ctx, userID)
 	if err != nil {
@@ -56,26 +80,50 @@ func (uc *UseCase) TopUpCard(ctx context.Context, userID domain.UUID, cardID dom
 	if err != nil {
 		return wrapper.Wrap(err)
 	}
-
 	err = uc.cardRepo.Update(ctx, card)
 	if err != nil {
 		return wrapper.Wrap(err)
 	}
 
-	tx := domain.NewTransaction(userID, &cardID, amount, domain.NewNumeric(0), "TOPUP_CARD", "COMPLETED", "Пополнение карты")
-
-	return wrapper.Wrap(uc.txRepo.Save(ctx, tx))
+	tx := domain.NewTransaction(userID, &cardID, amount, domain.NewNumeric(0),
+		"TOPUP_CARD", "COMPLETED", "Ручное пополнение карты")
+	return uc.txRepo.Save(ctx, tx)
 }
 
-func (uc *UseCase) ToggleAutoTopUp(ctx context.Context, cardID domain.UUID, enabled bool, below, amount domain.Numeric) error {
+// CloseCard — закрытие карты + возврат остатка на кошелёк.
+func (uc *UseCase) CloseCard(ctx context.Context, userID domain.UUID, cardID domain.UUID) error {
 	card, err := uc.cardRepo.GetByID(ctx, cardID)
 	if err != nil {
 		return wrapper.Wrap(err)
 	}
 
-	card.AutoTopUpEnabled = enabled
-	card.AutoTopUpBelow = below
-	card.AutoTopUpAmount = amount
+	if card.Balance.GreaterThan(domain.NewNumeric(0)) {
+		wallet, err := uc.walletRepo.GetByUserID(ctx, userID)
+		if err != nil {
+			return wrapper.Wrap(err)
+		}
 
-	return wrapper.Wrap(uc.cardRepo.Update(ctx, card))
+		err = wallet.TopUp(card.Balance)
+		if err != nil {
+			return wrapper.Wrap(err)
+		}
+
+		err = uc.walletRepo.Update(ctx, wallet)
+		if err != nil {
+			return wrapper.Wrap(err)
+		}
+	}
+
+	card.CardStatus = "CLOSED"
+	err = uc.cardRepo.Update(ctx, card)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	return nil
+}
+
+// AutoTopUpCard — главный метод автотопапа (вызывается, когда карте не хватило денег).
+func (uc *UseCase) AutoTopUpCard(ctx context.Context, userID domain.UUID, cardID domain.UUID, neededAmount domain.Numeric) error {
+	return uc.walletUC.AutoTopUpCard(ctx, userID, cardID, neededAmount)
 }
