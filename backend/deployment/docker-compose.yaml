@@ -1,0 +1,20 @@
+services:
+  epn_killer_postgres:
+    image: postgres:latest
+    container_name: epn_killer_postgres
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    networks:
+      - epn-killer-net
+    volumes:
+      - ./volumes/postgresql/data:/var/lib/postgresql/data/
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    restart: always
+
+networks:
+  epn-killer-net:
+    driver: bridge
+    external: true

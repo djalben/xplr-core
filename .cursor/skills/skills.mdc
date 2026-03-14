@@ -1,0 +1,15 @@
+---
+description: Индекс навыков проекта XPLR. Вызывай @add-card-type, @implement-antifraud и др.
+---
+
+# XPLR Skills
+
+Навыки в формате Cursor: `.cursor/skills/<name>/SKILL.md`
+
+| @skill | Описание |
+|--------|----------|
+| **add-card-type** | Добавление нового типа карты (domain → application → миграция) |
+| **implement-antifraud** | Антифрод: подсчёт попыток, блокировка после 3 неудач |
+| **add-migration** | Миграции только через `make migrate-create <name>` |
+| **use-wrapper** | Ошибки и логирование через gitlab.com/libs-artifex/wrapper |
+| **use-envparse** | Конфиг только через gitlab.com/libs-artifex/envparse |

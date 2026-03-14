@@ -1,0 +1,19 @@
+---
+alwaysApply: true
+---
+
+# Go Style Rules для XPLR
+
+- Makefile используй строго из корня (цели docker-up, migrate-create и т.д.)
+- go 1.26 в go.mod
+- go.mod должен содержать:
+  require gitlab.com/libs-artifex/wrapper
+  require gitlab.com/libs-artifex/envparse
+- Форматирование: gofmt + goimports
+- Линтер: golangci-lint по .golangci.yml
+- Комментарии на русском README, ТЗ и вообще везде
+- generics везде где можно (Repository[T], Wrapper[T])
+- slog вместо log
+- errors.Is / errors.As + sentinel errors в pkg/errors
+- context везде
+- struct tags: `json:"..." db:"..." validate:"..."`

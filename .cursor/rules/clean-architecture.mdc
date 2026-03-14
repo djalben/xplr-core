@@ -1,0 +1,28 @@
+---
+alwaysApply: true
+---
+
+# Clean Architecture + Обязательные библиотеки для XPLR
+
+## Общие правила
+- Всегда соблюдай Dependency Rule: domain → application → ports → infrastructure
+- domain/ — 100% чистый, без импортов infra/config/logger
+- Используй ТОЛЬКО библиотеки из Открытые_библиотеки.md:
+  • gitlab.com/libs-artifex/wrapper — для всех ошибок и логирования
+  • gitlab.com/libs-artifex/envparse — для парсинга конфига
+- Никогда не пиши самописные обёртки ошибок и config.MustLoad
+- Карты: только 3 типа (Subscription, Travel, Premium)
+- Киллер-фичи: Wallet + AutoReplenish + AntiFraud (3 неудачных попытки = блок карты)
+- Все ошибки оборачивай через wrapper (см. документацию библиотеки)
+- Тесты: SUT + gomock/testify/mock
+- Go 1.26: используй generics, iter, errors.Join
+
+## Как использовать wrapper
+- Импорт: "gitlab.com/libs-artifex/wrapper"
+- Всегда оборачивай ошибки и логируй через функции библиотеки
+- В usecases и handlers — wrapper.WithLogAndWrap / wrapper.Wrap и т.п.
+
+## Как использовать envparse
+- Импорт: "gitlab.com/libs-artifex/envparse"
+- Конфиг парсится в internal/config/config.go через envparse
+- Структура конфига должна соответствовать тегам envparse

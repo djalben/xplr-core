@@ -1,0 +1,87 @@
+version: "2"
+run:
+  concurrency: 16
+linters:
+  default: all
+  disable:
+    - wsl
+    - containedctx
+    - cyclop
+    - exhaustruct
+    - funlen
+    - gochecknoglobals
+    - gosmopolitan
+    - ireturn
+    - lll
+    - mnd
+    - nonamedreturns
+    - tagalign
+    - varnamelen
+  settings:
+    depguard:
+      rules:
+        config:
+          list-mode: lax
+          files:
+            - "**/internal/config/**/*.go"
+          deny:
+            - pkg: "github.com/djalben/xplr-core"
+        domain:
+          list-mode: lax
+          files:
+            - "**/internal/domain/**/*.go"
+          deny:
+            - pkg: "github.com/djalben/xplr-core/internal/..."
+        ports:
+          list-mode: lax
+          files:
+            - "**/internal/ports/**/*.go"
+          deny:
+            - pkg: "github.com/djalben/xplr-core/internal/application"
+            - pkg: "github.com/djalben/xplr-core/internal/infrastructure"
+            - pkg: "github.com/djalben/xplr-core/internal/transport"
+        application:
+          list-mode: lax
+          files:
+            - "**/internal/application/**/*.go"
+          deny:
+            - pkg: "github.com/djalben/xplr-core/internal/infrastructure"
+            - pkg: "github.com/djalben/xplr-core/internal/transport"
+            - pkg: "github.com/djalben/xplr-core/internal/config"
+        infrastructure:
+          list-mode: lax
+          files:
+            - "**/internal/infrastructure/**/*.go"
+          deny:
+            - pkg: "github.com/djalben/xplr-core/internal/application"
+            - pkg: "github.com/djalben/xplr-core/internal/transport"
+        transport:
+          list-mode: lax
+          files:
+            - "**/internal/transport/**/*.go"
+          deny:
+            - pkg: "github.com/djalben/xplr-core/internal/config"
+            - pkg: "github.com/djalben/xplr-core/internal/infrastructure"
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
