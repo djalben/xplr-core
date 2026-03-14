@@ -77,12 +77,14 @@ const CardIssueModal = ({
   card, 
   onClose,
   onIssue,
-  isIssuing = false
+  isIssuing = false,
+  walletBalance = 0
 }: { 
   card: { type: string; name: string; price: string; currency: string; description: string; features: { title: string; items: string }[]; conditions: { label: string; value: string }[]; capabilities: { label: string; value: string; link?: boolean }[] };
   onClose: () => void;
   onIssue?: (cardType: 'subscriptions' | 'travel' | 'premium', priceRub: number) => void;
   isIssuing?: boolean;
+  walletBalance?: number;
 }) => {
   const [showProhibited, setShowProhibited] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState<'USD' | 'EUR'>(card.currency === 'EUR' ? 'EUR' : 'USD');
@@ -237,6 +239,13 @@ const CardIssueModal = ({
         
         {/* Fixed footer button */}
         <div className="shrink-0 p-5 pt-3 border-t border-white/[0.06]">
+          {/* Wallet balance info */}
+          <div className="flex items-center justify-between mb-3 px-1">
+            <span className="text-xs text-slate-400">У вас на балансе:</span>
+            <span className={`text-sm font-bold ${walletBalance > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+              {walletBalance.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽
+            </span>
+          </div>
           <button 
             onClick={() => {
               if (onIssue) {
@@ -986,6 +995,8 @@ export const CardsPage = () => {
       const result = await issuePersonalCard(cardType, priceRub);
       if (result.successful_count > 0) {
         await fetchCards(); // Refresh card list from DB
+        // Refresh wallet balance after card issue
+        getWallet().then((v) => setWalletBalance(Number(v.master_balance) || 0)).catch(() => {});
         setIssueModal(null);
         setActiveTab('my-cards');
       } else {
@@ -1210,7 +1221,7 @@ export const CardsPage = () => {
         {closeCardModal && <CloseCardModal card={closeCardModal} onClose={() => setCloseCardModal(null)} onConfirm={() => handleCloseCard(closeCardModal)} />}
         {topUpModal && <WalletTopUpModal card={topUpModal} walletBalance={walletBalance} onClose={() => setTopUpModal(null)} onTransfer={(amt) => handleTransfer(topUpModal, amt)} />}
         {paymentModal && <PaymentMethodModal type={paymentModal.type} onClose={() => setPaymentModal(null)} />}
-        {issueModal && <CardIssueModal card={issueModal} onClose={() => setIssueModal(null)} onIssue={handleIssueCard} isIssuing={isIssuing} />}
+        {issueModal && <CardIssueModal card={issueModal} onClose={() => setIssueModal(null)} onIssue={handleIssueCard} isIssuing={isIssuing} walletBalance={walletBalance} />}
       </div>
 
       <style>{`

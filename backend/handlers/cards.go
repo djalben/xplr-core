@@ -264,31 +264,38 @@ func MassIssueCardsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Calculate fee per card based on category
-	feePerCard := decimal.NewFromFloat(5.00) // arbitrage default
+	// Calculate fee to deduct from wallet (internal_balances.master_balance is in RUB)
 	cat := strings.ToLower(req.Category)
-	switch cat {
-	case "travel":
-		feePerCard = decimal.NewFromFloat(3.00)
-	case "services":
-		feePerCard = decimal.NewFromFloat(2.00)
+	if cat == "" {
+		cat = "arbitrage"
 	}
 
-	// If price_rub is provided (personal cards), convert RUB → USD
+	var totalFeeRub decimal.Decimal
 	if req.PriceRub.GreaterThan(decimal.Zero) {
+		// Personal cards: price is already in RUB — deduct directly
+		totalFeeRub = req.PriceRub.Mul(decimal.NewFromInt(int64(req.Count)))
+	} else {
+		// Arbitrage cards: fee in USD, convert to RUB for wallet deduction
+		feeUSD := decimal.NewFromFloat(5.00)
+		switch cat {
+		case "travel":
+			feeUSD = decimal.NewFromFloat(3.00)
+		case "services":
+			feeUSD = decimal.NewFromFloat(2.00)
+		}
 		rate, err := repository.GetFinalRate("RUB", "USD")
 		if err == nil && rate.GreaterThan(decimal.Zero) {
-			feePerCard = req.PriceRub.Div(rate).Round(2)
+			totalFeeRub = feeUSD.Mul(rate).Mul(decimal.NewFromInt(int64(req.Count))).Round(2)
+		} else {
+			totalFeeRub = feeUSD.Mul(decimal.NewFromInt(int64(req.Count))) // fallback 1:1
 		}
 	}
 
-	totalFee := feePerCard.Mul(decimal.NewFromInt(int64(req.Count)))
-
-	// Deduct balance before issuing
-	if totalFee.GreaterThan(decimal.Zero) {
-		details := "Card issue fee: " + strconv.Itoa(req.Count) + "x " + cat + " @ $" + feePerCard.StringFixed(2)
-		if err := repository.DeductBalance(userID, totalFee, details); err != nil {
-			if strings.Contains(err.Error(), "недостаточно средств") {
+	// Deduct from wallet (internal_balances.master_balance, RUB) before issuing
+	if totalFeeRub.GreaterThan(decimal.Zero) {
+		details := "Card issue fee: " + strconv.Itoa(req.Count) + "x " + cat + " — " + totalFeeRub.StringFixed(2) + " ₽"
+		if err := repository.DeductWalletBalance(userID, totalFeeRub, details); err != nil {
+			if strings.Contains(err.Error(), "недостаточно средств") || strings.Contains(err.Error(), "кошелёк не найден") {
 				http.Error(w, err.Error(), http.StatusPaymentRequired)
 			} else {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
