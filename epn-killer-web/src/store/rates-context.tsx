@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
-import apiClient, { API_BASE_URL } from '../api/axios';
+import apiClient from '../api/axios';
 
 interface Rates {
   usd: number;
@@ -32,7 +32,7 @@ export const RatesProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshRates = useCallback(async () => {
     try {
-      const res = await apiClient.get(`${API_BASE_URL}/rates`);
+      const res = await apiClient.get('/rates');
       if (res.data?.usd && res.data?.eur) {
         setRatesState({ usd: Number(res.data.usd), eur: Number(res.data.eur) });
       }

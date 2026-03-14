@@ -19,7 +19,7 @@ import {
   ToggleRight,
   Info
 } from 'lucide-react';
-import apiClient, { API_BASE_URL } from '../api/axios';
+import apiClient from '../api/axios';
 import { getUserGrade, type GradeInfo } from '../api/grade';
 import { getWallet, type InternalBalance } from '../api/wallet';
 import { WorldClocks } from '../components/world-clocks';
@@ -219,16 +219,16 @@ export const DashboardPage = () => {
   const fetchData = async () => {
     try {
       const [userRes] = await Promise.all([
-        apiClient.get(`${API_BASE_URL}/user/me`),
+        apiClient.get('/user/me'),
       ]);
       setUserData(userRes.data);
 
       // Non-critical fetches
       try { const g = await getUserGrade(); setGradeInfo(g); } catch {}
       try { const v = await getWallet(); setWallet(v); } catch {}
-      try { const c = await apiClient.get(`${API_BASE_URL}/user/cards`); setCardCount(Array.isArray(c.data) ? c.data.length : 0); } catch {}
+      try { const c = await apiClient.get('/user/cards'); setCardCount(Array.isArray(c.data) ? c.data.length : 0); } catch {}
       try {
-        const t = await apiClient.get(`${API_BASE_URL}/user/report`, { params: { limit: 3 } });
+        const t = await apiClient.get('/user/report', { params: { limit: 3 } });
         const txs = t.data?.transactions ?? [];
         setTransactions((txs as any[]).slice(0, 3).map((tx: any, i: number) => ({
           id: String(i),
@@ -247,7 +247,7 @@ export const DashboardPage = () => {
         const startDate = new Date(now);
         startDate.setDate(now.getDate() - 6);
         const fmt = (d: Date) => d.toISOString().slice(0, 10);
-        const weekRes = await apiClient.get(`${API_BASE_URL}/user/report`, {
+        const weekRes = await apiClient.get('/user/report', {
           params: { start_date: fmt(startDate), end_date: fmt(now), limit: 500 }
         });
         const weekTxs: any[] = weekRes.data?.transactions ?? [];
@@ -352,7 +352,7 @@ export const DashboardPage = () => {
                 onClick={() => {
                   const next = !autoTopup;
                   setAutoTopup(next);
-                  apiClient.patch(`${API_BASE_URL}/user/wallet/auto-topup`, { enabled: next }).catch(() => setAutoTopup(!next));
+                  apiClient.patch('/user/wallet/auto-topup', { enabled: next }).catch(() => setAutoTopup(!next));
                 }}
                 className="flex items-center gap-2 text-sm"
               >

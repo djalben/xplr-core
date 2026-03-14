@@ -55,6 +55,8 @@ var allRequiredColumns = []requiredColumn{
 	{"users", "notify_security", "BOOLEAN DEFAULT TRUE"},
 	{"users", "verification_status", "VARCHAR(20) DEFAULT 'pending'"},
 	{"users", "display_name", "VARCHAR(255)"},
+	{"users", "email_verify_code", "VARCHAR(6)"},
+	{"users", "email_verify_expires", "TIMESTAMP WITH TIME ZONE"},
 }
 
 // RunSchemaGuard checks all required columns exist and creates missing ones.

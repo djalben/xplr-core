@@ -1,13 +1,16 @@
 package repository
 
 import (
+	"crypto/rand"
 	"database/sql"
 	"fmt"
 	"log"
+	"math/big"
 	"time"
 
 	"github.com/djalben/xplr-core/backend/models"
 	"github.com/djalben/xplr-core/backend/notification"
+	"github.com/djalben/xplr-core/backend/telegram"
 	"github.com/shopspring/decimal"
 )
 
@@ -342,8 +345,17 @@ func GetUserSpendStats(userID int) ([]map[string]interface{}, error) {
 	return stats, nil
 }
 
-// IssueCards — Mock-функция для выпуска виртуальных карт (без реального банка)
-// Генерирует фейковые карты с BIN 4242 для тестирования фронтенда
+// cryptoRand4 generates a cryptographically random 4-digit string (0000–9999).
+func cryptoRand4() string {
+	n, err := rand.Int(rand.Reader, big.NewInt(10000))
+	if err != nil {
+		return "0000"
+	}
+	return fmt.Sprintf("%04d", n.Int64())
+}
+
+// IssueCards — Mock-провайдер для выпуска виртуальных карт (песочница).
+// Генерирует карты с BIN 4455, случайным номером, CVV и Exp Date.
 func IssueCards(userID int, req models.MassIssueRequest) (interface{}, error) {
 	if GlobalDB == nil {
 		return nil, fmt.Errorf("database connection not initialized")
@@ -355,9 +367,26 @@ func IssueCards(userID int, req models.MassIssueRequest) (interface{}, error) {
 	successCount := 0
 	failedCount := 0
 
+	// Fee per card (calculated in handler and passed via context; also compute here for tx record)
+	feePerCard := decimal.NewFromFloat(5.00)
+	cat := req.Category
+	if cat == "" {
+		cat = "arbitrage"
+	}
+	switch cat {
+	case "travel":
+		feePerCard = decimal.NewFromFloat(3.00)
+	case "services":
+		feePerCard = decimal.NewFromFloat(2.00)
+	}
+
 	for i := 0; i < req.Count; i++ {
-		// Генерируем случайные последние 4 цифры карты
-		last4 := fmt.Sprintf("%04d", (userID*1000+i)%10000)
+		// Генерируем случайные последние 4 цифры карты (криптографически)
+		last4 := cryptoRand4()
+
+		// Генерируем provider_card_id: BIN + 6 random digits + last4 = 16-digit PAN
+		mid6 := fmt.Sprintf("%s%s", cryptoRand4()[:3], cryptoRand4()[:3])
+		providerCardID := "4455" + mid6 + last4
 
 		// Вставляем карту в БД
 		var cardID int
@@ -399,8 +428,8 @@ func IssueCards(userID int, req models.MassIssueRequest) (interface{}, error) {
 			RETURNING id, created_at
 		`,
 			userID,
-			fmt.Sprintf("MOCK-%d-%s", userID, last4),
-			"424242",
+			providerCardID,
+			"445500",
 			last4,
 			"ACTIVE",
 			req.CardNickname,
@@ -426,12 +455,12 @@ func IssueCards(userID int, req models.MassIssueRequest) (interface{}, error) {
 			continue
 		}
 
-		// Record transaction for card issuance
+		// Record transaction for card issuance (with actual fee)
 		_, txErr := GlobalDB.Exec(
 			`INSERT INTO transactions (user_id, card_id, amount, fee, transaction_type, status, details, executed_at)
-			 VALUES ($1, $2, $3, $4, 'ISSUE', 'APPROVED', $5, $6)`,
-			userID, cardID, decimal.Zero, decimal.Zero,
-			fmt.Sprintf("Card issued: %s •••• %s (%s)", cardType, last4, category),
+			 VALUES ($1, $2, $3, $4, 'CARD_ISSUE', 'SUCCESS', $5, $6)`,
+			userID, cardID, feePerCard, decimal.Zero,
+			fmt.Sprintf("Card issued: %s •••• %s (%s) — fee $%s", cardType, last4, category, feePerCard.StringFixed(2)),
 			time.Now(),
 		)
 		if txErr != nil {
@@ -450,7 +479,7 @@ func IssueCards(userID int, req models.MassIssueRequest) (interface{}, error) {
 				ID:              cardID,
 				UserID:          userID,
 				TeamID:          req.TeamID,
-				BIN:             "424242",
+				BIN:             "445500",
 				Last4Digits:     last4,
 				CardStatus:      "ACTIVE",
 				ServiceSlug:     serviceSlug,
@@ -476,12 +505,37 @@ func IssueCards(userID int, req models.MassIssueRequest) (interface{}, error) {
 	if successCount > 0 {
 		user, err := GetUserByID(userID)
 		if err == nil && user.TelegramChatID.Valid {
-			message := fmt.Sprintf("💳 Cards Issued Successfully!\n\nCount: %d cards\nMerchant: %s\nDaily Limit: $%.2f per card",
-				successCount,
-				req.MerchantName,
-				req.DailyLimit)
-			notification.SendTelegramMessage(user.TelegramChatID.Int64, message)
+			userMsg := fmt.Sprintf(
+				"💳 <b>Карта выпущена!</b>\n\n"+
+					"📦 <b>Количество:</b> %d\n"+
+					"🏷 <b>Категория:</b> %s\n"+
+					"💰 <b>Комиссия:</b> $%s\n"+
+					"📊 <b>Дневной лимит:</b> $%s\n\n"+
+					"Карта уже доступна в <a href=\"https://xplr.pro/cards\">личном кабинете</a>.",
+				successCount, cat, feePerCard.Mul(decimal.NewFromInt(int64(successCount))).StringFixed(2), req.DailyLimit.StringFixed(2),
+			)
+			telegram.SendMessageHTML(user.TelegramChatID.Int64, userMsg)
 		}
+
+		// Уведомление админам
+		go func() {
+			email := ""
+			if u, uErr := GetUserByID(userID); uErr == nil {
+				email = u.Email
+			}
+			if email == "" {
+				email = fmt.Sprintf("User #%d", userID)
+			}
+			adminMsg := fmt.Sprintf(
+				"💳 <b>Выпуск карт</b>\n\n"+
+					"👤 <b>Пользователь:</b> %s\n"+
+					"📦 <b>Количество:</b> %d\n"+
+					"🏷 <b>Категория:</b> %s\n"+
+					"💰 <b>Комиссия:</b> $%s",
+				email, successCount, cat, feePerCard.Mul(decimal.NewFromInt(int64(successCount))).StringFixed(2),
+			)
+			telegram.NotifyAdmins(adminMsg, "💳 Карты", "https://xplr.pro/admin/users")
+		}()
 	}
 
 	// RevShare: 5% commission to referrer on card issuance

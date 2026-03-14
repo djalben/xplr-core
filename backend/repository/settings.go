@@ -192,6 +192,109 @@ type MeExtended struct {
 	IsAdmin            bool   `json:"is_admin"`
 }
 
+// ── KYC Requests ──
+
+type KYCRequest struct {
+	ID          int    `json:"id"`
+	UserID      int    `json:"user_id"`
+	Country     string `json:"country"`
+	FirstName   string `json:"first_name"`
+	LastName    string `json:"last_name"`
+	BirthDate   string `json:"birth_date"`
+	Address     string `json:"address"`
+	DocPassport string `json:"doc_passport"`
+	DocAddress  string `json:"doc_address"`
+	DocSelfie   string `json:"doc_selfie"`
+	Status      string `json:"status"`
+	CreatedAt   string `json:"created_at"`
+}
+
+func CreateKYCRequest(userID int, country, firstName, lastName, birthDate, address string) (int, error) {
+	if GlobalDB == nil {
+		return 0, fmt.Errorf("database connection not initialized")
+	}
+	var id int
+	err := GlobalDB.QueryRow(
+		`INSERT INTO kyc_requests (user_id, country, first_name, last_name, birth_date, address, status)
+		 VALUES ($1, $2, $3, $4, $5, $6, 'pending') RETURNING id`,
+		userID, country, firstName, lastName, birthDate, address,
+	).Scan(&id)
+	if err != nil {
+		return 0, err
+	}
+	// Update user verification_status to pending
+	_, _ = GlobalDB.Exec(`UPDATE users SET verification_status = 'pending' WHERE id = $1`, userID)
+	log.Printf("[KYC] Created KYC request %d for user %d", id, userID)
+	return id, nil
+}
+
+func GetLatestKYCRequest(userID int) (*KYCRequest, error) {
+	if GlobalDB == nil {
+		return nil, fmt.Errorf("database connection not initialized")
+	}
+	var k KYCRequest
+	var createdAt time.Time
+	err := GlobalDB.QueryRow(
+		`SELECT id, user_id, country, first_name, last_name, COALESCE(birth_date,''), COALESCE(address,''),
+		        COALESCE(doc_passport,''), COALESCE(doc_address,''), COALESCE(doc_selfie,''), status, created_at
+		 FROM kyc_requests WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`, userID,
+	).Scan(&k.ID, &k.UserID, &k.Country, &k.FirstName, &k.LastName, &k.BirthDate, &k.Address,
+		&k.DocPassport, &k.DocAddress, &k.DocSelfie, &k.Status, &createdAt)
+	if err != nil {
+		return nil, err
+	}
+	k.CreatedAt = createdAt.Format(time.RFC3339)
+	return &k, nil
+}
+
+// ── Email Verification ──
+
+func SetEmailVerifyCode(userID int, code string) error {
+	if GlobalDB == nil {
+		return fmt.Errorf("database connection not initialized")
+	}
+	_, err := GlobalDB.Exec(
+		`UPDATE users SET email_verify_code = $1, email_verify_expires = NOW() + INTERVAL '15 minutes' WHERE id = $2`,
+		code, userID,
+	)
+	return err
+}
+
+func CheckEmailVerifyCode(userID int, code string) (bool, error) {
+	if GlobalDB == nil {
+		return false, fmt.Errorf("database connection not initialized")
+	}
+	var count int
+	err := GlobalDB.QueryRow(
+		`SELECT COUNT(*) FROM users WHERE id = $1 AND email_verify_code = $2 AND email_verify_expires > NOW()`,
+		userID, code,
+	).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func MarkEmailVerified(userID int) error {
+	if GlobalDB == nil {
+		return fmt.Errorf("database connection not initialized")
+	}
+	_, err := GlobalDB.Exec(
+		`UPDATE users SET is_verified = TRUE, email_verify_code = NULL, email_verify_expires = NULL WHERE id = $1`,
+		userID,
+	)
+	return err
+}
+
+func GetUserEmail(userID int) (string, error) {
+	if GlobalDB == nil {
+		return "", fmt.Errorf("database connection not initialized")
+	}
+	var email string
+	err := GlobalDB.QueryRow(`SELECT email FROM users WHERE id = $1`, userID).Scan(&email)
+	return email, err
+}
+
 func GetMeExtended(userID int) (MeExtended, error) {
 	var m MeExtended
 	if GlobalDB == nil {

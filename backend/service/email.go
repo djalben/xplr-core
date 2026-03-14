@@ -47,13 +47,47 @@ func loadSMTPConfig() *smtpConfig {
 	return c
 }
 
+// loadSupportSMTPConfig returns SMTP config for support@xplr.pro.
+// Falls back to main SMTP config if SMTP_SUPPORT_USER is not set.
+func loadSupportSMTPConfig() *smtpConfig {
+	user := os.Getenv("SMTP_SUPPORT_USER")
+	pass := os.Getenv("SMTP_SUPPORT_PASS")
+	if user == "" || pass == "" {
+		// Fallback: use main SMTP account
+		return loadSMTPConfig()
+	}
+	return &smtpConfig{
+		Host:   os.Getenv("SMTP_HOST"),
+		Port:   os.Getenv("SMTP_PORT"),
+		User:   user,
+		Pass:   pass,
+		From:   user, // Zoho requires From == authenticated user
+		Domain: os.Getenv("APP_DOMAIN"),
+	}
+}
+
 // sendMail — unified sender. Uses implicit TLS for port 465, STARTTLS for 587.
 func sendMail(to, subject, htmlBody string) error {
-	cfg := loadSMTPConfig()
+	return sendMailWith(loadSMTPConfig(), to, subject, htmlBody)
+}
+
+// sendMailSupport — sends email using the support SMTP account.
+func sendMailSupport(to, subject, htmlBody string) error {
+	return sendMailWith(loadSupportSMTPConfig(), to, subject, htmlBody)
+}
+
+func sendMailWith(cfg *smtpConfig, to, subject, htmlBody string) error {
 	if cfg.Host == "" || cfg.Port == "" {
-		log.Printf("[EMAIL] SMTP not configured. Email to %s skipped.", to)
-		return nil
+		log.Printf("[EMAIL] ⚠️  SMTP not configured (SMTP_HOST=%q, SMTP_PORT=%q). Email to %s skipped.", cfg.Host, cfg.Port, to)
+		return fmt.Errorf("SMTP not configured: SMTP_HOST and SMTP_PORT are required")
 	}
+	if cfg.User == "" || cfg.Pass == "" {
+		log.Printf("[EMAIL] ⚠️  SMTP credentials missing (SMTP_USER=%q, SMTP_PASS length=%d). Email to %s skipped.", cfg.User, len(cfg.Pass), to)
+		return fmt.Errorf("SMTP credentials missing: SMTP_USER and SMTP_PASS are required")
+	}
+
+	log.Printf("[EMAIL] 📤 Sending email: to=%s, from=%s, host=%s:%s, user=%s, subject=%q",
+		to, cfg.From, cfg.Host, cfg.Port, cfg.User, subject)
 
 	headers := fmt.Sprintf(
 		"From: XPLR <%s>\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n",
@@ -62,12 +96,21 @@ func sendMail(to, subject, htmlBody string) error {
 	msg := []byte(headers + htmlBody)
 	addr := fmt.Sprintf("%s:%s", cfg.Host, cfg.Port)
 
+	var err error
 	if cfg.Port == "465" {
-		return sendImplicitTLS(cfg, addr, to, msg)
+		err = sendImplicitTLS(cfg, addr, to, msg)
+	} else {
+		// Fallback: STARTTLS (port 587 etc.)
+		auth := smtp.PlainAuth("", cfg.User, cfg.Pass, cfg.Host)
+		err = smtp.SendMail(addr, auth, cfg.From, []string{to}, msg)
 	}
-	// Fallback: STARTTLS (port 587 etc.)
-	auth := smtp.PlainAuth("", cfg.User, cfg.Pass, cfg.Host)
-	return smtp.SendMail(addr, auth, cfg.From, []string{to}, msg)
+
+	if err != nil {
+		log.Printf("[EMAIL] ❌ FAILED to send to %s: %v", to, err)
+	} else {
+		log.Printf("[EMAIL] ✅ Sent successfully to %s", to)
+	}
+	return err
 }
 
 // sendImplicitTLS — connects with TLS first, then authenticates (Zoho, port 465).
@@ -306,11 +349,33 @@ func SendSupportTicketNotification(ticketID int, userEmail, subject, message str
 	html := wrapHTML("Новый тикет поддержки", content)
 	emailSubject := fmt.Sprintf("XPLR Тикет #%d — %s", ticketID, subject)
 
-	if err := sendMail("support@xplr.pro", emailSubject, html); err != nil {
+	if err := sendMailSupport("support@xplr.pro", emailSubject, html); err != nil {
 		log.Printf("[EMAIL] Failed to send support ticket notification: %v", err)
 		return err
 	}
 	log.Printf("[EMAIL] Support ticket #%d notification sent to support@xplr.pro", ticketID)
+	return nil
+}
+
+// SendEmailVerifyCode — отправка 6-значного кода подтверждения email.
+func SendEmailVerifyCode(toEmail, code string) error {
+	content := fmt.Sprintf(`
+    <p style="color:#cbd5e1;font-size:15px;line-height:1.6;margin:0 0 20px;">Здравствуйте!</p>
+    <p style="color:#94a3b8;font-size:14px;line-height:1.6;margin:0 0 24px;">Ваш код подтверждения email:</p>
+    <div style="text-align:center;margin:0 0 24px;">
+      <div style="display:inline-block;padding:20px 48px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);border-radius:16px;border:1px solid rgba(255,255,255,0.1);">
+        <p style="margin:0;color:#fff;font-size:36px;font-weight:800;letter-spacing:8px;">%s</p>
+      </div>
+    </div>
+    <p style="color:#64748b;font-size:12px;line-height:1.5;margin:0;">Код действителен 15 минут. Если вы не запрашивали подтверждение — проигнорируйте это письмо.</p>`, code)
+
+	html := wrapHTML("Подтверждение email", content)
+
+	if err := sendMail(toEmail, "XPLR — Код подтверждения email", html); err != nil {
+		log.Printf("[EMAIL] Failed to send verify code to %s: %v", toEmail, err)
+		return err
+	}
+	log.Printf("[EMAIL] Verify code sent to %s", toEmail)
 	return nil
 }
 

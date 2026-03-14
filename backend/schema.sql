@@ -424,9 +424,34 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'display_name') THEN
         ALTER TABLE users ADD COLUMN display_name VARCHAR(255);
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'email_verify_code') THEN
+        ALTER TABLE users ADD COLUMN email_verify_code VARCHAR(6);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'email_verify_expires') THEN
+        ALTER TABLE users ADD COLUMN email_verify_expires TIMESTAMP WITH TIME ZONE;
+    END IF;
 END $$;
 
--- 24. Миграция: support_tickets — добавляем email и message для полноценной поддержки
+-- 24. Таблица KYC-заявок
+CREATE TABLE IF NOT EXISTS kyc_requests (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    country VARCHAR(10) NOT NULL,
+    first_name VARCHAR(255) NOT NULL,
+    last_name VARCHAR(255) NOT NULL,
+    birth_date VARCHAR(20),
+    address TEXT,
+    doc_passport VARCHAR(500),
+    doc_address VARCHAR(500),
+    doc_selfie VARCHAR(500),
+    status VARCHAR(20) DEFAULT 'pending',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_kyc_requests_user_id ON kyc_requests(user_id);
+ALTER TABLE kyc_requests DISABLE ROW LEVEL SECURITY;
+
+-- 25. Миграция: support_tickets — добавляем email и message для полноценной поддержки
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'support_tickets' AND column_name = 'email') THEN

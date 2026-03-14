@@ -63,6 +63,7 @@ func ensureDB() {
 	// 3. Telegram
 	if token := os.Getenv("TELEGRAM_BOT_TOKEN"); token != "" {
 		telegram.SetBotToken(token)
+		telegram.AdminChatIDsProvider = repository.GetAdminChatIDs
 	}
 
 	// 4. Wallester
@@ -102,9 +103,114 @@ func ensureDB() {
 		}
 	}
 
-	// 7. Seed default exchange rates & start fetcher
+	// 7. Create tables that schema_guard doesn't cover (tables, not columns)
+	tableMigrations := []string{
+		// Wallet (internal balances)
+		`CREATE TABLE IF NOT EXISTS internal_balances (
+			id SERIAL PRIMARY KEY,
+			user_id INTEGER REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+			master_balance NUMERIC(20,4) DEFAULT 0.0000 NOT NULL,
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		// Support tickets
+		`CREATE TABLE IF NOT EXISTS support_tickets (
+			id SERIAL PRIMARY KEY,
+			user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+			subject VARCHAR(500) NOT NULL,
+			status VARCHAR(50) DEFAULT 'open',
+			tg_chat_id BIGINT,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		// Admin logs
+		`CREATE TABLE IF NOT EXISTS admin_logs (
+			id SERIAL PRIMARY KEY,
+			admin_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+			action TEXT NOT NULL,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		// Commission config
+		`CREATE TABLE IF NOT EXISTS commission_config (
+			id SERIAL PRIMARY KEY,
+			key VARCHAR(100) UNIQUE NOT NULL,
+			value NUMERIC(20,4) NOT NULL,
+			description TEXT,
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		// Telegram link codes (for /start UUID deep linking)
+		`CREATE TABLE IF NOT EXISTS telegram_link_codes (
+			id SERIAL PRIMARY KEY,
+			user_id INTEGER REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+			code VARCHAR(64) NOT NULL,
+			expires_at TIMESTAMP WITH TIME ZONE NOT NULL
+		)`,
+		// User sessions
+		`CREATE TABLE IF NOT EXISTS user_sessions (
+			id SERIAL PRIMARY KEY,
+			user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+			ip VARCHAR(50) DEFAULT '',
+			device TEXT DEFAULT '',
+			location TEXT DEFAULT '',
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			last_active TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		// KYC requests
+		`CREATE TABLE IF NOT EXISTS kyc_requests (
+			id SERIAL PRIMARY KEY,
+			user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+			country VARCHAR(10) NOT NULL,
+			first_name VARCHAR(255) NOT NULL,
+			last_name VARCHAR(255) NOT NULL,
+			birth_date VARCHAR(20),
+			address TEXT,
+			doc_passport VARCHAR(500),
+			doc_address VARCHAR(500),
+			doc_selfie VARCHAR(500),
+			status VARCHAR(20) DEFAULT 'pending',
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		// Seed default commission values (idempotent)
+		`INSERT INTO commission_config (key, value, description) VALUES
+			('fee_standard', 6.70, 'Комиссия для грейда STANDARD (%)'),
+			('fee_silver', 5.50, 'Комиссия для грейда SILVER (%)'),
+			('fee_gold', 4.50, 'Комиссия для грейда GOLD (%)'),
+			('fee_platinum', 3.50, 'Комиссия для грейда PLATINUM (%)'),
+			('fee_black', 2.50, 'Комиссия для грейда BLACK (%)'),
+			('referral_percent', 5.00, 'Процент реферальной комиссии'),
+			('card_issue_fee', 2.00, 'Стоимость выпуска карты ($)')
+		ON CONFLICT (key) DO NOTHING`,
+	}
+	for _, m := range tableMigrations {
+		if _, err := db.Exec(m); err != nil {
+			log.Printf("Warning: table migration failed: %v", err)
+		}
+	}
+
+	// 8. Run SchemaGuard to ensure all required columns exist
+	repository.RunSchemaGuard()
+
+	// 9. Seed default exchange rates & start fetcher
 	repository.SeedDefaultExchangeRates()
 	go service.StartExchangeRateFetcher()
+
+	// 10. SMTP diagnostics (log config status, never log passwords)
+	smtpHost := os.Getenv("SMTP_HOST")
+	smtpPort := os.Getenv("SMTP_PORT")
+	smtpUser := os.Getenv("SMTP_USER")
+	smtpPass := os.Getenv("SMTP_PASS")
+	smtpSupportUser := os.Getenv("SMTP_SUPPORT_USER")
+	if smtpHost != "" && smtpUser != "" && smtpPass != "" {
+		log.Printf("[SMTP] ✅ Configured: host=%s, port=%s, user=%s", smtpHost, smtpPort, smtpUser)
+	} else {
+		log.Printf("[SMTP] ⚠️  NOT configured! host=%q, port=%q, user=%q, pass_len=%d — emails will FAIL",
+			smtpHost, smtpPort, smtpUser, len(smtpPass))
+	}
+	if smtpSupportUser != "" {
+		log.Printf("[SMTP] ✅ Support account: %s", smtpSupportUser)
+	} else {
+		log.Printf("[SMTP] ℹ️  No SMTP_SUPPORT_USER — support emails will use main SMTP account")
+	}
 
 	dbReady = true
 	log.Println("Serverless handler initialized successfully")
@@ -125,9 +231,20 @@ func buildRouter() *mux.Router {
 	// Public auth routes
 	r.HandleFunc("/api/v1/auth/register", handlers.RegisterHandler).Methods("POST")
 	r.HandleFunc("/api/v1/auth/login", handlers.LoginHandler).Methods("POST")
+	r.HandleFunc("/api/v1/auth/verify", handlers.VerifyEmailHandler).Methods("GET")
+	r.HandleFunc("/api/v1/auth/reset-password-request", handlers.ResetPasswordRequestHandler).Methods("POST")
+	r.HandleFunc("/api/v1/auth/reset-password", handlers.ResetPasswordHandler).Methods("POST")
+	r.HandleFunc("/api/v1/auth/refresh-token", handlers.RefreshTokenHandler).Methods("POST")
 
-	// Wallester webhook (public)
+	// Webhooks (public)
 	r.HandleFunc("/api/v1/webhooks/wallester", handlers.WallesterWebhookHandler).Methods("POST")
+	r.HandleFunc("/api/v1/webhooks/external-topup", handlers.ExternalTopUpWebhookHandler).Methods("POST")
+
+	// Telegram Bot Webhook (public — Telegram calls directly)
+	r.HandleFunc("/api/v1/telegram/webhook", handlers.TelegramWebhookHandler).Methods("POST")
+
+	// Daily report (secret-key protected, for cron/internal use)
+	r.HandleFunc("/api/v1/admin/send-daily-report", handlers.SendDailyReportHandler).Methods("GET")
 
 	// Public card types endpoint
 	r.HandleFunc("/api/v1/cards/types", handlers.GetCardTypesHandler).Methods("GET")
@@ -154,7 +271,12 @@ func buildRouter() *mux.Router {
 	protected.HandleFunc("/cards/{id}/mock-details", handlers.MockCardDetailsHandler).Methods("GET")
 	protected.HandleFunc("/cards/{id}/limit", handlers.UpdateCardSpendLimitHandler).Methods("PATCH")
 	protected.HandleFunc("/cards/{id}/sync-balance", handlers.SyncCardBalanceHandler).Methods("POST")
+	protected.HandleFunc("/cards/{id}/spending-limit", handlers.SetSpendingLimitHandler).Methods("PATCH")
+	protected.HandleFunc("/wallet", handlers.GetWalletHandler).Methods("GET")
+	protected.HandleFunc("/wallet/topup", handlers.TopUpWalletHandler).Methods("POST")
+	protected.HandleFunc("/wallet/auto-topup", handlers.SetAutoTopupHandler).Methods("PATCH")
 	protected.HandleFunc("/report", handlers.GetUserTransactionReportHandler).Methods("GET")
+	protected.HandleFunc("/transactions", handlers.GetUnifiedTransactionsHandler).Methods("GET")
 	protected.HandleFunc("/api-key", handlers.CreateAPIKeyHandler).Methods("POST")
 
 	// Teams
@@ -167,10 +289,31 @@ func buildRouter() *mux.Router {
 
 	// Referrals
 	protected.HandleFunc("/referrals", handlers.GetReferralStatsHandler).Methods("GET")
+	protected.HandleFunc("/referrals/info", handlers.GetReferralInfoHandler).Methods("GET")
 	protected.HandleFunc("/referrals/list", handlers.GetReferralListHandler).Methods("GET")
 
-	// Settings
+	// Settings — Telegram
 	protected.HandleFunc("/settings/telegram", handlers.UpdateTelegramChatIDHandler).Methods("POST")
+	protected.HandleFunc("/settings/telegram-link", handlers.GetTelegramLinkHandler).Methods("GET")
+
+	// Support
+	protected.HandleFunc("/support", handlers.SubmitSupportTicketHandler).Methods("POST")
+
+	// Settings — Profile, Password, Sessions, Notifications, 2FA, Email Verify, KYC
+	protected.HandleFunc("/settings/profile", handlers.GetSettingsProfileHandler).Methods("GET")
+	protected.HandleFunc("/settings/profile", handlers.UpdateProfileHandler).Methods("PATCH")
+	protected.HandleFunc("/settings/change-password", handlers.ChangePasswordHandler).Methods("POST")
+	protected.HandleFunc("/settings/sessions", handlers.GetSessionsHandler).Methods("GET")
+	protected.HandleFunc("/settings/logout-all", handlers.LogoutAllSessionsHandler).Methods("POST")
+	protected.HandleFunc("/settings/notifications", handlers.GetNotificationPrefsHandler).Methods("GET")
+	protected.HandleFunc("/settings/notifications", handlers.UpdateNotificationPrefsHandler).Methods("PATCH")
+	protected.HandleFunc("/settings/2fa/setup", handlers.Setup2FAHandler).Methods("POST")
+	protected.HandleFunc("/settings/2fa/verify", handlers.Verify2FAHandler).Methods("POST")
+	protected.HandleFunc("/settings/2fa/disable", handlers.Disable2FAHandler).Methods("POST")
+	protected.HandleFunc("/settings/verify-email-request", handlers.RequestEmailVerifyHandler).Methods("POST")
+	protected.HandleFunc("/settings/verify-email-confirm", handlers.ConfirmEmailVerifyHandler).Methods("POST")
+	protected.HandleFunc("/settings/kyc", handlers.SubmitKYCHandler).Methods("POST")
+	protected.HandleFunc("/settings/kyc", handlers.GetKYCHandler).Methods("GET")
 
 	// Admin routes (JWT + AdminOnly)
 	admin := r.PathPrefix("/api/v1/admin").Subrouter()
@@ -181,8 +324,18 @@ func buildRouter() *mux.Router {
 	admin.HandleFunc("/users/{id}/balance", handlers.AdminAdjustBalanceHandler).Methods("PATCH")
 	admin.HandleFunc("/users/{id}/role", handlers.AdminToggleRoleHandler).Methods("PATCH")
 	admin.HandleFunc("/users/{id}/status", handlers.AdminSetUserStatusHandler).Methods("PATCH")
+	admin.HandleFunc("/dashboard", handlers.AdminDashboardStatsHandler).Methods("GET")
 	admin.HandleFunc("/rates", handlers.AdminGetExchangeRatesHandler).Methods("GET")
 	admin.HandleFunc("/rates/{id}/markup", handlers.AdminUpdateMarkupHandler).Methods("PATCH")
+	admin.HandleFunc("/report", handlers.GetAdminTransactionReportHandler).Methods("GET")
+	admin.HandleFunc("/users/search", handlers.AdminSearchUsersHandler).Methods("GET")
+	admin.HandleFunc("/users/{id}/grade", handlers.AdminUpdateUserGradeHandler).Methods("PATCH")
+	admin.HandleFunc("/commissions", handlers.AdminGetCommissionConfigHandler).Methods("GET")
+	admin.HandleFunc("/commissions/{id}", handlers.AdminUpdateCommissionConfigHandler).Methods("PATCH")
+	admin.HandleFunc("/tickets", handlers.AdminGetSupportTicketsHandler).Methods("GET")
+	admin.HandleFunc("/tickets/{id}", handlers.AdminUpdateTicketStatusHandler).Methods("PATCH")
+	admin.HandleFunc("/users/{id}/emergency-freeze", handlers.AdminEmergencyFreezeHandler).Methods("POST")
+	admin.HandleFunc("/logs", handlers.AdminGetLogsHandler).Methods("GET")
 
 	return r
 }

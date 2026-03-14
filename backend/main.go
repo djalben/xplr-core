@@ -93,6 +93,7 @@ func main() {
 	// Telegram bot token (для реальной отправки уведомлений)
 	if token := os.Getenv("TELEGRAM_BOT_TOKEN"); token != "" {
 		telegram.SetBotToken(token)
+		telegram.AdminChatIDsProvider = repository.GetAdminChatIDs
 		log.Println("Telegram bot token set: real notifications enabled")
 	}
 
@@ -141,6 +142,12 @@ func main() {
 	// Webhook от зарубежной организации — подтверждение пополнения (публичный)
 	router.HandleFunc("/api/v1/webhooks/external-topup", handlers.ExternalTopUpWebhookHandler).Methods("POST")
 
+	// Telegram Bot Webhook (публичный — Telegram вызывает напрямую)
+	router.HandleFunc("/api/v1/telegram/webhook", handlers.TelegramWebhookHandler).Methods("POST")
+
+	// Daily report (secret-key protected, for cron/internal use)
+	router.HandleFunc("/api/v1/admin/send-daily-report", handlers.SendDailyReportHandler).Methods("GET")
+
 	// --- НАСТРОЙКА ЗАЩИЩЕННЫХ МАРШРУТОВ (Protected Routes) ---
 	// Создаем Subrouter с префиксом /api/v1/user
 	protectedRouter := router.PathPrefix("/api/v1/user").Subrouter()
@@ -187,6 +194,7 @@ func main() {
 
 	// Привязка Telegram Chat ID для уведомлений
 	protectedRouter.HandleFunc("/settings/telegram", handlers.UpdateTelegramChatIDHandler).Methods("POST")
+	protectedRouter.HandleFunc("/settings/telegram-link", handlers.GetTelegramLinkHandler).Methods("GET")
 
 	// Поддержка — отправка тикета
 	protectedRouter.HandleFunc("/support", handlers.SubmitSupportTicketHandler).Methods("POST")
@@ -202,6 +210,10 @@ func main() {
 	protectedRouter.HandleFunc("/settings/2fa/setup", handlers.Setup2FAHandler).Methods("POST")
 	protectedRouter.HandleFunc("/settings/2fa/verify", handlers.Verify2FAHandler).Methods("POST")
 	protectedRouter.HandleFunc("/settings/2fa/disable", handlers.Disable2FAHandler).Methods("POST")
+	protectedRouter.HandleFunc("/settings/verify-email-request", handlers.RequestEmailVerifyHandler).Methods("POST")
+	protectedRouter.HandleFunc("/settings/verify-email-confirm", handlers.ConfirmEmailVerifyHandler).Methods("POST")
+	protectedRouter.HandleFunc("/settings/kyc", handlers.SubmitKYCHandler).Methods("POST")
+	protectedRouter.HandleFunc("/settings/kyc", handlers.GetKYCHandler).Methods("GET")
 
 	// --- ADMIN ROUTES (JWT + AdminOnly) ---
 	adminRouter := router.PathPrefix("/api/v1/admin").Subrouter()

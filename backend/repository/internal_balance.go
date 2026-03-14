@@ -108,6 +108,62 @@ func TopUpInternalBalance(userID int, amount decimal.Decimal) (*models.InternalB
 	return GetInternalBalance(userID)
 }
 
+// DeductWalletBalance — списать из Кошелька (internal_balances.master_balance) для оплаты выпуска карт.
+// Атомарно проверяет баланс, списывает и записывает транзакцию.
+func DeductWalletBalance(userID int, amount decimal.Decimal, details string) error {
+	if GlobalDB == nil {
+		return fmt.Errorf("database connection not initialized")
+	}
+	if amount.LessThanOrEqual(decimal.Zero) {
+		return fmt.Errorf("сумма списания должна быть положительной")
+	}
+
+	tx, err := GlobalDB.Begin()
+	if err != nil {
+		return fmt.Errorf("не удалось начать транзакцию: %v", err)
+	}
+	defer tx.Rollback()
+
+	// Проверяем master_balance
+	var balance decimal.Decimal
+	err = tx.QueryRow(
+		`SELECT COALESCE(master_balance, 0) FROM internal_balances WHERE user_id = $1 FOR UPDATE`,
+		userID,
+	).Scan(&balance)
+	if err != nil {
+		return fmt.Errorf("кошелёк не найден — пополните баланс")
+	}
+	if balance.LessThan(amount) {
+		return fmt.Errorf("недостаточно средств (баланс: $%s, требуется: $%s)", balance.StringFixed(2), amount.StringFixed(2))
+	}
+
+	// Списываем
+	_, err = tx.Exec(
+		`UPDATE internal_balances SET master_balance = master_balance - $1, updated_at = NOW() WHERE user_id = $2`,
+		amount, userID,
+	)
+	if err != nil {
+		return fmt.Errorf("не удалось списать из кошелька: %v", err)
+	}
+
+	// Записываем транзакцию
+	_, err = tx.Exec(
+		`INSERT INTO transactions (user_id, amount, fee, transaction_type, status, details, executed_at)
+		 VALUES ($1, $2, 0, 'CARD_ISSUE_FEE', 'APPROVED', $3, $4)`,
+		userID, amount, details, time.Now(),
+	)
+	if err != nil {
+		log.Printf("DB Error Insert deduction transaction: %v", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("ошибка фиксации: %v", err)
+	}
+
+	log.Printf("User %d: deducted $%s from wallet for: %s", userID, amount.StringFixed(2), details)
+	return nil
+}
+
 // DeductInternalBalance — списать из Кошелька пользователя (вызывается Bridge при webhook).
 // Атомарно уменьшает master_balance и увеличивает spent_from_wallet на карте.
 func DeductInternalBalance(tx interface {

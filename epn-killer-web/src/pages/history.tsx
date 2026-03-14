@@ -9,7 +9,7 @@ import {
   CreditCard,
   Clock
 } from 'lucide-react';
-import apiClient, { API_BASE_URL } from '../api/axios';
+import apiClient from '../api/axios';
 
 type Period = 'day' | 'week' | 'month';
 
@@ -51,7 +51,7 @@ export const HistoryPage = () => {
       else if (period === 'week') start.setDate(now.getDate() - 7);
       else start.setDate(now.getDate() - 31);
 
-      const res = await apiClient.get(`${API_BASE_URL}/user/transactions`, {
+      const res = await apiClient.get('/user/transactions', {
         params: { start_date: fmt(start), end_date: fmt(now), limit: 200 }
       });
       const txs: any[] = res.data?.transactions ?? [];
