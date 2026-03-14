@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X } from 'lucide-react';
 import { useRates } from '../store/rates-context';
 import { ModalPortal } from './modal-portal';
+import { topUpWallet } from '../api/wallet';
 
 // Inline SVG bank logos
 const SbpLogo = () => (
@@ -51,13 +52,16 @@ const bankIcons = [
 
 interface WalletTopUpModalProps {
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
-export const WalletTopUpModal = ({ onClose }: WalletTopUpModalProps) => {
+export const WalletTopUpModal = ({ onClose, onSuccess }: WalletTopUpModalProps) => {
   const { rates } = useRates();
   const [selectedCurrency, setSelectedCurrency] = useState<'USD' | 'EUR'>('USD');
   const [foreignAmount, setForeignAmount] = useState('');
   const [activeRubPreset, setActiveRubPreset] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const currentRate = selectedCurrency === 'USD' ? rates.usd : rates.eur;
   const currencySymbol = selectedCurrency === 'USD' ? '$' : '€';
@@ -183,13 +187,29 @@ export const WalletTopUpModal = ({ onClose }: WalletTopUpModalProps) => {
 
           {/* Footer — СБП button + bank icons */}
           <div className="shrink-0 px-5 pt-2 pb-5 flex flex-col gap-2.5">
+            {error && (
+              <div className="mb-2 p-2 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-xs text-center">{error}</div>
+            )}
             <button
-              onClick={onClose}
-              disabled={!foreignAmount || parseFloat(foreignAmount) <= 0}
+              onClick={async () => {
+                if (!rubAmount) return;
+                setIsLoading(true);
+                setError('');
+                try {
+                  await topUpWallet(Number(rubAmount));
+                  onSuccess?.();
+                  onClose();
+                } catch (err: any) {
+                  setError(err?.response?.data || err?.message || 'Ошибка пополнения');
+                } finally {
+                  setIsLoading(false);
+                }
+              }}
+              disabled={!foreignAmount || parseFloat(foreignAmount) <= 0 || isLoading}
               className="w-full py-4 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2.5 text-base"
             >
               <SbpLogo />
-              <span>Пополнить через СБП{rubAmount ? ` — ${Number(rubAmount).toLocaleString('ru-RU')} ₽` : ''}</span>
+              <span>{isLoading ? 'Обработка...' : `Пополнить через СБП${rubAmount ? ` — ${Number(rubAmount).toLocaleString('ru-RU')} ₽` : ''}`}</span>
             </button>
             {/* Bank icons row */}
             <div className="flex items-center justify-center gap-3">

@@ -45,14 +45,24 @@ func GetInternalBalance(userID int) (*models.InternalBalance, error) {
 	return &ib, nil
 }
 
-// TopUpInternalBalance — пополнить Кошелёк пользователя на указанную сумму.
-// Списывает с balance_rub пользователя и зачисляет в internal_balances.
-func TopUpInternalBalance(userID int, amount decimal.Decimal) (*models.InternalBalance, error) {
+// TopUpInternalBalance — пополнить Кошелёк пользователя.
+// Принимает сумму в рублях, конвертирует в USD по текущему курсу и зачисляет в master_balance (USD).
+func TopUpInternalBalance(userID int, amountRub decimal.Decimal) (*models.InternalBalance, error) {
 	if GlobalDB == nil {
 		return nil, fmt.Errorf("database connection not initialized")
 	}
-	if amount.LessThanOrEqual(decimal.Zero) {
+	if amountRub.LessThanOrEqual(decimal.Zero) {
 		return nil, fmt.Errorf("amount must be positive")
+	}
+
+	// Конвертируем RUB → USD по внутреннему курсу
+	rate, err := GetFinalRate("RUB", "USD")
+	if err != nil || rate.IsZero() {
+		return nil, fmt.Errorf("exchange rate not available, cannot convert RUB to USD")
+	}
+	amountUsd := amountRub.Div(rate).Round(2)
+	if amountUsd.LessThanOrEqual(decimal.Zero) {
+		return nil, fmt.Errorf("converted amount too small")
 	}
 
 	tx, err := GlobalDB.Begin()
@@ -61,28 +71,12 @@ func TopUpInternalBalance(userID int, amount decimal.Decimal) (*models.InternalB
 	}
 	defer tx.Rollback()
 
-	// Проверяем достаточность balance_rub
-	var balanceRub decimal.Decimal
-	err = tx.QueryRow("SELECT COALESCE(balance_rub, 0) FROM users WHERE id = $1 FOR UPDATE", userID).Scan(&balanceRub)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user balance: %w", err)
-	}
-	if balanceRub.LessThan(amount) {
-		return nil, fmt.Errorf("insufficient funds: available %s, required %s", balanceRub.String(), amount.String())
-	}
-
-	// Списываем с balance_rub
-	_, err = tx.Exec("UPDATE users SET balance_rub = balance_rub - $1 WHERE id = $2", amount, userID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to deduct user balance: %w", err)
-	}
-
-	// Зачисляем в Кошелёк (upsert)
+	// Зачисляем USD в Кошелёк (upsert)
 	_, err = tx.Exec(
 		`INSERT INTO internal_balances (user_id, master_balance, updated_at)
 		 VALUES ($1, $2, NOW())
 		 ON CONFLICT (user_id) DO UPDATE SET master_balance = internal_balances.master_balance + $2, updated_at = NOW()`,
-		userID, amount,
+		userID, amountUsd,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to top up wallet: %w", err)
@@ -92,8 +86,8 @@ func TopUpInternalBalance(userID int, amount decimal.Decimal) (*models.InternalB
 	_, err = tx.Exec(
 		`INSERT INTO transactions (user_id, amount, fee, transaction_type, status, details, executed_at)
 		 VALUES ($1, $2, 0, 'WALLET_TOPUP', 'APPROVED', $3, $4)`,
-		userID, amount,
-		fmt.Sprintf("Top-up wallet: +%s", amount.String()),
+		userID, amountUsd,
+		fmt.Sprintf("Top-up wallet: %s ₽ → $%s (rate %s)", amountRub.StringFixed(0), amountUsd.StringFixed(2), rate.StringFixed(2)),
 		time.Now(),
 	)
 	if err != nil {
@@ -104,7 +98,7 @@ func TopUpInternalBalance(userID int, amount decimal.Decimal) (*models.InternalB
 		return nil, fmt.Errorf("failed to commit: %w", err)
 	}
 
-	log.Printf("✅ Wallet topped up: user=%d, amount=%s", userID, amount.String())
+	log.Printf("✅ Wallet topped up: user=%d, %s ₽ → $%s", userID, amountRub.StringFixed(0), amountUsd.StringFixed(2))
 	return GetInternalBalance(userID)
 }
 

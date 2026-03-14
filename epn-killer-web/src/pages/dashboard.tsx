@@ -324,7 +324,7 @@ export const DashboardPage = () => {
               <div className="p-3 rounded-xl stat-icon-blue"><Wallet className="w-6 h-6 text-blue-400" /></div>
             </div>
             <p className="text-slate-400 text-sm mb-1">Баланс Кошелька</p>
-            <p className="text-2xl font-bold text-white balance-display">{wallet ? `${Number(wallet.master_balance).toLocaleString('ru-RU', { minimumFractionDigits: 2 })} ₽` : `$${balancePers.toFixed(2)}`}</p>
+            <p className="text-2xl font-bold text-white balance-display">{wallet ? `$${Number(wallet.master_balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `$${balancePers.toFixed(2)}`}</p>
             <button
               onClick={() => setIsWalletModalOpen(true)}
               className="mt-4 w-full py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-medium rounded-xl text-sm hover:shadow-lg hover:shadow-amber-500/25 transition-all"
@@ -423,7 +423,7 @@ export const DashboardPage = () => {
         </div>
 
       </div>
-      {isWalletModalOpen && <WalletTopUpModal onClose={() => setIsWalletModalOpen(false)} />}
+      {isWalletModalOpen && <WalletTopUpModal onClose={() => setIsWalletModalOpen(false)} onSuccess={() => { getWallet().then(v => setWallet(v)).catch(() => {}); }} />}
     </DashboardLayout>
   );
 };

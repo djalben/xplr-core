@@ -82,7 +82,7 @@ const CardIssueModal = ({
 }: { 
   card: { type: string; name: string; price: string; currency: string; description: string; features: { title: string; items: string }[]; conditions: { label: string; value: string }[]; capabilities: { label: string; value: string; link?: boolean }[] };
   onClose: () => void;
-  onIssue?: (cardType: 'subscriptions' | 'travel' | 'premium', priceRub: number) => void;
+  onIssue?: (cardType: 'subscriptions' | 'travel' | 'premium', priceUsd: number) => void;
   isIssuing?: boolean;
   walletBalance?: number;
 }) => {
@@ -243,13 +243,13 @@ const CardIssueModal = ({
           <div className="flex items-center justify-between mb-3 px-1">
             <span className="text-xs text-slate-400">У вас на балансе:</span>
             <span className={`text-sm font-bold ${walletBalance > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-              {walletBalance.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽
+              ${walletBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
           <button 
             onClick={() => {
               if (onIssue) {
-                const priceNum = parseInt(card.price.replace(/\D/g, '')) || 0;
+                const priceNum = parseFloat(card.price.replace(/[^0-9.]/g, '')) || 0;
                 onIssue(card.type as 'subscriptions' | 'travel' | 'premium', priceNum);
               } else {
                 onClose();
@@ -611,7 +611,7 @@ const BankLogoButton = ({
 // Wallet-to-Card Transfer Modal — internal transfer, no banks/СБП
 const WalletTopUpModal = ({ card, walletBalance, onClose, onTransfer }: {
   card: PersonalCard;
-  walletBalance: number;      // master_balance in ₽
+  walletBalance: number;      // master_balance in USD
   onClose: () => void;
   onTransfer: (amount: number) => void; // amount in card's currency
 }) => {
@@ -620,8 +620,10 @@ const WalletTopUpModal = ({ card, walletBalance, onClose, onTransfer }: {
   const [isTransferring, setIsTransferring] = useState(false);
 
   const currencySymbol = card.currency;
-  const rate = card.currency === '€' ? rates.eur : rates.usd;
-  const availableInCurrency = rate > 0 ? walletBalance / rate : 0;
+  // walletBalance is in USD; convert to card currency
+  const availableInCurrency = card.currency === '€'
+    ? (rates.eur > 0 ? walletBalance * rates.usd / rates.eur : 0)
+    : walletBalance; // USD → USD, no conversion
 
   const numAmount = parseFloat(amount) || 0;
   const isInsufficient = numAmount > 0 && numAmount > availableInCurrency;
@@ -989,10 +991,10 @@ export const CardsPage = () => {
   }, []);
 
   // Handle card issuance via real API
-  const handleIssueCard = async (cardType: 'subscriptions' | 'travel' | 'premium', priceRub: number) => {
+  const handleIssueCard = async (cardType: 'subscriptions' | 'travel' | 'premium', priceUsd: number) => {
     setIsIssuing(true);
     try {
-      const result = await issuePersonalCard(cardType, priceRub);
+      const result = await issuePersonalCard(cardType, priceUsd);
       if (result.successful_count > 0) {
         await fetchCards(); // Refresh card list from DB
         // Refresh wallet balance after card issue
@@ -1025,14 +1027,16 @@ export const CardsPage = () => {
 
   // Handle wallet-to-card transfer with optimistic UI
   const handleTransfer = async (card: PersonalCard, amountInCurrency: number) => {
-    const rate = card.currency === '€' ? rates.eur : rates.usd;
-    const rubEquivalent = amountInCurrency * rate;
+    // walletBalance is in USD; convert transfer amount to USD equivalent for optimistic deduction
+    const usdEquivalent = card.currency === '€'
+      ? amountInCurrency * (rates.eur / rates.usd)
+      : amountInCurrency; // already USD
 
     // Optimistic update — instant visual feedback
     setPersonalCards(prev =>
       prev.map(c => c.id === card.id ? { ...c, balance: c.balance + amountInCurrency } : c)
     );
-    setWalletBalance(prev => prev - rubEquivalent);
+    setWalletBalance(prev => prev - usdEquivalent);
     setTopUpModal(null);
 
     try {
@@ -1043,7 +1047,7 @@ export const CardsPage = () => {
       setPersonalCards(prev =>
         prev.map(c => c.id === card.id ? { ...c, balance: c.balance - amountInCurrency } : c)
       );
-      setWalletBalance(prev => prev + rubEquivalent);
+      setWalletBalance(prev => prev + usdEquivalent);
       console.error('Transfer failed:', err);
     }
   };
@@ -1055,7 +1059,7 @@ export const CardsPage = () => {
       description: 'Карта в евро, подходит для оплаты сервисов',
       currency: 'EUR',
       currencySymbol: '€',
-      price: '2 990 ₽',
+      price: '$34',
       features: [
         { title: 'Онлайн сервисы', items: 'Netflix, Patreon, Apple Music, Disney+' },
         { title: 'Нейросети', items: 'ChatGPT, Grok, DeepL, Midjourney, Gemini, DeepSeek, Veo 3' },
@@ -1063,11 +1067,11 @@ export const CardsPage = () => {
         { title: 'Для бизнеса и работы', items: 'Adobe Creative Cloud, Canva, Notion, Miro' },
       ],
       conditions: [
-        { label: 'Выпуск карты', value: '2 990 ₽' },
-        { label: 'Первый год обслуживания', value: '0 ₽' },
+        { label: 'Выпуск карты', value: '$34' },
+        { label: 'Первый год обслуживания', value: '$0' },
         { label: 'Комиссия за пополнение', value: '0%' },
-        { label: 'Комиссия за транзакцию', value: '€0.25' },
-        { label: 'Обслуживание после 1 года', value: '2 990 ₽' },
+        { label: 'Комиссия за транзакцию', value: '$0.25' },
+        { label: 'Обслуживание после 1 года', value: '$34' },
       ],
       capabilities: [
         { label: '3D Secure', value: 'в приложении' },
@@ -1081,18 +1085,18 @@ export const CardsPage = () => {
       description: 'С возможностью привязать Apple Pay и Google Pay',
       currency: 'USD',
       currencySymbol: '$',
-      price: '3 990 ₽',
+      price: '$45',
       features: [
         { title: 'Бронирование и оплата отелей', items: 'Booking, AirBnb, Trip.com и другие' },
         { title: 'Покупка авиабилетов', items: 'Google Flights, Skyscanner, Kayak, Momondo' },
         { title: 'Оплата покупок через терминалы', items: 'Оплачивайте покупки в любых магазинах по всему миру, которые поддерживают Apple Pay и Google Pay' },
       ],
       conditions: [
-        { label: 'Выпуск карты', value: '3 990 ₽' },
-        { label: 'Первый год обслуживания', value: '0 ₽' },
+        { label: 'Выпуск карты', value: '$45' },
+        { label: 'Первый год обслуживания', value: '$0' },
         { label: 'Комиссия за пополнение', value: '0%' },
         { label: 'Комиссия за транзакцию', value: '$0.25' },
-        { label: 'Обслуживание после 1 года', value: '3 990 ₽' },
+        { label: 'Обслуживание после 1 года', value: '$45' },
       ],
       capabilities: [
         { label: '3D Secure', value: 'в приложении' },
@@ -1106,18 +1110,18 @@ export const CardsPage = () => {
       description: 'Для тех, кто совершает много покупок за границей',
       currency: 'USD',
       currencySymbol: '$',
-      price: '14 990 ₽',
+      price: '$168',
       features: [
         { title: 'Для покупок и подписок', items: 'Booking, Grab, Uber, Trip.com и любые другие сервисы' },
         { title: 'Покупка авиабилетов', items: 'Google Flights, Skyscanner, Kayak, Momondo' },
         { title: 'Самый выгодный курс валют', items: 'Возможность покупать больше' },
       ],
       conditions: [
-        { label: 'Выпуск карты', value: '14 990 ₽' },
-        { label: 'Первый год обслуживания', value: '0 ₽' },
+        { label: 'Выпуск карты', value: '$168' },
+        { label: 'Первый год обслуживания', value: '$0' },
         { label: 'Комиссия за пополнение', value: '0%' },
         { label: 'Комиссия за транзакцию', value: '$0.25' },
-        { label: 'Обслуживание после 1 года', value: '14 990 ₽' },
+        { label: 'Обслуживание после 1 года', value: '$168' },
       ],
       capabilities: [
         { label: '3D Secure', value: 'в приложении' },

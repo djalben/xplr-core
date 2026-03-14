@@ -264,37 +264,32 @@ func MassIssueCardsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Calculate fee to deduct from wallet (internal_balances.master_balance is in RUB)
+	// Calculate fee in USD (master_balance is now in USD)
 	cat := strings.ToLower(req.Category)
 	if cat == "" {
 		cat = "arbitrage"
 	}
 
-	var totalFeeRub decimal.Decimal
-	if req.PriceRub.GreaterThan(decimal.Zero) {
-		// Personal cards: price is already in RUB — deduct directly
-		totalFeeRub = req.PriceRub.Mul(decimal.NewFromInt(int64(req.Count)))
+	var feeUSD decimal.Decimal
+	if req.PriceUSD.GreaterThan(decimal.Zero) {
+		// Personal cards: fixed USD price sent by frontend
+		feeUSD = req.PriceUSD
 	} else {
-		// Arbitrage cards: fee in USD, convert to RUB for wallet deduction
-		feeUSD := decimal.NewFromFloat(5.00)
+		// Arbitrage cards: default USD fees
+		feeUSD = decimal.NewFromFloat(5.00)
 		switch cat {
 		case "travel":
 			feeUSD = decimal.NewFromFloat(3.00)
 		case "services":
 			feeUSD = decimal.NewFromFloat(2.00)
 		}
-		rate, err := repository.GetFinalRate("RUB", "USD")
-		if err == nil && rate.GreaterThan(decimal.Zero) {
-			totalFeeRub = feeUSD.Mul(rate).Mul(decimal.NewFromInt(int64(req.Count))).Round(2)
-		} else {
-			totalFeeRub = feeUSD.Mul(decimal.NewFromInt(int64(req.Count))) // fallback 1:1
-		}
 	}
+	totalFeeUSD := feeUSD.Mul(decimal.NewFromInt(int64(req.Count)))
 
-	// Deduct from wallet (internal_balances.master_balance, RUB) before issuing
-	if totalFeeRub.GreaterThan(decimal.Zero) {
-		details := "Card issue fee: " + strconv.Itoa(req.Count) + "x " + cat + " — " + totalFeeRub.StringFixed(2) + " ₽"
-		if err := repository.DeductWalletBalance(userID, totalFeeRub, details); err != nil {
+	// Deduct from wallet (internal_balances.master_balance, USD)
+	if totalFeeUSD.GreaterThan(decimal.Zero) {
+		details := "Card issue fee: " + strconv.Itoa(req.Count) + "x " + cat + " — $" + totalFeeUSD.StringFixed(2)
+		if err := repository.DeductWalletBalance(userID, totalFeeUSD, details); err != nil {
 			if strings.Contains(err.Error(), "недостаточно средств") || strings.Contains(err.Error(), "кошелёк не найден") {
 				http.Error(w, err.Error(), http.StatusPaymentRequired)
 			} else {

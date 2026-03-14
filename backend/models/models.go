@@ -177,7 +177,7 @@ type MassIssueRequest struct {
 	ServiceSlug  string          `json:"service_slug"` // 'arbitrage', 'travel', 'subscriptions'
 	Category     string          `json:"category"`     // 'arbitrage', 'travel', 'services'
 	TeamID       *int            `json:"team_id,omitempty"`
-	PriceRub     decimal.Decimal `json:"price_rub"` // Цена в рублях для личных карт (конвертируется в USD)
+	PriceUSD     decimal.Decimal `json:"price_usd"` // Цена в USD для личных карт (списывается из кошелька напрямую)
 }
 
 // CardIssueResult - Результат выпуска одной карты

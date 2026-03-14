@@ -36,7 +36,7 @@ export interface MassIssueRequest {
   service_slug?: string;
   category?: string;
   team_id?: number;
-  price_rub?: number;
+  price_usd?: number;
 }
 
 export interface CardIssueResult {
@@ -63,7 +63,7 @@ export const issueCards = async (data: MassIssueRequest): Promise<MassIssueRespo
 // Выпустить персональную карту (subscriptions/travel/premium)
 export const issuePersonalCard = async (
   cardType: 'subscriptions' | 'travel' | 'premium',
-  priceRub: number
+  priceUsd: number
 ): Promise<MassIssueResponse> => {
   const categoryMap: Record<string, string> = {
     subscriptions: 'services',
@@ -84,7 +84,7 @@ export const issuePersonalCard = async (
     card_type: 'MasterCard',
     service_slug: cardType,
     category: categoryMap[cardType],
-    price_rub: priceRub,
+    price_usd: priceUsd,
   };
 
   return issueCards(data);
