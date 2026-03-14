@@ -233,6 +233,8 @@ func BlockCard(cardID int) error {
 
 // UpdateCardStatus sets card_status for a card owned by userID.
 // Supported statuses: ACTIVE, BLOCKED, FROZEN, CLOSED.
+// On CLOSED or BLOCKED: atomically refunds card_balance back to wallet (master_balance).
+// Issue fee is NOT refunded — only remaining card balance.
 func UpdateCardStatus(cardID int, userID int, status string) error {
 	if GlobalDB == nil {
 		return fmt.Errorf("database connection not initialized")
@@ -241,18 +243,74 @@ func UpdateCardStatus(cardID int, userID int, status string) error {
 	if !validStatuses[status] {
 		return fmt.Errorf("invalid status: must be ACTIVE, BLOCKED, FROZEN or CLOSED")
 	}
-	res, err := GlobalDB.Exec(
-		"UPDATE cards SET card_status = $1 WHERE id = $2 AND user_id = $3",
+
+	tx, err := GlobalDB.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %v", err)
+	}
+	defer tx.Rollback()
+
+	// Lock card row and verify ownership
+	var cardBalance decimal.Decimal
+	var last4 string
+	err = tx.QueryRow(
+		`SELECT COALESCE(card_balance, 0), last_4_digits FROM cards WHERE id = $1 AND user_id = $2 FOR UPDATE`,
+		cardID, userID,
+	).Scan(&cardBalance, &last4)
+	if err != nil {
+		return fmt.Errorf("card not found or access denied")
+	}
+
+	// Refund card_balance to wallet on CLOSED or BLOCKED
+	if (status == "CLOSED" || status == "BLOCKED") && cardBalance.GreaterThan(decimal.Zero) {
+		// Credit master_balance
+		_, err = tx.Exec(
+			`UPDATE internal_balances SET master_balance = master_balance + $1, updated_at = NOW() WHERE user_id = $2`,
+			cardBalance, userID,
+		)
+		if err != nil {
+			log.Printf("DB Error refunding card %d balance to wallet: %v", cardID, err)
+			return fmt.Errorf("failed to refund card balance to wallet")
+		}
+
+		// Zero out card_balance
+		_, err = tx.Exec(
+			`UPDATE cards SET card_balance = 0 WHERE id = $1`,
+			cardID,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to zero card balance")
+		}
+
+		// Record CARD_REFUND transaction
+		details := fmt.Sprintf("Возврат остатка $%s с карты •••• %s при %s",
+			cardBalance.StringFixed(2), last4, map[string]string{"CLOSED": "закрытии", "BLOCKED": "блокировке"}[status])
+		_, err = tx.Exec(
+			`INSERT INTO transactions (user_id, card_id, amount, fee, transaction_type, status, details, executed_at)
+			 VALUES ($1, $2, $3, 0, 'CARD_REFUND', 'APPROVED', $4, $5)`,
+			userID, cardID, cardBalance, details, time.Now(),
+		)
+		if err != nil {
+			log.Printf("DB Error recording CARD_REFUND for card %d: %v", cardID, err)
+		}
+
+		log.Printf("💰 Card %d: refunded $%s to wallet (user %d) on %s",
+			cardID, cardBalance.StringFixed(2), userID, status)
+	}
+
+	// Update card status
+	_, err = tx.Exec(
+		`UPDATE cards SET card_status = $1 WHERE id = $2 AND user_id = $3`,
 		status, cardID, userID,
 	)
 	if err != nil {
-		log.Printf("DB Error UpdateCardStatus card %d: %v", cardID, err)
 		return fmt.Errorf("failed to update card status")
 	}
-	rows, _ := res.RowsAffected()
-	if rows == 0 {
-		return fmt.Errorf("card not found or access denied")
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit: %v", err)
 	}
+
 	log.Printf("✅ Card %d status updated to %s (user %d)", cardID, status, userID)
 	return nil
 }

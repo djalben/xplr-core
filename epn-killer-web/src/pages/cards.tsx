@@ -1013,12 +1013,14 @@ export const CardsPage = () => {
     }
   };
 
-  // Handle card close via real API
+  // Handle card close via real API — refunds card_balance back to wallet
   const handleCloseCard = async (card: PersonalCard) => {
     try {
       await updateCardStatus(parseInt(card.id), 'CLOSED');
       setPersonalCards(prev => prev.filter(c => c.id !== card.id));
       setCloseCardModal(null);
+      // Refresh wallet balance (card_balance was refunded to master_balance)
+      getWallet().then(v => setWalletBalance(Number(v.master_balance) || 0)).catch(() => {});
     } catch (err) {
       console.error('Failed to close card:', err);
       setCloseCardModal(null);

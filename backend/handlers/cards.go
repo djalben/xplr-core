@@ -235,12 +235,18 @@ func PatchCardStatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	// Return updated wallet balance so frontend can refresh instantly
+	resp := map[string]interface{}{
 		"card_id": cardID,
 		"status":  status,
-	})
+	}
+	if ib, err := repository.GetInternalBalance(userID); err == nil {
+		resp["wallet_balance"] = ib.MasterBalance
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
 }
 
 func MassIssueCardsHandler(w http.ResponseWriter, r *http.Request) {

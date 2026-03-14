@@ -226,7 +226,7 @@ export const DashboardPage = () => {
       // Non-critical fetches
       try { const g = await getUserGrade(); setGradeInfo(g); } catch {}
       try { const v = await getWallet(); setWallet(v); } catch {}
-      try { const c = await apiClient.get('/user/cards'); setCardCount(Array.isArray(c.data) ? c.data.length : 0); } catch {}
+      try { const c = await apiClient.get('/user/cards'); setCardCount(Array.isArray(c.data) ? c.data.filter((card: any) => card.card_status === 'ACTIVE').length : 0); } catch {}
       try {
         const t = await apiClient.get('/user/report', { params: { limit: 3 } });
         const txs = t.data?.transactions ?? [];
