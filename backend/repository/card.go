@@ -114,15 +114,6 @@ func GetUserCards(userID int) ([]models.Card, error) {
 		return nil, fmt.Errorf("error iterating cards: %w", err)
 	}
 
-	// XPLR: виртуальный баланс — у каждой карты в списке отображаем общий BalanceRub пользователя
-	user, err := GetUserByID(userID)
-	if err != nil {
-		return nil, err
-	}
-	for i := range cards {
-		cards[i].CardBalance = user.BalanceRub
-	}
-
 	return cards, nil
 }
 
