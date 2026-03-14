@@ -274,6 +274,7 @@ func buildRouter() *mux.Router {
 	protected.HandleFunc("/cards/{id}/spending-limit", handlers.SetSpendingLimitHandler).Methods("PATCH")
 	protected.HandleFunc("/wallet", handlers.GetWalletHandler).Methods("GET")
 	protected.HandleFunc("/wallet/topup", handlers.TopUpWalletHandler).Methods("POST")
+	protected.HandleFunc("/wallet/transfer-to-card", handlers.TransferWalletToCardHandler).Methods("POST")
 	protected.HandleFunc("/wallet/auto-topup", handlers.SetAutoTopupHandler).Methods("PATCH")
 	protected.HandleFunc("/report", handlers.GetUserTransactionReportHandler).Methods("GET")
 	protected.HandleFunc("/transactions", handlers.GetUnifiedTransactionsHandler).Methods("GET")

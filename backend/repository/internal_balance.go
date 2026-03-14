@@ -3,6 +3,7 @@ package repository
 import (
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/djalben/xplr-core/backend/models"
@@ -156,6 +157,112 @@ func DeductWalletBalance(userID int, amount decimal.Decimal, details string) err
 
 	log.Printf("User %d: deducted $%s from wallet for: %s", userID, amount.StringFixed(2), details)
 	return nil
+}
+
+// TransferWalletToCard — перевести средства из Кошелька (USD) на карту.
+// Если карта в EUR, конвертирует USD→EUR по внутреннему курсу.
+// Атомарно: проверяет баланс, списывает из wallet, зачисляет на card_balance, записывает транзакцию.
+func TransferWalletToCard(userID int, cardID int, amountInCardCurrency decimal.Decimal, cardCurrency string) (*models.InternalBalance, error) {
+	if GlobalDB == nil {
+		return nil, fmt.Errorf("database connection not initialized")
+	}
+	if amountInCardCurrency.LessThanOrEqual(decimal.Zero) {
+		return nil, fmt.Errorf("сумма должна быть положительной")
+	}
+
+	// Определяем сколько USD нужно списать из кошелька
+	var deductUSD decimal.Decimal
+	currency := strings.ToUpper(strings.TrimSpace(cardCurrency))
+	if currency == "" {
+		currency = "USD"
+	}
+
+	if currency == "EUR" || currency == "€" {
+		// Конвертируем EUR→USD: amountEUR * (rateRubPerEur / rateRubPerUsd)
+		rateRubUsd, err := GetFinalRate("RUB", "USD")
+		if err != nil || rateRubUsd.IsZero() {
+			return nil, fmt.Errorf("курс USD недоступен")
+		}
+		rateRubEur, err := GetFinalRate("RUB", "EUR")
+		if err != nil || rateRubEur.IsZero() {
+			return nil, fmt.Errorf("курс EUR недоступен")
+		}
+		deductUSD = amountInCardCurrency.Mul(rateRubEur).Div(rateRubUsd).Round(2)
+	} else {
+		// USD → USD, 1:1
+		deductUSD = amountInCardCurrency
+	}
+
+	tx, err := GlobalDB.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("не удалось начать транзакцию: %v", err)
+	}
+	defer tx.Rollback()
+
+	// Проверяем master_balance и списываем
+	var balance decimal.Decimal
+	err = tx.QueryRow(
+		`SELECT COALESCE(master_balance, 0) FROM internal_balances WHERE user_id = $1 FOR UPDATE`,
+		userID,
+	).Scan(&balance)
+	if err != nil {
+		return nil, fmt.Errorf("кошелёк не найден — пополните баланс")
+	}
+	if balance.LessThan(deductUSD) {
+		return nil, fmt.Errorf("недостаточно средств (баланс: $%s, требуется: $%s)", balance.StringFixed(2), deductUSD.StringFixed(2))
+	}
+
+	_, err = tx.Exec(
+		`UPDATE internal_balances SET master_balance = master_balance - $1, updated_at = NOW() WHERE user_id = $2`,
+		deductUSD, userID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("не удалось списать из кошелька: %v", err)
+	}
+
+	// Проверяем принадлежность карты и зачисляем на card_balance
+	var ownerID int
+	err = tx.QueryRow(`SELECT user_id FROM cards WHERE id = $1 FOR UPDATE`, cardID).Scan(&ownerID)
+	if err != nil {
+		return nil, fmt.Errorf("карта не найдена")
+	}
+	if ownerID != userID {
+		return nil, fmt.Errorf("нет доступа к этой карте")
+	}
+
+	_, err = tx.Exec(
+		`UPDATE cards SET card_balance = COALESCE(card_balance, 0) + $1 WHERE id = $2`,
+		amountInCardCurrency, cardID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("не удалось зачислить на карту: %v", err)
+	}
+
+	// Записываем транзакцию
+	sym := "$"
+	if currency == "EUR" || currency == "€" {
+		sym = "€"
+	}
+	details := fmt.Sprintf("Card top-up: %s%s → card #%d (deducted $%s from wallet)",
+		sym, amountInCardCurrency.StringFixed(2), cardID, deductUSD.StringFixed(2))
+
+	_, err = tx.Exec(
+		`INSERT INTO transactions (user_id, card_id, amount, fee, transaction_type, status, details, executed_at)
+		 VALUES ($1, $2, $3, 0, 'CARD_TOPUP', 'APPROVED', $4, $5)`,
+		userID, cardID, deductUSD, details, time.Now(),
+	)
+	if err != nil {
+		log.Printf("DB Error Insert CARD_TOPUP transaction: %v", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("ошибка фиксации: %v", err)
+	}
+
+	log.Printf("✅ User %d: transferred %s%s to card %d (deducted $%s from wallet)",
+		userID, sym, amountInCardCurrency.StringFixed(2), cardID, deductUSD.StringFixed(2))
+
+	return GetInternalBalance(userID)
 }
 
 // DeductInternalBalance — списать из Кошелька пользователя (вызывается Bridge при webhook).

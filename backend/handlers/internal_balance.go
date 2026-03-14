@@ -61,6 +61,54 @@ func TopUpWalletHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(ib)
 }
 
+// TransferWalletToCardHandler — POST /api/v1/user/wallet/transfer-to-card
+// Переводит средства из Кошелька (USD) на баланс карты. Если карта в EUR, конвертирует.
+func TransferWalletToCardHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		CardID   json.Number `json:"card_id"`
+		Amount   float64     `json:"amount"`
+		Currency string      `json:"currency"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	cardIDStr := req.CardID.String()
+	cardID, err := strconv.Atoi(cardIDStr)
+	if err != nil || cardID <= 0 {
+		http.Error(w, "Invalid card_id", http.StatusBadRequest)
+		return
+	}
+
+	amount := decimal.NewFromFloat(req.Amount)
+	if amount.LessThanOrEqual(decimal.Zero) {
+		http.Error(w, "Amount must be positive", http.StatusBadRequest)
+		return
+	}
+
+	ib, err := repository.TransferWalletToCard(userID, cardID, amount, req.Currency)
+	if err != nil {
+		if err.Error() == "нет доступа к этой карте" || err.Error() == "карта не найдена" {
+			http.Error(w, err.Error(), http.StatusForbidden)
+		} else if err.Error() == "кошелёк не найден — пополните баланс" {
+			http.Error(w, err.Error(), http.StatusPaymentRequired)
+		} else {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(ib)
+}
+
 // SetAutoTopupHandler — PATCH /api/v1/user/wallet/auto-topup
 // Включает/выключает автопополнение карт из Кошелька
 func SetAutoTopupHandler(w http.ResponseWriter, r *http.Request) {
