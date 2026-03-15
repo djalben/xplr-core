@@ -8,7 +8,10 @@ import (
 
 	"github.com/djalben/xplr-core/backend/internal/app"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler"
+	adminApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/admin"
 	cardApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/card"
+	ticketApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/ticket"
+	transactionApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/transaction"
 	walletApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/wallet"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -91,5 +94,20 @@ func (s *Server) setupRoutes() {
 		// Card
 		cardHandler := cardApi.NewHandler(s.container.CardUseCase)
 		cardHandler.Register(r)
+
+		//ticket
+		ticketHandler := ticketApi.NewHandler(s.container.TicketUseCase)
+		ticketHandler.Register(r)
+
+		//transaction
+		transactionHandler := transactionApi.NewHandler(s.container.TransactionUseCase)
+		transactionHandler.Register(r)
+
+	})
+
+	s.router.Route("/admin", func(r chi.Router) {
+		// Только для админов (потом middleware)
+		adminHandler := adminApi.NewHandler(s.container.CardUseCase, s.container.CommissionUseCase, s.container.TicketUseCase)
+		adminHandler.Register(r)
 	})
 }

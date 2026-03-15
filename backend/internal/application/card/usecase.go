@@ -127,3 +127,37 @@ func (uc *UseCase) CloseCard(ctx context.Context, userID domain.UUID, cardID dom
 func (uc *UseCase) AutoTopUpCard(ctx context.Context, userID domain.UUID, cardID domain.UUID, neededAmount domain.Numeric) error {
 	return uc.walletUC.AutoTopUpCard(ctx, userID, cardID, neededAmount)
 }
+
+// BlockCard — блокирует карту.
+func (uc *UseCase) BlockCard(ctx context.Context, cardID domain.UUID) error {
+	card, err := uc.cardRepo.GetByID(ctx, cardID)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	card.CardStatus = "BLOCKED"
+
+	err = uc.cardRepo.Update(ctx, card)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	return nil
+}
+
+// UnblockCard — разблокирует карту.
+func (uc *UseCase) UnblockCard(ctx context.Context, cardID domain.UUID) error {
+	card, err := uc.cardRepo.GetByID(ctx, cardID)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	card.CardStatus = "ACTIVE"
+
+	err = uc.cardRepo.Update(ctx, card)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	return nil
+}
