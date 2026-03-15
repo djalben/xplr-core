@@ -1,11 +1,13 @@
 package http
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/djalben/xplr-core/backend/internal/app"
+	"github.com/djalben/xplr-core/backend/internal/transport/http/handler"
 	cardApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/card"
 	walletApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/wallet"
 	"github.com/go-chi/chi/v5"
@@ -15,17 +17,22 @@ import (
 )
 
 type Server struct {
-	router    *chi.Mux
+	srv       *http.Server
 	container *app.Container
-	addr      string
+	router    *chi.Mux
 }
 
 // NewServer — создаёт сервер.
 func NewServer(container *app.Container, host string, port int) *Server {
+	r := chi.NewRouter()
+
 	s := &Server{
-		router:    chi.NewRouter(),
+		srv: &http.Server{
+			Addr:    host + ":" + strconv.Itoa(port),
+			Handler: r,
+		},
 		container: container,
-		addr:      host + ":" + strconv.Itoa(port),
+		router:    r,
 	}
 
 	s.setupMiddleware()
@@ -34,17 +41,19 @@ func NewServer(container *app.Container, host string, port int) *Server {
 	return s
 }
 
-// Start — запускает HTTP-сервер с таймаутами.
+// Start — запускает сервер.
 func (s *Server) Start() error {
-	srv := &http.Server{
-		Addr:         s.addr,
-		Handler:      s.router,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  60 * time.Second,
+	err := s.srv.ListenAndServe()
+	if err != nil {
+		return wrapper.Wrap(err)
 	}
 
-	err := srv.ListenAndServe()
+	return nil
+}
+
+// Shutdown — gracefully закрывает сервер.
+func (s *Server) Shutdown(ctx context.Context) error {
+	err := s.srv.Shutdown(ctx)
 	if err != nil {
 		return wrapper.Wrap(err)
 	}
@@ -58,6 +67,7 @@ func (s *Server) setupMiddleware() {
 	s.router.Use(middleware.RealIP)
 	s.router.Use(middleware.Logger)
 	s.router.Use(middleware.Recoverer)
+	s.router.Use(middleware.Timeout(60 * time.Second)) // добавлен таймаут для запросов
 
 	s.router.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"},
@@ -67,8 +77,12 @@ func (s *Server) setupMiddleware() {
 	}))
 }
 
-// setupRoutes — регистрирует все маршруты.
+// setupRoutes — регистрирует маршруты.
 func (s *Server) setupRoutes() {
+	s.router.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+		handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	})
+
 	s.router.Route("/v1", func(r chi.Router) {
 		// Wallet
 		walletHandler := walletApi.NewHandler(s.container.WalletUseCase)

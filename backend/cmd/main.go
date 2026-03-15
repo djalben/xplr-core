@@ -59,4 +59,5 @@ func main() {
 
 	<-ctx.Done()
 	logger.Info("Shutting down...")
+	server.Shutdown(context.Background())
 }
