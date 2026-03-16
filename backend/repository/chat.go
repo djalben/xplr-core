@@ -13,6 +13,7 @@ type ChatConversation struct {
 	UserID    int       `json:"user_id"`
 	Topic     string    `json:"topic"`
 	Status    string    `json:"status"` // open, closed
+	ClaimedBy int       `json:"claimed_by"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -66,6 +67,12 @@ func EnsureChatTables() error {
 			created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);
 		CREATE INDEX IF NOT EXISTS idx_chat_tg_bridge_tgmsg ON chat_tg_bridge(tg_message_id);
+
+		DO $$ BEGIN
+			IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chat_conversations' AND column_name='claimed_by') THEN
+				ALTER TABLE chat_conversations ADD COLUMN claimed_by INTEGER DEFAULT 0;
+			END IF;
+		END $$;
 	`)
 	if err != nil {
 		log.Printf("[CHAT] Error creating chat tables: %v", err)
@@ -83,9 +90,9 @@ func CreateConversation(userID int, topic string) (*ChatConversation, error) {
 	var conv ChatConversation
 	err := GlobalDB.QueryRow(
 		`INSERT INTO chat_conversations (user_id, topic) VALUES ($1, $2)
-		 RETURNING id, user_id, topic, status, created_at, updated_at`,
+		 RETURNING id, user_id, topic, status, COALESCE(claimed_by,0), created_at, updated_at`,
 		userID, topic,
-	).Scan(&conv.ID, &conv.UserID, &conv.Topic, &conv.Status, &conv.CreatedAt, &conv.UpdatedAt)
+	).Scan(&conv.ID, &conv.UserID, &conv.Topic, &conv.Status, &conv.ClaimedBy, &conv.CreatedAt, &conv.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create conversation: %w", err)
 	}
@@ -99,11 +106,11 @@ func GetOpenConversation(userID int) (*ChatConversation, error) {
 	}
 	var conv ChatConversation
 	err := GlobalDB.QueryRow(
-		`SELECT id, user_id, topic, status, created_at, updated_at
+		`SELECT id, user_id, topic, status, COALESCE(claimed_by,0), created_at, updated_at
 		 FROM chat_conversations WHERE user_id = $1 AND status = 'open'
 		 ORDER BY created_at DESC LIMIT 1`,
 		userID,
-	).Scan(&conv.ID, &conv.UserID, &conv.Topic, &conv.Status, &conv.CreatedAt, &conv.UpdatedAt)
+	).Scan(&conv.ID, &conv.UserID, &conv.Topic, &conv.Status, &conv.ClaimedBy, &conv.CreatedAt, &conv.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -120,10 +127,10 @@ func GetConversationByID(convID int) (*ChatConversation, error) {
 	}
 	var conv ChatConversation
 	err := GlobalDB.QueryRow(
-		`SELECT id, user_id, topic, status, created_at, updated_at
+		`SELECT id, user_id, topic, status, COALESCE(claimed_by,0), created_at, updated_at
 		 FROM chat_conversations WHERE id = $1`,
 		convID,
-	).Scan(&conv.ID, &conv.UserID, &conv.Topic, &conv.Status, &conv.CreatedAt, &conv.UpdatedAt)
+	).Scan(&conv.ID, &conv.UserID, &conv.Topic, &conv.Status, &conv.ClaimedBy, &conv.CreatedAt, &conv.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -140,6 +147,78 @@ func CloseConversation(convID int) error {
 		convID,
 	)
 	return err
+}
+
+// ClaimConversation atomically sets claimed_by if not already claimed. Returns true if claimed successfully.
+func ClaimConversation(convID int, adminUserID int) (bool, error) {
+	if GlobalDB == nil {
+		return false, fmt.Errorf("database connection not initialized")
+	}
+	res, err := GlobalDB.Exec(
+		`UPDATE chat_conversations SET claimed_by = $1, updated_at = NOW()
+		 WHERE id = $2 AND (claimed_by = 0 OR claimed_by IS NULL)`,
+		adminUserID, convID,
+	)
+	if err != nil {
+		return false, err
+	}
+	rows, _ := res.RowsAffected()
+	return rows > 0, nil
+}
+
+// TgBridgeEntry represents a single TG bridge mapping row.
+type TgBridgeEntry struct {
+	TgChatID    int64
+	TgMessageID int64
+}
+
+// GetTgBridgeForConversation returns all TG bridge entries for a conversation.
+func GetTgBridgeForConversation(convID int) ([]TgBridgeEntry, error) {
+	if GlobalDB == nil {
+		return nil, fmt.Errorf("database connection not initialized")
+	}
+	rows, err := GlobalDB.Query(
+		`SELECT DISTINCT tg_chat_id, tg_message_id FROM chat_tg_bridge WHERE conversation_id = $1`,
+		convID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var entries []TgBridgeEntry
+	for rows.Next() {
+		var e TgBridgeEntry
+		if err := rows.Scan(&e.TgChatID, &e.TgMessageID); err != nil {
+			return nil, err
+		}
+		entries = append(entries, e)
+	}
+	return entries, rows.Err()
+}
+
+// GetLatestTgBridgePerAdmin returns the latest TG bridge entry per admin for a conversation.
+func GetLatestTgBridgePerAdmin(convID int) ([]TgBridgeEntry, error) {
+	if GlobalDB == nil {
+		return nil, fmt.Errorf("database connection not initialized")
+	}
+	rows, err := GlobalDB.Query(
+		`SELECT tg_chat_id, MAX(tg_message_id) FROM chat_tg_bridge
+		 WHERE conversation_id = $1 GROUP BY tg_chat_id`,
+		convID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var entries []TgBridgeEntry
+	for rows.Next() {
+		var e TgBridgeEntry
+		if err := rows.Scan(&e.TgChatID, &e.TgMessageID); err != nil {
+			return nil, err
+		}
+		entries = append(entries, e)
+	}
+	return entries, rows.Err()
 }
 
 // InsertChatMessage adds a message to a conversation.

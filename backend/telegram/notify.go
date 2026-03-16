@@ -332,6 +332,127 @@ func EditMessageText(chatID int64, messageID int64, newText string) error {
 	return postJSON("editMessageText", payload)
 }
 
+// editReplyMarkupPayload is used by editMessageReplyMarkup to update only the keyboard.
+type editReplyMarkupPayload struct {
+	ChatID      int64       `json:"chat_id"`
+	MessageID   int64       `json:"message_id"`
+	ReplyMarkup interface{} `json:"reply_markup"`
+}
+
+// EditMessageReplyMarkup updates only the inline keyboard of an existing message.
+func EditMessageReplyMarkup(chatID int64, messageID int64, markup interface{}) error {
+	payload := editReplyMarkupPayload{
+		ChatID:      chatID,
+		MessageID:   messageID,
+		ReplyMarkup: markup,
+	}
+	return postJSON("editMessageReplyMarkup", payload)
+}
+
+// SendMessageHTMLWithKeyboardReturnID sends an HTML message with an inline keyboard and returns the message_id.
+func SendMessageHTMLWithKeyboardReturnID(chatID int64, message string, keyboard *inlineKeyboardMarkup) int64 {
+	if botToken == "" || chatID == 0 {
+		return 0
+	}
+	payload := sendMessagePayload{
+		ChatID:      chatID,
+		Text:        message,
+		ParseMode:   "HTML",
+		ReplyMarkup: keyboard,
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("[TELEGRAM] SendMessageHTMLWithKeyboardReturnID marshal error: %v", err)
+		return 0
+	}
+	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", botToken)
+	resp, err := http.Post(apiURL, "application/json", bytes.NewReader(body))
+	if err != nil {
+		log.Printf("[TELEGRAM] SendMessageHTMLWithKeyboardReturnID HTTP error (Chat %d): %v", chatID, err)
+		return 0
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		log.Printf("[TELEGRAM] SendMessageHTMLWithKeyboardReturnID failed (Chat %d): %d %s", chatID, resp.StatusCode, string(respBody))
+		return 0
+	}
+	var result struct {
+		OK     bool `json:"ok"`
+		Result struct {
+			MessageID int64 `json:"message_id"`
+		} `json:"result"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return 0
+	}
+	return result.Result.MessageID
+}
+
+// BuildInlineKeyboard is a helper to create an inline keyboard markup from rows of buttons.
+func BuildInlineKeyboard(rows [][]inlineKeyboardButton) *inlineKeyboardMarkup {
+	return &inlineKeyboardMarkup{InlineKeyboard: rows}
+}
+
+// NewCallbackButton creates a single inline keyboard button with callback_data.
+func NewCallbackButton(text string, callbackData string) inlineKeyboardButton {
+	return inlineKeyboardButton{Text: text, CallbackData: callbackData}
+}
+
+// ── Exported types for cross-package use (handlers → telegram) ──
+
+// InlineKeyboardButtonExported is an exported inline keyboard button.
+type InlineKeyboardButtonExported struct {
+	Text         string `json:"text"`
+	CallbackData string `json:"callback_data,omitempty"`
+}
+
+// InlineKeyboardMarkupExported is an exported inline keyboard markup.
+type InlineKeyboardMarkupExported struct {
+	InlineKeyboard [][]InlineKeyboardButtonExported `json:"inline_keyboard"`
+}
+
+// SendMessageHTMLWithInlineReturnID sends an HTML message with an inline keyboard and returns the message_id.
+func SendMessageHTMLWithInlineReturnID(chatID int64, message string, keyboard *InlineKeyboardMarkupExported) int64 {
+	if botToken == "" || chatID == 0 {
+		return 0
+	}
+	type payload struct {
+		ChatID      int64                         `json:"chat_id"`
+		Text        string                        `json:"text"`
+		ParseMode   string                        `json:"parse_mode,omitempty"`
+		ReplyMarkup *InlineKeyboardMarkupExported `json:"reply_markup,omitempty"`
+	}
+	p := payload{ChatID: chatID, Text: message, ParseMode: "HTML", ReplyMarkup: keyboard}
+	body, err := json.Marshal(p)
+	if err != nil {
+		log.Printf("[TELEGRAM] SendMessageHTMLWithInlineReturnID marshal error: %v", err)
+		return 0
+	}
+	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", botToken)
+	resp, err := http.Post(apiURL, "application/json", bytes.NewReader(body))
+	if err != nil {
+		log.Printf("[TELEGRAM] SendMessageHTMLWithInlineReturnID HTTP error (Chat %d): %v", chatID, err)
+		return 0
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		log.Printf("[TELEGRAM] SendMessageHTMLWithInlineReturnID failed (Chat %d): %d %s", chatID, resp.StatusCode, string(respBody))
+		return 0
+	}
+	var result struct {
+		OK     bool `json:"ok"`
+		Result struct {
+			MessageID int64 `json:"message_id"`
+		} `json:"result"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return 0
+	}
+	return result.Result.MessageID
+}
+
 // AnswerCallbackQuery отвечает на callback_query (убирает «часики» в Telegram).
 func AnswerCallbackQuery(callbackQueryID string, text string) {
 	payload := answerCallbackPayload{

@@ -219,15 +219,34 @@ func forwardToTelegramAdmins(conv *repository.ChatConversation, msg *repository.
 
 	log.Printf("[CHAT-FWD] Forwarding msg #%d (conv=%d) to %d admin(s)", msg.ID, conv.ID, len(ids))
 
+	// Build inline keyboard: Claim button (only if not yet claimed)
+	var keyboard *telegram.InlineKeyboardMarkupExported
+	if conv.ClaimedBy == 0 {
+		keyboard = &telegram.InlineKeyboardMarkupExported{
+			InlineKeyboard: [][]telegram.InlineKeyboardButtonExported{
+				{
+					{Text: "🙋‍♂️ Взять в работу", CallbackData: fmt.Sprintf("claim_%d", conv.ID)},
+				},
+			},
+		}
+	} else {
+		claimerName := repository.GetUserDisplayName(conv.ClaimedBy)
+		keyboard = &telegram.InlineKeyboardMarkupExported{
+			InlineKeyboard: [][]telegram.InlineKeyboardButtonExported{
+				{
+					{Text: fmt.Sprintf("✅ В работе у %s", claimerName), CallbackData: "noop"},
+				},
+			},
+		}
+	}
+
 	for _, chatID := range ids {
-		tgMsgID := telegram.SendMessageHTMLReturnID(chatID, text)
+		tgMsgID := telegram.SendMessageHTMLWithInlineReturnID(chatID, text, keyboard)
 		if tgMsgID != 0 {
-			// Save to legacy column (last-write-wins, kept for backward compat)
 			repository.UpdateChatMessageTgID(msg.ID, tgMsgID)
-			// Save to bridge table (supports multiple admins)
 			repository.InsertTgBridge(conv.ID, msg.ID, chatID, tgMsgID)
 		} else {
-			log.Printf("[CHAT-FWD] ⚠️ SendMessageHTMLReturnID returned 0 for admin chat %d", chatID)
+			log.Printf("[CHAT-FWD] ⚠️ SendMessageHTMLWithInlineReturnID returned 0 for admin chat %d", chatID)
 		}
 	}
 }
