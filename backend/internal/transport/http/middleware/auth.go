@@ -5,9 +5,9 @@ import (
 	"net/http"
 
 	"github.com/djalben/xplr-core/backend/internal/pkg/utils"
-	"github.com/djalben/xplr-core/backend/internal/transport/http/handler"
 )
 
+// Auth — проверка JWT токена.
 func Auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tokenStr := r.Header.Get("Authorization")
@@ -18,7 +18,7 @@ func Auth(next http.Handler) http.Handler {
 		}
 
 		// Парсим JWT
-		userID, err := utils.ValidateJWT(tokenStr) // предположим, что ValidateJWT возвращает userID
+		userID, err := utils.ValidateJWT(tokenStr)
 		if err != nil {
 			http.Error(w, "Invalid token", http.StatusUnauthorized)
 
@@ -34,11 +34,13 @@ func Auth(next http.Handler) http.Handler {
 	})
 }
 
+// AdminOnly — проверка на админа.
 func AdminOnly(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_ = handler.GetUserIDFromContext(r)
-		// TODO: проверить, что userID — админ (из userRepo.GetByID(userID).Role == "admin")
-		isAdmin := true // заглушка
+		// userID := handler.GetUserIDFromContext(r)
+
+		// TODO: проверь роль юзера (из userRepo, user.Role == "admin")
+		isAdmin := true // заглушка, замени на реальную проверку
 
 		if !isAdmin {
 			http.Error(w, "Forbidden", http.StatusForbidden)

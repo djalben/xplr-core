@@ -33,14 +33,20 @@ func (h *Handler) GetWalletTransactions(w http.ResponseWriter, r *http.Request) 
 	fromStr := r.URL.Query().Get("from")
 	toStr := r.URL.Query().Get("to")
 
-	from, err := time.Parse(time.RFC3339, fromStr)
-	if err != nil {
-		from = time.Now().AddDate(0, -1, 0) // дефолт месяц назад
+	var from, to time.Time
+
+	f, fErr := time.Parse(time.RFC3339, fromStr)
+	if fErr != nil {
+		from = time.Now().AddDate(0, -1, 0)
+	} else {
+		from = f
 	}
 
-	to, err := time.Parse(time.RFC3339, toStr)
-	if err != nil {
+	t, tErr := time.Parse(time.RFC3339, toStr)
+	if tErr != nil {
 		to = time.Now()
+	} else {
+		to = t
 	}
 
 	txs, err := h.useCase.GetWalletTransactions(r.Context(), userID, from, to)
@@ -67,14 +73,20 @@ func (h *Handler) GetCardTransactions(w http.ResponseWriter, r *http.Request) {
 	fromStr := r.URL.Query().Get("from")
 	toStr := r.URL.Query().Get("to")
 
-	from, err := time.Parse(time.RFC3339, fromStr)
-	if err != nil {
+	var from, to time.Time
+
+	f, fErr := time.Parse(time.RFC3339, fromStr)
+	if fErr != nil {
 		from = time.Now().AddDate(0, -1, 0)
+	} else {
+		from = f
 	}
 
-	to, err := time.Parse(time.RFC3339, toStr)
-	if err != nil {
+	t, tErr := time.Parse(time.RFC3339, toStr)
+	if tErr != nil {
 		to = time.Now()
+	} else {
+		to = t
 	}
 
 	txs, err := h.useCase.GetCardTransactions(r.Context(), id, from, to)
