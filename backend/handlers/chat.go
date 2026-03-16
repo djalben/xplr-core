@@ -157,7 +157,8 @@ func ChatSendHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userName := repository.GetUserDisplayName(userID)
-	log.Printf("[CHAT-SEND] User %d (%s) sent: %q", userID, userName, body.Message)
+	userEmail, _ := repository.GetUserEmail(userID)
+	log.Printf("[CHAT-SEND] User %d (%s / %s) sent: %q", userID, userName, userEmail, body.Message)
 
 	msg, err := repository.InsertChatMessage(convID, "user", userName, body.Message, 0)
 	if err != nil {
@@ -167,8 +168,10 @@ func ChatSendHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("[CHAT-SEND] ✅ Message #%d inserted into conv %d", msg.ID, convID)
 
-	// Forward to Telegram admins (async)
-	go forwardToTelegramAdmins(conv, msg, userID, userName)
+	// Forward to Telegram admins SYNCHRONOUSLY.
+	// CRITICAL: on Vercel serverless, goroutines launched with `go` are killed
+	// as soon as the HTTP response is written. We MUST forward BEFORE responding.
+	forwardToTelegramAdmins(conv, msg, userID, userName, userEmail)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(msg)
@@ -207,17 +210,33 @@ func ChatCloseHandler(w http.ResponseWriter, r *http.Request) {
 
 // forwardToTelegramAdmins sends the user's chat message to all admin Telegram accounts.
 // The TG message_id is saved so admin replies can be routed back.
-func forwardToTelegramAdmins(conv *repository.ChatConversation, msg *repository.ChatMessage, userID int, userName string) {
-	log.Printf("[CHAT-FWD] >>> forwardToTelegramAdmins called: conv=%d, msg=%d, user=%d (%s)", conv.ID, msg.ID, userID, userName)
+// Called SYNCHRONOUSLY — Vercel kills goroutines after HTTP response.
+func forwardToTelegramAdmins(conv *repository.ChatConversation, msg *repository.ChatMessage, userID int, userName string, userEmail string) {
+	// Panic protection — never let this crash the request
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[CHAT-FWD] ❌ PANIC in forwardToTelegramAdmins: %v", r)
+		}
+	}()
+
+	log.Printf("[CHAT-FWD] [TRACE-1] Start forwarding for message ID: %d (conv=%d, user=%d, email=%s, name=%s)",
+		msg.ID, conv.ID, userID, userEmail, userName)
 
 	if telegram.AdminChatIDsProvider == nil {
-		log.Printf("[CHAT-FWD] ❌ AdminChatIDsProvider is nil — cannot forward. Check TELEGRAM_BOT_TOKEN env.")
+		log.Printf("[CHAT-FWD] ❌ AdminChatIDsProvider is nil — cannot forward. TELEGRAM_BOT_TOKEN not set?")
 		return
 	}
+
+	log.Printf("[CHAT-FWD] [TRACE-2] Fetching Admin Chat IDs...")
 	ids, err := telegram.AdminChatIDsProvider()
-	log.Printf("[CHAT-FWD] AdminChatIDsProvider returned %d IDs, err=%v, ids=%v", len(ids), err, ids)
-	if err != nil || len(ids) == 0 {
-		log.Printf("[CHAT-FWD] ❌ No admin chat IDs found (err=%v, count=%d). Check users.is_admin and telegram_chat_id!", err, len(ids))
+	if err != nil {
+		log.Printf("[CHAT-FWD] ❌ AdminChatIDsProvider error: %v", err)
+		return
+	}
+	log.Printf("[CHAT-FWD] [TRACE-3] Found %d admin IDs: %v", len(ids), ids)
+
+	if len(ids) == 0 {
+		log.Printf("[CHAT-FWD] ❌ Admin list EMPTY! Check: SELECT email, is_admin, telegram_chat_id FROM users WHERE is_admin = TRUE")
 		return
 	}
 
@@ -229,15 +248,13 @@ func forwardToTelegramAdmins(conv *repository.ChatConversation, msg *repository.
 		conv.ID, userName, conv.Topic, msg.Body,
 	)
 
-	log.Printf("[CHAT-FWD] Forwarding msg #%d (conv=%d) to %d admin(s)", msg.ID, conv.ID, len(ids))
-
 	// Build inline keyboard: Claim button (only if not yet claimed)
 	var keyboard *telegram.InlineKeyboardMarkupExported
 	if conv.ClaimedBy == 0 {
 		keyboard = &telegram.InlineKeyboardMarkupExported{
 			InlineKeyboard: [][]telegram.InlineKeyboardButtonExported{
 				{
-					{Text: "🙋‍♂️ Взять в работу", CallbackData: fmt.Sprintf("claim_%d", conv.ID)},
+					{Text: "🙋\u200d♂️ Взять в работу", CallbackData: fmt.Sprintf("claim_%d", conv.ID)},
 				},
 			},
 		}
@@ -252,13 +269,19 @@ func forwardToTelegramAdmins(conv *repository.ChatConversation, msg *repository.
 		}
 	}
 
+	successCount := 0
 	for _, chatID := range ids {
+		log.Printf("[CHAT-FWD] Sending to admin TG chat %d...", chatID)
 		tgMsgID := telegram.SendMessageHTMLWithInlineReturnID(chatID, text, keyboard)
 		if tgMsgID != 0 {
 			repository.UpdateChatMessageTgID(msg.ID, tgMsgID)
 			repository.InsertTgBridge(conv.ID, msg.ID, chatID, tgMsgID)
+			successCount++
+			log.Printf("[CHAT-FWD] ✅ Sent to admin chat %d → tg_msg_id=%d", chatID, tgMsgID)
 		} else {
-			log.Printf("[CHAT-FWD] ⚠️ SendMessageHTMLWithInlineReturnID returned 0 for admin chat %d", chatID)
+			log.Printf("[CHAT-FWD] ❌ FAILED to send to admin chat %d (returned 0)", chatID)
 		}
 	}
+
+	log.Printf("[CHAT-FWD] ✅ Message from [%s] forwarded to [%d/%d] admins via Telegram", userEmail, successCount, len(ids))
 }
