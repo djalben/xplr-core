@@ -235,7 +235,16 @@ func TelegramWebhookHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Any other message
+	// ── Any other message: check if admin direct message ──
+	// If the sender is an admin with a claimed conversation, route their text there.
+	adminUserID, _ := resolveAdminUserID(chatID)
+	if adminUserID != 0 && !strings.HasPrefix(text, "/") {
+		handleAdminDirectMessage(chatID, text)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// Non-admin fallback: generic bot template
 	telegram.SendMessageHTML(chatID,
 		"🤖 Я бот уведомлений <b>XPLR</b>.\n\n"+
 			"Доступные команды:\n"+
@@ -256,9 +265,6 @@ func handleCallbackQuery(cb *tgCallbackQuery) {
 	data := cb.Data
 
 	log.Printf("[TG-CALLBACK] chat_id=%d (int64), data=%q, callback_id=%q", callerChatID, data, cb.ID)
-
-	// DEBUG: send confirmation to admin that we received the click
-	telegram.SendMessageHTML(callerChatID, fmt.Sprintf("🔄 Получен клик: <code>%s</code>\nОбработка...", data))
 
 	// ── Handle claim_<convID> ──
 	if strings.HasPrefix(data, "claim_") {
@@ -574,56 +580,100 @@ func updateAllAdminKeyboardsClosed(convID int) {
 
 // ── Chat Bridge: admin TG reply → web chat ──
 
-func handleChatBridgeReply(adminChatID int64, replyToMsgID int64, text string) {
-	log.Printf("[CHAT-BRIDGE] Incoming reply: adminChat=%d, replyToMsgID=%d, text=%q", adminChatID, replyToMsgID, text)
-
-	// 1. Find the conversation by the TG message the admin replied to
-	convID, err := repository.GetConversationIDByTgReplyMsgID(replyToMsgID)
-	if err != nil || convID == 0 {
-		log.Printf("[CHAT-BRIDGE] ❌ No conversation found for tg_message_id=%d (err=%v)", replyToMsgID, err)
-		return
-	}
-
-	conv, err := repository.GetConversationByID(convID)
-	if err != nil || conv == nil {
-		log.Printf("[CHAT-BRIDGE] ❌ Conversation %d not found in DB (err=%v)", convID, err)
-		return
-	}
-	log.Printf("[CHAT-BRIDGE] Found conversation #%d (user=%d, topic=%q, status=%q)", conv.ID, conv.UserID, conv.Topic, conv.Status)
-
-	// 2. Resolve admin via direct lookup + auto-link
-	adminUserID, _ := resolveAdminUserID(adminChatID)
-	if adminUserID == 0 {
-		log.Printf("[CHAT-BRIDGE] ❌ Chat %d could not be resolved to any admin — ignoring reply", adminChatID)
-		telegram.SendMessageHTML(adminChatID, "❌ Ваш Telegram не привязан к аккаунту XPLR. Привяжите через настройки.")
-		return
-	}
-
-	// 3. Check claim protection: only the claiming admin can reply
+// sendAdminReplyToConversation inserts the admin's reply into a conversation and notifies the user.
+// Returns true if successful.
+func sendAdminReplyToConversation(adminChatID int64, adminUserID int, conv *repository.ChatConversation, text string) bool {
+	// Check claim protection: only the claiming admin (or unclaimed) can reply
 	if conv.ClaimedBy != 0 && conv.ClaimedBy != adminUserID {
 		claimerName := repository.GetUserDisplayName(conv.ClaimedBy)
-		log.Printf("[CHAT-BRIDGE] ⚠️ Admin %d tried to reply to conv #%d claimed by %d (%s)", adminUserID, convID, conv.ClaimedBy, claimerName)
 		telegram.SendMessageHTML(adminChatID,
-			fmt.Sprintf("⚠️ <b>Этот тикет уже обрабатывает %s.</b>\nВаши ответы не будут отправлены клиенту.", claimerName))
-		return
+			fmt.Sprintf("⚠️ <b>Тикет #%d обрабатывает %s.</b>\nВаши ответы не будут отправлены.", conv.ID, claimerName))
+		return false
 	}
 
-	// 4. Insert admin message (masked name for client anonymity)
-	_, err = repository.InsertChatMessage(convID, "admin", "Support Specialist", text, 0)
+	// Insert admin message
+	_, err := repository.InsertChatMessage(conv.ID, "admin", "Support Specialist", text, 0)
 	if err != nil {
-		log.Printf("[CHAT-BRIDGE] ❌ Failed to insert admin reply for conv %d: %v", convID, err)
-		return
+		log.Printf("[CHAT-BRIDGE] ❌ Failed to insert admin reply for conv %d: %v", conv.ID, err)
+		telegram.SendMessageHTML(adminChatID, fmt.Sprintf("❌ Ошибка записи в БД: %v", err))
+		return false
 	}
 
-	log.Printf("[CHAT-BRIDGE] ✅ Admin reply saved to conversation #%d (admin user=%d)", convID, adminUserID)
+	log.Printf("[CHAT-BRIDGE] ✅ Admin reply saved to conversation #%d (admin=%d)", conv.ID, adminUserID)
 
-	// 4. Notify the user via Telegram that they have a new reply
+	// Confirm to admin
+	telegram.SendMessageHTML(adminChatID, fmt.Sprintf("✅ Сообщение доставлено клиенту (тикет #%d)", conv.ID))
+
+	// Notify the user via Telegram
 	userChatID := repository.GetUserTelegramChatID(conv.UserID)
 	if userChatID != 0 {
 		telegram.SendMessageHTML(userChatID,
 			fmt.Sprintf("💬 <b>Новое сообщение от поддержки</b>\n\n%s\n\n"+
 				"<a href=\"https://xplr.pro/support\">Открыть чат</a>", text))
-	} else {
-		log.Printf("[CHAT-BRIDGE] User %d has no linked Telegram — skipping TG notification", conv.UserID)
 	}
+	return true
+}
+
+func handleChatBridgeReply(adminChatID int64, replyToMsgID int64, text string) {
+	log.Printf("[CHAT-BRIDGE] Incoming reply: adminChat=%d, replyToMsgID=%d, text=%q", adminChatID, replyToMsgID, text)
+
+	// Resolve admin first — we need this for all paths
+	adminUserID, adminName := resolveAdminUserID(adminChatID)
+	if adminUserID == 0 {
+		log.Printf("[CHAT-BRIDGE] ❌ Chat %d not resolved to any admin", adminChatID)
+		telegram.SendMessageHTML(adminChatID, "❌ Ваш Telegram не привязан к аккаунту XPLR.")
+		return
+	}
+	log.Printf("[CHAT-BRIDGE] Admin resolved: userID=%d (%s)", adminUserID, adminName)
+
+	// 1. Try to find conversation via bridge table (exact message match)
+	convID, err := repository.GetConversationIDByTgReplyMsgID(replyToMsgID)
+	if err == nil && convID != 0 {
+		conv, convErr := repository.GetConversationByID(convID)
+		if convErr == nil && conv != nil {
+			log.Printf("[CHAT-BRIDGE] Bridge match: tg_msg=%d → conv #%d", replyToMsgID, convID)
+			sendAdminReplyToConversation(adminChatID, adminUserID, conv, text)
+			return
+		}
+	}
+	log.Printf("[CHAT-BRIDGE] ⚠️ Bridge lookup failed for tg_message_id=%d (err=%v, convID=%d)", replyToMsgID, err, convID)
+
+	// 2. Fallback: find admin's claimed open conversation
+	claimedConv, claimErr := repository.GetClaimedOpenConversation(adminUserID)
+	if claimErr == nil && claimedConv != nil {
+		log.Printf("[CHAT-BRIDGE] Fallback: routing to admin's claimed conv #%d", claimedConv.ID)
+		sendAdminReplyToConversation(adminChatID, adminUserID, claimedConv, text)
+		return
+	}
+
+	// 3. Nothing found — tell admin
+	log.Printf("[CHAT-BRIDGE] ❌ No conversation found for admin %d (bridge failed, no claimed conv)", adminUserID)
+	telegram.SendMessageHTML(adminChatID,
+		"❌ <b>Не удалось определить тикет.</b>\n\n"+
+			"Нажмите <b>Reply</b> на сообщение клиента, чтобы ответить.\n"+
+			"Или сначала нажмите «Взять в работу» на тикете.")
+}
+
+// handleAdminDirectMessage handles a direct (non-reply) message from an admin.
+// Routes it to their currently claimed open conversation, if any.
+func handleAdminDirectMessage(adminChatID int64, text string) {
+	adminUserID, adminName := resolveAdminUserID(adminChatID)
+	if adminUserID == 0 {
+		return // not an admin, caller handles fallback
+	}
+	log.Printf("[CHAT-DIRECT] Admin direct message from %d (%s): %q", adminChatID, adminName, text)
+
+	claimedConv, err := repository.GetClaimedOpenConversation(adminUserID)
+	if err != nil || claimedConv == nil {
+		telegram.SendMessageHTML(adminChatID,
+			"ℹ️ <b>У вас нет активных тикетов.</b>\n\n"+
+				"Чтобы ответить клиенту:\n"+
+				"1. Нажмите «Взять в работу» на тикете\n"+
+				"2. Ответьте Reply на сообщение клиента\n\n"+
+				"Или просто напишите сюда текст — он будет направлен в ваш активный тикет.")
+		return
+	}
+
+	log.Printf("[CHAT-DIRECT] Routing direct message to claimed conv #%d", claimedConv.ID)
+	sendAdminReplyToConversation(adminChatID, adminUserID, claimedConv, text)
 }

@@ -202,6 +202,28 @@ func ClaimConversation(convID int, adminUserID int) (bool, error) {
 	return rows > 0, nil
 }
 
+// GetClaimedOpenConversation returns the open conversation claimed by a given admin user.
+// Used as fallback when bridge lookup fails — admin can still reply to their claimed conversation.
+func GetClaimedOpenConversation(adminUserID int) (*ChatConversation, error) {
+	if GlobalDB == nil {
+		return nil, fmt.Errorf("database connection not initialized")
+	}
+	var conv ChatConversation
+	err := GlobalDB.QueryRow(
+		`SELECT id, user_id, topic, status, COALESCE(claimed_by,0), created_at, updated_at
+		 FROM chat_conversations WHERE claimed_by = $1 AND status = 'open'
+		 ORDER BY updated_at DESC LIMIT 1`,
+		adminUserID,
+	).Scan(&conv.ID, &conv.UserID, &conv.Topic, &conv.Status, &conv.ClaimedBy, &conv.CreatedAt, &conv.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &conv, nil
+}
+
 // TgBridgeEntry represents a single TG bridge mapping row.
 type TgBridgeEntry struct {
 	TgChatID    int64
