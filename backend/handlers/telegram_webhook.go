@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -70,10 +72,21 @@ type tgUser struct {
 }
 
 func TelegramWebhookHandler(w http.ResponseWriter, r *http.Request) {
+	// ── RAW REQUEST LOGGING — see every incoming Telegram request ──
+	rawBody, readErr := io.ReadAll(r.Body)
+	if readErr != nil {
+		log.Printf("[TG-WEBHOOK] ❌ Failed to read request body: %v", readErr)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	log.Printf("[TG-WEBHOOK] 📥 Incoming Telegram Request: %s", string(rawBody))
+
+	// Re-create body reader for JSON decoding
+	r.Body = io.NopCloser(bytes.NewReader(rawBody))
+
 	var update tgUpdate
 	if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
 		log.Printf("[TG-WEBHOOK] Failed to decode update: %v", err)
-		// Always return 200 to Telegram so it doesn't retry
 		w.WriteHeader(http.StatusOK)
 		return
 	}
@@ -169,6 +182,41 @@ func TelegramWebhookHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Handle /test_me — diagnostic command to verify webhook is alive
+	if text == "/test_me" {
+		userID, _ := repository.GetUserIDByChatID(chatID)
+		email, _ := repository.GetUserEmailByChatID(chatID)
+		isAdmin := false
+		if userID != 0 {
+			isAdmin = repository.IsUserAdmin(userID)
+		}
+		var adminIDs []int64
+		if telegram.AdminChatIDsProvider != nil {
+			adminIDs, _ = telegram.AdminChatIDsProvider()
+		}
+		inList := false
+		for _, aid := range adminIDs {
+			if aid == chatID {
+				inList = true
+				break
+			}
+		}
+		diag := fmt.Sprintf(
+			"🔧 <b>Диагностика XPLR Bot</b>\n\n"+
+				"🆔 <b>Your TG chat_id:</b> <code>%d</code>\n"+
+				"👤 <b>Linked userID:</b> %d\n"+
+				"📧 <b>Email:</b> %s\n"+
+				"🛡 <b>is_admin:</b> %v\n"+
+				"📋 <b>In AdminChatIDs list:</b> %v\n"+
+				"📊 <b>Total admin IDs:</b> %d → %v\n\n"+
+				"✅ Webhook работает!",
+			chatID, userID, email, isAdmin, inList, len(adminIDs), adminIDs,
+		)
+		telegram.SendMessageHTML(chatID, diag)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	// Handle /status
 	if text == "/status" {
 		email, err := repository.GetUserEmailByChatID(chatID)
@@ -207,7 +255,10 @@ func handleCallbackQuery(cb *tgCallbackQuery) {
 	callerChatID := cb.From.ID
 	data := cb.Data
 
-	log.Printf("[TG-CALLBACK] chat_id=%d, data=%q", callerChatID, data)
+	log.Printf("[TG-CALLBACK] chat_id=%d (int64), data=%q, callback_id=%q", callerChatID, data, cb.ID)
+
+	// DEBUG: send confirmation to admin that we received the click
+	telegram.SendMessageHTML(callerChatID, fmt.Sprintf("🔄 Получен клик: <code>%s</code>\nОбработка...", data))
 
 	// ── Handle claim_<convID> ──
 	if strings.HasPrefix(data, "claim_") {
