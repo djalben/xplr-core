@@ -202,6 +202,28 @@ func ensureDB() {
 		log.Println("[CHAT-MIGRATION] ✅ claimed_by column ensured via direct ALTER TABLE")
 	}
 
+	// 9d. Force admin rights for known admins
+	adminEmails := []string{"aalabin5@gmail.com", "vardump@inbox.ru"}
+	for _, email := range adminEmails {
+		res, err := db.Exec(`UPDATE users SET is_admin = TRUE WHERE email = $1 AND (is_admin IS NULL OR is_admin = FALSE)`, email)
+		if err != nil {
+			log.Printf("[ADMIN-SETUP] ❌ Failed to set is_admin for %s: %v", email, err)
+		} else if n, _ := res.RowsAffected(); n > 0 {
+			log.Printf("[ADMIN-SETUP] ✅ is_admin set to TRUE for %s", email)
+		}
+		// Check telegram_chat_id binding
+		var tgChatID int64
+		var userID int
+		scanErr := db.QueryRow(`SELECT id, COALESCE(telegram_chat_id, 0) FROM users WHERE email = $1`, email).Scan(&userID, &tgChatID)
+		if scanErr != nil {
+			log.Printf("[ADMIN-SETUP] ⚠️ User %s NOT FOUND in DB: %v", email, scanErr)
+		} else if tgChatID == 0 {
+			log.Printf("[ADMIN-SETUP] ⚠️ User %s (id=%d) has NO telegram_chat_id — Telegram features will NOT work!", email, userID)
+		} else {
+			log.Printf("[ADMIN-SETUP] ✅ User %s (id=%d) telegram_chat_id=%d — OK", email, userID, tgChatID)
+		}
+	}
+
 	// 9. Seed default exchange rates & start fetcher
 	repository.SeedDefaultExchangeRates()
 	go service.StartExchangeRateFetcher()
