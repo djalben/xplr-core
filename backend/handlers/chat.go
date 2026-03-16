@@ -31,12 +31,17 @@ func ChatStartHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if user already has an open conversation
-	existing, _ := repository.GetOpenConversation(userID)
+	existing, err := repository.GetOpenConversation(userID)
+	if err != nil {
+		log.Printf("[CHAT] GetOpenConversation error for user %d: %v", userID, err)
+	}
 	if existing != nil {
 		msgs, _ := repository.GetChatMessages(existing.ID)
 		if msgs == nil {
 			msgs = []repository.ChatMessage{}
 		}
+		log.Printf("[CHAT] Returning existing conv #%d (topic=%q, msgs=%d) for user %d",
+			existing.ID, existing.Topic, len(msgs), userID)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"conversation": existing,
@@ -47,6 +52,7 @@ func ChatStartHandler(w http.ResponseWriter, r *http.Request) {
 
 	// __check__ is a sentinel topic used by the frontend to probe for existing conversations
 	if body.Topic == "__check__" {
+		log.Printf("[CHAT] No open conversation for user %d (__check__ probe)", userID)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"conversation": nil,
@@ -194,10 +200,12 @@ func ChatCloseHandler(w http.ResponseWriter, r *http.Request) {
 // The TG message_id is saved so admin replies can be routed back.
 func forwardToTelegramAdmins(conv *repository.ChatConversation, msg *repository.ChatMessage, userID int, userName string) {
 	if telegram.AdminChatIDsProvider == nil {
+		log.Printf("[CHAT-FWD] AdminChatIDsProvider is nil — cannot forward")
 		return
 	}
 	ids, err := telegram.AdminChatIDsProvider()
 	if err != nil || len(ids) == 0 {
+		log.Printf("[CHAT-FWD] No admin chat IDs found (err=%v, count=%d)", err, len(ids))
 		return
 	}
 
@@ -209,11 +217,17 @@ func forwardToTelegramAdmins(conv *repository.ChatConversation, msg *repository.
 		conv.ID, userName, conv.Topic, msg.Body,
 	)
 
+	log.Printf("[CHAT-FWD] Forwarding msg #%d (conv=%d) to %d admin(s)", msg.ID, conv.ID, len(ids))
+
 	for _, chatID := range ids {
 		tgMsgID := telegram.SendMessageHTMLReturnID(chatID, text)
 		if tgMsgID != 0 {
-			// Save the tg_message_id on the chat message so we can route replies back
+			// Save to legacy column (last-write-wins, kept for backward compat)
 			repository.UpdateChatMessageTgID(msg.ID, tgMsgID)
+			// Save to bridge table (supports multiple admins)
+			repository.InsertTgBridge(conv.ID, msg.ID, chatID, tgMsgID)
+		} else {
+			log.Printf("[CHAT-FWD] ⚠️ SendMessageHTMLReturnID returned 0 for admin chat %d", chatID)
 		}
 	}
 }

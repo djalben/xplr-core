@@ -56,6 +56,16 @@ func EnsureChatTables() error {
 			created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);
 		CREATE INDEX IF NOT EXISTS idx_chat_msg_conv ON chat_messages(conversation_id);
+
+		CREATE TABLE IF NOT EXISTS chat_tg_bridge (
+			id                SERIAL PRIMARY KEY,
+			conversation_id   INTEGER NOT NULL REFERENCES chat_conversations(id),
+			chat_message_id   INTEGER NOT NULL REFERENCES chat_messages(id),
+			tg_chat_id        BIGINT NOT NULL,
+			tg_message_id     BIGINT NOT NULL,
+			created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+		CREATE INDEX IF NOT EXISTS idx_chat_tg_bridge_tgmsg ON chat_tg_bridge(tg_message_id);
 	`)
 	if err != nil {
 		log.Printf("[CHAT] Error creating chat tables: %v", err)
@@ -208,22 +218,56 @@ func UpdateChatMessageTgID(msgID int, tgMsgID int64) {
 	_, err := GlobalDB.Exec(`UPDATE chat_messages SET tg_message_id = $1 WHERE id = $2`, tgMsgID, msgID)
 	if err != nil {
 		log.Printf("[CHAT] Failed to update tg_message_id for msg %d: %v", msgID, err)
+	} else {
+		log.Printf("[CHAT] ✅ Saved tg_message_id=%d for chat msg #%d", tgMsgID, msgID)
+	}
+}
+
+// InsertTgBridge saves a mapping between a TG message sent to an admin and the chat conversation/message.
+// This supports multiple admins each receiving a different TG message_id.
+func InsertTgBridge(convID int, chatMsgID int, tgChatID int64, tgMsgID int64) {
+	if GlobalDB == nil {
+		return
+	}
+	_, err := GlobalDB.Exec(
+		`INSERT INTO chat_tg_bridge (conversation_id, chat_message_id, tg_chat_id, tg_message_id) VALUES ($1, $2, $3, $4)`,
+		convID, chatMsgID, tgChatID, tgMsgID,
+	)
+	if err != nil {
+		log.Printf("[CHAT] Failed to insert tg_bridge (conv=%d, tgMsg=%d): %v", convID, tgMsgID, err)
+	} else {
+		log.Printf("[CHAT] ✅ Bridge saved: conv=%d, chatMsg=%d, tgChat=%d, tgMsg=%d", convID, chatMsgID, tgChatID, tgMsgID)
 	}
 }
 
 // GetConversationIDByTgReplyMsgID finds the conversation by the tg_message_id that the admin replied to.
+// First checks the bridge table (supports multi-admin), then falls back to chat_messages column.
 func GetConversationIDByTgReplyMsgID(tgMsgID int64) (int, error) {
 	if GlobalDB == nil {
 		return 0, fmt.Errorf("database connection not initialized")
 	}
+
+	// Primary: check bridge table
 	var convID int
 	err := GlobalDB.QueryRow(
+		`SELECT conversation_id FROM chat_tg_bridge WHERE tg_message_id = $1 LIMIT 1`,
+		tgMsgID,
+	).Scan(&convID)
+	if err == nil && convID != 0 {
+		log.Printf("[CHAT] Bridge lookup: tg_message_id=%d → conv=%d", tgMsgID, convID)
+		return convID, nil
+	}
+
+	// Fallback: legacy column on chat_messages
+	err = GlobalDB.QueryRow(
 		`SELECT conversation_id FROM chat_messages WHERE tg_message_id = $1 LIMIT 1`,
 		tgMsgID,
 	).Scan(&convID)
 	if err != nil {
+		log.Printf("[CHAT] Bridge lookup FAILED for tg_message_id=%d: %v", tgMsgID, err)
 		return 0, err
 	}
+	log.Printf("[CHAT] Legacy lookup: tg_message_id=%d → conv=%d", tgMsgID, convID)
 	return convID, nil
 }
 
