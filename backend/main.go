@@ -178,6 +178,8 @@ func main() {
 	verifiedWallet.HandleFunc("/auto-topup", handlers.SetAutoTopupHandler).Methods("PATCH")
 	protectedRouter.HandleFunc("/report", handlers.GetUserTransactionReportHandler).Methods("GET")
 	protectedRouter.HandleFunc("/transactions", handlers.GetUnifiedTransactionsHandler).Methods("GET")
+	protectedRouter.HandleFunc("/transactions/export", handlers.ExportTransactionsHandler).Methods("GET")
+	protectedRouter.HandleFunc("/dashboard-stats", handlers.GetDashboardStatsHandler).Methods("GET")
 	protectedRouter.HandleFunc("/api-key", handlers.CreateAPIKeyHandler).Methods("POST")
 
 	// Команды (Teams)

@@ -47,33 +47,9 @@ func loadSMTPConfig() *smtpConfig {
 	return c
 }
 
-// loadSupportSMTPConfig returns SMTP config for support@xplr.pro.
-// Falls back to main SMTP config if SMTP_SUPPORT_USER is not set.
-func loadSupportSMTPConfig() *smtpConfig {
-	user := os.Getenv("SMTP_SUPPORT_USER")
-	pass := os.Getenv("SMTP_SUPPORT_PASS")
-	if user == "" || pass == "" {
-		// Fallback: use main SMTP account
-		return loadSMTPConfig()
-	}
-	return &smtpConfig{
-		Host:   os.Getenv("SMTP_HOST"),
-		Port:   os.Getenv("SMTP_PORT"),
-		User:   user,
-		Pass:   pass,
-		From:   user, // Zoho requires From == authenticated user
-		Domain: os.Getenv("APP_DOMAIN"),
-	}
-}
-
-// sendMail — unified sender. Uses implicit TLS for port 465, STARTTLS for 587.
+// sendMail — unified sender via admin@xplr.pro. Uses implicit TLS for port 465, STARTTLS for 587.
 func sendMail(to, subject, htmlBody string) error {
 	return sendMailWith(loadSMTPConfig(), to, subject, htmlBody)
-}
-
-// sendMailSupport — sends email using the support SMTP account.
-func sendMailSupport(to, subject, htmlBody string) error {
-	return sendMailWith(loadSupportSMTPConfig(), to, subject, htmlBody)
 }
 
 func sendMailWith(cfg *smtpConfig, to, subject, htmlBody string) error {
@@ -330,7 +306,7 @@ func SendGradeChangeEmail(toEmail, newGrade string) error {
 	return nil
 }
 
-// SendSupportTicketNotification — дублирует тикет на support@xplr.pro через Zoho SMTP.
+// SendSupportTicketNotification — дублирует тикет на admin@xplr.pro через Zoho SMTP.
 func SendSupportTicketNotification(ticketID int, userEmail, subject, message string) error {
 	content := fmt.Sprintf(`
     <p style="color:#cbd5e1;font-size:15px;line-height:1.6;margin:0 0 20px;">Новый тикет поддержки</p>
@@ -349,11 +325,11 @@ func SendSupportTicketNotification(ticketID int, userEmail, subject, message str
 	html := wrapHTML("Новый тикет поддержки", content)
 	emailSubject := fmt.Sprintf("XPLR Тикет #%d — %s", ticketID, subject)
 
-	if err := sendMailSupport("support@xplr.pro", emailSubject, html); err != nil {
+	if err := sendMail("admin@xplr.pro", emailSubject, html); err != nil {
 		log.Printf("[EMAIL] Failed to send support ticket notification: %v", err)
 		return err
 	}
-	log.Printf("[EMAIL] Support ticket #%d notification sent to support@xplr.pro", ticketID)
+	log.Printf("[EMAIL] Support ticket #%d notification sent to admin@xplr.pro", ticketID)
 	return nil
 }
 

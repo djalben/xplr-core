@@ -217,17 +217,24 @@ func IncrementFailedAuthCount(cardID int) error {
 	return err
 }
 
-// BlockCard блокирует карту (устанавливает статус BLOCKED)
+// BlockCard блокирует карту (устанавливает статус BLOCKED).
+// Delegates to UpdateCardStatus which atomically refunds card_balance to wallet.
 func BlockCard(cardID int) error {
 	if GlobalDB == nil {
 		return fmt.Errorf("database connection not initialized")
 	}
-	_, err := GlobalDB.Exec("UPDATE cards SET card_status = 'BLOCKED' WHERE id = $1", cardID)
+	// Look up card owner so we can use the ACID UpdateCardStatus path
+	var userID int
+	err := GlobalDB.QueryRow("SELECT user_id FROM cards WHERE id = $1", cardID).Scan(&userID)
 	if err != nil {
-		log.Printf("DB Error Blocking Card %d: %v", cardID, err)
-		return fmt.Errorf("не удалось заблокировать карту")
+		log.Printf("DB Error looking up owner of card %d for block: %v", cardID, err)
+		return fmt.Errorf("card not found")
 	}
-	log.Printf("🔒 Card %d has been BLOCKED due to multiple failed attempts", cardID)
+	if err := UpdateCardStatus(cardID, userID, "BLOCKED"); err != nil {
+		log.Printf("DB Error blocking card %d via UpdateCardStatus: %v", cardID, err)
+		return err
+	}
+	log.Printf("🔒 Card %d has been BLOCKED (ACID refund applied) for user %d", cardID, userID)
 	return nil
 }
 

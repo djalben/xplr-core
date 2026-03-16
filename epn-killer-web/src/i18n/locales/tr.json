@@ -181,6 +181,7 @@
       "notVerified": "Doğrulanmadı",
       "displayName": "Görünen ad",
       "displayNamePlaceholder": "Adınız",
+      "edit": "Düzenle",
       "saveProfile": "Kaydet",
       "profileUpdated": "Profil güncellendi",
       "saveError": "Kaydetme hatası"
@@ -278,7 +279,15 @@
       "submitReview": "İncelemeye gönder",
       "submitSuccess": "Talep incelemeye gönderildi",
       "submitError": "Talep gönderme hatası",
-      "fillRequired": "Tüm gerekli alanları doldurun"
+      "fillRequired": "Tüm gerekli alanları doldurun",
+      "countries": {
+        "RU": "🇷🇺 Rusya",
+        "BY": "🇧🇾 Belarus",
+        "KZ": "🇰🇿 Kazakistan",
+        "UA": "🇺🇦 Ukrayna",
+        "US": "🇺🇸 ABD",
+        "DE": "🇩🇪 Almanya"
+      }
     },
     "error": "Hata",
     "emailVerify": {
@@ -365,10 +374,5 @@
     "back": "Geri",
     "next": "İleri",
     "search": "Ara..."
-  },
-  "clocks": {
-    "moscow": "Moskova",
-    "london": "Londra",
-    "newYork": "New York"
   }
 }

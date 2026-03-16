@@ -181,6 +181,7 @@
       "notVerified": "Não verificado",
       "displayName": "Nome de exibição",
       "displayNamePlaceholder": "Seu nome",
+      "edit": "Editar",
       "saveProfile": "Salvar",
       "profileUpdated": "Perfil atualizado",
       "saveError": "Erro ao salvar"
@@ -278,7 +279,15 @@
       "submitReview": "Enviar para revisão",
       "submitSuccess": "Solicitação enviada para revisão",
       "submitError": "Erro ao enviar solicitação",
-      "fillRequired": "Preencha todos os campos obrigatórios"
+      "fillRequired": "Preencha todos os campos obrigatórios",
+      "countries": {
+        "RU": "🇷🇺 Rússia",
+        "BY": "🇧🇾 Bielorrússia",
+        "KZ": "🇰🇿 Cazaquistão",
+        "UA": "🇺🇦 Ucrânia",
+        "US": "🇺🇸 EUA",
+        "DE": "🇩🇪 Alemanha"
+      }
     },
     "error": "Erro",
     "emailVerify": {
@@ -365,10 +374,5 @@
     "back": "Voltar",
     "next": "Próximo",
     "search": "Buscar..."
-  },
-  "clocks": {
-    "moscow": "Moscou",
-    "london": "Londres",
-    "newYork": "Nova York"
   }
 }

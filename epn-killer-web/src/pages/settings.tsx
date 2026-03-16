@@ -92,9 +92,9 @@ const TelegramCard = ({ profile, reload, showToast }: { profile: ProfileData | n
   };
 
   return (
-    <div className="glass-card p-6">
+    <div className="glass-card p-4 sm:p-6">
       <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><MessageCircle className="w-5 h-5 text-blue-400" />{t('settings.telegram.title')}</h3>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         {profile?.telegram_linked ? (
           <>
             <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-400" /><p className="text-white font-medium">{t('settings.telegram.connected')}</p></div>
@@ -103,7 +103,7 @@ const TelegramCard = ({ profile, reload, showToast }: { profile: ProfileData | n
         ) : (
           <>
             <p className="text-sm text-slate-400">{t('settings.telegram.linkDesc')}</p>
-            <button onClick={handleLink} disabled={linking} className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap">
+            <button onClick={handleLink} disabled={linking} className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors whitespace-nowrap w-full sm:w-auto">
               {linking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
               {t('settings.telegram.link')}
             </button>
@@ -171,23 +171,23 @@ const ProfileTab = ({ profile, reload, showToast, setActiveTab }: { profile: Pro
 
   return (
     <div className="space-y-6">
-      <div className="glass-card p-6">
+      <div className="glass-card p-4 sm:p-6">
         <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><User className="w-5 h-5 text-blue-400" />{t('settings.profileSection.title')}</h3>
         <div className="space-y-4">
           <div>
             <label className="block text-sm text-slate-400 mb-2">{t('settings.profileSection.email')}</label>
-            <div className="flex items-center gap-3">
-              <input type="text" value={profile?.email || ''} readOnly className="xplr-input w-full bg-white/[0.02] cursor-not-allowed" />
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+              <input type="text" value={profile?.email || ''} readOnly className="xplr-input w-full min-w-0 bg-white/[0.02] cursor-not-allowed" />
               {profile?.is_verified
-                ? <span className="flex items-center gap-1 text-xs text-emerald-400 whitespace-nowrap"><CheckCircle className="w-3.5 h-3.5" />{t('settings.profileSection.verified')}</span>
-                : <button onClick={handleRequestEmailCode} disabled={emailSending} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 text-blue-400 text-xs font-medium rounded-lg transition-colors whitespace-nowrap">
+                ? <span className="flex items-center gap-1 text-xs text-emerald-400 whitespace-nowrap shrink-0"><CheckCircle className="w-3.5 h-3.5" />{t('settings.profileSection.verified')}</span>
+                : <button onClick={handleRequestEmailCode} disabled={emailSending} className="flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 text-blue-400 text-xs font-medium rounded-lg transition-colors whitespace-nowrap w-full sm:w-auto shrink-0">
                     {emailSending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />}{t('settings.emailVerify.verify')}
                   </button>}
             </div>
           </div>
           <div>
             <label className="block text-sm text-slate-400 mb-2">{t('settings.profileSection.displayName')}</label>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-full min-w-0">
               <input
                 type="text"
                 value={displayName}
@@ -195,7 +195,7 @@ const ProfileTab = ({ profile, reload, showToast, setActiveTab }: { profile: Pro
                 placeholder={t('settings.profileSection.displayNamePlaceholder')}
                 readOnly={!isEditingName}
                 onKeyDown={e => { if (e.key === 'Enter' && isEditingName) handleSave(); if (e.key === 'Escape') { setDisplayName(profile?.display_name || ''); setIsEditingName(false); } }}
-                className={`xplr-input w-full transition-colors ${
+                className={`xplr-input w-full min-w-0 transition-colors ${
                   isEditingName ? 'border-blue-500/50 bg-white/[0.04]' : 'bg-white/[0.02] cursor-default'
                 }`}
               />
@@ -203,7 +203,7 @@ const ProfileTab = ({ profile, reload, showToast, setActiveTab }: { profile: Pro
                 <button
                   onClick={() => setIsEditingName(true)}
                   className="shrink-0 p-2.5 hover:bg-white/10 rounded-xl transition-colors group"
-                  title="Редактировать"
+                  title={t('settings.profileSection.edit')}
                 >
                   <Pencil className="w-4 h-4 text-slate-400 group-hover:text-blue-400 transition-colors" />
                 </button>
@@ -222,14 +222,14 @@ const ProfileTab = ({ profile, reload, showToast, setActiveTab }: { profile: Pro
         </div>
       </div>
 
-      <div className="glass-card p-6">
+      <div className="glass-card p-4 sm:p-6">
         <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><FileText className="w-5 h-5 text-purple-400" />{t('settings.verification.title')}</h3>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className={`px-3 py-1 rounded-full text-xs font-medium ${verColors[verStatus] || verColors.pending}`}>{verLabel}</span>
-            <p className="text-sm text-slate-400">{verStatus === 'verified' ? t('settings.verification.accountVerified') : t('settings.verification.needVerification')}</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 ${verColors[verStatus] || verColors.pending}`}>{verLabel}</span>
+            <p className="text-sm text-slate-400 truncate">{verStatus === 'verified' ? t('settings.verification.accountVerified') : t('settings.verification.needVerification')}</p>
           </div>
-          {verStatus !== 'verified' && <button onClick={() => setActiveTab('kyc')} className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap">{t('settings.verification.startVerification')}</button>}
+          {verStatus !== 'verified' && <button onClick={() => setActiveTab('kyc')} className="w-full sm:w-auto px-4 py-2.5 bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium rounded-xl transition-colors whitespace-nowrap text-center">{t('settings.verification.startVerification')}</button>}
         </div>
       </div>
 
@@ -341,7 +341,7 @@ const SecurityTab = ({ profile, reload, showToast }: { profile: ProfileData | nu
   return (
     <div className="space-y-6">
       {/* Change Password */}
-      <div className="glass-card p-6">
+      <div className="glass-card p-4 sm:p-6">
         <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><Lock className="w-5 h-5 text-amber-400" />{t('settings.password.title')}</h3>
         <div className="space-y-3 max-w-md">
           <div className="relative">
@@ -360,15 +360,15 @@ const SecurityTab = ({ profile, reload, showToast }: { profile: ProfileData | nu
       </div>
 
       {/* 2FA */}
-      <div className="glass-card p-6">
+      <div className="glass-card p-4 sm:p-6">
         <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><Smartphone className="w-5 h-5 text-emerald-400" />{t('settings.twoFa.title')}</h3>
         {profile?.two_factor_enabled ? (
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-3">
-              <ShieldCheck className="w-6 h-6 text-emerald-400" />
+              <ShieldCheck className="w-6 h-6 text-emerald-400 shrink-0" />
               <div><p className="text-white font-medium">{t('settings.twoFa.enabled')}</p><p className="text-sm text-slate-400">{t('settings.twoFa.enabledDesc')}</p></div>
             </div>
-            <button onClick={handleDisable2FA} className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-sm font-medium rounded-lg transition-colors">{t('settings.twoFa.disable')}</button>
+            <button onClick={handleDisable2FA} className="w-full sm:w-auto px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-sm font-medium rounded-xl transition-colors text-center">{t('settings.twoFa.disable')}</button>
           </div>
         ) : totpSecret ? (
           <div className="space-y-4">
@@ -387,21 +387,21 @@ const SecurityTab = ({ profile, reload, showToast }: { profile: ProfileData | nu
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-3">
-              <ShieldAlert className="w-6 h-6 text-orange-400" />
+              <ShieldAlert className="w-6 h-6 text-orange-400 shrink-0" />
               <div><p className="text-white font-medium">{t('settings.twoFa.notConfigured')}</p><p className="text-sm text-slate-400">{t('settings.twoFa.notConfiguredDesc')}</p></div>
             </div>
-            <button onClick={handleSetup2FA} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-lg transition-colors">{t('settings.twoFa.setup')}</button>
+            <button onClick={handleSetup2FA} className="w-full sm:w-auto px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-xl transition-colors text-center">{t('settings.twoFa.setup')}</button>
           </div>
         )}
       </div>
 
       {/* Sessions */}
-      <div className="glass-card p-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="glass-card p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <h3 className="text-lg font-semibold text-white flex items-center gap-2"><MonitorSmartphone className="w-5 h-5 text-blue-400" />{t('settings.sessions.title')}</h3>
-          <button onClick={handleLogoutAll} disabled={logoutSaving} className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-medium rounded-lg transition-colors">
+          <button onClick={handleLogoutAll} disabled={logoutSaving} className="flex items-center justify-center gap-2 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-medium rounded-lg transition-colors w-full sm:w-auto">
             {logoutSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LogOut className="w-3.5 h-3.5" />}{t('settings.sessions.logoutAll')}
           </button>
         </div>
@@ -456,12 +456,12 @@ const NotificationsTab = ({ showToast }: { showToast: (m: string, t: 'ok' | 'err
 
   return (
     <div className="space-y-6">
-      <div className="glass-card p-6">
+      <div className="glass-card p-4 sm:p-6">
         <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><Bell className="w-5 h-5 text-blue-400" />{t('settings.notif.title')}</h3>
         <div className="space-y-4">
           {items.map(item => (
-            <div key={item.key} className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/5">
-              <div><p className="text-white font-medium">{item.label}</p><p className="text-sm text-slate-500">{item.desc}</p></div>
+            <div key={item.key} className="flex items-center justify-between gap-4 p-4 rounded-xl bg-white/[0.03] border border-white/5">
+              <div className="min-w-0"><p className="text-white font-medium">{item.label}</p><p className="text-sm text-slate-500">{item.desc}</p></div>
               <Toggle checked={prefs[item.key]} onChange={v => savePrefs({ ...prefs, [item.key]: v })} />
             </div>
           ))}
@@ -536,14 +536,14 @@ const KYCTab = ({ profile, reload, showToast }: { profile: ProfileData | null; r
     <div className="space-y-6">
       <div className="glass-card p-6">
         <h3 className="text-lg font-semibold text-white mb-6">{t('settings.kycForm.title')}</h3>
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-8 overflow-x-auto pb-2">
           {steps.map((s, i) => (
-            <div key={s.id} className="flex items-center">
+            <div key={s.id} className="flex items-center shrink-0">
               <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
                 s.status === 'completed' ? 'bg-emerald-500 text-white' : s.status === 'current' ? 'bg-blue-500 text-white' : 'bg-white/10 text-slate-500'
               }`}>{s.status === 'completed' ? <Check className="w-5 h-5" /> : s.id}</div>
-              <span className={`ml-3 ${s.status === 'current' ? 'text-white' : 'text-slate-500'}`}>{s.title}</span>
-              {i < steps.length - 1 && <div className="w-16 md:w-24 h-0.5 bg-white/10 mx-4" />}
+              <span className={`ml-2 sm:ml-3 text-sm sm:text-base hidden sm:inline ${s.status === 'current' ? 'text-white' : 'text-slate-500'}`}>{s.title}</span>
+              {i < steps.length - 1 && <div className="w-8 sm:w-16 md:w-24 h-0.5 bg-white/10 mx-2 sm:mx-4" />}
             </div>
           ))}
         </div>
@@ -554,12 +554,12 @@ const KYCTab = ({ profile, reload, showToast }: { profile: ProfileData | null; r
           <h3 className="text-lg font-semibold text-white mb-4">{t('settings.kycForm.stepCitizenship')}</h3>
           <select value={country} onChange={e => setCountry(e.target.value)} className="xplr-select w-full mb-4">
             <option value="">{t('settings.kycForm.selectCountry')}</option>
-            <option value="RU">🇷🇺 Россия / Russia</option>
-            <option value="BY">🇧🇾 Беларусь / Belarus</option>
-            <option value="KZ">🇰🇿 Казахстан / Kazakhstan</option>
-            <option value="UA">🇺🇦 Украина / Ukraine</option>
-            <option value="US">🇺🇸 США / USA</option>
-            <option value="DE">🇩🇪 Германия / Germany</option>
+            <option value="RU">{t('settings.kycForm.countries.RU')}</option>
+            <option value="BY">{t('settings.kycForm.countries.BY')}</option>
+            <option value="KZ">{t('settings.kycForm.countries.KZ')}</option>
+            <option value="UA">{t('settings.kycForm.countries.UA')}</option>
+            <option value="US">{t('settings.kycForm.countries.US')}</option>
+            <option value="DE">{t('settings.kycForm.countries.DE')}</option>
           </select>
           <button onClick={() => country && setStep(2)} disabled={!country} className="w-full px-4 py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-medium rounded-xl transition-colors">{t('settings.kycForm.continue')}</button>
         </div>
@@ -593,12 +593,12 @@ const KYCTab = ({ profile, reload, showToast }: { profile: ProfileData | null; r
               { id: 'selfie', label: t('settings.kycForm.selfie'), desc: t('settings.kycForm.selfieDesc') },
             ].map(doc => (
               <div key={doc.id} className="p-4 rounded-xl bg-white/[0.03] border border-white/10 border-dashed">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Upload className="w-5 h-5 text-slate-400" />
-                    <div><p className="text-white font-medium">{doc.label}</p><p className="text-sm text-slate-500">{doc.desc}</p></div>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Upload className="w-5 h-5 text-slate-400 shrink-0" />
+                    <div className="min-w-0"><p className="text-white font-medium">{doc.label}</p><p className="text-sm text-slate-500 truncate">{doc.desc}</p></div>
                   </div>
-                  <button className="px-4 py-2 glass-card hover:bg-white/10 text-slate-300 text-sm rounded-lg transition-colors">{t('settings.kycForm.upload')}</button>
+                  <button className="w-full sm:w-auto px-4 py-2.5 glass-card hover:bg-white/10 text-slate-300 text-sm rounded-xl transition-colors text-center shrink-0">{t('settings.kycForm.upload')}</button>
                 </div>
               </div>
             ))}
@@ -632,7 +632,7 @@ const LanguageTab = () => {
   const handleChange = (code: string) => { i18n.changeLanguage(code); localStorage.setItem(LANG_KEY, code); };
 
   return (
-    <div className="glass-card p-6">
+    <div className="glass-card p-4 sm:p-6">
       <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><Globe className="w-5 h-5 text-blue-400" />{t('settings.languageTitle')}</h3>
       <div className="space-y-3">
         {languages.map(lang => (
@@ -677,7 +677,7 @@ export const SettingsPage = () => {
 
   return (
     <DashboardLayout>
-      <div className="stagger-fade-in max-w-4xl">
+      <div className="stagger-fade-in w-full max-w-4xl overflow-hidden">
         <BackButton />
         {toast && <Toast msg={toast.msg} type={toast.type} />}
         <div className="mb-8">

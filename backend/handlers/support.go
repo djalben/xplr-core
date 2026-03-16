@@ -14,7 +14,7 @@ import (
 )
 
 // SubmitSupportTicketHandler — POST /api/v1/user/support
-// Creates a support ticket and sends email notification to support@xplr.pro.
+// Creates a support ticket and sends email notification to admin@xplr.pro.
 func SubmitSupportTicketHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
 	if !ok || userID == 0 {

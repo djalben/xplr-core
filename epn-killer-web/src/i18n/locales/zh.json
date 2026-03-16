@@ -181,6 +181,7 @@
       "notVerified": "未验证",
       "displayName": "显示名称",
       "displayNamePlaceholder": "您的名字",
+      "edit": "编辑",
       "saveProfile": "保存",
       "profileUpdated": "资料已更新",
       "saveError": "保存失败"
@@ -278,7 +279,15 @@
       "submitReview": "提交审核",
       "submitSuccess": "申请已提交审核",
       "submitError": "提交申请失败",
-      "fillRequired": "请填写所有必填字段"
+      "fillRequired": "请填写所有必填字段",
+      "countries": {
+        "RU": "🇷🇺 俄罗斯",
+        "BY": "🇧🇾 白俄罗斯",
+        "KZ": "🇰🇿 哈萨克斯坦",
+        "UA": "🇺🇦 乌克兰",
+        "US": "🇺🇸 美国",
+        "DE": "🇩🇪 德国"
+      }
     },
     "error": "错误",
     "emailVerify": {
@@ -365,10 +374,5 @@
     "back": "返回",
     "next": "下一步",
     "search": "搜索..."
-  },
-  "clocks": {
-    "moscow": "莫斯科",
-    "london": "伦敦",
-    "newYork": "纽约"
   }
 }

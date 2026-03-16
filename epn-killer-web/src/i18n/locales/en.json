@@ -176,6 +176,7 @@
       "notVerified": "Not verified",
       "displayName": "Display Name",
       "displayNamePlaceholder": "Your name",
+      "edit": "Edit",
       "saveProfile": "Save",
       "profileUpdated": "Profile updated",
       "saveError": "Save failed"
@@ -273,7 +274,15 @@
       "submitReview": "Submit for Review",
       "submitSuccess": "Request submitted for review",
       "submitError": "Failed to submit request",
-      "fillRequired": "Fill in all required fields"
+      "fillRequired": "Fill in all required fields",
+      "countries": {
+        "RU": "🇷🇺 Russia",
+        "BY": "🇧🇾 Belarus",
+        "KZ": "🇰🇿 Kazakhstan",
+        "UA": "🇺🇦 Ukraine",
+        "US": "🇺🇸 USA",
+        "DE": "🇩🇪 Germany"
+      }
     },
     "error": "Error",
     "emailVerify": {
@@ -360,10 +369,5 @@
     "back": "Back",
     "next": "Next",
     "search": "Search..."
-  },
-  "clocks": {
-    "moscow": "Moscow",
-    "london": "London",
-    "newYork": "New York"
   }
 }

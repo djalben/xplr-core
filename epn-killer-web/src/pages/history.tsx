@@ -7,9 +7,13 @@ import {
   Search,
   Wallet,
   CreditCard,
-  Clock
+  Clock,
+  FileText,
+  TableProperties,
+  Loader2
 } from 'lucide-react';
 import apiClient from '../api/axios';
+import { API_BASE_URL } from '../api/axios';
 
 type Period = 'day' | 'week' | 'month';
 
@@ -35,6 +39,8 @@ export const HistoryPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [transactions, setTransactions] = useState<HistoryTx[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
 
   const fmt = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -93,6 +99,44 @@ export const HistoryPage = () => {
     return true;
   });
 
+  const downloadExport = async (format: 'pdf' | 'excel') => {
+    const setter = format === 'pdf' ? setExportingPdf : setExportingExcel;
+    setter(true);
+    try {
+      const now = new Date();
+      const start = new Date(now);
+      if (period === 'day') start.setDate(now.getDate() - 1);
+      else if (period === 'week') start.setDate(now.getDate() - 7);
+      else start.setDate(now.getDate() - 31);
+
+      const token = localStorage.getItem('token');
+      const params = new URLSearchParams({
+        format,
+        start_date: fmt(start),
+        end_date: fmt(now),
+      });
+      const res = await fetch(`${API_BASE_URL}/user/transactions/export?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const ext = format === 'pdf' ? 'pdf' : 'xlsx';
+      const filename = `XPLR_transactions_${fmt(now)}.${ext}`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export error:', err);
+    } finally {
+      setter(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="stagger-fade-in">
@@ -103,6 +147,25 @@ export const HistoryPage = () => {
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-white mb-1">История</h1>
             <p className="text-slate-400 text-sm">Все операции по кошельку и картам</p>
+          </div>
+          {/* Export buttons */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => downloadExport('pdf')}
+              disabled={exportingPdf}
+              className="flex items-center gap-2 px-3 py-2 md:px-4 md:py-2.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-sm font-medium hover:bg-red-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {exportingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+              <span className="hidden sm:inline">Скачать PDF</span>
+            </button>
+            <button
+              onClick={() => downloadExport('excel')}
+              disabled={exportingExcel}
+              className="flex items-center gap-2 px-3 py-2 md:px-4 md:py-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-sm font-medium hover:bg-emerald-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {exportingExcel ? <Loader2 className="w-4 h-4 animate-spin" /> : <TableProperties className="w-4 h-4" />}
+              <span className="hidden sm:inline">Скачать Excel</span>
+            </button>
           </div>
         </div>
 

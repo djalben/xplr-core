@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../components/dashboard-layout';
 import { BackButton } from '../components/back-button';
 import apiClient from '../api/axios';
@@ -10,13 +11,25 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
-  Loader2
+  Loader2,
+  ShieldAlert,
+  Settings
 } from 'lucide-react';
 
 export const SupportPage = () => {
+  const navigate = useNavigate();
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
+  const [telegramLinked, setTelegramLinked] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    apiClient.get('/user/settings/profile')
+      .then(res => setTelegramLinked(!!res.data?.telegram_linked))
+      .catch(() => setTelegramLinked(false));
+  }, []);
+
+  const formBlocked = telegramLinked === false;
 
   const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
     setToast({ msg, type });
@@ -81,7 +94,7 @@ export const SupportPage = () => {
           </a>
 
           <a 
-            href="mailto:support@xplr.pro"
+            href="mailto:admin@xplr.pro"
             className="glass-card p-6 card-hover group text-center"
           >
             <div className="w-14 h-14 rounded-xl bg-emerald-500/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform mx-auto">
@@ -90,13 +103,13 @@ export const SupportPage = () => {
             <h3 className="text-lg font-semibold text-white mb-1">Email</h3>
             <p className="text-slate-500 text-sm mb-3">Ответ в течение 24 часов</p>
             <div className="flex items-center justify-center gap-2 text-emerald-500 text-sm font-medium">
-              support@xplr.pro
+              admin@xplr.pro
             </div>
           </a>
         </div>
 
         {/* Quick Message Form */}
-        <div className="glass-card p-6 mb-8 max-w-2xl mx-auto">
+        <div className="glass-card p-6 mb-8 max-w-2xl mx-auto relative overflow-hidden">
           <h3 className="text-lg font-semibold text-white mb-4">Быстрое сообщение</h3>
           <textarea
             value={message}
@@ -104,7 +117,7 @@ export const SupportPage = () => {
             placeholder="Опишите вашу проблему или вопрос..."
             rows={4}
             className="xplr-input w-full mb-4 resize-none"
-            disabled={sending}
+            disabled={sending || formBlocked}
           />
           <div className="flex items-center justify-between">
             <p className="text-sm text-slate-400">
@@ -112,13 +125,35 @@ export const SupportPage = () => {
             </p>
             <button 
               onClick={handleSend}
-              disabled={!message.trim() || sending}
+              disabled={!message.trim() || sending || formBlocked}
               className="flex items-center gap-2 px-6 py-3 gradient-accent text-white font-medium rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-blue-500/25"
             >
               {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
               {sending ? 'Отправка...' : 'Отправить'}
             </button>
           </div>
+
+          {/* Overlay: Telegram not linked */}
+          {formBlocked && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-slate-950/80 backdrop-blur-sm rounded-2xl px-6 text-center">
+              <div className="w-14 h-14 rounded-full bg-amber-500/20 flex items-center justify-center">
+                <ShieldAlert className="w-7 h-7 text-amber-400" />
+              </div>
+              <p className="text-white font-semibold text-lg leading-snug max-w-sm">
+                Для отправки сообщений в поддержку необходимо подключить Telegram
+              </p>
+              <p className="text-slate-400 text-sm max-w-xs">
+                Привяжите Telegram-бота в настройках профиля, чтобы получать ответы и отправлять обращения.
+              </p>
+              <button
+                onClick={() => navigate('/settings')}
+                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-violet-500 hover:from-blue-600 hover:to-violet-600 text-white font-semibold rounded-xl transition-all shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40"
+              >
+                <Settings className="w-5 h-5" />
+                Перейти к привязке
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Working Hours */}

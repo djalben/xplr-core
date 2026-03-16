@@ -129,21 +129,24 @@ var AdminChatIDsProvider func() ([]int64, error)
 
 func NotifyAdmins(message string, buttonText string, buttonURL string) {
 	if botToken == "" {
+		log.Println("[TELEGRAM] ⚠️ NotifyAdmins skipped: TELEGRAM_BOT_TOKEN not set")
 		return
 	}
 	if AdminChatIDsProvider == nil {
-		log.Println("[TELEGRAM] NotifyAdmins: AdminChatIDsProvider not set")
+		log.Println("[TELEGRAM] ⚠️ NotifyAdmins skipped: AdminChatIDsProvider not set (check main.go init)")
 		return
 	}
 	ids, err := AdminChatIDsProvider()
 	if err != nil {
-		log.Printf("[TELEGRAM] NotifyAdmins: failed to get admin chat IDs: %v", err)
+		log.Printf("[TELEGRAM] ❌ NotifyAdmins: failed to get admin chat IDs: %v", err)
 		return
 	}
 	if len(ids) == 0 {
+		log.Println("[TELEGRAM] ⚠️ NotifyAdmins: no admins with linked Telegram found (telegram_chat_id is NULL for all admins)")
 		return
 	}
 
+	log.Printf("[TELEGRAM] 📤 Sending notification to %d admin(s)...", len(ids))
 	for _, chatID := range ids {
 		if buttonText != "" && buttonURL != "" {
 			payload := sendMessageWithURLPayload{
