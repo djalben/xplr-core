@@ -305,9 +305,27 @@
   },
   "support": {
     "title": "Destek",
-    "subtitle": "Size nasıl yardımcı olabiliriz?",
-    "newTicket": "Yeni Ticket",
-    "faq": "SSS"
+    "subtitle": "Sohbet başlatmak için bir konu seçin",
+    "chatTitle": "Destek Sohbeti",
+    "online": "Çevrimiçi",
+    "closeChat": "Sohbeti kapat",
+    "chatClosed": "Sohbet kapatıldı",
+    "placeholder": "Bir mesaj yazın...",
+    "welcomeMsg": "Bir uzman kısa sürede bağlanacak",
+    "avgResponse": "Ortalama yanıt süresi:",
+    "avgResponseTime": "5 dakikaya kadar",
+    "error": "Bir hata oluştu. Lütfen tekrar deneyin.",
+    "sendError": "Mesaj gönderilemedi",
+    "topics": {
+      "cards": "Kartlar",
+      "cardsDesc": "Düzenleme, engelleme, limitler",
+      "payments": "Ödemeler ve bakiye",
+      "paymentsDesc": "Yükleme, çekim, işlemler",
+      "security": "Güvenlik",
+      "securityDesc": "2FA, doğrulama, erişim",
+      "other": "Diğer",
+      "otherDesc": "Diğer her şey"
+    }
   },
   "auth": {
     "login": "Giriş",

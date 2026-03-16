@@ -280,6 +280,47 @@ func SendTransactionAlert(chatID int64, amount string, merchant string, last4 st
 	}
 }
 
+// SendMessageHTMLReturnID sends an HTML message and returns the Telegram message_id.
+// Used by the chat bridge to save the TG message ID for reply routing.
+func SendMessageHTMLReturnID(chatID int64, message string) int64 {
+	if botToken == "" || chatID == 0 {
+		return 0
+	}
+	payload := sendMessagePayload{
+		ChatID:    chatID,
+		Text:      message,
+		ParseMode: "HTML",
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("[TELEGRAM] SendMessageHTMLReturnID marshal error: %v", err)
+		return 0
+	}
+	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", botToken)
+	resp, err := http.Post(apiURL, "application/json", bytes.NewReader(body))
+	if err != nil {
+		log.Printf("[TELEGRAM] SendMessageHTMLReturnID HTTP error (Chat %d): %v", chatID, err)
+		return 0
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		log.Printf("[TELEGRAM] SendMessageHTMLReturnID failed (Chat %d): %d %s", chatID, resp.StatusCode, string(respBody))
+		return 0
+	}
+	var result struct {
+		OK     bool `json:"ok"`
+		Result struct {
+			MessageID int64 `json:"message_id"`
+		} `json:"result"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		// Try reading the body we already consumed — fallback
+		return 0
+	}
+	return result.Result.MessageID
+}
+
 // EditMessageText изменяет текст существующего сообщения (убирает inline-кнопки).
 func EditMessageText(chatID int64, messageID int64, newText string) error {
 	payload := editMessagePayload{

@@ -1,180 +1,290 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { DashboardLayout } from '../components/dashboard-layout';
 import { BackButton } from '../components/back-button';
 import apiClient from '../api/axios';
-import { 
+import {
   MessageCircle,
-  Mail,
   Send,
-  ExternalLink,
-  Clock,
   CheckCircle,
   AlertCircle,
   Loader2,
-  ShieldAlert,
-  Settings
+  CreditCard,
+  Wallet,
+  ShieldCheck,
+  HelpCircle,
+  X,
+  Headphones,
 } from 'lucide-react';
 
+interface ChatMessage {
+  id: number;
+  conversation_id: number;
+  sender_type: 'user' | 'admin';
+  sender_name: string;
+  body: string;
+  created_at: string;
+}
+
+interface Conversation {
+  id: number;
+  user_id: number;
+  topic: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+const POLL_INTERVAL = 5000;
+
 export const SupportPage = () => {
-  const navigate = useNavigate();
-  const [message, setMessage] = useState('');
+  const { t } = useTranslation();
+  const [conversation, setConversation] = useState<Conversation | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
-  const [telegramLinked, setTelegramLinked] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    apiClient.get('/user/settings/profile')
-      .then(res => setTelegramLinked(!!res.data?.telegram_linked))
-      .catch(() => setTelegramLinked(false));
-  }, []);
-
-  const formBlocked = telegramLinked === false;
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 5000);
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
+
+  // Try to load existing open conversation on mount
+  useEffect(() => {
+    apiClient.post('/user/chat/start', { topic: '__check__' })
+      .then(res => {
+        if (res.data?.conversation?.status === 'open' && res.data.conversation.topic !== '__check__') {
+          setConversation(res.data.conversation);
+          setMessages(res.data.messages || []);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Poll for new messages when conversation is active
+  useEffect(() => {
+    if (!conversation || conversation.status !== 'open') return;
+
+    const poll = () => {
+      apiClient.get(`/user/chat/messages/${conversation.id}`)
+        .then(res => {
+          const newMsgs: ChatMessage[] = res.data?.messages || [];
+          setMessages(prev => {
+            if (newMsgs.length !== prev.length) return newMsgs;
+            return prev;
+          });
+          // Update conversation status
+          if (res.data?.conversation) setConversation(res.data.conversation);
+        })
+        .catch(() => {});
+    };
+
+    pollRef.current = setInterval(poll, POLL_INTERVAL);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [conversation]);
+
+  // Auto-scroll on new messages
+  useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
+
+  const startConversation = async (topic: string) => {
+    setLoading(true);
+    try {
+      const res = await apiClient.post('/user/chat/start', { topic });
+      setConversation(res.data.conversation);
+      setMessages(res.data.messages || []);
+    } catch {
+      showToast(t('support.error'), 'err');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSend = async () => {
-    if (!message.trim() || sending) return;
+    if (!input.trim() || sending || !conversation) return;
+    const text = input.trim();
     setSending(true);
+    setInput('');
     try {
-      await apiClient.post('/user/support', { message: message.trim() });
-      setMessage('');
-      showToast('Сообщение отправлено! Мы ответим вам в течение 24 часов.', 'ok');
-    } catch (err: any) {
-      const msg = err.response?.data || 'Не удалось отправить сообщение. Попробуйте позже.';
-      showToast(typeof msg === 'string' ? msg : 'Ошибка отправки', 'err');
+      const res = await apiClient.post(`/user/chat/send/${conversation.id}`, { message: text });
+      setMessages(prev => [...prev, res.data]);
+    } catch {
+      showToast(t('support.sendError'), 'err');
+      setInput(text);
     } finally {
       setSending(false);
     }
   };
 
+  const handleClose = async () => {
+    if (!conversation) return;
+    try {
+      await apiClient.post(`/user/chat/close/${conversation.id}`);
+      setConversation(null);
+      setMessages([]);
+      showToast(t('support.chatClosed'), 'ok');
+    } catch {
+      showToast(t('support.error'), 'err');
+    }
+  };
+
+  const topics = [
+    { key: 'cards', icon: CreditCard, color: 'text-blue-400 bg-blue-500/20' },
+    { key: 'payments', icon: Wallet, color: 'text-emerald-400 bg-emerald-500/20' },
+    { key: 'security', icon: ShieldCheck, color: 'text-amber-400 bg-amber-500/20' },
+    { key: 'other', icon: HelpCircle, color: 'text-purple-400 bg-purple-500/20' },
+  ];
+
+  const fmtTime = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex justify-center items-center py-24">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
-      <div className="stagger-fade-in max-w-4xl mx-auto">
+      <div className="stagger-fade-in w-full max-w-3xl mx-auto overflow-hidden">
         <BackButton />
-        
+
         {/* Toast */}
         {toast && (
           <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-5 py-4 rounded-2xl text-sm font-medium shadow-2xl backdrop-blur-lg border animate-slide-in ${
-            toast.type === 'ok'
-              ? 'bg-emerald-500/90 text-white border-emerald-400/30'
-              : 'bg-red-500/90 text-white border-red-400/30'
+            toast.type === 'ok' ? 'bg-emerald-500/90 text-white border-emerald-400/30' : 'bg-red-500/90 text-white border-red-400/30'
           }`}>
             {toast.type === 'ok' ? <CheckCircle className="w-5 h-5 shrink-0" /> : <AlertCircle className="w-5 h-5 shrink-0" />}
             {toast.msg}
           </div>
         )}
 
-        {/* Header */}
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-white mb-2">Поддержка</h1>
-          <p className="text-slate-500">Мы на связи 24/7. Выберите удобный способ обращения.</p>
-        </div>
-
-        {/* Contact Options — only Telegram + Email, centered */}
-        <div className="grid md:grid-cols-2 gap-4 mb-8 max-w-2xl mx-auto">
-          <a 
-            href="https://t.me/your_telegram_link" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="glass-card p-6 card-hover group text-center"
-          >
-            <div className="w-14 h-14 rounded-xl bg-blue-500/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform mx-auto">
-              <MessageCircle className="w-7 h-7 text-blue-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-white mb-1">Telegram</h3>
-            <p className="text-slate-500 text-sm mb-3">Быстрый ответ в чате</p>
-            <div className="flex items-center justify-center gap-2 text-blue-500 text-sm font-medium">
-              Написать в Telegram
-              <ExternalLink className="w-4 h-4" />
-            </div>
-          </a>
-
-          <a 
-            href="mailto:admin@xplr.pro"
-            className="glass-card p-6 card-hover group text-center"
-          >
-            <div className="w-14 h-14 rounded-xl bg-emerald-500/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform mx-auto">
-              <Mail className="w-7 h-7 text-emerald-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-white mb-1">Email</h3>
-            <p className="text-slate-500 text-sm mb-3">Ответ в течение 24 часов</p>
-            <div className="flex items-center justify-center gap-2 text-emerald-500 text-sm font-medium">
-              admin@xplr.pro
-            </div>
-          </a>
-        </div>
-
-        {/* Quick Message Form */}
-        <div className="glass-card p-6 mb-8 max-w-2xl mx-auto relative overflow-hidden">
-          <h3 className="text-lg font-semibold text-white mb-4">Быстрое сообщение</h3>
-          <textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="Опишите вашу проблему или вопрос..."
-            rows={4}
-            className="xplr-input w-full mb-4 resize-none"
-            disabled={sending || formBlocked}
-          />
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-slate-400">
-              Среднее время ответа: <span className="text-white font-medium">до 24 часов</span>
-            </p>
-            <button 
-              onClick={handleSend}
-              disabled={!message.trim() || sending || formBlocked}
-              className="flex items-center gap-2 px-6 py-3 gradient-accent text-white font-medium rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-blue-500/25"
-            >
-              {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-              {sending ? 'Отправка...' : 'Отправить'}
-            </button>
-          </div>
-
-          {/* Overlay: Telegram not linked */}
-          {formBlocked && (
-            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-slate-950/80 backdrop-blur-sm rounded-2xl px-6 text-center">
-              <div className="w-14 h-14 rounded-full bg-amber-500/20 flex items-center justify-center">
-                <ShieldAlert className="w-7 h-7 text-amber-400" />
+        {/* ─── No active conversation → Topic picker ─── */}
+        {!conversation && (
+          <>
+            <div className="mb-8 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-blue-500/20 flex items-center justify-center mx-auto mb-4">
+                <Headphones className="w-8 h-8 text-blue-400" />
               </div>
-              <p className="text-white font-semibold text-lg leading-snug max-w-sm">
-                Для отправки сообщений в поддержку необходимо подключить Telegram
-              </p>
-              <p className="text-slate-400 text-sm max-w-xs">
-                Привяжите Telegram-бота в настройках профиля, чтобы получать ответы и отправлять обращения.
-              </p>
-              <button
-                onClick={() => navigate('/settings')}
-                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-violet-500 hover:from-blue-600 hover:to-violet-600 text-white font-semibold rounded-xl transition-all shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40"
-              >
-                <Settings className="w-5 h-5" />
-                Перейти к привязке
-              </button>
+              <h1 className="text-3xl font-bold text-white mb-2">{t('support.title')}</h1>
+              <p className="text-slate-400">{t('support.subtitle')}</p>
             </div>
-          )}
-        </div>
 
-        {/* Working Hours */}
-        <div className="glass-card p-6 max-w-2xl mx-auto">
-          <div className="flex items-center gap-3 mb-4">
-            <Clock className="w-5 h-5 text-blue-500" />
-            <h3 className="text-lg font-semibold text-white">Время работы</h3>
-          </div>
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="p-4 bg-white/[0.03] rounded-xl border border-white/10">
-              <p className="font-medium text-white mb-1">Telegram</p>
-              <p className="text-emerald-400 font-semibold">24/7</p>
-              <p className="text-sm text-slate-500 mt-1">Круглосуточно без выходных</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl mx-auto">
+              {topics.map(tp => (
+                <button
+                  key={tp.key}
+                  onClick={() => startConversation(tp.key)}
+                  className="glass-card p-5 card-hover group text-left"
+                >
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 ${tp.color} group-hover:scale-110 transition-transform`}>
+                    <tp.icon className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-white font-semibold mb-1">{t(`support.topics.${tp.key}`)}</h3>
+                  <p className="text-slate-500 text-sm">{t(`support.topics.${tp.key}Desc`)}</p>
+                </button>
+              ))}
             </div>
-            <div className="p-4 bg-white/[0.03] rounded-xl border border-white/10">
-              <p className="font-medium text-white mb-1">Email поддержка</p>
-              <p className="text-blue-400 font-semibold">09:00 — 21:00 МСК</p>
-              <p className="text-sm text-slate-500 mt-1">Ответ в течение 24 часов</p>
+
+            <div className="mt-8 text-center">
+              <p className="text-slate-500 text-sm">
+                {t('support.avgResponse')} <span className="text-white font-medium">{t('support.avgResponseTime')}</span>
+              </p>
+            </div>
+          </>
+        )}
+
+        {/* ─── Active conversation → Chat ─── */}
+        {conversation && (
+          <div className="glass-card overflow-hidden flex flex-col" style={{ height: 'calc(100dvh - 180px)', minHeight: 400 }}>
+            {/* Chat header */}
+            <div className="flex items-center justify-between p-4 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                  <MessageCircle className="w-5 h-5 text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="text-white font-semibold text-sm">{t('support.chatTitle')}</h3>
+                  <p className="text-slate-500 text-xs">{t(`support.topics.${conversation.topic}`)}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  {t('support.online')}
+                </span>
+                <button onClick={handleClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors" title={t('support.closeChat')}>
+                  <X className="w-4 h-4 text-slate-400" />
+                </button>
+              </div>
+            </div>
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {/* System welcome */}
+              <div className="flex justify-center">
+                <span className="px-3 py-1.5 rounded-full bg-white/[0.05] text-slate-500 text-xs">
+                  {t('support.welcomeMsg')}
+                </span>
+              </div>
+
+              {messages.map(msg => (
+                <div key={msg.id} className={`flex ${msg.sender_type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
+                    msg.sender_type === 'user'
+                      ? 'bg-blue-500 text-white rounded-br-md'
+                      : 'bg-white/[0.06] text-white border border-white/10 rounded-bl-md'
+                  }`}>
+                    {msg.sender_type === 'admin' && (
+                      <p className="text-xs text-blue-400 font-medium mb-1">{msg.sender_name}</p>
+                    )}
+                    <p className="text-sm whitespace-pre-wrap break-words">{msg.body}</p>
+                    <p className={`text-[10px] mt-1 ${msg.sender_type === 'user' ? 'text-blue-200' : 'text-slate-500'}`}>
+                      {fmtTime(msg.created_at)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Input */}
+            <div className="p-3 border-t border-white/10">
+              <div className="flex items-end gap-2">
+                <textarea
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                  placeholder={t('support.placeholder')}
+                  rows={1}
+                  className="xplr-input flex-1 resize-none min-h-[44px] max-h-32 py-2.5"
+                  disabled={sending}
+                />
+                <button
+                  onClick={handleSend}
+                  disabled={!input.trim() || sending}
+                  className="shrink-0 w-11 h-11 flex items-center justify-center rounded-xl bg-blue-500 hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors"
+                >
+                  {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       <style>{`

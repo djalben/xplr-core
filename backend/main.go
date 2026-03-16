@@ -90,6 +90,11 @@ func main() {
 		}
 	}
 
+	// Ensure chat tables exist
+	if err := repository.EnsureChatTables(); err != nil {
+		log.Printf("⚠️ Warning: could not ensure chat tables: %v", err)
+	}
+
 	// Telegram bot token (для реальной отправки уведомлений)
 	if token := os.Getenv("TELEGRAM_BOT_TOKEN"); token != "" {
 		telegram.SetBotToken(token)
@@ -200,6 +205,12 @@ func main() {
 
 	// Поддержка — отправка тикета
 	protectedRouter.HandleFunc("/support", handlers.SubmitSupportTicketHandler).Methods("POST")
+
+	// Live Chat
+	protectedRouter.HandleFunc("/chat/start", handlers.ChatStartHandler).Methods("POST")
+	protectedRouter.HandleFunc("/chat/messages/{id}", handlers.ChatMessagesHandler).Methods("GET")
+	protectedRouter.HandleFunc("/chat/send/{id}", handlers.ChatSendHandler).Methods("POST")
+	protectedRouter.HandleFunc("/chat/close/{id}", handlers.ChatCloseHandler).Methods("POST")
 
 	// Настройки профиля
 	protectedRouter.HandleFunc("/settings/profile", handlers.GetSettingsProfileHandler).Methods("GET")

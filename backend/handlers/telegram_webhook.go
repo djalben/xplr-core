@@ -48,9 +48,10 @@ type tgUpdate struct {
 }
 
 type tgMessage struct {
-	MessageID int64  `json:"message_id"`
-	Chat      tgChat `json:"chat"`
-	Text      string `json:"text"`
+	MessageID      int64      `json:"message_id"`
+	Chat           tgChat     `json:"chat"`
+	Text           string     `json:"text"`
+	ReplyToMessage *tgMessage `json:"reply_to_message"`
 }
 
 type tgChat struct {
@@ -93,6 +94,13 @@ func TelegramWebhookHandler(w http.ResponseWriter, r *http.Request) {
 	chatID := update.Message.Chat.ID
 
 	log.Printf("[TG-WEBHOOK] Received message: chat_id=%d, text=%q", chatID, text)
+
+	// ── Chat Bridge: admin replies to a forwarded chat message ──
+	if update.Message.ReplyToMessage != nil && !strings.HasPrefix(text, "/") {
+		handleChatBridgeReply(chatID, update.Message.ReplyToMessage.MessageID, text)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 
 	// Handle /start <code>
 	if strings.HasPrefix(text, "/start ") {
@@ -248,4 +256,45 @@ func handleCallbackQuery(cb *tgCallbackQuery) {
 	}
 
 	log.Printf("[TG-CALLBACK] Unknown callback data: %q", data)
+}
+
+// ── Chat Bridge: admin TG reply → web chat ──
+
+func handleChatBridgeReply(adminChatID int64, replyToMsgID int64, text string) {
+	// 1. Find the conversation by the TG message the admin replied to
+	convID, err := repository.GetConversationIDByTgReplyMsgID(replyToMsgID)
+	if err != nil || convID == 0 {
+		log.Printf("[CHAT-BRIDGE] No conversation found for tg_message_id=%d (not a chat forward)", replyToMsgID)
+		return
+	}
+
+	conv, err := repository.GetConversationByID(convID)
+	if err != nil || conv == nil {
+		log.Printf("[CHAT-BRIDGE] Conversation %d not found", convID)
+		return
+	}
+
+	// 2. Verify the sender is an admin
+	adminUserID, _ := repository.GetUserIDByChatID(adminChatID)
+	if adminUserID == 0 || !repository.IsUserAdmin(adminUserID) {
+		log.Printf("[CHAT-BRIDGE] Chat %d is not a linked admin — ignoring reply", adminChatID)
+		return
+	}
+
+	// 3. Insert admin message (masked name for client)
+	_, err = repository.InsertChatMessage(convID, "admin", "Support Specialist", text, 0)
+	if err != nil {
+		log.Printf("[CHAT-BRIDGE] Failed to insert admin reply for conv %d: %v", convID, err)
+		return
+	}
+
+	log.Printf("[CHAT-BRIDGE] ✅ Admin reply saved to conversation #%d", convID)
+
+	// 4. Optionally notify the user via Telegram that they have a new reply
+	userChatID := repository.GetUserTelegramChatID(conv.UserID)
+	if userChatID != 0 {
+		telegram.SendMessageHTML(userChatID,
+			fmt.Sprintf("💬 <b>Новое сообщение от поддержки</b>\n\n%s\n\n"+
+				"<a href=\"https://xplr.pro/support\">Открыть чат</a>", text))
+	}
 }
