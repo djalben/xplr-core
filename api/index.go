@@ -190,6 +190,11 @@ func ensureDB() {
 	// 8. Run SchemaGuard to ensure all required columns exist
 	repository.RunSchemaGuard()
 
+	// 9b. Chat tables
+	if err := repository.EnsureChatTables(); err != nil {
+		log.Printf("Warning: could not ensure chat tables: %v", err)
+	}
+
 	// 9. Seed default exchange rates & start fetcher
 	repository.SeedDefaultExchangeRates()
 	go service.StartExchangeRateFetcher()
@@ -299,6 +304,12 @@ func buildRouter() *mux.Router {
 
 	// Support
 	protected.HandleFunc("/support", handlers.SubmitSupportTicketHandler).Methods("POST")
+
+	// Live Chat
+	protected.HandleFunc("/chat/start", handlers.ChatStartHandler).Methods("POST")
+	protected.HandleFunc("/chat/messages/{id}", handlers.ChatMessagesHandler).Methods("GET")
+	protected.HandleFunc("/chat/send/{id}", handlers.ChatSendHandler).Methods("POST")
+	protected.HandleFunc("/chat/close/{id}", handlers.ChatCloseHandler).Methods("POST")
 
 	// Settings — Profile, Password, Sessions, Notifications, 2FA, Email Verify, KYC
 	protected.HandleFunc("/settings/profile", handlers.GetSettingsProfileHandler).Methods("GET")
