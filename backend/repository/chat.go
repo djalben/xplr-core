@@ -79,6 +79,26 @@ func EnsureChatTables() error {
 		return err
 	}
 	log.Println("[CHAT] ✅ Chat tables ensured")
+
+	// Verify claimed_by column exists — direct check + fallback
+	var colExists bool
+	verifyErr := GlobalDB.QueryRow(
+		`SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chat_conversations' AND column_name='claimed_by')`,
+	).Scan(&colExists)
+	if verifyErr != nil {
+		log.Printf("[CHAT] ⚠️ Could not verify claimed_by column: %v", verifyErr)
+	} else if !colExists {
+		log.Println("[CHAT] ⚠️ claimed_by column missing after migration — attempting direct ALTER TABLE")
+		_, altErr := GlobalDB.Exec(`ALTER TABLE chat_conversations ADD COLUMN IF NOT EXISTS claimed_by INTEGER DEFAULT 0`)
+		if altErr != nil {
+			log.Printf("[CHAT] ❌ Direct ALTER TABLE for claimed_by failed: %v", altErr)
+		} else {
+			log.Println("[CHAT] ✅ claimed_by column added via direct ALTER TABLE fallback")
+		}
+	} else {
+		log.Println("[CHAT] ✅ claimed_by column verified present")
+	}
+
 	return nil
 }
 
@@ -154,15 +174,31 @@ func ClaimConversation(convID int, adminUserID int) (bool, error) {
 	if GlobalDB == nil {
 		return false, fmt.Errorf("database connection not initialized")
 	}
+
+	// Pre-check: log current state of the conversation
+	var curStatus string
+	var curClaimedBy sql.NullInt64
+	preErr := GlobalDB.QueryRow(
+		`SELECT status, claimed_by FROM chat_conversations WHERE id = $1`, convID,
+	).Scan(&curStatus, &curClaimedBy)
+	if preErr != nil {
+		log.Printf("[CHAT-CLAIM-DB] Pre-check failed for conv %d: %v", convID, preErr)
+	} else {
+		log.Printf("[CHAT-CLAIM-DB] Pre-check conv %d: status=%q, claimed_by=%v (valid=%v)",
+			convID, curStatus, curClaimedBy.Int64, curClaimedBy.Valid)
+	}
+
 	res, err := GlobalDB.Exec(
 		`UPDATE chat_conversations SET claimed_by = $1, updated_at = NOW()
 		 WHERE id = $2 AND (claimed_by = 0 OR claimed_by IS NULL)`,
 		adminUserID, convID,
 	)
 	if err != nil {
+		log.Printf("[CHAT-CLAIM-DB] UPDATE failed: conv=%d, admin=%d, err=%v", convID, adminUserID, err)
 		return false, err
 	}
 	rows, _ := res.RowsAffected()
+	log.Printf("[CHAT-CLAIM-DB] UPDATE result: conv=%d, admin=%d, rowsAffected=%d", convID, adminUserID, rows)
 	return rows > 0, nil
 }
 
