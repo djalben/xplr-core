@@ -195,6 +195,13 @@ func ensureDB() {
 		log.Printf("Warning: could not ensure chat tables: %v", err)
 	}
 
+	// 9c. HARD migration: force claimed_by column (DO $$ may fail on Vercel)
+	if _, err := db.Exec(`ALTER TABLE chat_conversations ADD COLUMN IF NOT EXISTS claimed_by INTEGER DEFAULT 0`); err != nil {
+		log.Printf("[CHAT-MIGRATION] claimed_by ALTER TABLE: %v (may already exist, OK)", err)
+	} else {
+		log.Println("[CHAT-MIGRATION] ✅ claimed_by column ensured via direct ALTER TABLE")
+	}
+
 	// 9. Seed default exchange rates & start fetcher
 	repository.SeedDefaultExchangeRates()
 	go service.StartExchangeRateFetcher()

@@ -302,23 +302,40 @@ func handleClaimCallback(cb *tgCallbackQuery, callerChatID int64, data string) {
 	}
 	log.Printf("[CHAT-CLAIM] Parsed convID=%d", convID)
 
-	// Verify caller is an admin
+	// Verify caller is an admin — check BOTH is_admin flag AND AdminChatIDs list
 	adminUserID, dbErr := repository.GetUserIDByChatID(callerChatID)
 	log.Printf("[CHAT-CLAIM] GetUserIDByChatID(tg=%d) → userID=%d, err=%v", callerChatID, adminUserID, dbErr)
-	if adminUserID == 0 {
-		log.Printf("[CHAT-CLAIM] ❌ TG chat %d is not linked to any user", callerChatID)
-		telegram.AnswerCallbackQuery(cb.ID, "Ошибка: аккаунт не привязан к XPLR")
+
+	isAdmin := false
+	if adminUserID != 0 {
+		isAdmin = repository.IsUserAdmin(adminUserID)
+		log.Printf("[CHAT-CLAIM] IsUserAdmin(userID=%d) → %v", adminUserID, isAdmin)
+	}
+
+	// Fallback: check if this TG chat ID is in the admin list (they receive messages, so they should be able to claim)
+	if !isAdmin && telegram.AdminChatIDsProvider != nil {
+		adminIDs, _ := telegram.AdminChatIDsProvider()
+		for _, aid := range adminIDs {
+			if aid == callerChatID {
+				isAdmin = true
+				log.Printf("[CHAT-CLAIM] TG %d found in AdminChatIDsProvider list — granting claim access", callerChatID)
+				break
+			}
+		}
+	}
+
+	if !isAdmin {
+		log.Printf("[CHAT-CLAIM] ❌ TG %d (user=%d) is NOT admin by any method", callerChatID, adminUserID)
+		telegram.AnswerCallbackQuery(cb.ID, "Нет доступа")
 		answered = true
 		return
 	}
 
-	isAdmin := repository.IsUserAdmin(adminUserID)
-	log.Printf("[CHAT-CLAIM] IsUserAdmin(userID=%d) → %v", adminUserID, isAdmin)
-	if !isAdmin {
-		log.Printf("[CHAT-CLAIM] ❌ User %d (tg=%d) is NOT admin", adminUserID, callerChatID)
-		telegram.AnswerCallbackQuery(cb.ID, "Нет доступа: вы не администратор")
-		answered = true
-		return
+	// If adminUserID is 0 but they're in admin list, we still need a userID for the claim
+	if adminUserID == 0 {
+		log.Printf("[CHAT-CLAIM] ⚠️ TG %d is in admin list but has no linked user — using TG ID as placeholder", callerChatID)
+		// Use negative TG chat ID as a placeholder user ID so claim doesn't fail
+		adminUserID = int(callerChatID)
 	}
 
 	// Atomically claim
@@ -404,10 +421,24 @@ func handleCloseChatCallback(cb *tgCallbackQuery, callerChatID int64, data strin
 
 	adminUserID, _ := repository.GetUserIDByChatID(callerChatID)
 	log.Printf("[CHAT-CLOSE] GetUserIDByChatID(tg=%d) → userID=%d", callerChatID, adminUserID)
-	if adminUserID == 0 || !repository.IsUserAdmin(adminUserID) {
+
+	isAdmin := adminUserID != 0 && repository.IsUserAdmin(adminUserID)
+	if !isAdmin && telegram.AdminChatIDsProvider != nil {
+		adminIDs, _ := telegram.AdminChatIDsProvider()
+		for _, aid := range adminIDs {
+			if aid == callerChatID {
+				isAdmin = true
+				break
+			}
+		}
+	}
+	if !isAdmin {
 		telegram.AnswerCallbackQuery(cb.ID, "Нет доступа")
 		answered = true
 		return
+	}
+	if adminUserID == 0 {
+		adminUserID = int(callerChatID)
 	}
 
 	conv, err := repository.GetConversationByID(convID)
@@ -524,11 +555,25 @@ func handleChatBridgeReply(adminChatID int64, replyToMsgID int64, text string) {
 	}
 	log.Printf("[CHAT-BRIDGE] Found conversation #%d (user=%d, topic=%q, status=%q)", conv.ID, conv.UserID, conv.Topic, conv.Status)
 
-	// 2. Verify the sender is an admin
+	// 2. Verify the sender is an admin (with fallback to AdminChatIDs list)
 	adminUserID, _ := repository.GetUserIDByChatID(adminChatID)
-	if adminUserID == 0 || !repository.IsUserAdmin(adminUserID) {
+	isAdmin := adminUserID != 0 && repository.IsUserAdmin(adminUserID)
+	if !isAdmin && telegram.AdminChatIDsProvider != nil {
+		adminIDs, _ := telegram.AdminChatIDsProvider()
+		for _, aid := range adminIDs {
+			if aid == adminChatID {
+				isAdmin = true
+				log.Printf("[CHAT-BRIDGE] TG %d found in AdminChatIDsProvider — granting reply access", adminChatID)
+				break
+			}
+		}
+	}
+	if !isAdmin {
 		log.Printf("[CHAT-BRIDGE] ❌ Chat %d → user %d is not a linked admin — ignoring reply", adminChatID, adminUserID)
 		return
+	}
+	if adminUserID == 0 {
+		adminUserID = int(adminChatID)
 	}
 
 	// 3. Check claim protection: only the claiming admin can reply

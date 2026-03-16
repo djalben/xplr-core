@@ -120,6 +120,7 @@ func ChatMessagesHandler(w http.ResponseWriter, r *http.Request) {
 func ChatSendHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
 	if !ok || userID == 0 {
+		log.Printf("[CHAT-SEND] ❌ Unauthorized request (no userID in context)")
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -127,16 +128,21 @@ func ChatSendHandler(w http.ResponseWriter, r *http.Request) {
 	convIDStr := mux.Vars(r)["id"]
 	convID, err := strconv.Atoi(convIDStr)
 	if err != nil {
+		log.Printf("[CHAT-SEND] ❌ Invalid conv ID: %q", convIDStr)
 		http.Error(w, "Invalid conversation ID", http.StatusBadRequest)
 		return
 	}
 
+	log.Printf("[CHAT-SEND] >>> User %d sending message to conv %d", userID, convID)
+
 	conv, err := repository.GetConversationByID(convID)
 	if err != nil || conv == nil || conv.UserID != userID {
+		log.Printf("[CHAT-SEND] ❌ Conv %d not found or not owned by user %d (err=%v, conv=%+v)", convID, userID, err, conv)
 		http.Error(w, "Conversation not found", http.StatusNotFound)
 		return
 	}
 	if conv.Status != "open" {
+		log.Printf("[CHAT-SEND] ❌ Conv %d is %q, not open", convID, conv.Status)
 		http.Error(w, "Conversation is closed", http.StatusBadRequest)
 		return
 	}
@@ -145,18 +151,21 @@ func ChatSendHandler(w http.ResponseWriter, r *http.Request) {
 		Message string `json:"message"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Message == "" {
+		log.Printf("[CHAT-SEND] ❌ Empty or invalid message body (err=%v)", err)
 		http.Error(w, "Message is required", http.StatusBadRequest)
 		return
 	}
 
 	userName := repository.GetUserDisplayName(userID)
+	log.Printf("[CHAT-SEND] User %d (%s) sent: %q", userID, userName, body.Message)
 
 	msg, err := repository.InsertChatMessage(convID, "user", userName, body.Message, 0)
 	if err != nil {
-		log.Printf("[CHAT] Failed to insert message for conv %d: %v", convID, err)
+		log.Printf("[CHAT-SEND] ❌ Failed to insert message for conv %d: %v", convID, err)
 		http.Error(w, "Failed to send message", http.StatusInternalServerError)
 		return
 	}
+	log.Printf("[CHAT-SEND] ✅ Message #%d inserted into conv %d", msg.ID, convID)
 
 	// Forward to Telegram admins (async)
 	go forwardToTelegramAdmins(conv, msg, userID, userName)
@@ -199,13 +208,16 @@ func ChatCloseHandler(w http.ResponseWriter, r *http.Request) {
 // forwardToTelegramAdmins sends the user's chat message to all admin Telegram accounts.
 // The TG message_id is saved so admin replies can be routed back.
 func forwardToTelegramAdmins(conv *repository.ChatConversation, msg *repository.ChatMessage, userID int, userName string) {
+	log.Printf("[CHAT-FWD] >>> forwardToTelegramAdmins called: conv=%d, msg=%d, user=%d (%s)", conv.ID, msg.ID, userID, userName)
+
 	if telegram.AdminChatIDsProvider == nil {
-		log.Printf("[CHAT-FWD] AdminChatIDsProvider is nil — cannot forward")
+		log.Printf("[CHAT-FWD] ❌ AdminChatIDsProvider is nil — cannot forward. Check TELEGRAM_BOT_TOKEN env.")
 		return
 	}
 	ids, err := telegram.AdminChatIDsProvider()
+	log.Printf("[CHAT-FWD] AdminChatIDsProvider returned %d IDs, err=%v, ids=%v", len(ids), err, ids)
 	if err != nil || len(ids) == 0 {
-		log.Printf("[CHAT-FWD] No admin chat IDs found (err=%v, count=%d)", err, len(ids))
+		log.Printf("[CHAT-FWD] ❌ No admin chat IDs found (err=%v, count=%d). Check users.is_admin and telegram_chat_id!", err, len(ids))
 		return
 	}
 
