@@ -31,6 +31,10 @@ func WriteJSON(w http.ResponseWriter, status int, v any) {
 }
 
 // GetUserIDFromContext — заглушка (потом будет из JWT).
-func GetUserIDFromContext(_ *http.Request) domain.UUID {
-	return domain.NewUUID()
+func GetUserIDFromContext(r *http.Request) domain.UUID {
+	userID, ok := r.Context().Value("userID").(domain.UUID)
+	if !ok {
+		return domain.UUID{}
+	}
+	return userID
 }

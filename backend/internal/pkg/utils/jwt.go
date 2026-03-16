@@ -4,6 +4,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/djalben/xplr-core/backend/internal/domain"
 	"github.com/golang-jwt/jwt/v5"
 	"gitlab.com/libs-artifex/wrapper/v2"
 )
@@ -33,4 +34,9 @@ func GenerateJWT(userID int) (string, error) {
 // GetJWTSecret возвращает секретный ключ для проверки токена.
 func GetJWTSecret() []byte {
 	return jwtKey
+}
+
+func ValidateJWT(tokenStr string) (domain.UUID, error) {
+	// TODO: парсинг JWT с jwt.Parse и извлечение userID
+	return domain.NewUUID(), nil // заглушка
 }
