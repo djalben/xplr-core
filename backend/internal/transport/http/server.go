@@ -108,7 +108,7 @@ func (s *Server) setupRoutes() {
 
 	s.router.Route("/admin", func(r chi.Router) {
 		// Только для админов
-		adminHandler := adminApi.NewHandler(s.container.CardUseCase, s.container.CommissionUseCase, s.container.TicketUseCase)
+		adminHandler := adminApi.NewHandler(s.container.CardUseCase, s.container.CommissionUseCase, s.container.TicketUseCase, s.container.GradesUseCase)
 		adminHandler.Register(r)
 
 		r.Use(authMiddleware.Auth)

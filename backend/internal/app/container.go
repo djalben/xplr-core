@@ -5,6 +5,7 @@ import (
 
 	"github.com/djalben/xplr-core/backend/internal/application/card"
 	"github.com/djalben/xplr-core/backend/internal/application/commission"
+	"github.com/djalben/xplr-core/backend/internal/application/grades"
 	"github.com/djalben/xplr-core/backend/internal/application/ticket"
 	"github.com/djalben/xplr-core/backend/internal/application/transaction"
 	"github.com/djalben/xplr-core/backend/internal/application/wallet"
@@ -24,12 +25,14 @@ type Container struct {
 	TicketRepo      ports.TicketRepository
 	UserRepo        ports.UserRepository
 	CommissionRepo  ports.CommissionConfigRepository
+	GradeRepo       ports.GradeRepository
 
 	WalletUseCase      *wallet.UseCase
 	CardUseCase        *card.UseCase
 	TransactionUseCase *transaction.UseCase
 	TicketUseCase      *ticket.UseCase
 	CommissionUseCase  *commission.UseCase
+	GradesUseCase      *grades.UseCase
 }
 
 func NewContainer(cfg *config.ENV) (*Container, error) {
@@ -46,6 +49,7 @@ func NewContainer(cfg *config.ENV) (*Container, error) {
 	ticketRepo := postgres.NewTicketRepository(db)
 	userRepo := postgres.NewUserRepository(db)
 	commissionRepo := postgres.NewCommissionConfigRepository(db)
+	gradeRepo := postgres.NewGradeRepository(db)
 
 	// WalletUseCase создаём первым — он нужен для CardUseCase
 	walletUC := wallet.NewUseCase(walletRepo, transactionRepo)
@@ -59,12 +63,14 @@ func NewContainer(cfg *config.ENV) (*Container, error) {
 		TicketRepo:      ticketRepo,
 		UserRepo:        userRepo,
 		CommissionRepo:  commissionRepo,
+		GradeRepo:       gradeRepo,
 
 		WalletUseCase:      walletUC,
 		CardUseCase:        card.NewUseCase(cardRepo, walletRepo, transactionRepo, walletUC),
 		TransactionUseCase: transaction.NewUseCase(transactionRepo),
 		TicketUseCase:      ticket.NewUseCase(ticketRepo),
 		CommissionUseCase:  commission.NewUseCase(commissionRepo),
+		GradesUseCase:      grades.NewUseCase(gradeRepo),
 	}, nil
 }
 

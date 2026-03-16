@@ -5,6 +5,7 @@ import (
 
 	"github.com/djalben/xplr-core/backend/internal/application/card"
 	"github.com/djalben/xplr-core/backend/internal/application/commission"
+	"github.com/djalben/xplr-core/backend/internal/application/grades"
 	"github.com/djalben/xplr-core/backend/internal/application/ticket"
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler"
@@ -16,19 +17,20 @@ type Handler struct {
 	cardUseCase       *card.UseCase
 	commissionUseCase *commission.UseCase
 	ticketUseCase     *ticket.UseCase
+	gradesUseCase     *grades.UseCase
 }
 
-func NewHandler(cardUC *card.UseCase, commissionUC *commission.UseCase, ticketUC *ticket.UseCase) *Handler {
+func NewHandler(cardUC *card.UseCase, commissionUC *commission.UseCase, ticketUC *ticket.UseCase, gradesUC *grades.UseCase) *Handler {
 	return &Handler{
 		cardUseCase:       cardUC,
 		commissionUseCase: commissionUC,
 		ticketUseCase:     ticketUC,
+		gradesUseCase:     gradesUC,
 	}
 }
 
 func (h *Handler) Register(r chi.Router) {
 	r.Route("/admin", func(r chi.Router) {
-		// Middleware auth для админов (потом добавим)
 		r.Post("/tariffs", h.ChangeTariffs)
 		r.Post("/referrals", h.ChangeReferralBonuses)
 		r.Put("/cards/{id}/block", h.BlockCard)
@@ -211,7 +213,7 @@ func (h *Handler) CloseTicket(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ChangeUserGrade(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 
-	_, err := domain.ParseUUID(idStr)
+	id, err := domain.ParseUUID(idStr)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 
@@ -231,8 +233,7 @@ func (h *Handler) ChangeUserGrade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: вызов grade usecase ChangeGrade (если нет, добавим)
-	err = nil // заглушка
+	err = h.gradesUseCase.ChangeGrade(r.Context(), id, req.Grade)
 	if err != nil {
 		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
 
