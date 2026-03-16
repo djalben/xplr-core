@@ -277,60 +277,98 @@ func handleCallbackQuery(cb *tgCallbackQuery) {
 	telegram.AnswerCallbackQuery(cb.ID, "")
 }
 
+// knownAdminEmails maps admin emails to allow auto-linking.
+// Anyone who receives the "Claim" button is already an admin — they got the message
+// because they were in GetAdminChatIDs. This list is for auto-linking TG → user account.
+var knownAdminEmails = []string{"aalabin5@gmail.com", "vardump@inbox.ru"}
+
+// resolveAdminUserID resolves a Telegram chat ID to an internal user ID.
+// If the TG ID is not linked to any user, it tries to auto-link by finding
+// an admin user without a telegram_chat_id and linking them.
+func resolveAdminUserID(tgChatID int64) (int, string) {
+	// 1. Try direct lookup
+	userID, _ := repository.GetUserIDByChatID(tgChatID)
+	if userID != 0 {
+		name := repository.GetUserDisplayName(userID)
+		log.Printf("[ADMIN-RESOLVE] TG %d → userID=%d (%s) via direct lookup", tgChatID, userID, name)
+		return userID, name
+	}
+
+	// 2. Auto-link: find first known admin email whose telegram_chat_id is NULL/0
+	log.Printf("[ADMIN-RESOLVE] TG %d not linked to any user — attempting auto-link...", tgChatID)
+	for _, email := range knownAdminEmails {
+		var uid int
+		var existingTG int64
+		err := repository.GlobalDB.QueryRow(
+			`SELECT id, COALESCE(telegram_chat_id, 0) FROM users WHERE email = $1`, email,
+		).Scan(&uid, &existingTG)
+		if err != nil {
+			log.Printf("[ADMIN-RESOLVE] Email %s not found in DB: %v", email, err)
+			continue
+		}
+		if existingTG != 0 && existingTG != tgChatID {
+			log.Printf("[ADMIN-RESOLVE] Email %s already linked to TG %d (not %d) — skip", email, existingTG, tgChatID)
+			continue
+		}
+		if existingTG == tgChatID {
+			// Already linked but GetUserIDByChatID failed? Shouldn't happen, but handle it
+			log.Printf("[ADMIN-RESOLVE] Email %s already linked to TG %d — returning userID=%d", email, tgChatID, uid)
+			return uid, repository.GetUserDisplayName(uid)
+		}
+		// Link this TG to this admin
+		_, linkErr := repository.GlobalDB.Exec(
+			`UPDATE users SET telegram_chat_id = $1 WHERE id = $2`, tgChatID, uid,
+		)
+		if linkErr != nil {
+			log.Printf("[ADMIN-RESOLVE] ❌ Failed to auto-link TG %d → user %d (%s): %v", tgChatID, uid, email, linkErr)
+			continue
+		}
+		log.Printf("[ADMIN-RESOLVE] ✅ AUTO-LINKED TG %d → user %d (%s)", tgChatID, uid, email)
+		return uid, repository.GetUserDisplayName(uid)
+	}
+
+	log.Printf("[ADMIN-RESOLVE] ❌ Could not resolve TG %d to any admin user", tgChatID)
+	return 0, ""
+}
+
 // ── Claim ticket callback ──
 func handleClaimCallback(cb *tgCallbackQuery, callerChatID int64, data string) {
 	// ⚡ IMMEDIATELY answer the callback to stop the spinner — before ANY other work
 	telegram.AnswerCallbackQuery(cb.ID, "⏳ Обработка...")
-	log.Printf("[CHAT-CLAIM] >>> Entry: callback_id=%q, data=%q, tg_user_id=%d", cb.ID, data, callerChatID)
+	log.Printf("[CHAT-CLAIM] >>> Entry: callback_id=%q, data=%q, tg_chat_id=%d", cb.ID, data, callerChatID)
 
-	// Safety net for panics
+	// Safety net: report ALL errors to admin via TG message
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("[CHAT-CLAIM] ❌ PANIC in handleClaimCallback: %v", r)
+			errMsg := fmt.Sprintf("❌ PANIC в handleClaimCallback: %v", r)
+			log.Printf("[CHAT-CLAIM] %s", errMsg)
+			telegram.SendMessageHTML(callerChatID, errMsg)
 		}
 	}()
 
 	convIDStr := strings.TrimPrefix(data, "claim_")
 	convID, err := strconv.Atoi(convIDStr)
 	if err != nil || convID <= 0 {
-		log.Printf("[CHAT-CLAIM] ❌ Invalid convID from data=%q: parsed=%q err=%v", data, convIDStr, err)
-		telegram.SendMessageHTML(callerChatID, "❌ Ошибка: неверный ID чата")
+		errMsg := fmt.Sprintf("❌ Ошибка: неверный ID чата из data=%q", data)
+		log.Printf("[CHAT-CLAIM] %s", errMsg)
+		telegram.SendMessageHTML(callerChatID, errMsg)
 		return
 	}
 	log.Printf("[CHAT-CLAIM] Parsed convID=%d", convID)
 
-	// Verify caller is an admin — check is_admin flag (with hardcoded email whitelist fallback)
-	adminUserID, dbErr := repository.GetUserIDByChatID(callerChatID)
-	log.Printf("[CHAT-CLAIM] GetUserIDByChatID(tg=%d) → userID=%d, err=%v", callerChatID, adminUserID, dbErr)
-
-	isAdmin := false
-	if adminUserID != 0 {
-		isAdmin = repository.IsUserAdmin(adminUserID)
-		log.Printf("[CHAT-CLAIM] IsUserAdmin(userID=%d) → %v", adminUserID, isAdmin)
-	}
-
-	// Fallback: check if this TG chat ID is in the admin list
-	if !isAdmin && telegram.AdminChatIDsProvider != nil {
-		adminIDs, _ := telegram.AdminChatIDsProvider()
-		for _, aid := range adminIDs {
-			if aid == callerChatID {
-				isAdmin = true
-				log.Printf("[CHAT-CLAIM] TG %d found in AdminChatIDsProvider list — granting claim access", callerChatID)
-				break
-			}
-		}
-	}
-
-	if !isAdmin {
-		log.Printf("[CHAT-CLAIM] ❌ TG %d (user=%d) is NOT admin by any method", callerChatID, adminUserID)
-		telegram.SendMessageHTML(callerChatID, "❌ Нет доступа: вы не администратор")
+	// Resolve admin: direct lookup + auto-link fallback
+	// NO is_admin check — if they received the Claim button, they ARE admin
+	adminUserID, adminName := resolveAdminUserID(callerChatID)
+	if adminUserID == 0 {
+		errMsg := fmt.Sprintf("❌ Ошибка захвата: TG ID %d не удалось привязать ни к одному админ-аккаунту.\nПроверьте привязку Telegram в настройках XPLR.", callerChatID)
+		log.Printf("[CHAT-CLAIM] %s", errMsg)
+		telegram.SendMessageHTML(callerChatID, errMsg)
 		return
 	}
+	log.Printf("[CHAT-CLAIM] Resolved admin: userID=%d, name=%s", adminUserID, adminName)
 
-	if adminUserID == 0 {
-		log.Printf("[CHAT-CLAIM] ⚠️ TG %d is in admin list but has no linked user — using TG ID as userID", callerChatID)
-		adminUserID = int(callerChatID)
-	}
+	// Force is_admin = TRUE for this user (belt-and-suspenders)
+	repository.GlobalDB.Exec(`UPDATE users SET is_admin = TRUE WHERE id = $1`, adminUserID)
 
 	// Atomically claim
 	log.Printf("[CHAT-CLAIM] Attempting ClaimConversation(conv=%d, admin=%d)...", convID, adminUserID)
@@ -338,8 +376,9 @@ func handleClaimCallback(cb *tgCallbackQuery, callerChatID int64, data string) {
 	log.Printf("[CHAT-CLAIM] ClaimConversation result: claimed=%v, err=%v", claimed, claimErr)
 
 	if claimErr != nil {
-		log.Printf("[CHAT-CLAIM] ❌ DB error claiming conv %d: %v", convID, claimErr)
-		telegram.SendMessageHTML(callerChatID, fmt.Sprintf("❌ Ошибка БД: %v", claimErr))
+		errMsg := fmt.Sprintf("❌ Ошибка захвата тикета #%d: %v", convID, claimErr)
+		log.Printf("[CHAT-CLAIM] %s", errMsg)
+		telegram.SendMessageHTML(callerChatID, errMsg)
 		return
 	}
 
@@ -347,52 +386,42 @@ func handleClaimCallback(cb *tgCallbackQuery, callerChatID int64, data string) {
 		conv, _ := repository.GetConversationByID(convID)
 		if conv != nil && conv.ClaimedBy != 0 {
 			claimerName := repository.GetUserDisplayName(conv.ClaimedBy)
-			log.Printf("[CHAT-CLAIM] Conv #%d already claimed by user %d (%s)", convID, conv.ClaimedBy, claimerName)
-			telegram.SendMessageHTML(callerChatID, fmt.Sprintf("ℹ️ Уже в работе у %s", claimerName))
+			telegram.SendMessageHTML(callerChatID, fmt.Sprintf("ℹ️ Тикет #%d уже в работе у %s", convID, claimerName))
 		} else {
-			log.Printf("[CHAT-CLAIM] Conv #%d claim returned 0 rows (conv=%+v)", convID, conv)
-			telegram.SendMessageHTML(callerChatID, "ℹ️ Тикет уже занят или не найден")
+			telegram.SendMessageHTML(callerChatID, fmt.Sprintf("ℹ️ Тикет #%d уже занят или не найден", convID))
 		}
 		return
 	}
 
-	adminName := repository.GetUserDisplayName(adminUserID)
 	log.Printf("[CHAT-CLAIM] ✅ Conv #%d CLAIMED by admin %d (%s)", convID, adminUserID, adminName)
 	telegram.SendMessageHTML(callerChatID, fmt.Sprintf("✅ Вы взяли тикет #%d в работу", convID))
 
-	// Everything below is async / best-effort
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Printf("[CHAT-CLAIM] ❌ PANIC in async claim work: %v", r)
-			}
-		}()
+	// Post-claim work SYNCHRONOUSLY (Vercel kills goroutines after response)
+	updateAllAdminKeyboards(convID, adminName)
 
-		updateAllAdminKeyboards(convID, adminName)
-
-		conv, _ := repository.GetConversationByID(convID)
-		if conv != nil {
-			repository.InsertChatMessage(convID, "admin", "Support Specialist", "Специалист подключился к диалогу", 0)
-			userChatID := repository.GetUserTelegramChatID(conv.UserID)
-			if userChatID != 0 {
-				telegram.SendMessageHTML(userChatID,
-					"💬 <b>Специалист подключился к диалогу</b>\n\n"+
-						"<a href=\"https://xplr.pro/support\">Открыть чат</a>")
-			}
+	conv, _ := repository.GetConversationByID(convID)
+	if conv != nil {
+		repository.InsertChatMessage(convID, "admin", "Support Specialist", "Специалист подключился к диалогу", 0)
+		userChatID := repository.GetUserTelegramChatID(conv.UserID)
+		if userChatID != 0 {
+			telegram.SendMessageHTML(userChatID,
+				"💬 <b>Специалист подключился к диалогу</b>\n\n"+
+					"<a href=\"https://xplr.pro/support\">Открыть чат</a>")
 		}
-		log.Printf("[CHAT-CLAIM] Async claim work complete for conv #%d", convID)
-	}()
+	}
+	log.Printf("[CHAT-CLAIM] ✅ Claim flow complete for conv #%d", convID)
 }
 
 // ── Close chat callback (only claimer) ──
 func handleCloseChatCallback(cb *tgCallbackQuery, callerChatID int64, data string) {
-	// ⚡ IMMEDIATELY answer the callback to stop the spinner
 	telegram.AnswerCallbackQuery(cb.ID, "⏳ Закрытие...")
-	log.Printf("[CHAT-CLOSE] >>> Entry: data=%q, tg_user_id=%d", data, callerChatID)
+	log.Printf("[CHAT-CLOSE] >>> Entry: data=%q, tg_chat_id=%d", data, callerChatID)
 
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("[CHAT-CLOSE] ❌ PANIC in handleCloseChatCallback: %v", r)
+			errMsg := fmt.Sprintf("❌ PANIC в handleCloseChatCallback: %v", r)
+			log.Printf("[CHAT-CLOSE] %s", errMsg)
+			telegram.SendMessageHTML(callerChatID, errMsg)
 		}
 	}()
 
@@ -403,60 +432,43 @@ func handleCloseChatCallback(cb *tgCallbackQuery, callerChatID int64, data strin
 		return
 	}
 
-	adminUserID, _ := repository.GetUserIDByChatID(callerChatID)
-	isAdmin := adminUserID != 0 && repository.IsUserAdmin(adminUserID)
-	if !isAdmin && telegram.AdminChatIDsProvider != nil {
-		adminIDs, _ := telegram.AdminChatIDsProvider()
-		for _, aid := range adminIDs {
-			if aid == callerChatID {
-				isAdmin = true
-				break
-			}
-		}
-	}
-	if !isAdmin {
-		telegram.SendMessageHTML(callerChatID, "❌ Нет доступа")
-		return
-	}
+	adminUserID, _ := resolveAdminUserID(callerChatID)
 	if adminUserID == 0 {
-		adminUserID = int(callerChatID)
+		telegram.SendMessageHTML(callerChatID, "❌ Нет доступа: аккаунт не найден")
+		return
 	}
 
 	conv, err := repository.GetConversationByID(convID)
 	if err != nil || conv == nil {
-		telegram.SendMessageHTML(callerChatID, "❌ Чат не найден")
+		telegram.SendMessageHTML(callerChatID, fmt.Sprintf("❌ Чат #%d не найден: %v", convID, err))
 		return
 	}
 
-	if conv.ClaimedBy != adminUserID {
-		telegram.SendMessageHTML(callerChatID, "❌ Только назначенный специалист может закрыть чат")
+	if conv.ClaimedBy != 0 && conv.ClaimedBy != adminUserID {
+		claimerName := repository.GetUserDisplayName(conv.ClaimedBy)
+		telegram.SendMessageHTML(callerChatID, fmt.Sprintf("❌ Только %s может закрыть этот чат", claimerName))
 		return
 	}
 
 	if err := repository.CloseConversation(convID); err != nil {
-		log.Printf("[CHAT-CLOSE] ❌ Failed to close conv %d: %v", convID, err)
-		telegram.SendMessageHTML(callerChatID, "❌ Ошибка при закрытии")
+		telegram.SendMessageHTML(callerChatID, fmt.Sprintf("❌ Ошибка закрытия: %v", err))
 		return
 	}
 
 	log.Printf("[CHAT-CLOSE] ✅ Conv #%d closed by admin %d", convID, adminUserID)
 	telegram.SendMessageHTML(callerChatID, fmt.Sprintf("✅ Диалог #%d завершён", convID))
 
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Printf("[CHAT-CLOSE] ❌ PANIC in async close work: %v", r)
-			}
-		}()
-		repository.InsertChatMessage(convID, "admin", "Support Specialist", "Диалог завершён специалистом", 0)
-		updateAllAdminKeyboardsClosed(convID)
+	// Synchronous post-close work
+	repository.InsertChatMessage(convID, "admin", "Support Specialist", "Диалог завершён специалистом", 0)
+	updateAllAdminKeyboardsClosed(convID)
+	if conv != nil {
 		userChatID := repository.GetUserTelegramChatID(conv.UserID)
 		if userChatID != 0 {
 			telegram.SendMessageHTML(userChatID,
 				"🔒 <b>Диалог завершён</b>\n\nСпасибо за обращение!\n"+
 					"<a href=\"https://xplr.pro/support\">Открыть новый чат</a>")
 		}
-	}()
+	}
 }
 
 // updateAllAdminKeyboards updates the inline keyboard on all forwarded messages for a conversation.
@@ -528,25 +540,12 @@ func handleChatBridgeReply(adminChatID int64, replyToMsgID int64, text string) {
 	}
 	log.Printf("[CHAT-BRIDGE] Found conversation #%d (user=%d, topic=%q, status=%q)", conv.ID, conv.UserID, conv.Topic, conv.Status)
 
-	// 2. Verify the sender is an admin (with fallback to AdminChatIDs list)
-	adminUserID, _ := repository.GetUserIDByChatID(adminChatID)
-	isAdmin := adminUserID != 0 && repository.IsUserAdmin(adminUserID)
-	if !isAdmin && telegram.AdminChatIDsProvider != nil {
-		adminIDs, _ := telegram.AdminChatIDsProvider()
-		for _, aid := range adminIDs {
-			if aid == adminChatID {
-				isAdmin = true
-				log.Printf("[CHAT-BRIDGE] TG %d found in AdminChatIDsProvider — granting reply access", adminChatID)
-				break
-			}
-		}
-	}
-	if !isAdmin {
-		log.Printf("[CHAT-BRIDGE] ❌ Chat %d → user %d is not a linked admin — ignoring reply", adminChatID, adminUserID)
-		return
-	}
+	// 2. Resolve admin via direct lookup + auto-link
+	adminUserID, _ := resolveAdminUserID(adminChatID)
 	if adminUserID == 0 {
-		adminUserID = int(adminChatID)
+		log.Printf("[CHAT-BRIDGE] ❌ Chat %d could not be resolved to any admin — ignoring reply", adminChatID)
+		telegram.SendMessageHTML(adminChatID, "❌ Ваш Telegram не привязан к аккаунту XPLR. Привяжите через настройки.")
+		return
 	}
 
 	// 3. Check claim protection: only the claiming admin can reply
