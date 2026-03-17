@@ -22,6 +22,7 @@ func NewNumeric(value float64) Numeric {
 	return decimal.NewFromFloat(value)
 }
 
+// ParseUUID — безопасный парсинг строки в UUID.
 func ParseUUID(s string) (UUID, error) {
 	u, err := uuid.Parse(s)
 	if err != nil {

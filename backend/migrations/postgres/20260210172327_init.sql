@@ -73,7 +73,7 @@ CREATE TABLE wallets (
 -- 7. Грейды пользователей
 CREATE TABLE user_grades (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE,uf 
     grade VARCHAR(50) DEFAULT 'STANDARD',
     total_spent NUMERIC(20, 4) DEFAULT 0.0000,
     fee_percent NUMERIC(5, 2) DEFAULT 6.70,

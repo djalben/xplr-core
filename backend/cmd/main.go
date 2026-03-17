@@ -43,7 +43,7 @@ func main() {
 		}
 	}()
 
-	// Запуск HTTP-сервера
+	// Запуск сервера
 	server := httpServer.NewServer(container, cfg.ServerHost, cfg.ServerPort)
 
 	go func() {
