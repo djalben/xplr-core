@@ -15,6 +15,7 @@ import {
   HelpCircle,
   X,
   Headphones,
+  Lock,
 } from 'lucide-react';
 
 interface ChatMessage {
@@ -70,9 +71,9 @@ export const SupportPage = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  // Poll for new messages when conversation is active
+  // Poll for new messages when conversation is active (also poll 'closed' briefly to get final system msg)
   useEffect(() => {
-    if (!conversation || conversation.status !== 'open') return;
+    if (!conversation) return;
 
     const poll = () => {
       apiClient.get(`/user/chat/messages/${conversation.id}`)
@@ -223,13 +224,22 @@ export const SupportPage = () => {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-medium">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  {t('support.online')}
-                </span>
-                <button onClick={handleClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors" title={t('support.closeChat')}>
-                  <X className="w-4 h-4 text-slate-400" />
-                </button>
+                {conversation.status === 'open' ? (
+                  <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-medium">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    {t('support.online')}
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-500/20 text-slate-400 text-xs font-medium">
+                    <Lock className="w-3 h-3" />
+                    Решён
+                  </span>
+                )}
+                {conversation.status === 'open' && (
+                  <button onClick={handleClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors" title={t('support.closeChat')}>
+                    <X className="w-4 h-4 text-slate-400" />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -262,27 +272,42 @@ export const SupportPage = () => {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input */}
-            <div className="p-3 border-t border-white/10">
-              <div className="flex items-end gap-2">
-                <textarea
-                  value={input}
-                  onChange={e => setInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                  placeholder={t('support.placeholder')}
-                  rows={1}
-                  className="xplr-input flex-1 resize-none min-h-[44px] max-h-32 py-2.5"
-                  disabled={sending}
-                />
+            {/* Input or Closed banner */}
+            {conversation.status === 'open' ? (
+              <div className="p-3 border-t border-white/10">
+                <div className="flex items-end gap-2">
+                  <textarea
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                    placeholder={t('support.placeholder')}
+                    rows={1}
+                    className="xplr-input flex-1 resize-none min-h-[44px] max-h-32 py-2.5"
+                    disabled={sending}
+                  />
+                  <button
+                    onClick={handleSend}
+                    disabled={!input.trim() || sending}
+                    className="shrink-0 w-11 h-11 flex items-center justify-center rounded-xl bg-blue-500 hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors"
+                  >
+                    {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 border-t border-white/10 text-center">
+                <div className="flex items-center justify-center gap-2 text-slate-400 mb-3">
+                  <CheckCircle className="w-5 h-5 text-emerald-400" />
+                  <span className="text-sm font-medium">Вопрос решён</span>
+                </div>
                 <button
-                  onClick={handleSend}
-                  disabled={!input.trim() || sending}
-                  className="shrink-0 w-11 h-11 flex items-center justify-center rounded-xl bg-blue-500 hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors"
+                  onClick={() => { setConversation(null); setMessages([]); }}
+                  className="px-6 py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium transition-colors"
                 >
-                  {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                  Создать новый запрос
                 </button>
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>

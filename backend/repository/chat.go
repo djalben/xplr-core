@@ -163,7 +163,7 @@ func CloseConversation(convID int) error {
 		return fmt.Errorf("database connection not initialized")
 	}
 	_, err := GlobalDB.Exec(
-		`UPDATE chat_conversations SET status = 'closed', updated_at = NOW() WHERE id = $1`,
+		`UPDATE chat_conversations SET status = 'closed', claimed_by = 0, updated_at = NOW() WHERE id = $1`,
 		convID,
 	)
 	return err

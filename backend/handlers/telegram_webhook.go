@@ -516,14 +516,16 @@ func handleCloseChatCallback(cb *tgCallbackQuery, callerChatID int64, data strin
 	telegram.SendMessageHTML(callerChatID, fmt.Sprintf("✅ Диалог #%d завершён", convID))
 
 	// Synchronous post-close work
-	repository.InsertChatMessage(convID, "admin", "Support Specialist", "Диалог завершён специалистом", 0)
+	repository.InsertChatMessage(convID, "admin", "Support Specialist",
+		"Ваш вопрос был отмечен специалистом как решённый. Спасибо за обращение!", 0)
 	updateAllAdminKeyboardsClosed(convID)
 	if conv != nil {
 		userChatID := repository.GetUserTelegramChatID(conv.UserID)
 		if userChatID != 0 {
 			telegram.SendMessageHTML(userChatID,
-				"🔒 <b>Диалог завершён</b>\n\nСпасибо за обращение!\n"+
-					"<a href=\"https://xplr.pro/support\">Открыть новый чат</a>")
+				"✅ <b>Задача решена</b>\n\n"+
+					"Ваш вопрос был отмечен специалистом как решённый. Спасибо за обращение!\n\n"+
+					"<a href=\"https://xplr.pro/support\">Создать новый запрос</a>")
 		}
 	}
 }
@@ -566,7 +568,7 @@ func updateAllAdminKeyboardsClosed(convID int) {
 	closedMarkup := &telegram.InlineKeyboardMarkupExported{
 		InlineKeyboard: [][]telegram.InlineKeyboardButtonExported{
 			{
-				{Text: "🔒 Диалог завершён", CallbackData: "noop"},
+				{Text: "✅ Задача решена и закрыта", CallbackData: "noop"},
 			},
 		},
 	}
