@@ -94,6 +94,33 @@ func AdminGetCommissionConfigHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(configs)
 }
 
+// AdminToggleBlockHandler - POST /api/v1/admin/users/{id}/toggle-block
+func AdminToggleBlockHandler(w http.ResponseWriter, r *http.Request) {
+	adminID, _ := r.Context().Value(middleware.UserIDKey).(int)
+	vars := mux.Vars(r)
+	targetID, err := strconv.Atoi(vars["id"])
+	if err != nil || targetID <= 0 {
+		http.Error(w, "invalid user id", http.StatusBadRequest)
+		return
+	}
+	newBlocked, email, err := repository.ToggleUserBlock(targetID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	action := "разблокирован"
+	if newBlocked {
+		action = "заблокирован"
+	}
+	repository.WriteAdminLog(adminID, fmt.Sprintf("Пользователь %s (ID %d) %s", email, targetID, action))
+	log.Printf("[ADMIN] User %d (%s) %s by admin %d", targetID, email, action, adminID)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"is_blocked": newBlocked,
+		"email":      email,
+	})
+}
+
 // AdminUpdateCommissionConfigHandler - PATCH /api/v1/admin/commissions/{id}
 func AdminUpdateCommissionConfigHandler(w http.ResponseWriter, r *http.Request) {
 	adminID, _ := r.Context().Value(middleware.UserIDKey).(int)

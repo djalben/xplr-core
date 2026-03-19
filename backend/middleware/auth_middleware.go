@@ -84,6 +84,12 @@ func JWTAuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
+		// Check if user is blocked
+		if repository.IsUserBlocked(userID) {
+			http.Error(w, "Ваш аккаунт заблокирован. Пожалуйста, обратитесь в поддержку.", http.StatusForbidden)
+			return
+		}
+
 		ctx := context.WithValue(r.Context(), UserIDKey, userID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})

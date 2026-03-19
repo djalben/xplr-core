@@ -28,6 +28,7 @@ type AdminUserRow struct {
 	IsAdmin    bool   `json:"is_admin"`
 	Role       string `json:"role"`
 	IsVerified bool   `json:"is_verified"`
+	IsBlocked  bool   `json:"is_blocked"`
 	CardCount  int    `json:"card_count"`
 	CreatedAt  string `json:"created_at"`
 }
@@ -205,7 +206,7 @@ func SearchUsersByEmail(query string, limit int) ([]AdminUserRow, error) {
 	}
 	sql := `
 		SELECT u.id, u.email, COALESCE(u.balance_rub, 0), u.status, COALESCE(u.is_admin, FALSE),
-		       COALESCE(u.role, 'user'), COALESCE(u.is_verified, FALSE),
+		       COALESCE(u.role, 'user'), COALESCE(u.is_verified, FALSE), COALESCE(u.is_blocked, FALSE),
 		       (SELECT COUNT(*) FROM cards c WHERE c.user_id = u.id) as card_count,
 		       u.created_at
 		FROM users u
@@ -223,7 +224,7 @@ func SearchUsersByEmail(query string, limit int) ([]AdminUserRow, error) {
 		var u AdminUserRow
 		var bal decimal.Decimal
 		var createdAt interface{}
-		if err := rows.Scan(&u.ID, &u.Email, &bal, &u.Status, &u.IsAdmin, &u.Role, &u.IsVerified, &u.CardCount, &createdAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Email, &bal, &u.Status, &u.IsAdmin, &u.Role, &u.IsVerified, &u.IsBlocked, &u.CardCount, &createdAt); err != nil {
 			continue
 		}
 		u.BalanceRub = bal.String()
@@ -497,4 +498,36 @@ func GetAdminDashboardStats() (*AdminDashboardStats, error) {
 	GlobalDB.QueryRow("SELECT COUNT(*) FROM support_tickets WHERE status IN ('open','in_progress')").Scan(&s.OpenTickets)
 	GlobalDB.QueryRow("SELECT COUNT(*) FROM users WHERE created_at >= CURRENT_DATE").Scan(&s.TodaySignups)
 	return s, nil
+}
+
+// ToggleUserBlock flips is_blocked for a user and returns the new value.
+func ToggleUserBlock(userID int) (bool, string, error) {
+	if GlobalDB == nil {
+		return false, "", fmt.Errorf("database connection not initialized")
+	}
+	var newBlocked bool
+	var email string
+	err := GlobalDB.QueryRow(
+		`UPDATE users SET is_blocked = NOT COALESCE(is_blocked, FALSE) WHERE id = $1
+		 RETURNING is_blocked, email`, userID,
+	).Scan(&newBlocked, &email)
+	if err != nil {
+		return false, "", fmt.Errorf("user not found or update failed: %v", err)
+	}
+	return newBlocked, email, nil
+}
+
+// IsUserBlocked checks if a user is blocked. Returns false on any error.
+func IsUserBlocked(userID int) bool {
+	if GlobalDB == nil {
+		return false
+	}
+	var blocked bool
+	err := GlobalDB.QueryRow(
+		`SELECT COALESCE(is_blocked, FALSE) FROM users WHERE id = $1`, userID,
+	).Scan(&blocked)
+	if err != nil {
+		return false
+	}
+	return blocked
 }

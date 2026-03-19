@@ -20,6 +20,7 @@ import {
   Zap,
   Languages,
   Eye,
+  Ban,
 } from 'lucide-react';
 
 type Tab = 'dashboard' | 'users' | 'finances' | 'commissions' | 'tickets' | 'translations' | 'logs';
@@ -41,6 +42,7 @@ interface AdminUser {
   is_admin: boolean;
   role: string;
   is_verified: boolean;
+  is_blocked: boolean;
   card_count: number;
   created_at: string;
 }
@@ -160,6 +162,7 @@ export const StaffOnlyZone = () => {
   const [editingTransValue, setEditingTransValue] = useState('');
   const [saving, setSaving] = useState(false);
   const [freezeConfirm, setFreezeConfirm] = useState(false);
+  const [blockConfirmUser, setBlockConfirmUser] = useState<AdminUser | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
 
   const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
@@ -265,6 +268,18 @@ export const StaffOnlyZone = () => {
       showToast('Удалено');
       loadTranslations();
     } catch { showToast('Ошибка удаления', 'err'); }
+  };
+
+  const toggleBlock = async (user: AdminUser) => {
+    try {
+      setSaving(true);
+      const res = await apiClient.post(`/admin/users/${user.id}/toggle-block`);
+      const newBlocked = res.data.is_blocked;
+      showToast(`${user.email} — ${newBlocked ? 'заблокирован' : 'разблокирован'}`);
+      setBlockConfirmUser(null);
+      setUsers(prev => prev.map(u => u.id === user.id ? { ...u, is_blocked: newBlocked } : u));
+    } catch { showToast('Ошибка блокировки', 'err'); }
+    finally { setSaving(false); }
   };
 
   const updateTicketStatus = async (id: number, status: string) => {
@@ -463,21 +478,39 @@ export const StaffOnlyZone = () => {
                   </thead>
                   <tbody>
                     {users.map(u => (
-                      <tr key={u.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                      <tr key={u.id} className={`border-b border-white/5 transition-colors ${u.is_blocked ? 'bg-red-500/[0.06] hover:bg-red-500/[0.1]' : 'hover:bg-white/5'}`}>
                         <td className="px-4 py-3 text-slate-300 font-mono text-xs">{u.id}</td>
                         <td className="px-4 py-3 text-white">{u.email}</td>
                         <td className="px-4 py-3 text-emerald-400 font-medium">${parseFloat(u.balance_rub).toFixed(2)}</td>
-                        <td className="px-4 py-3"><StatusBadge status={u.status} /></td>
+                        <td className="px-4 py-3">
+                          {u.is_blocked
+                            ? <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-500/20 text-red-400">Blocked</span>
+                            : <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/20 text-emerald-400">Active</span>
+                          }
+                        </td>
                         <td className="px-4 py-3"><StatusBadge status={u.role} /></td>
                         <td className="px-4 py-3 text-slate-300">{u.card_count}</td>
                         <td className="px-4 py-3 text-slate-500 text-xs">{u.created_at?.slice(0, 10)}</td>
                         <td className="px-4 py-3">
-                          <button
-                            onClick={() => { setSelectedUser(u); setSelectedGrade(''); setSelectedStatus(''); }}
-                            className="text-blue-400 hover:text-blue-300 transition-colors"
-                          >
-                            <ChevronRight className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => setBlockConfirmUser(u)}
+                              title={u.is_blocked ? 'Разблокировать' : 'Заблокировать'}
+                              className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all ${
+                                u.is_blocked
+                                  ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30'
+                                  : 'bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30'
+                              }`}
+                            >
+                              <Ban className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => { setSelectedUser(u); setSelectedGrade(''); setSelectedStatus(''); }}
+                              className="text-blue-400 hover:text-blue-300 transition-colors"
+                            >
+                              <ChevronRight className="w-4 h-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -488,6 +521,45 @@ export const StaffOnlyZone = () => {
                 </table>
               </div>
             </div>
+
+            {/* Block confirmation modal */}
+            {blockConfirmUser && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setBlockConfirmUser(null)}>
+                <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-sm p-6 shadow-2xl space-y-4" onClick={e => e.stopPropagation()}>
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2.5 rounded-xl ${blockConfirmUser.is_blocked ? 'bg-emerald-500/20' : 'bg-red-500/20'}`}>
+                      <Ban className={`w-5 h-5 ${blockConfirmUser.is_blocked ? 'text-emerald-400' : 'text-red-400'}`} />
+                    </div>
+                    <h4 className="text-white font-semibold text-sm">
+                      {blockConfirmUser.is_blocked ? 'Разблокировать' : 'Заблокировать'} пользователя?
+                    </h4>
+                  </div>
+                  <p className="text-sm text-slate-400">
+                    Вы уверены, что хотите {blockConfirmUser.is_blocked ? 'разблокировать' : 'заблокировать'} пользователя <strong className="text-white">{blockConfirmUser.email}</strong>?
+                    {!blockConfirmUser.is_blocked && <span className="block mt-1 text-red-400/80 text-xs">Пользователь немедленно потеряет доступ ко всем API.</span>}
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => toggleBlock(blockConfirmUser)}
+                      disabled={saving}
+                      className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors disabled:opacity-50 ${
+                        blockConfirmUser.is_blocked
+                          ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                          : 'bg-red-500 hover:bg-red-600 text-white'
+                      }`}
+                    >
+                      {saving ? '...' : blockConfirmUser.is_blocked ? 'Разблокировать' : 'Заблокировать'}
+                    </button>
+                    <button
+                      onClick={() => setBlockConfirmUser(null)}
+                      className="px-5 py-2.5 bg-white/10 hover:bg-white/20 text-slate-300 rounded-xl text-sm transition-colors"
+                    >
+                      Отмена
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* User edit modal */}
             {selectedUser && (
