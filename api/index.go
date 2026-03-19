@@ -376,6 +376,8 @@ func buildRouter() *mux.Router {
 	admin.HandleFunc("/tickets", handlers.AdminGetSupportTicketsHandler).Methods("GET")
 	admin.HandleFunc("/tickets/{id}", handlers.AdminUpdateTicketStatusHandler).Methods("PATCH")
 	admin.HandleFunc("/users/{id}/emergency-freeze", handlers.AdminEmergencyFreezeHandler).Methods("POST")
+	admin.HandleFunc("/chats", handlers.AdminGetChatsHandler).Methods("GET")
+	admin.HandleFunc("/chats/{id}/messages", handlers.AdminGetChatMessagesHandler).Methods("GET")
 	admin.HandleFunc("/logs", handlers.AdminGetLogsHandler).Methods("GET")
 
 	return r

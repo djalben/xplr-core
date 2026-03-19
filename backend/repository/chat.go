@@ -102,6 +102,67 @@ func EnsureChatTables() error {
 	return nil
 }
 
+// AdminChatConversationRow is the admin-facing view of a chat conversation.
+type AdminChatConversationRow struct {
+	ID           int    `json:"id"`
+	UserID       int    `json:"user_id"`
+	UserEmail    string `json:"user_email"`
+	Topic        string `json:"topic"`
+	Status       string `json:"status"`
+	ClaimedBy    int    `json:"claimed_by"`
+	ClaimerEmail string `json:"claimer_email"`
+	MessageCount int    `json:"message_count"`
+	CreatedAt    string `json:"created_at"`
+	UpdatedAt    string `json:"updated_at"`
+}
+
+// GetAllChatConversationsForAdmin returns all chat conversations with user/claimer info.
+func GetAllChatConversationsForAdmin(statusFilter string) ([]AdminChatConversationRow, error) {
+	if GlobalDB == nil {
+		return nil, fmt.Errorf("database connection not initialized")
+	}
+	q := `SELECT
+		cc.id, cc.user_id, u.email,
+		cc.topic, cc.status, COALESCE(cc.claimed_by, 0),
+		COALESCE(adm.email, ''),
+		(SELECT COUNT(*) FROM chat_messages cm WHERE cm.conversation_id = cc.id),
+		cc.created_at, cc.updated_at
+	FROM chat_conversations cc
+	JOIN users u ON u.id = cc.user_id
+	LEFT JOIN users adm ON adm.id = cc.claimed_by`
+	var args []interface{}
+	if statusFilter != "" {
+		q += ` WHERE cc.status = $1`
+		args = append(args, statusFilter)
+	}
+	q += ` ORDER BY cc.updated_at DESC LIMIT 100`
+
+	rows, err := GlobalDB.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var convs []AdminChatConversationRow
+	for rows.Next() {
+		var c AdminChatConversationRow
+		var createdAt, updatedAt time.Time
+		if err := rows.Scan(&c.ID, &c.UserID, &c.UserEmail, &c.Topic, &c.Status,
+			&c.ClaimedBy, &c.ClaimerEmail, &c.MessageCount,
+			&createdAt, &updatedAt); err != nil {
+			log.Printf("[CHAT-ADMIN] scan error: %v", err)
+			continue
+		}
+		c.CreatedAt = createdAt.Format(time.RFC3339)
+		c.UpdatedAt = updatedAt.Format(time.RFC3339)
+		convs = append(convs, c)
+	}
+	if convs == nil {
+		convs = []AdminChatConversationRow{}
+	}
+	return convs, nil
+}
+
 // CreateConversation opens a new chat conversation for a user.
 func CreateConversation(userID int, topic string) (*ChatConversation, error) {
 	if GlobalDB == nil {

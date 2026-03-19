@@ -9,7 +9,7 @@ import (
 )
 
 // StoreTelegramLinkCode generates a random UUID-like code, stores it in the DB
-// linked to the userID, and returns the code. Expires in 15 minutes.
+// linked to the userID, and returns the code. Expires in 24 hours.
 func StoreTelegramLinkCode(userID int) (string, error) {
 	if GlobalDB == nil {
 		return "", fmt.Errorf("database connection not initialized")
@@ -27,7 +27,7 @@ func StoreTelegramLinkCode(userID int) (string, error) {
 		`INSERT INTO telegram_link_codes (user_id, code, expires_at)
 		 VALUES ($1, $2, $3)
 		 ON CONFLICT (user_id) DO UPDATE SET code = $2, expires_at = $3`,
-		userID, code, time.Now().Add(15*time.Minute),
+		userID, code, time.Now().Add(24*time.Hour),
 	)
 	if err != nil {
 		return "", fmt.Errorf("failed to store link code: %w", err)

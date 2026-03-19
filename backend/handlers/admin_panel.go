@@ -193,6 +193,39 @@ func AdminEmergencyFreezeHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// AdminGetChatsHandler - GET /api/v1/admin/chats?status=open
+func AdminGetChatsHandler(w http.ResponseWriter, r *http.Request) {
+	statusFilter := r.URL.Query().Get("status")
+	chats, err := repository.GetAllChatConversationsForAdmin(statusFilter)
+	if err != nil {
+		log.Printf("[ADMIN] Failed to fetch chats: %v", err)
+		http.Error(w, "Failed to fetch chats", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(chats)
+}
+
+// AdminGetChatMessagesHandler - GET /api/v1/admin/chats/{id}/messages
+func AdminGetChatMessagesHandler(w http.ResponseWriter, r *http.Request) {
+	convIDStr := mux.Vars(r)["id"]
+	convID, err := strconv.Atoi(convIDStr)
+	if err != nil || convID <= 0 {
+		http.Error(w, "invalid chat id", http.StatusBadRequest)
+		return
+	}
+	msgs, err := repository.GetChatMessages(convID)
+	if err != nil {
+		http.Error(w, "Failed to fetch messages", http.StatusInternalServerError)
+		return
+	}
+	if msgs == nil {
+		msgs = []repository.ChatMessage{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(msgs)
+}
+
 // AdminGetLogsHandler - GET /api/v1/admin/logs
 func AdminGetLogsHandler(w http.ResponseWriter, r *http.Request) {
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))

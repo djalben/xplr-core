@@ -248,6 +248,8 @@ func main() {
 	adminRouter.HandleFunc("/tickets", handlers.AdminGetSupportTicketsHandler).Methods("GET")
 	adminRouter.HandleFunc("/tickets/{id}", handlers.AdminUpdateTicketStatusHandler).Methods("PATCH")
 	adminRouter.HandleFunc("/users/{id}/emergency-freeze", handlers.AdminEmergencyFreezeHandler).Methods("POST")
+	adminRouter.HandleFunc("/chats", handlers.AdminGetChatsHandler).Methods("GET")
+	adminRouter.HandleFunc("/chats/{id}/messages", handlers.AdminGetChatMessagesHandler).Methods("GET")
 	adminRouter.HandleFunc("/logs", handlers.AdminGetLogsHandler).Methods("GET")
 	// --------------------------------------------------------
 
