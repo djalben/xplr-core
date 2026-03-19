@@ -19,6 +19,7 @@ import {
   Loader2,
   Zap,
   Languages,
+  Eye,
 } from 'lucide-react';
 
 type Tab = 'dashboard' | 'users' | 'finances' | 'commissions' | 'tickets' | 'translations' | 'logs';
@@ -148,7 +149,6 @@ export const StaffOnlyZone = () => {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [ticketFilter, setTicketFilter] = useState('');
   const [liveChats, setLiveChats] = useState<LiveChat[]>([]);
-  const [chatFilter, setChatFilter] = useState('');
   const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
   const [viewingChatId, setViewingChatId] = useState<number | null>(null);
   const [translations, setTranslations] = useState<{ id: number; msg_key: string; lang: string; value: string; updated_at: string }[]>([]);
@@ -216,22 +216,18 @@ export const StaffOnlyZone = () => {
   // ── Support tickets ──
   const loadTickets = useCallback(async () => {
     try {
-      const params: Record<string, string> = {};
-      if (ticketFilter) params.status = ticketFilter;
-      const res = await apiClient.get('/admin/tickets', { params });
+      const res = await apiClient.get('/admin/tickets');
       setTickets(res.data || []);
     } catch { /* ignore */ }
-  }, [ticketFilter]);
+  }, []);
 
   // ── Live chats ──
   const loadChats = useCallback(async () => {
     try {
-      const params: Record<string, string> = {};
-      if (chatFilter) params.status = chatFilter;
-      const res = await apiClient.get('/admin/chats', { params });
+      const res = await apiClient.get('/admin/chats');
       setLiveChats(res.data || []);
     } catch { /* ignore */ }
-  }, [chatFilter]);
+  }, []);
 
   const viewChatMessages = async (chatId: number) => {
     try {
@@ -674,132 +670,145 @@ export const StaffOnlyZone = () => {
         )}
 
         {/* ════════════ TICKETS TAB ════════════ */}
-        {tab === 'tickets' && (
+        {tab === 'tickets' && (() => {
+          // Normalize both sources into one unified list
+          const normalizeStatus = (s: string) => {
+            if (s === 'open') return 'open';
+            if (s === 'in_progress' || s === 'claimed') return 'in_progress';
+            if (s === 'resolved') return 'closed';
+            if (s === 'closed') return 'closed';
+            return s;
+          };
+          const statusLabel = (s: string) => s === 'open' ? 'Открыт' : s === 'in_progress' ? 'В работе' : 'Закрыт';
+          const statusBadge = (s: string) =>
+            s === 'open' ? 'bg-emerald-500/20 text-emerald-400'
+            : s === 'in_progress' ? 'bg-orange-500/20 text-orange-400'
+            : 'bg-slate-500/20 text-slate-400';
+
+          type UnifiedItem = {
+            uid: string; id: number; source: 'ticket' | 'chat';
+            status: string; topic: string; client: string;
+            claimer: string; date: string; msgCount?: number;
+          };
+
+          const unified: UnifiedItem[] = [
+            ...tickets.map(t => ({
+              uid: `t-${t.id}`, id: t.id, source: 'ticket' as const,
+              status: normalizeStatus(t.status),
+              topic: t.subject || t.message || '—',
+              client: t.email, claimer: '',
+              date: t.created_at || '',
+            })),
+            ...liveChats.map(c => ({
+              uid: `c-${c.id}`, id: c.id, source: 'chat' as const,
+              status: normalizeStatus(c.claimed_by > 0 && c.status === 'open' ? 'in_progress' : c.status),
+              topic: c.topic || 'Живой чат',
+              client: c.user_email, claimer: c.claimer_email || '',
+              date: c.updated_at || c.created_at || '',
+              msgCount: c.message_count,
+            })),
+          ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+          const filtered = ticketFilter ? unified.filter(u => u.status === ticketFilter) : unified;
+
+          return (
           <div className="space-y-4">
-            {/* Filter */}
+            {/* Single unified filter bar */}
             <div className="flex gap-2 flex-wrap">
-              {['', 'open', 'in_progress', 'resolved', 'closed'].map(f => (
+              {[
+                { value: '', label: 'Все' },
+                { value: 'open', label: 'Открытые' },
+                { value: 'in_progress', label: 'В работе' },
+                { value: 'closed', label: 'Закрытые' },
+              ].map(f => (
                 <button
-                  key={f}
-                  onClick={() => setTicketFilter(f)}
+                  key={f.value}
+                  onClick={() => setTicketFilter(f.value)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                    ticketFilter === f
+                    ticketFilter === f.value
                       ? 'border-blue-500 bg-blue-500/20 text-blue-400'
                       : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
                   }`}
                 >
-                  {f === '' ? 'Все' : f === 'open' ? 'Открытые' : f === 'in_progress' ? 'В работе' : f === 'resolved' ? 'Решено' : 'Закрыто'}
+                  {f.label}
                 </button>
               ))}
             </div>
 
-            {/* Tickets list */}
+            {/* Unified ticket list */}
             <div className="space-y-3">
-              {tickets.map(t => (
-                <div key={t.id} className="glass-card p-5">
-                  <div className="flex items-start justify-between gap-4 mb-3">
+              {filtered.map(item => (
+                <div key={item.uid} className="glass-card p-5">
+                  <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs text-slate-500 font-mono">#{t.id}</span>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                          t.status === 'open' ? 'bg-orange-500/20 text-orange-400'
-                          : t.status === 'in_progress' ? 'bg-blue-500/20 text-blue-400'
-                          : t.status === 'resolved' ? 'bg-emerald-500/20 text-emerald-400'
-                          : 'bg-slate-500/20 text-slate-400'
-                        }`}>
-                          {t.status === 'open' ? 'Открыт' : t.status === 'in_progress' ? 'В работе' : t.status === 'resolved' ? 'Решено' : 'Закрыт'}
+                      {/* Row 1: ID | Status | Topic | Msg count */}
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                        <span className="text-xs text-slate-500 font-mono">#{item.source === 'chat' ? `C${item.id}` : item.id}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${statusBadge(item.status)}`}>
+                          {statusLabel(item.status)}
                         </span>
-                        <span className="text-xs text-slate-500">{t.created_at ? new Date(t.created_at).toLocaleString('ru-RU') : ''}</span>
+                        <span className="text-xs text-slate-500 truncate max-w-[220px]">{item.topic}</span>
+                        {item.source === 'chat' && item.msgCount !== undefined && (
+                          <span className="text-[10px] text-slate-600 bg-white/5 px-1.5 py-0.5 rounded">{item.msgCount} сообщ.</span>
+                        )}
+                        {item.source === 'chat' && (
+                          <span className="text-[10px] text-blue-500/60 bg-blue-500/10 px-1.5 py-0.5 rounded">чат</span>
+                        )}
                       </div>
-                      <p className="text-sm text-slate-300 mb-1">
-                        <strong className="text-white">{t.email}</strong>
-                      </p>
-                      <p className="text-sm text-slate-400 whitespace-pre-wrap break-words">{t.message || t.subject}</p>
+                      {/* Row 2: Client | Claimer | Date */}
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <p className="text-sm text-white font-medium">{item.client}</p>
+                        {item.claimer ? (
+                          <span className="text-xs text-orange-400">← {item.claimer}</span>
+                        ) : item.status === 'open' ? (
+                          <span className="text-xs text-slate-600">Не назначен</span>
+                        ) : null}
+                        <span className="text-[10px] text-slate-600 ml-auto shrink-0">{item.date ? new Date(item.date).toLocaleString('ru-RU') : ''}</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex gap-2 flex-wrap">
-                    {t.status !== 'in_progress' && (
-                      <button onClick={() => updateTicketStatus(t.id, 'in_progress')} className="px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-lg text-xs font-medium transition-all">
-                        В работу
-                      </button>
-                    )}
-                    {t.status !== 'resolved' && (
-                      <button onClick={() => updateTicketStatus(t.id, 'resolved')} className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-lg text-xs font-medium transition-all">
-                        Решено
-                      </button>
-                    )}
-                    {t.status !== 'closed' && (
-                      <button onClick={() => updateTicketStatus(t.id, 'closed')} className="px-3 py-1.5 bg-slate-500/10 hover:bg-slate-500/20 border border-slate-500/30 text-slate-400 rounded-lg text-xs font-medium transition-all">
-                        Закрыть
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-              {tickets.length === 0 && (
-                <div className="glass-card p-8 text-center text-slate-500 text-sm">
-                  Нет тикетов{ticketFilter ? ` со статусом "${ticketFilter}"` : ''}
-                </div>
-              )}
-            </div>
 
-            {/* ── Live Chats Section ── */}
-            <h3 className="text-lg font-bold text-white mt-8 mb-3 flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-blue-400" />
-              Живые чаты
-            </h3>
-            <div className="flex gap-2 flex-wrap mb-4">
-              {['', 'open', 'closed'].map(f => (
-                <button
-                  key={`chat-${f}`}
-                  onClick={() => setChatFilter(f)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                    chatFilter === f
-                      ? 'border-blue-500 bg-blue-500/20 text-blue-400'
-                      : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
-                  }`}
-                >
-                  {f === '' ? 'Все' : f === 'open' ? 'Открытые' : 'Закрытые'}
-                </button>
-              ))}
-            </div>
-            <div className="space-y-3">
-              {liveChats.map(c => (
-                <div key={`chat-${c.id}`} className="glass-card p-5">
-                  <div className="flex items-start justify-between gap-4 mb-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className="text-xs text-slate-500 font-mono">#{c.id}</span>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                          c.status === 'open' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-500/20 text-slate-400'
-                        }`}>
-                          {c.status === 'open' ? 'Открыт' : 'Закрыт'}
-                        </span>
-                        <span className="text-xs text-slate-500">{c.topic}</span>
-                        <span className="text-xs text-slate-600">{c.message_count} сообщ.</span>
-                      </div>
-                      <p className="text-sm text-slate-300 mb-1">
-                        <strong className="text-white">{c.user_email}</strong>
-                      </p>
-                      {c.claimer_email ? (
-                        <p className="text-xs text-blue-400">В работе у: {c.claimer_email}</p>
-                      ) : (
-                        <p className="text-xs text-orange-400">Не назначен</p>
+                    {/* Action buttons */}
+                    <div className="flex items-center gap-1.5 shrink-0 self-center">
+                      {item.source === 'chat' && (
+                        <button
+                          onClick={() => viewChatMessages(item.id)}
+                          title="История"
+                          className="w-8 h-8 flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 hover:text-white rounded-lg transition-all"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
                       )}
-                      <p className="text-[10px] text-slate-600 mt-1">{c.updated_at ? new Date(c.updated_at).toLocaleString('ru-RU') : ''}</p>
+                      {item.source === 'ticket' && item.status !== 'in_progress' && item.status !== 'closed' && (
+                        <button
+                          onClick={() => updateTicketStatus(item.id, 'in_progress')}
+                          className="px-2.5 py-1.5 bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 text-orange-400 rounded-lg text-[11px] font-medium transition-all"
+                        >
+                          В работу
+                        </button>
+                      )}
+                      {item.source === 'ticket' && item.status !== 'closed' && (
+                        <button
+                          onClick={() => updateTicketStatus(item.id, 'resolved')}
+                          className="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-lg text-[11px] font-medium transition-all"
+                        >
+                          Решено
+                        </button>
+                      )}
+                      {item.source === 'ticket' && item.status !== 'closed' && (
+                        <button
+                          onClick={() => updateTicketStatus(item.id, 'closed')}
+                          className="px-2.5 py-1.5 bg-slate-500/10 hover:bg-slate-500/20 border border-slate-500/30 text-slate-400 rounded-lg text-[11px] font-medium transition-all"
+                        >
+                          Закрыть
+                        </button>
+                      )}
                     </div>
-                    <button
-                      onClick={() => viewChatMessages(c.id)}
-                      className="px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-lg text-xs font-medium transition-all shrink-0"
-                    >
-                      Просмотр
-                    </button>
                   </div>
                 </div>
               ))}
-              {liveChats.length === 0 && (
+              {filtered.length === 0 && (
                 <div className="glass-card p-8 text-center text-slate-500 text-sm">
-                  Нет чатов{chatFilter ? ` со статусом "${chatFilter}"` : ''}
+                  Нет тикетов{ticketFilter ? ` со статусом «${ticketFilter === 'open' ? 'Открытые' : ticketFilter === 'in_progress' ? 'В работе' : 'Закрытые'}»` : ''}
                 </div>
               )}
             </div>
@@ -836,7 +845,8 @@ export const StaffOnlyZone = () => {
               </div>
             )}
           </div>
-        )}
+          );
+        })()}
 
         {/* ════════════ TRANSLATIONS TAB ════════════ */}
         {tab === 'translations' && (
