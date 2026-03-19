@@ -99,6 +99,20 @@ func EnsureChatTables() error {
 		log.Println("[CHAT] ✅ claimed_by column verified present")
 	}
 
+	// SECURITY CLEANUP: reset claimed_by for conversations claimed by non-admin users
+	res, cleanErr := GlobalDB.Exec(
+		`UPDATE chat_conversations SET claimed_by = 0
+		 WHERE claimed_by != 0
+		   AND claimed_by NOT IN (SELECT id FROM users WHERE is_admin = TRUE)`)
+	if cleanErr != nil {
+		log.Printf("[CHAT] ⚠️ Security cleanup of claimed_by failed: %v", cleanErr)
+	} else {
+		affected, _ := res.RowsAffected()
+		if affected > 0 {
+			log.Printf("[CHAT] 🛡️ SECURITY CLEANUP: Reset claimed_by on %d conversations claimed by non-admins", affected)
+		}
+	}
+
 	return nil
 }
 

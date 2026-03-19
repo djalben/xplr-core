@@ -289,14 +289,19 @@ func handleCallbackQuery(cb *tgCallbackQuery) {
 
 	log.Printf("[TG-CALLBACK] chat_id=%d (int64), data=%q, callback_id=%q", callerChatID, data, cb.ID)
 
-	// ── Handle claim_<convID> ──
-	if strings.HasPrefix(data, "claim_") {
-		handleClaimCallback(cb, callerChatID, data)
-		return
-	}
+	// ── SECURITY: Admin-only callbacks require is_admin check ──
+	if strings.HasPrefix(data, "claim_") || strings.HasPrefix(data, "closechat_") {
+		callerUserID, _ := repository.GetUserIDByChatID(callerChatID)
+		if callerUserID == 0 || !repository.IsUserAdmin(callerUserID) {
+			log.Printf("[SECURITY] ⛔ NON-ADMIN TG callback attempt: chat_id=%d, userID=%d, data=%q", callerChatID, callerUserID, data)
+			telegram.AnswerCallbackQuery(cb.ID, "⛔ Ошибка: У вас нет прав администратора для этого действия")
+			return
+		}
 
-	// ── Handle closechat_<convID> ──
-	if strings.HasPrefix(data, "closechat_") {
+		if strings.HasPrefix(data, "claim_") {
+			handleClaimCallback(cb, callerChatID, data)
+			return
+		}
 		handleCloseChatCallback(cb, callerChatID, data)
 		return
 	}
@@ -436,8 +441,7 @@ func handleClaimCallback(cb *tgCallbackQuery, callerChatID int64, data string) {
 	}
 	log.Printf("[CHAT-CLAIM] Parsed convID=%d", convID)
 
-	// Resolve admin: direct lookup + auto-link fallback
-	// NO is_admin check — if they received the Claim button, they ARE admin
+	// Resolve admin: direct lookup (is_admin already verified in handleCallbackQuery)
 	adminUserID, adminName := resolveAdminUserID(callerChatID)
 	if adminUserID == 0 {
 		errMsg := fmt.Sprintf("❌ Ошибка захвата: TG ID %d не удалось привязать ни к одному админ-аккаунту.\nПроверьте привязку Telegram в настройках XPLR.", callerChatID)
@@ -446,9 +450,6 @@ func handleClaimCallback(cb *tgCallbackQuery, callerChatID int64, data string) {
 		return
 	}
 	log.Printf("[CHAT-CLAIM] Resolved admin: userID=%d, name=%s", adminUserID, adminName)
-
-	// Force is_admin = TRUE for this user (belt-and-suspenders)
-	repository.GlobalDB.Exec(`UPDATE users SET is_admin = TRUE WHERE id = $1`, adminUserID)
 
 	// Atomically claim
 	log.Printf("[CHAT-CLAIM] Attempting ClaimConversation(conv=%d, admin=%d)...", convID, adminUserID)
@@ -512,6 +513,7 @@ func handleCloseChatCallback(cb *tgCallbackQuery, callerChatID int64, data strin
 		return
 	}
 
+	// is_admin already verified in handleCallbackQuery
 	adminUserID, _ := resolveAdminUserID(callerChatID)
 	if adminUserID == 0 {
 		telegram.SendMessageHTML(callerChatID, "❌ Нет доступа: аккаунт не найден")
