@@ -223,6 +223,8 @@ func main() {
 	protectedRouter.HandleFunc("/settings/2fa/setup", handlers.Setup2FAHandler).Methods("POST")
 	protectedRouter.HandleFunc("/settings/2fa/verify", handlers.Verify2FAHandler).Methods("POST")
 	protectedRouter.HandleFunc("/settings/2fa/disable", handlers.Disable2FAHandler).Methods("POST")
+	protectedRouter.HandleFunc("/settings/2fa/unlink", handlers.Unlink2FAHandler).Methods("POST")
+	protectedRouter.HandleFunc("/settings/telegram/unlink", handlers.UnlinkTelegramHandler).Methods("POST")
 	protectedRouter.HandleFunc("/settings/verify-email-request", handlers.RequestEmailVerifyHandler).Methods("POST")
 	protectedRouter.HandleFunc("/settings/verify-email-confirm", handlers.ConfirmEmailVerifyHandler).Methods("POST")
 	protectedRouter.HandleFunc("/settings/kyc", handlers.SubmitKYCHandler).Methods("POST")

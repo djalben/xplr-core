@@ -159,8 +159,14 @@ func GetNotificationPrefsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to fetch notifications", http.StatusInternalServerError)
 		return
 	}
+	notifPref := repository.GetNotificationPref(userID)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(prefs)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"notify_transactions": prefs.NotifyTransactions,
+		"notify_balance":      prefs.NotifyBalance,
+		"notify_security":     prefs.NotifySecurity,
+		"notification_pref":   notifPref,
+	})
 }
 
 // ── PATCH /api/v1/user/settings/notifications ──
@@ -170,17 +176,79 @@ func UpdateNotificationPrefsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	var req repository.NotificationPrefs
+	var req struct {
+		NotifyTransactions *bool   `json:"notify_transactions,omitempty"`
+		NotifyBalance      *bool   `json:"notify_balance,omitempty"`
+		NotifySecurity     *bool   `json:"notify_security,omitempty"`
+		NotificationPref   *string `json:"notification_pref,omitempty"`
+	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid body", http.StatusBadRequest)
 		return
 	}
-	if err := repository.UpdateNotificationPrefs(userID, req); err != nil {
+
+	// Update notification_pref channel if provided
+	if req.NotificationPref != nil {
+		pref := *req.NotificationPref
+		if err := repository.SetNotificationPref(userID, pref); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
+	// Update toggle prefs
+	prefs, _ := repository.GetNotificationPrefs(userID)
+	if req.NotifyTransactions != nil {
+		prefs.NotifyTransactions = *req.NotifyTransactions
+	}
+	if req.NotifyBalance != nil {
+		prefs.NotifyBalance = *req.NotifyBalance
+	}
+	if req.NotifySecurity != nil {
+		prefs.NotifySecurity = *req.NotifySecurity
+	}
+	if err := repository.UpdateNotificationPrefs(userID, prefs); err != nil {
 		http.Error(w, "Failed to update notifications", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(req)
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+// ── POST /api/v1/user/settings/telegram/unlink ──
+func UnlinkTelegramHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	// Ensure user won't be left with no notification channel
+	pref := repository.GetNotificationPref(userID)
+	if pref == "telegram" {
+		// Switch to email before unlinking
+		_ = repository.SetNotificationPref(userID, "email")
+	}
+	if err := repository.UnlinkTelegram(userID); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "message": "Telegram отвязан"})
+}
+
+// ── POST /api/v1/user/settings/2fa/unlink ──
+func Unlink2FAHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if err := repository.DisableTwoFactor(userID); err != nil {
+		http.Error(w, "Failed to disable 2FA", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "message": "2FA отключена"})
 }
 
 // ── POST /api/v1/user/settings/2fa/setup ──

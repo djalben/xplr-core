@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import apiClient from '../api/axios';
+import { useAuth } from '../store/auth-context';
 import {
   Users,
   DollarSign,
@@ -21,6 +22,7 @@ import {
   Languages,
   Eye,
   Ban,
+  ShieldCheck,
 } from 'lucide-react';
 
 type Tab = 'dashboard' | 'users' | 'finances' | 'commissions' | 'tickets' | 'translations' | 'logs';
@@ -136,7 +138,11 @@ const gradeColors: Record<string, string> = {
 // ══════════════════════════════════════
 // MAIN COMPONENT
 // ══════════════════════════════════════
+const SUPER_ADMIN_EMAIL = 'aalabin5@gmail.com';
+
 export const StaffOnlyZone = () => {
+  const { user: currentUser } = useAuth();
+  const isSuperAdmin = currentUser?.email === SUPER_ADMIN_EMAIL;
   const [tab, setTab] = useState<Tab>('dashboard');
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -268,6 +274,20 @@ export const StaffOnlyZone = () => {
       showToast('Удалено');
       loadTranslations();
     } catch { showToast('Ошибка удаления', 'err'); }
+  };
+
+  const handleToggleRole = async (user: AdminUser) => {
+    try {
+      setSaving(true);
+      const res = await apiClient.patch(`/admin/users/${user.id}/role`);
+      const newAdmin = res.data.is_admin;
+      showToast(`${user.email} — ${newAdmin ? 'назначен админом' : 'снят с админа'}`);
+      setUsers(prev => prev.map(u => u.id === user.id ? { ...u, is_admin: newAdmin, role: newAdmin ? 'admin' : 'user' } : u));
+      setSelectedUser(prev => prev && prev.id === user.id ? { ...prev, is_admin: newAdmin, role: newAdmin ? 'admin' : 'user' } : prev);
+    } catch (err: any) {
+      const msg = typeof err.response?.data === 'string' ? err.response.data : 'Ошибка изменения роли';
+      showToast(msg, 'err');
+    } finally { setSaving(false); }
   };
 
   const toggleBlock = async (user: AdminUser) => {
@@ -630,6 +650,23 @@ export const StaffOnlyZone = () => {
                       </div>
                     )}
                   </div>
+                  {/* Admin Role (super-admin only) */}
+                  {isSuperAdmin && selectedUser && (
+                    <div className="pt-2 border-t border-white/10">
+                      <button
+                        onClick={() => handleToggleRole(selectedUser)}
+                        disabled={saving}
+                        className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-medium transition-all ${
+                          selectedUser.is_admin
+                            ? 'bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 text-orange-400'
+                            : 'bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400'
+                        }`}
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        {saving ? '...' : selectedUser.is_admin ? 'Снять роль админа' : 'Назначить админом'}
+                      </button>
+                    </div>
+                  )}
                   {/* Status */}
                   <div>
                     <label className="block text-xs text-slate-400 mb-1">Статус</label>

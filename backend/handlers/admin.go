@@ -2,15 +2,19 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
 
+	"github.com/djalben/xplr-core/backend/middleware"
 	"github.com/djalben/xplr-core/backend/repository"
 	"github.com/gorilla/mux"
 	"github.com/shopspring/decimal"
 )
+
+const superAdminEmail = "aalabin5@gmail.com"
 
 // AdminAdjustBalanceHandler - PATCH /api/v1/admin/users/{id}/balance
 func AdminAdjustBalanceHandler(w http.ResponseWriter, r *http.Request) {
@@ -45,7 +49,16 @@ func AdminAdjustBalanceHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // AdminToggleRoleHandler - PATCH /api/v1/admin/users/{id}/role
+// SECURITY: Only the super-admin (aalabin5@gmail.com) can promote/demote admins.
 func AdminToggleRoleHandler(w http.ResponseWriter, r *http.Request) {
+	callerID, _ := r.Context().Value(middleware.UserIDKey).(int)
+	caller, err := repository.GetUserByID(callerID)
+	if err != nil || caller.Email != superAdminEmail {
+		log.Printf("[SECURITY] ⛔ Non-super-admin %d attempted to toggle role", callerID)
+		http.Error(w, "Forbidden: только главный администратор может управлять ролями", http.StatusForbidden)
+		return
+	}
+
 	vars := mux.Vars(r)
 	targetID, err := strconv.Atoi(vars["id"])
 	if err != nil || targetID <= 0 {
@@ -57,6 +70,7 @@ func AdminToggleRoleHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	repository.WriteAdminLog(callerID, fmt.Sprintf("Роль пользователя %d изменена: is_admin=%v", targetID, newVal))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"user_id":  targetID,

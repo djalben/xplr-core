@@ -98,7 +98,21 @@ const TelegramCard = ({ profile, reload, showToast }: { profile: ProfileData | n
         {profile?.telegram_linked ? (
           <>
             <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-400" /><p className="text-white font-medium">{t('settings.telegram.connected')}</p></div>
-            <span className="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 text-xs font-medium rounded-lg">{t('settings.telegram.connected')}</span>
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 text-xs font-medium rounded-lg">{t('settings.telegram.connected')}</span>
+              <button
+                onClick={async () => {
+                  try {
+                    await apiClient.post('/user/settings/telegram/unlink');
+                    showToast('Telegram отвязан', 'ok');
+                    reload();
+                  } catch { showToast('Ошибка отвязки Telegram', 'err'); }
+                }}
+                className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-medium rounded-lg transition-colors"
+              >
+                Отвязать
+              </button>
+            </div>
           </>
         ) : (
           <>
@@ -431,19 +445,36 @@ const SecurityTab = ({ profile, reload, showToast }: { profile: ProfileData | nu
 // ══════════════════════════════════════
 // NOTIFICATIONS TAB
 // ══════════════════════════════════════
+const CHANNEL_OPTIONS: { value: string; label: string; desc: string }[] = [
+  { value: 'both', label: 'Email + Telegram', desc: 'Уведомления в оба канала' },
+  { value: 'email', label: 'Только Email', desc: 'Уведомления только на почту' },
+  { value: 'telegram', label: 'Только Telegram', desc: 'Уведомления только в Telegram' },
+];
+
 const NotificationsTab = ({ showToast }: { showToast: (m: string, t: 'ok' | 'err') => void }) => {
   const { t } = useTranslation();
   const [prefs, setPrefs] = useState<NotifPrefs>({ notify_transactions: true, notify_balance: true, notify_security: true });
+  const [notifChannel, setNotifChannel] = useState('both');
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    apiClient.get('/user/settings/notifications').then(res => { setPrefs(res.data); setLoaded(true); }).catch(() => setLoaded(true));
+    apiClient.get('/user/settings/notifications').then(res => {
+      setPrefs({ notify_transactions: res.data.notify_transactions, notify_balance: res.data.notify_balance, notify_security: res.data.notify_security });
+      setNotifChannel(res.data.notification_pref || 'both');
+      setLoaded(true);
+    }).catch(() => setLoaded(true));
   }, []);
 
   const savePrefs = async (updated: NotifPrefs) => {
     setPrefs(updated);
     try { await apiClient.patch('/user/settings/notifications', updated); }
     catch { showToast(t('settings.notif.saveError'), 'err'); }
+  };
+
+  const saveChannel = async (ch: string) => {
+    setNotifChannel(ch);
+    try { await apiClient.patch('/user/settings/notifications', { notification_pref: ch }); showToast('Канал уведомлений обновлён', 'ok'); }
+    catch { showToast('Необходимо оставить хотя бы один способ связи', 'err'); }
   };
 
   if (!loaded) return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-blue-400" /></div>;
@@ -456,6 +487,28 @@ const NotificationsTab = ({ showToast }: { showToast: (m: string, t: 'ok' | 'err
 
   return (
     <div className="space-y-6">
+      {/* Notification Channel Selector */}
+      <div className="glass-card p-4 sm:p-6">
+        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><Globe className="w-5 h-5 text-purple-400" />Канал уведомлений</h3>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {CHANNEL_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => saveChannel(opt.value)}
+              className={`p-4 rounded-xl border text-left transition-all ${
+                notifChannel === opt.value
+                  ? 'border-blue-500/50 bg-blue-500/10'
+                  : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.05]'
+              }`}
+            >
+              <p className={`text-sm font-medium ${notifChannel === opt.value ? 'text-blue-400' : 'text-white'}`}>{opt.label}</p>
+              <p className="text-xs text-slate-500 mt-1">{opt.desc}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Toggle Prefs */}
       <div className="glass-card p-4 sm:p-6">
         <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><Bell className="w-5 h-5 text-blue-400" />{t('settings.notif.title')}</h3>
         <div className="space-y-4">

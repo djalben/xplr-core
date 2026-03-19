@@ -136,3 +136,99 @@ func UpdateTelegramChatIDInt64(userID int, chatID int64) error {
 	log.Printf("[TELEGRAM] Chat ID %d linked to user %d", chatID, userID)
 	return nil
 }
+
+// GetFixedTelegramID returns the permanently locked TG ID for a user. Returns 0 if not set.
+func GetFixedTelegramID(userID int) int64 {
+	if GlobalDB == nil {
+		return 0
+	}
+	var id int64
+	err := GlobalDB.QueryRow(
+		`SELECT COALESCE(fixed_telegram_id, 0) FROM users WHERE id = $1`, userID,
+	).Scan(&id)
+	if err != nil {
+		return 0
+	}
+	return id
+}
+
+// SetFixedTelegramID permanently locks the user's first TG account.
+func SetFixedTelegramID(userID int, chatID int64) {
+	if GlobalDB == nil {
+		return
+	}
+	_, err := GlobalDB.Exec(
+		`UPDATE users SET fixed_telegram_id = $1 WHERE id = $2 AND (fixed_telegram_id IS NULL OR fixed_telegram_id = 0)`,
+		chatID, userID,
+	)
+	if err != nil {
+		log.Printf("[TELEGRAM] Error setting fixed_telegram_id for user %d: %v", userID, err)
+	} else {
+		log.Printf("[TELEGRAM] 🔒 Fixed TG ID %d for user %d", chatID, userID)
+	}
+}
+
+// UnlinkTelegram removes telegram_chat_id but preserves fixed_telegram_id.
+func UnlinkTelegram(userID int) error {
+	if GlobalDB == nil {
+		return fmt.Errorf("database connection not initialized")
+	}
+	_, err := GlobalDB.Exec(
+		`UPDATE users SET telegram_chat_id = NULL WHERE id = $1`, userID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to unlink telegram: %v", err)
+	}
+	log.Printf("[TELEGRAM] 🔓 Unlinked TG for user %d (fixed_telegram_id preserved)", userID)
+	return nil
+}
+
+// GetAdminEmails returns emails of all users with is_admin=true.
+func GetAdminEmails() ([]string, error) {
+	if GlobalDB == nil {
+		return nil, fmt.Errorf("database connection not initialized")
+	}
+	rows, err := GlobalDB.Query(`SELECT email FROM users WHERE is_admin = TRUE`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var emails []string
+	for rows.Next() {
+		var e string
+		if err := rows.Scan(&e); err == nil && e != "" {
+			emails = append(emails, e)
+		}
+	}
+	return emails, rows.Err()
+}
+
+// GetNotificationPref returns the user's notification preference ('email', 'telegram', 'both').
+func GetNotificationPref(userID int) string {
+	if GlobalDB == nil {
+		return "both"
+	}
+	var pref string
+	err := GlobalDB.QueryRow(
+		`SELECT COALESCE(notification_pref, 'both') FROM users WHERE id = $1`, userID,
+	).Scan(&pref)
+	if err != nil {
+		return "both"
+	}
+	return pref
+}
+
+// SetNotificationPref updates the user's notification preference.
+func SetNotificationPref(userID int, pref string) error {
+	if GlobalDB == nil {
+		return fmt.Errorf("database connection not initialized")
+	}
+	valid := map[string]bool{"email": true, "telegram": true, "both": true}
+	if !valid[pref] {
+		return fmt.Errorf("invalid notification_pref: must be 'email', 'telegram', or 'both'")
+	}
+	_, err := GlobalDB.Exec(
+		`UPDATE users SET notification_pref = $1 WHERE id = $2`, pref, userID,
+	)
+	return err
+}

@@ -133,12 +133,35 @@ func TelegramWebhookHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Save chat_id to user
+		// Anti-fraud: check if this chat_id is already linked to a different user
+		existingUID, _ := repository.GetUserIDByChatID(chatID)
+		if existingUID != 0 && existingUID != userID {
+			log.Printf("[TG-WEBHOOK] ⛔ Anti-fraud: chat_id %d already linked to user %d, rejecting for user %d", chatID, existingUID, userID)
+			telegram.SendMessageHTML(chatID, "❌ <b>Этот Telegram-аккаунт уже привязан к другому пользователю.</b>\n\nОтвяжите его сначала в настройках того аккаунта.")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		// Anti-fraud: check fixed_telegram_id — user can only link their original TG account
+		fixedTgID := repository.GetFixedTelegramID(userID)
+		if fixedTgID != 0 && fixedTgID != chatID {
+			log.Printf("[TG-WEBHOOK] ⛔ Anti-fraud: user %d has fixed_telegram_id=%d but tried to link chat_id=%d", userID, fixedTgID, chatID)
+			telegram.SendMessageHTML(chatID, "❌ <b>Можно привязать только ваш первый Telegram-аккаунт.</b>\n\nЕсли вы потеряли доступ к старому аккаунту, обратитесь в поддержку.")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		// Save chat_id to user (NEVER grants is_admin)
 		if err := repository.UpdateTelegramChatIDInt64(userID, chatID); err != nil {
 			log.Printf("[TG-WEBHOOK] Failed to save chat_id for user %d: %v", userID, err)
 			telegram.SendMessageHTML(chatID, "❌ <b>Произошла ошибка при привязке.</b>\n\nПопробуйте ещё раз.")
 			w.WriteHeader(http.StatusOK)
 			return
+		}
+
+		// Lock fixed_telegram_id on first link
+		if fixedTgID == 0 {
+			repository.SetFixedTelegramID(userID, chatID)
 		}
 
 		// Delete used code

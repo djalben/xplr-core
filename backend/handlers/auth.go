@@ -161,6 +161,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 			"role":        userRole,
 			"created_at":  createdUser.CreatedAt,
 		},
+		"message": "Регистрация успешна! ВНИМАНИЕ: Подключите Telegram в настройках для получения уведомлений о безопасности и транзакциях. Без этого важные оповещения могут быть пропущены.",
 	}
 
 	w.Header().Set("Content-Type", "application/json")

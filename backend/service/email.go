@@ -382,3 +382,13 @@ func SendEmergencyFreezeNotification(toEmail string, frozenCards int) error {
 	log.Printf("[EMAIL] Emergency freeze notification sent to %s", toEmail)
 	return nil
 }
+
+// SendGenericEmail — sends a generic HTML email (used by NotifyUser).
+func SendGenericEmail(toEmail, subject, htmlContent string) error {
+	html := wrapHTML(subject, htmlContent)
+	if err := sendMail(toEmail, "XPLR — "+subject, html); err != nil {
+		log.Printf("[EMAIL] SendGenericEmail to %s failed: %v", toEmail, err)
+		return err
+	}
+	return nil
+}
