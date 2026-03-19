@@ -451,7 +451,7 @@ const CHANNEL_OPTIONS: { value: string; label: string; desc: string }[] = [
   { value: 'telegram', label: 'Только Telegram', desc: 'Уведомления только в Telegram' },
 ];
 
-const NotificationsTab = ({ showToast }: { showToast: (m: string, t: 'ok' | 'err') => void }) => {
+const NotificationsTab = ({ showToast, telegramLinked }: { showToast: (m: string, t: 'ok' | 'err') => void; telegramLinked: boolean }) => {
   const { t } = useTranslation();
   const [prefs, setPrefs] = useState<NotifPrefs>({ notify_transactions: true, notify_balance: true, notify_security: true });
   const [notifChannel, setNotifChannel] = useState('both');
@@ -491,20 +491,33 @@ const NotificationsTab = ({ showToast }: { showToast: (m: string, t: 'ok' | 'err
       <div className="glass-card p-4 sm:p-6">
         <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><Globe className="w-5 h-5 text-purple-400" />Канал уведомлений</h3>
         <div className="grid gap-3 sm:grid-cols-3">
-          {CHANNEL_OPTIONS.map(opt => (
-            <button
-              key={opt.value}
-              onClick={() => saveChannel(opt.value)}
-              className={`p-4 rounded-xl border text-left transition-all ${
-                notifChannel === opt.value
-                  ? 'border-blue-500/50 bg-blue-500/10'
-                  : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.05]'
-              }`}
-            >
-              <p className={`text-sm font-medium ${notifChannel === opt.value ? 'text-blue-400' : 'text-white'}`}>{opt.label}</p>
-              <p className="text-xs text-slate-500 mt-1">{opt.desc}</p>
-            </button>
-          ))}
+          {CHANNEL_OPTIONS.map(opt => {
+            const needsTG = opt.value === 'both' || opt.value === 'telegram';
+            const isDisabled = needsTG && !telegramLinked;
+            return (
+              <div key={opt.value} className="relative group">
+                <button
+                  onClick={() => !isDisabled && saveChannel(opt.value)}
+                  disabled={isDisabled}
+                  className={`w-full p-4 rounded-xl border text-left transition-all ${
+                    isDisabled
+                      ? 'border-white/5 bg-white/[0.01] opacity-40 cursor-not-allowed'
+                      : notifChannel === opt.value
+                        ? 'border-blue-500/50 bg-blue-500/10'
+                        : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.05]'
+                  }`}
+                >
+                  <p className={`text-sm font-medium ${isDisabled ? 'text-slate-500' : notifChannel === opt.value ? 'text-blue-400' : 'text-white'}`}>{opt.label}</p>
+                  <p className="text-xs text-slate-500 mt-1">{opt.desc}</p>
+                </button>
+                {isDisabled && (
+                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-slate-800 border border-white/10 rounded-lg text-xs text-slate-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                    Сначала привяжите Telegram в блоке выше
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -746,7 +759,7 @@ export const SettingsPage = () => {
         </div>
         {activeTab === 'profile' && <ProfileTab profile={profile} reload={loadProfile} showToast={showToast} setActiveTab={setActiveTab} />}
         {activeTab === 'security' && <SecurityTab profile={profile} reload={loadProfile} showToast={showToast} />}
-        {activeTab === 'notifications' && <NotificationsTab showToast={showToast} />}
+        {activeTab === 'notifications' && <NotificationsTab showToast={showToast} telegramLinked={profile?.telegram_linked ?? false} />}
         {activeTab === 'kyc' && <KYCTab profile={profile} reload={loadProfile} showToast={showToast} />}
         {activeTab === 'language' && <LanguageTab />}
       </div>

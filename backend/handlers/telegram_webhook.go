@@ -164,6 +164,13 @@ func TelegramWebhookHandler(w http.ResponseWriter, r *http.Request) {
 			repository.SetFixedTelegramID(userID, chatID)
 		}
 
+		// Auto-enable both channels now that TG is linked
+		if err := repository.SetNotificationPref(userID, "both"); err != nil {
+			log.Printf("[TG-WEBHOOK] ⚠️ Failed to set notification_pref=both for user %d: %v", userID, err)
+		} else {
+			log.Printf("[TG-WEBHOOK] ✅ notification_pref set to 'both' for user %d", userID)
+		}
+
 		// Delete used code
 		repository.DeleteTelegramLinkCode(code)
 
