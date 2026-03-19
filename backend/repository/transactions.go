@@ -88,6 +88,10 @@ func GetUnifiedTransactions(userID int, filters map[string]interface{}) ([]model
 		argIdx++
 		countArgIdx++
 	}
+	if _, ok := filters["card_id_wallet"].(bool); ok {
+		query += " AND t.card_id IS NULL"
+		countQuery += " AND card_id IS NULL"
+	}
 	if v, ok := filters["search"].(string); ok && v != "" {
 		query += fmt.Sprintf(" AND t.details ILIKE $%d", argIdx)
 		countQuery += fmt.Sprintf(" AND details ILIKE $%d", countArgIdx)

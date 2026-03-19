@@ -20,7 +20,8 @@ import {
   Info,
   FileText,
   TableProperties,
-  Loader2
+  Loader2,
+  Clock
 } from 'lucide-react';
 import apiClient, { API_BASE_URL } from '../api/axios';
 import { getUserGrade, type GradeInfo } from '../api/grade';
@@ -365,6 +366,13 @@ export const DashboardPage = () => {
           <div className="glass-card p-6 border-blue-500/30">
             <div className="flex items-start justify-between mb-4">
               <div className="p-3 rounded-xl stat-icon-blue"><Wallet className="w-6 h-6 text-blue-400" /></div>
+              <button
+                onClick={() => navigate('/history?type=wallet')}
+                title="История кошелька"
+                className="p-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 hover:text-white transition-all"
+              >
+                <Clock className="w-4 h-4" />
+              </button>
             </div>
             <p className="text-slate-400 text-sm mb-1">Баланс Кошелька</p>
             <p className="text-2xl font-bold text-white balance-display">{wallet ? `$${Number(wallet.master_balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `$${balancePers.toFixed(2)}`}</p>

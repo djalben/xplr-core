@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { DashboardLayout } from '../components/dashboard-layout';
 import { BackButton } from '../components/back-button';
 import { 
@@ -45,6 +46,7 @@ const periodLabels: Record<Period, string> = {
 };
 
 export const HistoryPage = () => {
+  const [searchParams] = useSearchParams();
   const [period, setPeriod] = useState<Period>('month');
   const [searchQuery, setSearchQuery] = useState('');
   const [transactions, setTransactions] = useState<HistoryTx[]>([]);
@@ -52,7 +54,9 @@ export const HistoryPage = () => {
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
   const [cards, setCards] = useState<UserCard[]>([]);
-  const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
+  const [selectedCardId, setSelectedCardId] = useState<number | null>(
+    searchParams.get('type') === 'wallet' ? 0 : null
+  );
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
 
@@ -89,7 +93,7 @@ export const HistoryPage = () => {
       }
 
       const params: Record<string, string | number> = { start_date: startDate, end_date: endDate, limit: 200 };
-      if (selectedCardId) params.card_id = selectedCardId;
+      if (selectedCardId !== null) params.card_id = selectedCardId;
 
       const res = await apiClient.get('/user/transactions', { params });
       const txs: any[] = res.data?.transactions ?? [];
@@ -240,15 +244,19 @@ export const HistoryPage = () => {
               </div>
             </>
           )}
-          {cards.length > 0 && (
+          {(
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-slate-400" />
               <select
-                value={selectedCardId ?? ''}
-                onChange={e => setSelectedCardId(e.target.value ? Number(e.target.value) : null)}
-                className="h-10 px-3 bg-white/[0.04] border border-white/[0.08] rounded-xl text-white text-sm focus:outline-none focus:border-blue-400 transition-colors appearance-none cursor-pointer min-w-[160px]"
+                value={selectedCardId === null ? '' : selectedCardId}
+                onChange={e => {
+                  const v = e.target.value;
+                  setSelectedCardId(v === '' ? null : Number(v));
+                }}
+                className="h-10 px-3 bg-white/[0.04] border border-white/[0.08] rounded-xl text-white text-sm focus:outline-none focus:border-blue-400 transition-colors appearance-none cursor-pointer min-w-[180px]"
               >
-                <option value="" className="bg-slate-900">Все карты</option>
+                <option value="" className="bg-slate-900">Все операции</option>
+                <option value="0" className="bg-slate-900">Основной кошелёк</option>
                 {cards.map(c => (
                   <option key={c.id} value={c.id} className="bg-slate-900">
                     •••• {c.last_4_digits} ({c.card_type})
