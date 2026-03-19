@@ -195,6 +195,11 @@ func ensureDB() {
 		log.Printf("Warning: could not ensure chat tables: %v", err)
 	}
 
+	// 9b2. Translations table
+	if err := repository.EnsureTranslationsTable(); err != nil {
+		log.Printf("Warning: could not ensure translations table: %v", err)
+	}
+
 	// 9c. HARD migration: force claimed_by column (DO $$ may fail on Vercel)
 	if _, err := db.Exec(`ALTER TABLE chat_conversations ADD COLUMN IF NOT EXISTS claimed_by INTEGER DEFAULT 0`); err != nil {
 		log.Printf("[CHAT-MIGRATION] claimed_by ALTER TABLE: %v (may already exist, OK)", err)
@@ -378,6 +383,9 @@ func buildRouter() *mux.Router {
 	admin.HandleFunc("/users/{id}/emergency-freeze", handlers.AdminEmergencyFreezeHandler).Methods("POST")
 	admin.HandleFunc("/chats", handlers.AdminGetChatsHandler).Methods("GET")
 	admin.HandleFunc("/chats/{id}/messages", handlers.AdminGetChatMessagesHandler).Methods("GET")
+	admin.HandleFunc("/translations", handlers.AdminGetTranslationsHandler).Methods("GET")
+	admin.HandleFunc("/translations", handlers.AdminUpsertTranslationHandler).Methods("PUT")
+	admin.HandleFunc("/translations/{id}", handlers.AdminDeleteTranslationHandler).Methods("DELETE")
 	admin.HandleFunc("/logs", handlers.AdminGetLogsHandler).Methods("GET")
 
 	return r

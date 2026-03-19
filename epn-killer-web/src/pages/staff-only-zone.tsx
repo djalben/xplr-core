@@ -18,9 +18,10 @@ import {
   UserCheck,
   Loader2,
   Zap,
+  Languages,
 } from 'lucide-react';
 
-type Tab = 'dashboard' | 'users' | 'finances' | 'commissions' | 'tickets' | 'logs';
+type Tab = 'dashboard' | 'users' | 'finances' | 'commissions' | 'tickets' | 'translations' | 'logs';
 
 interface DashboardStats {
   total_users: number;
@@ -150,6 +151,13 @@ export const StaffOnlyZone = () => {
   const [chatFilter, setChatFilter] = useState('');
   const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
   const [viewingChatId, setViewingChatId] = useState<number | null>(null);
+  const [translations, setTranslations] = useState<{ id: number; msg_key: string; lang: string; value: string; updated_at: string }[]>([]);
+  const [transLangFilter, setTransLangFilter] = useState('');
+  const [newTransKey, setNewTransKey] = useState('');
+  const [newTransLang, setNewTransLang] = useState('ru');
+  const [newTransValue, setNewTransValue] = useState('');
+  const [editingTransId, setEditingTransId] = useState<number | null>(null);
+  const [editingTransValue, setEditingTransValue] = useState('');
   const [saving, setSaving] = useState(false);
   const [freezeConfirm, setFreezeConfirm] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
@@ -235,6 +243,34 @@ export const StaffOnlyZone = () => {
     }
   };
 
+  // ── Translations ──
+  const loadTranslations = useCallback(async () => {
+    try {
+      const params: Record<string, string> = {};
+      if (transLangFilter) params.lang = transLangFilter;
+      const res = await apiClient.get('/admin/translations', { params });
+      setTranslations(res.data || []);
+    } catch { /* ignore */ }
+  }, [transLangFilter]);
+
+  const saveTranslation = async (msgKey: string, lang: string, value: string) => {
+    try {
+      await apiClient.put('/admin/translations', { msg_key: msgKey, lang, value });
+      showToast(`Сохранено: ${msgKey} [${lang}]`);
+      loadTranslations();
+      setNewTransKey(''); setNewTransValue('');
+      setEditingTransId(null);
+    } catch { showToast('Ошибка сохранения', 'err'); }
+  };
+
+  const deleteTranslation = async (id: number) => {
+    try {
+      await apiClient.delete(`/admin/translations/${id}`);
+      showToast('Удалено');
+      loadTranslations();
+    } catch { showToast('Ошибка удаления', 'err'); }
+  };
+
   const updateTicketStatus = async (id: number, status: string) => {
     try {
       await apiClient.patch(`/admin/tickets/${id}`, { status });
@@ -254,8 +290,9 @@ export const StaffOnlyZone = () => {
     if (tab === 'users') loadAllUsers();
     if (tab === 'commissions') loadCommissions();
     if (tab === 'tickets') { loadTickets(); loadChats(); }
+    if (tab === 'translations') loadTranslations();
     if (tab === 'logs') loadLogs();
-  }, [tab, loadAllUsers, loadCommissions, loadTickets, loadChats, loadLogs]);
+  }, [tab, loadAllUsers, loadCommissions, loadTickets, loadChats, loadTranslations, loadLogs]);
 
   // ── Emergency Freeze ──
   const handleEmergencyFreeze = async () => {
@@ -369,6 +406,7 @@ export const StaffOnlyZone = () => {
           <TabBtn id="finances" icon={TrendingUp} label="Финансы" />
           <TabBtn id="commissions" icon={Settings} label="Комиссии" />
           <TabBtn id="tickets" icon={MessageSquare} label="Тикеты" />
+          <TabBtn id="translations" icon={Languages} label="Словари" />
           <TabBtn id="logs" icon={Clock} label="Логи" />
         </div>
 
@@ -797,6 +835,102 @@ export const StaffOnlyZone = () => {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ════════════ TRANSLATIONS TAB ════════════ */}
+        {tab === 'translations' && (
+          <div className="space-y-4">
+            {/* Lang filter */}
+            <div className="flex gap-2 flex-wrap mb-2">
+              {['', 'ru', 'en', 'es', 'pt', 'tr', 'zh', 'de'].map(l => (
+                <button
+                  key={`tl-${l}`}
+                  onClick={() => setTransLangFilter(l)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                    transLangFilter === l
+                      ? 'border-blue-500 bg-blue-500/20 text-blue-400'
+                      : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
+                  }`}
+                >
+                  {l === '' ? 'Все' : l.toUpperCase()}
+                </button>
+              ))}
+            </div>
+
+            {/* Add new */}
+            <div className="glass-card p-4">
+              <h4 className="text-white text-sm font-semibold mb-3">Добавить / Редактировать</h4>
+              <div className="flex gap-2 flex-wrap items-end">
+                <div className="flex-1 min-w-[150px]">
+                  <label className="text-xs text-slate-500 mb-1 block">Ключ</label>
+                  <input value={newTransKey} onChange={e => setNewTransKey(e.target.value)} placeholder="support.title" className="w-full h-9 px-3 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-blue-400" />
+                </div>
+                <div className="w-20">
+                  <label className="text-xs text-slate-500 mb-1 block">Язык</label>
+                  <select value={newTransLang} onChange={e => setNewTransLang(e.target.value)} className="w-full h-9 px-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-blue-400 appearance-none">
+                    {['ru','en','es','pt','tr','zh','de'].map(l => <option key={l} value={l} className="bg-slate-900">{l.toUpperCase()}</option>)}
+                  </select>
+                </div>
+                <div className="flex-1 min-w-[200px]">
+                  <label className="text-xs text-slate-500 mb-1 block">Значение</label>
+                  <input value={newTransValue} onChange={e => setNewTransValue(e.target.value)} placeholder="Поддержка" className="w-full h-9 px-3 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-blue-400" />
+                </div>
+                <button
+                  onClick={() => newTransKey && saveTranslation(newTransKey, newTransLang, newTransValue)}
+                  disabled={!newTransKey}
+                  className="h-9 px-4 bg-blue-500 hover:bg-blue-600 disabled:opacity-40 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  <Save className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Table */}
+            <div className="glass-card overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-white/10">
+                    <th className="text-left px-4 py-3 text-slate-400 font-medium">Ключ</th>
+                    <th className="text-left px-4 py-3 text-slate-400 font-medium w-16">Яз.</th>
+                    <th className="text-left px-4 py-3 text-slate-400 font-medium">Значение</th>
+                    <th className="text-right px-4 py-3 text-slate-400 font-medium w-24"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {translations.map(t => (
+                    <tr key={t.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                      <td className="px-4 py-2.5 text-white text-xs font-mono">{t.msg_key}</td>
+                      <td className="px-4 py-2.5 text-blue-400 text-xs font-medium">{t.lang.toUpperCase()}</td>
+                      <td className="px-4 py-2.5">
+                        {editingTransId === t.id ? (
+                          <input
+                            value={editingTransValue}
+                            onChange={e => setEditingTransValue(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') saveTranslation(t.msg_key, t.lang, editingTransValue); }}
+                            className="w-full h-7 px-2 bg-white/10 border border-blue-500/50 rounded text-white text-xs focus:outline-none"
+                            autoFocus
+                          />
+                        ) : (
+                          <span className="text-slate-300 text-xs cursor-pointer hover:text-white" onClick={() => { setEditingTransId(t.id); setEditingTransValue(t.value); }}>{t.value || <em className="text-slate-600">пусто</em>}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <div className="flex justify-end gap-1">
+                          {editingTransId === t.id && (
+                            <button onClick={() => saveTranslation(t.msg_key, t.lang, editingTransValue)} className="px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded text-[10px] font-medium hover:bg-emerald-500/30">✔</button>
+                          )}
+                          <button onClick={() => deleteTranslation(t.id)} className="px-2 py-1 bg-red-500/10 text-red-400 rounded text-[10px] font-medium hover:bg-red-500/20">✖</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {translations.length === 0 && (
+                    <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-500 text-sm">Нет переводов{transLangFilter ? ` для ${transLangFilter.toUpperCase()}` : ''}</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 

@@ -80,6 +80,14 @@ func GetUnifiedTransactions(userID int, filters map[string]interface{}) ([]model
 		argIdx++
 		countArgIdx++
 	}
+	if v, ok := filters["card_id"].(int); ok && v > 0 {
+		query += fmt.Sprintf(" AND t.card_id = $%d", argIdx)
+		countQuery += fmt.Sprintf(" AND card_id = $%d", countArgIdx)
+		args = append(args, v)
+		countArgs = append(countArgs, v)
+		argIdx++
+		countArgIdx++
+	}
 	if v, ok := filters["search"].(string); ok && v != "" {
 		query += fmt.Sprintf(" AND t.details ILIKE $%d", argIdx)
 		countQuery += fmt.Sprintf(" AND details ILIKE $%d", countArgIdx)

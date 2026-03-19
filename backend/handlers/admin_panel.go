@@ -226,6 +226,59 @@ func AdminGetChatMessagesHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(msgs)
 }
 
+// AdminGetTranslationsHandler - GET /api/v1/admin/translations?lang=ru
+func AdminGetTranslationsHandler(w http.ResponseWriter, r *http.Request) {
+	langFilter := r.URL.Query().Get("lang")
+	translations, err := repository.GetAllTranslations(langFilter)
+	if err != nil {
+		log.Printf("[ADMIN] Failed to fetch translations: %v", err)
+		http.Error(w, "Failed to fetch translations", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(translations)
+}
+
+// AdminUpsertTranslationHandler - PUT /api/v1/admin/translations
+func AdminUpsertTranslationHandler(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		MsgKey string `json:"msg_key"`
+		Lang   string `json:"lang"`
+		Value  string `json:"value"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.MsgKey == "" || req.Lang == "" {
+		http.Error(w, "msg_key and lang are required", http.StatusBadRequest)
+		return
+	}
+	if err := repository.UpsertTranslation(req.MsgKey, req.Lang, req.Value); err != nil {
+		log.Printf("[ADMIN] Failed to upsert translation: %v", err)
+		http.Error(w, "Failed to save translation", http.StatusInternalServerError)
+		return
+	}
+	adminID, _ := r.Context().Value(middleware.UserIDKey).(int)
+	repository.WriteAdminLog(adminID, fmt.Sprintf("Перевод обновлён: %s [%s]", req.MsgKey, req.Lang))
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+// AdminDeleteTranslationHandler - DELETE /api/v1/admin/translations/{id}
+func AdminDeleteTranslationHandler(w http.ResponseWriter, r *http.Request) {
+	idStr := mux.Vars(r)["id"]
+	id, err := strconv.Atoi(idStr)
+	if err != nil || id <= 0 {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if err := repository.DeleteTranslation(id); err != nil {
+		http.Error(w, "Failed to delete translation", http.StatusInternalServerError)
+		return
+	}
+	adminID, _ := r.Context().Value(middleware.UserIDKey).(int)
+	repository.WriteAdminLog(adminID, fmt.Sprintf("Перевод удалён: id=%d", id))
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
+}
+
 // AdminGetLogsHandler - GET /api/v1/admin/logs
 func AdminGetLogsHandler(w http.ResponseWriter, r *http.Request) {
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))

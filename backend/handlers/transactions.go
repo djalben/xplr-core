@@ -32,6 +32,11 @@ func GetUnifiedTransactionsHandler(w http.ResponseWriter, r *http.Request) {
 	if v := q.Get("source_type"); v != "" {
 		filters["source_type"] = v
 	}
+	if v := q.Get("card_id"); v != "" {
+		if cid, err := strconv.Atoi(v); err == nil && cid > 0 {
+			filters["card_id"] = cid
+		}
+	}
 	if v := q.Get("search"); v != "" {
 		filters["search"] = v
 	}

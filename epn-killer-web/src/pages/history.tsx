@@ -10,12 +10,21 @@ import {
   Clock,
   FileText,
   TableProperties,
-  Loader2
+  Loader2,
+  Calendar,
+  Filter,
 } from 'lucide-react';
 import apiClient from '../api/axios';
 import { API_BASE_URL } from '../api/axios';
 
-type Period = 'day' | 'week' | 'month';
+type Period = 'day' | 'week' | 'month' | 'custom';
+
+interface UserCard {
+  id: number;
+  last_4_digits: string;
+  card_type: string;
+  card_status: string;
+}
 
 interface HistoryTx {
   id: string;
@@ -32,6 +41,7 @@ const periodLabels: Record<Period, string> = {
   day: 'День',
   week: 'Неделя',
   month: 'Месяц',
+  custom: 'Период',
 };
 
 export const HistoryPage = () => {
@@ -41,25 +51,47 @@ export const HistoryPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
+  const [cards, setCards] = useState<UserCard[]>([]);
+  const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
 
   const fmt = (d: Date) => d.toISOString().slice(0, 10);
 
+  // Fetch user cards for filter dropdown
   useEffect(() => {
+    apiClient.get('/user/cards').then(res => {
+      setCards(res.data?.cards || res.data || []);
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (period === 'custom' && (!customStart || !customEnd)) return;
     fetchTransactions();
-  }, [period]);
+  }, [period, selectedCardId, customStart, customEnd]);
 
   const fetchTransactions = async () => {
     setIsLoading(true);
     try {
-      const now = new Date();
-      const start = new Date(now);
-      if (period === 'day') start.setDate(now.getDate() - 1);
-      else if (period === 'week') start.setDate(now.getDate() - 7);
-      else start.setDate(now.getDate() - 31);
+      let startDate: string;
+      let endDate: string;
+      if (period === 'custom') {
+        startDate = customStart;
+        endDate = customEnd;
+      } else {
+        const now = new Date();
+        const start = new Date(now);
+        if (period === 'day') start.setDate(now.getDate() - 1);
+        else if (period === 'week') start.setDate(now.getDate() - 7);
+        else start.setDate(now.getDate() - 31);
+        startDate = fmt(start);
+        endDate = fmt(now);
+      }
 
-      const res = await apiClient.get('/user/transactions', {
-        params: { start_date: fmt(start), end_date: fmt(now), limit: 200 }
-      });
+      const params: Record<string, string | number> = { start_date: startDate, end_date: endDate, limit: 200 };
+      if (selectedCardId) params.card_id = selectedCardId;
+
+      const res = await apiClient.get('/user/transactions', { params });
       const txs: any[] = res.data?.transactions ?? [];
       const sourceLabels: Record<string, string> = {
         wallet_topup: 'Пополнение кошелька',
@@ -170,7 +202,7 @@ export const HistoryPage = () => {
         </div>
 
         {/* Period filters */}
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
           {(Object.keys(periodLabels) as Period[]).map(p => (
             <button
               key={p}
@@ -184,6 +216,47 @@ export const HistoryPage = () => {
               {periodLabels[p]}
             </button>
           ))}
+        </div>
+
+        {/* Custom date range + Card filter */}
+        <div className="flex items-center gap-3 mb-4 flex-wrap">
+          {period === 'custom' && (
+            <>
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-slate-400" />
+                <input
+                  type="date"
+                  value={customStart}
+                  onChange={e => setCustomStart(e.target.value)}
+                  className="h-10 px-3 bg-white/[0.04] border border-white/[0.08] rounded-xl text-white text-sm focus:outline-none focus:border-blue-400 transition-colors"
+                />
+                <span className="text-slate-500 text-sm">—</span>
+                <input
+                  type="date"
+                  value={customEnd}
+                  onChange={e => setCustomEnd(e.target.value)}
+                  className="h-10 px-3 bg-white/[0.04] border border-white/[0.08] rounded-xl text-white text-sm focus:outline-none focus:border-blue-400 transition-colors"
+                />
+              </div>
+            </>
+          )}
+          {cards.length > 0 && (
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-slate-400" />
+              <select
+                value={selectedCardId ?? ''}
+                onChange={e => setSelectedCardId(e.target.value ? Number(e.target.value) : null)}
+                className="h-10 px-3 bg-white/[0.04] border border-white/[0.08] rounded-xl text-white text-sm focus:outline-none focus:border-blue-400 transition-colors appearance-none cursor-pointer min-w-[160px]"
+              >
+                <option value="" className="bg-slate-900">Все карты</option>
+                {cards.map(c => (
+                  <option key={c.id} value={c.id} className="bg-slate-900">
+                    •••• {c.last_4_digits} ({c.card_type})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         {/* Search */}

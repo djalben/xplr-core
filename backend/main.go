@@ -250,6 +250,9 @@ func main() {
 	adminRouter.HandleFunc("/users/{id}/emergency-freeze", handlers.AdminEmergencyFreezeHandler).Methods("POST")
 	adminRouter.HandleFunc("/chats", handlers.AdminGetChatsHandler).Methods("GET")
 	adminRouter.HandleFunc("/chats/{id}/messages", handlers.AdminGetChatMessagesHandler).Methods("GET")
+	adminRouter.HandleFunc("/translations", handlers.AdminGetTranslationsHandler).Methods("GET")
+	adminRouter.HandleFunc("/translations", handlers.AdminUpsertTranslationHandler).Methods("PUT")
+	adminRouter.HandleFunc("/translations/{id}", handlers.AdminDeleteTranslationHandler).Methods("DELETE")
 	adminRouter.HandleFunc("/logs", handlers.AdminGetLogsHandler).Methods("GET")
 	// --------------------------------------------------------
 
