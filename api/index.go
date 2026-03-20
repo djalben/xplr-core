@@ -297,6 +297,9 @@ func buildRouter() *mux.Router {
 	// Daily report (secret-key protected, for cron/internal use)
 	r.HandleFunc("/api/v1/admin/send-daily-report", handlers.SendDailyReportHandler).Methods("GET")
 
+	// Notification diagnostic (secret-key protected)
+	r.HandleFunc("/api/v1/diag/test-notify", handlers.DiagTestNotifyHandler).Methods("GET")
+
 	// Public card types endpoint
 	r.HandleFunc("/api/v1/cards/types", handlers.GetCardTypesHandler).Methods("GET")
 

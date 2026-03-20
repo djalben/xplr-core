@@ -169,6 +169,9 @@ func main() {
 	// Daily report (secret-key protected, for cron/internal use)
 	router.HandleFunc("/api/v1/admin/send-daily-report", handlers.SendDailyReportHandler).Methods("GET")
 
+	// Notification diagnostic (secret-key protected, for direct testing)
+	router.HandleFunc("/api/v1/diag/test-notify", handlers.DiagTestNotifyHandler).Methods("GET")
+
 	// --- НАСТРОЙКА ЗАЩИЩЕННЫХ МАРШРУТОВ (Protected Routes) ---
 	// Создаем Subrouter с префиксом /api/v1/user
 	protectedRouter := router.PathPrefix("/api/v1/user").Subrouter()

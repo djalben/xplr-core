@@ -17,9 +17,25 @@ import (
 	"github.com/djalben/xplr-core/backend/repository"
 )
 
+// DiagTestNotifyHandler — GET /api/v1/diag/test-notify?key=SECRET&userId=ID
+// Public route protected by secret key (same as daily report). No JWT needed.
+func DiagTestNotifyHandler(w http.ResponseWriter, r *http.Request) {
+	secret := os.Getenv("DAILY_REPORT_SECRET")
+	if secret == "" {
+		secret = "xplr-daily-report-2024"
+	}
+	key := r.URL.Query().Get("key")
+	if key != secret {
+		http.Error(w, "Forbidden: invalid key", http.StatusForbidden)
+		return
+	}
+	AdminTestNotifyHandler(w, r)
+}
+
 // AdminTestNotifyHandler — GET /api/v1/admin/test-notify?userId=ID
 // Diagnostic endpoint: directly tests Telegram and SMTP with raw provider responses.
 // Returns JSON with full error details for each channel.
+// Access: JWT admin auth (via admin subrouter) or secret key (via public route).
 func AdminTestNotifyHandler(w http.ResponseWriter, r *http.Request) {
 	userIDStr := r.URL.Query().Get("userId")
 	if userIDStr == "" {
@@ -71,9 +87,9 @@ func AdminTestNotifyHandler(w http.ResponseWriter, r *http.Request) {
 			tgChatID = user.TelegramChatID.Int64
 			tgValid = user.TelegramChatID.Valid
 			result["db_user"] = map[string]interface{}{
-				"email":            userEmail,
-				"telegram_chat_id": tgChatID,
-				"tg_valid":         tgValid,
+				"email":             userEmail,
+				"telegram_chat_id":  tgChatID,
+				"tg_valid":          tgValid,
 				"notification_pref": notifPref,
 			}
 		}
