@@ -251,6 +251,23 @@ func Unlink2FAHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "message": "2FA отключена"})
 }
 
+// ── GET /api/v1/user/settings/telegram/check-status ──
+// Lightweight polling endpoint: returns whether the user has telegram_chat_id linked.
+func CheckTelegramStatusHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	chatID := repository.GetUserTelegramChatID(userID)
+	linked := chatID != 0
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"linked":  linked,
+		"chat_id": chatID,
+	})
+}
+
 // ── POST /api/v1/user/settings/2fa/setup ──
 func Setup2FAHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(int)

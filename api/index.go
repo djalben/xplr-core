@@ -358,6 +358,7 @@ func buildRouter() *mux.Router {
 	protected.HandleFunc("/settings/2fa/disable", handlers.Disable2FAHandler).Methods("POST")
 	protected.HandleFunc("/settings/2fa/unlink", handlers.Unlink2FAHandler).Methods("POST")
 	protected.HandleFunc("/settings/telegram/unlink", handlers.UnlinkTelegramHandler).Methods("POST")
+	protected.HandleFunc("/settings/telegram/check-status", handlers.CheckTelegramStatusHandler).Methods("GET")
 	protected.HandleFunc("/settings/verify-email-request", handlers.RequestEmailVerifyHandler).Methods("POST")
 	protected.HandleFunc("/settings/verify-email-confirm", handlers.ConfirmEmailVerifyHandler).Methods("POST")
 	protected.HandleFunc("/settings/kyc", handlers.SubmitKYCHandler).Methods("POST")

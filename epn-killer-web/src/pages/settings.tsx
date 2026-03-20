@@ -1,14 +1,16 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LANG_KEY } from '../i18n';
 import { DashboardLayout } from '../components/dashboard-layout';
 import { BackButton } from '../components/back-button';
 import apiClient from '../api/axios';
 import { useAuth } from '../store/auth-context';
+import { QRCodeSVG } from 'qrcode.react';
 import { 
   User, Lock, Bell, Shield, Eye, EyeOff, Save, Check, Smartphone, Globe, Mail,
   FileText, Upload, CheckCircle, AlertCircle, MessageCircle, LogOut, Loader2,
-  MonitorSmartphone, ShieldCheck, ShieldAlert, ExternalLink, Clock, X, Pencil
+  MonitorSmartphone, ShieldCheck, ShieldAlert, ExternalLink, Clock, X, Pencil,
+  Copy, PartyPopper
 } from 'lucide-react';
 
 type SettingsTab = 'profile' | 'security' | 'notifications' | 'kyc' | 'language';
@@ -56,75 +58,181 @@ const Toast = ({ msg, type }: { msg: string; type: 'ok' | 'err' }) => (
 );
 
 // ══════════════════════════════════════
-// TELEGRAM CARD (used inside ProfileTab)
+// TELEGRAM LINK MODAL
 // ══════════════════════════════════════
-const TelegramCard = ({ profile, reload, showToast }: { profile: ProfileData | null; reload: () => void; showToast: (m: string, t: 'ok' | 'err') => void }) => {
-  const { t } = useTranslation();
-  const [linking, setLinking] = useState(false);
+const TelegramLinkModal = ({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) => {
+  const [link, setLink] = useState('');
+  const [code, setCode] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const handleLink = async () => {
-    setLinking(true);
-    try {
-      const res = await apiClient.get('/user/settings/telegram-link');
-      const link = res.data?.link;
-      if (link) {
-        window.open(link, '_blank', 'noopener,noreferrer');
-        // Poll for status update after user completes linking in Telegram
-        let attempts = 0;
-        const poll = setInterval(async () => {
-          attempts++;
-          if (attempts > 20) { clearInterval(poll); return; }
-          try {
-            const me = await apiClient.get('/user/settings/profile');
-            if (me.data?.telegram_linked) {
-              clearInterval(poll);
-              showToast(t('settings.telegram.linkedSuccess'), 'ok');
-              reload();
-            }
-          } catch { /* ignore */ }
-        }, 3000);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiClient.get('/user/settings/telegram-link');
+        if (!cancelled) {
+          setLink(res.data?.link || '');
+          setCode(res.data?.code || '');
+          setLoading(false);
+        }
+      } catch {
+        if (!cancelled) setLoading(false);
       }
-    } catch {
-      showToast(t('settings.telegram.linkError'), 'err');
-    } finally {
-      setLinking(false);
-    }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Polling for link status
+  useEffect(() => {
+    if (!code || success) return;
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await apiClient.get('/user/settings/telegram/check-status');
+        if (res.data?.linked) {
+          if (pollRef.current) clearInterval(pollRef.current);
+          setSuccess(true);
+          setTimeout(() => { onSuccess(); }, 2000);
+        }
+      } catch { /* ignore */ }
+    }, 2500);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [code, success, onSuccess]);
+
+  const copyCode = () => {
+    navigator.clipboard.writeText(code).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   };
 
   return (
-    <div className="glass-card p-4 sm:p-6">
-      <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><MessageCircle className="w-5 h-5 text-blue-400" />{t('settings.telegram.title')}</h3>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        {profile?.telegram_linked ? (
-          <>
-            <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-400" /><p className="text-white font-medium">{t('settings.telegram.connected')}</p></div>
-            <div className="flex items-center gap-2">
-              <span className="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 text-xs font-medium rounded-lg">{t('settings.telegram.connected')}</span>
-              <button
-                onClick={async () => {
-                  try {
-                    await apiClient.post('/user/settings/telegram/unlink');
-                    showToast('Telegram отвязан', 'ok');
-                    reload();
-                  } catch { showToast('Ошибка отвязки Telegram', 'err'); }
-                }}
-                className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-medium rounded-lg transition-colors"
-              >
-                Отвязать
-              </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="relative w-full max-w-md bg-slate-900/95 border border-white/10 rounded-2xl shadow-2xl p-6 space-y-5" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <MessageCircle className="w-5 h-5 text-blue-400" />
+            Привязка Telegram
+          </h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors"><X className="w-5 h-5" /></button>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-blue-400" /></div>
+        ) : success ? (
+          <div className="flex flex-col items-center gap-4 py-8">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center">
+              <CheckCircle className="w-10 h-10 text-emerald-400" />
             </div>
-          </>
+            <p className="text-xl font-bold text-white">Telegram привязан!</p>
+            <p className="text-sm text-slate-400">Уведомления теперь приходят в оба канала</p>
+          </div>
         ) : (
           <>
-            <p className="text-sm text-slate-400">{t('settings.telegram.linkDesc')}</p>
-            <button onClick={handleLink} disabled={linking} className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors whitespace-nowrap w-full sm:w-auto">
-              {linking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
-              {t('settings.telegram.link')}
-            </button>
+            {/* QR Code */}
+            <div className="flex flex-col items-center gap-3">
+              <div className="bg-white p-3 rounded-xl">
+                <QRCodeSVG value={link} size={180} level="M" />
+              </div>
+              <p className="text-xs text-slate-500">Отсканируйте QR-код камерой телефона</p>
+            </div>
+
+            {/* Open Telegram button */}
+            <a
+              href={link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-xl transition-colors text-sm"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Открыть Telegram
+            </a>
+
+            {/* Manual code */}
+            <div className="bg-white/[0.03] border border-white/5 rounded-xl p-4 space-y-2">
+              <p className="text-xs text-slate-400">Или отправьте боту <span className="text-blue-400 font-medium">@xplr_notify_bot</span> команду:</p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 bg-slate-800 text-blue-300 px-3 py-2 rounded-lg text-sm font-mono truncate">/start {code}</code>
+                <button
+                  onClick={copyCode}
+                  className="shrink-0 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors"
+                  title="Скопировать код"
+                >
+                  {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <p className="text-xs text-slate-500 text-center">
+              Если Telegram не установлен — <a href="https://web.telegram.org" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">используйте Telegram Web</a>
+            </p>
+
+            {/* Polling indicator */}
+            <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Ожидание привязки...
+            </div>
           </>
         )}
       </div>
     </div>
+  );
+};
+
+// ══════════════════════════════════════
+// TELEGRAM CARD (used inside ProfileTab)
+// ══════════════════════════════════════
+const TelegramCard = ({ profile, reload, showToast }: { profile: ProfileData | null; reload: () => void; showToast: (m: string, t: 'ok' | 'err') => void }) => {
+  const { t } = useTranslation();
+  const [showModal, setShowModal] = useState(false);
+
+  const handleLinkSuccess = () => {
+    setShowModal(false);
+    showToast('✅ Telegram успешно привязан!', 'ok');
+    reload();
+  };
+
+  return (
+    <>
+      <div className="glass-card p-4 sm:p-6">
+        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><MessageCircle className="w-5 h-5 text-blue-400" />{t('settings.telegram.title')}</h3>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          {profile?.telegram_linked ? (
+            <>
+              <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-400" /><p className="text-white font-medium">{t('settings.telegram.connected')}</p></div>
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 text-xs font-medium rounded-lg">{t('settings.telegram.connected')}</span>
+                <button
+                  onClick={async () => {
+                    try {
+                      await apiClient.post('/user/settings/telegram/unlink');
+                      showToast('Telegram отвязан', 'ok');
+                      reload();
+                    } catch { showToast('Ошибка отвязки Telegram', 'err'); }
+                  }}
+                  className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-medium rounded-lg transition-colors"
+                >
+                  Отвязать
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-slate-400">{t('settings.telegram.linkDesc')}</p>
+              <button onClick={() => setShowModal(true)} className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-xl transition-colors whitespace-nowrap w-full sm:w-auto">
+                <MessageCircle className="w-3.5 h-3.5" />
+                {t('settings.telegram.link')}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+      {showModal && <TelegramLinkModal onClose={() => setShowModal(false)} onSuccess={handleLinkSuccess} />}
+    </>
   );
 };
 
