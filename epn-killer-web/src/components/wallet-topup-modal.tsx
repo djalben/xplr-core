@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { useRates } from '../store/rates-context';
 import { ModalPortal } from './modal-portal';
@@ -86,6 +86,13 @@ export const WalletTopUpModal = ({ onClose, onSuccess }: WalletTopUpModalProps) 
     }
   };
 
+  // Recalculate foreign amount when currency switches (rate changes)
+  useEffect(() => {
+    if (rubInput && !isNaN(parseFloat(rubInput))) {
+      setForeignAmount((parseFloat(rubInput) / currentRate).toFixed(2));
+    }
+  }, [selectedCurrency]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleRubInput = (val: string) => {
     setRubInput(val);
     setActiveRubPreset(null);
@@ -128,7 +135,7 @@ export const WalletTopUpModal = ({ onClose, onSuccess }: WalletTopUpModalProps) 
             {/* Currency toggle */}
             <div className="flex gap-2">
               <button
-                onClick={() => { setSelectedCurrency('USD'); setActiveRubPreset(null); setForeignAmount(''); }}
+                onClick={() => { setSelectedCurrency('USD'); setActiveRubPreset(null); }}
                 className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all text-center ${
                   selectedCurrency === 'USD'
                     ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40'
@@ -136,7 +143,7 @@ export const WalletTopUpModal = ({ onClose, onSuccess }: WalletTopUpModalProps) 
                 }`}
               >$ USD</button>
               <button
-                onClick={() => { setSelectedCurrency('EUR'); setActiveRubPreset(null); setForeignAmount(''); }}
+                onClick={() => { setSelectedCurrency('EUR'); setActiveRubPreset(null); }}
                 className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all text-center ${
                   selectedCurrency === 'EUR'
                     ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40'

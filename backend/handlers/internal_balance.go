@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -60,12 +61,15 @@ func TopUpWalletHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Notify user about successful topup
-	go service.NotifyUser(userID, "Кошелёк пополнен",
-		fmt.Sprintf("💰 <b>Кошелёк пополнен</b>\n\n"+
-			"Сумма: <b>%s ₽</b>\n"+
-			"Баланс: <b>$%s</b>\n\n"+
-			"<a href=\"https://xplr.pro/wallet\">Открыть кошелёк</a>",
-			req.Amount.StringFixed(0), ib.MasterBalance.StringFixed(2)))
+	go func() {
+		service.NotifyUser(userID, "Кошелёк пополнен",
+			fmt.Sprintf("💰 <b>Кошелёк пополнен</b>\n\n"+
+				"Сумма: <b>%s ₽</b>\n"+
+				"Баланс: <b>$%s</b>\n\n"+
+				"<a href=\"https://xplr.pro/wallet\">Открыть кошелёк</a>",
+				req.Amount.StringFixed(0), ib.MasterBalance.StringFixed(2)))
+		log.Printf("[NOTIFY] Message sent to UserID: %d via NotifyUser (wallet topup %s RUB)", userID, req.Amount.StringFixed(0))
+	}()
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(ib)

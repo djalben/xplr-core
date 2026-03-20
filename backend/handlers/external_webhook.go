@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/djalben/xplr-core/backend/repository"
+	"github.com/djalben/xplr-core/backend/service"
 	"github.com/shopspring/decimal"
 )
 
@@ -120,6 +121,17 @@ func ExternalTopUpWebhookHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("✅ [EXT-WEBHOOK] Credited %s %s to wallet (user %d, tx=%s)",
 		amount.String(), payload.Currency, payload.UserID, payload.ExternalTxID)
+
+	// Notify user about successful top-up
+	go func() {
+		service.NotifyUser(payload.UserID, "Пополнение баланса",
+			fmt.Sprintf("💰 <b>Кошелёк пополнен</b>\n\n"+
+				"Сумма: <b>%s %s</b>\n"+
+				"Источник: <b>%s</b>\n\n"+
+				"<a href=\"https://xplr.pro/wallet\">Открыть кошелёк</a>",
+				amount.String(), payload.Currency, providerName))
+		log.Printf("[NOTIFY] Message sent to UserID: %d via NotifyUser (external topup)", payload.UserID)
+	}()
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

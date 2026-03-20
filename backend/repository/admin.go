@@ -647,14 +647,33 @@ func GetAdminDashboardStats() (*AdminDashboardStats, error) {
 		return nil, fmt.Errorf("database connection not initialized")
 	}
 	s := &AdminDashboardStats{}
+
+	// Total users
 	GlobalDB.QueryRow("SELECT COUNT(*) FROM users").Scan(&s.TotalUsers)
-	var bal decimal.Decimal
-	GlobalDB.QueryRow("SELECT COALESCE(SUM(balance_rub), 0) FROM users").Scan(&bal)
-	s.TotalBalance = bal.String()
-	GlobalDB.QueryRow("SELECT COUNT(*) FROM cards WHERE card_status='ACTIVE'").Scan(&s.ActiveCards)
+
+	// Wallet balance — real sum from internal_balances (USD)
+	var walletBal decimal.Decimal
+	GlobalDB.QueryRow("SELECT COALESCE(SUM(master_balance), 0) FROM internal_balances").Scan(&walletBal)
+	s.TotalBalance = walletBal.StringFixed(2)
+
+	// Active cards
+	GlobalDB.QueryRow("SELECT COUNT(*) FROM cards WHERE card_status = 'ACTIVE'").Scan(&s.ActiveCards)
+
+	// Total cards
 	GlobalDB.QueryRow("SELECT COUNT(*) FROM cards").Scan(&s.TotalCards)
-	GlobalDB.QueryRow("SELECT COUNT(*) FROM support_tickets WHERE status IN ('open','in_progress')").Scan(&s.OpenTickets)
+
+	// Open tickets (support_tickets + chat_conversations)
+	var ticketCount, chatCount int
+	GlobalDB.QueryRow("SELECT COUNT(*) FROM support_tickets WHERE status IN ('open','in_progress')").Scan(&ticketCount)
+	GlobalDB.QueryRow("SELECT COUNT(*) FROM chat_conversations WHERE status = 'open'").Scan(&chatCount)
+	s.OpenTickets = ticketCount + chatCount
+
+	// Today signups
 	GlobalDB.QueryRow("SELECT COUNT(*) FROM users WHERE created_at >= CURRENT_DATE").Scan(&s.TodaySignups)
+
+	log.Printf("[ADMIN-DASHBOARD] Stats: users=%d, balance=$%s, cards=%d/%d, tickets=%d, signups=%d",
+		s.TotalUsers, s.TotalBalance, s.ActiveCards, s.TotalCards, s.OpenTickets, s.TodaySignups)
+
 	return s, nil
 }
 
