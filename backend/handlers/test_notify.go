@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/djalben/xplr-core/backend/repository"
+	"github.com/djalben/xplr-core/backend/service"
 )
 
 // DiagTestNotifyHandler — GET /api/v1/diag/test-notify?key=SECRET&userId=ID
@@ -130,6 +131,18 @@ func AdminTestNotifyHandler(w http.ResponseWriter, r *http.Request) {
 	// ── 4. TEST SMTP — direct connection, capture full response ──
 	smtpResult := testSMTPDirect(smtpHost, smtpPort, smtpUser, smtpPass, smtpFrom, userEmail)
 	result["smtp_test"] = smtpResult
+
+	// ── 5. FULL PIPELINE TEST: call actual NotifyUser if requested ──
+	if r.URL.Query().Get("sendTest") == "1" && userID > 0 {
+		log.Printf("[TEST-NOTIFY] Running full NotifyUser pipeline for user %d...", userID)
+		service.NotifyUser(userID, "Тест уведомлений XPLR",
+			fmt.Sprintf("✅ <b>Тест системы уведомлений</b>\n\n"+
+				"Это тестовое сообщение от XPLR.\n"+
+				"Время: <b>%s</b>\n\n"+
+				"Если вы видите это сообщение — уведомления работают корректно.",
+				time.Now().UTC().Format(time.RFC3339)))
+		result["notify_user_test"] = "DISPATCHED — check logs for [NOTIFY-START]/[NOTIFY-SUCCESS]/[NOTIFY-FAIL]"
+	}
 
 	log.Printf("[TEST-NOTIFY] Full diagnostic result for userId=%d: %+v", userID, result)
 
