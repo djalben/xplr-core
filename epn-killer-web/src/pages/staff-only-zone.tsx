@@ -23,6 +23,12 @@ import {
   Eye,
   Ban,
   ShieldCheck,
+  Send,
+  Mail,
+  FileSearch,
+  X,
+  Wallet,
+  Filter,
 } from 'lucide-react';
 
 type Tab = 'dashboard' | 'users' | 'finances' | 'commissions' | 'tickets' | 'translations' | 'logs';
@@ -46,7 +52,51 @@ interface AdminUser {
   is_verified: boolean;
   is_blocked: boolean;
   card_count: number;
+  wallet_balance: string;
+  is_telegram_linked: boolean;
+  notification_pref: string;
   created_at: string;
+}
+
+interface UserFullDetails {
+  id: number;
+  email: string;
+  status: string;
+  wallet_balance: string;
+  balance_rub: string;
+  is_admin: boolean;
+  is_verified: boolean;
+  is_blocked: boolean;
+  telegram_chat_id: number;
+  is_telegram_linked: boolean;
+  notification_pref: string;
+  created_at: string;
+  cards: CardSummary[];
+  transactions: TxSummary[];
+}
+
+interface CardSummary {
+  id: number;
+  last_4: string;
+  card_status: string;
+  card_balance: string;
+  card_type: string;
+  category: string;
+  nickname: string;
+  created_at: string;
+}
+
+interface TxSummary {
+  id: number;
+  amount: string;
+  fee: string;
+  transaction_type: string;
+  status: string;
+  details: string;
+  source_type: string;
+  currency: string;
+  card_last_4: string;
+  executed_at: string;
 }
 
 interface CommissionRow {
@@ -169,6 +219,9 @@ export const StaffOnlyZone = () => {
   const [editingTransValue, setEditingTransValue] = useState('');
   const [saving, setSaving] = useState(false);
   const [freezeConfirm, setFreezeConfirm] = useState(false);
+  const [inspectUser, setInspectUser] = useState<UserFullDetails | null>(null);
+  const [inspectLoading, setInspectLoading] = useState(false);
+  const [txFilter, setTxFilter] = useState('');
   const [blockConfirmUser, setBlockConfirmUser] = useState<AdminUser | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
 
@@ -325,6 +378,20 @@ export const StaffOnlyZone = () => {
     if (tab === 'translations') loadTranslations();
     if (tab === 'logs') loadLogs();
   }, [tab, loadAllUsers, loadCommissions, loadTickets, loadChats, loadTranslations, loadLogs]);
+
+  // ── Inspect User (Financial Passport) ──
+  const inspectUserDetails = async (userId: number) => {
+    setInspectLoading(true);
+    setTxFilter('');
+    try {
+      const res = await apiClient.get(`/admin/users/${userId}/full-details`);
+      setInspectUser(res.data);
+    } catch {
+      showToast('Ошибка загрузки данных пользователя', 'err');
+    } finally {
+      setInspectLoading(false);
+    }
+  };
 
   // ── Emergency Freeze ──
   const handleEmergencyFreeze = async () => {
@@ -489,10 +556,10 @@ export const StaffOnlyZone = () => {
                     <tr className="border-b border-white/10">
                       <th className="text-left px-4 py-3 text-slate-400 font-medium">ID</th>
                       <th className="text-left px-4 py-3 text-slate-400 font-medium">Email</th>
-                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Баланс</th>
+                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Кошелёк</th>
                       <th className="text-left px-4 py-3 text-slate-400 font-medium">Статус</th>
-                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Роль</th>
                       <th className="text-left px-4 py-3 text-slate-400 font-medium">Карты</th>
+                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Связь</th>
                       <th className="text-left px-4 py-3 text-slate-400 font-medium">Дата</th>
                       <th className="text-left px-4 py-3 text-slate-400 font-medium"></th>
                     </tr>
@@ -502,18 +569,33 @@ export const StaffOnlyZone = () => {
                       <tr key={u.id} className={`border-b border-white/5 transition-colors ${u.is_blocked ? 'bg-red-500/[0.06] hover:bg-red-500/[0.1]' : 'hover:bg-white/5'}`}>
                         <td className="px-4 py-3 text-slate-300 font-mono text-xs">{u.id}</td>
                         <td className="px-4 py-3 text-white">{u.email}</td>
-                        <td className="px-4 py-3 text-emerald-400 font-medium">${parseFloat(u.balance_rub).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-emerald-400 font-medium">${u.wallet_balance || '0.00'}</td>
                         <td className="px-4 py-3">
                           {u.is_blocked
                             ? <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-500/20 text-red-400">Blocked</span>
                             : <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/20 text-emerald-400">Active</span>
                           }
                         </td>
-                        <td className="px-4 py-3"><StatusBadge status={u.role} /></td>
-                        <td className="px-4 py-3 text-slate-300">{u.card_count}</td>
+                        <td className="px-4 py-3 text-slate-300">{u.card_count} шт.</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1.5 relative group">
+                            <Send className={`w-3.5 h-3.5 ${u.is_telegram_linked ? 'text-blue-400' : 'text-slate-600'}`} />
+                            <Mail className={`w-3.5 h-3.5 ${u.notification_pref === 'email' || u.notification_pref === 'both' ? 'text-amber-400' : 'text-slate-600'}`} />
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-slate-800 border border-white/10 text-[10px] text-slate-300 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                              Канал: {u.notification_pref === 'both' ? 'TG + Email' : u.notification_pref === 'telegram' ? 'Telegram' : 'Email'}
+                            </div>
+                          </div>
+                        </td>
                         <td className="px-4 py-3 text-slate-500 text-xs">{u.created_at?.slice(0, 10)}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => inspectUserDetails(u.id)}
+                              title="Инспектировать"
+                              className="w-7 h-7 flex items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 border border-indigo-500/30 transition-all"
+                            >
+                              <FileSearch className="w-3.5 h-3.5" />
+                            </button>
                             <button
                               onClick={() => setBlockConfirmUser(u)}
                               title={u.is_blocked ? 'Разблокировать' : 'Заблокировать'}
@@ -694,6 +776,163 @@ export const StaffOnlyZone = () => {
                       </button>
                     )}
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* ══ Financial Passport Modal ══ */}
+            {(inspectUser || inspectLoading) && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => { setInspectUser(null); setInspectLoading(false); }}>
+                <div className="bg-[#0c0c18]/95 border border-white/10 rounded-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+                  {/* Header */}
+                  <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-xl bg-indigo-500/20">
+                        <FileSearch className="w-5 h-5 text-indigo-400" />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-bold text-white">Финансовый паспорт</h3>
+                        {inspectUser && <p className="text-xs text-slate-400">{inspectUser.email} · #{inspectUser.id}</p>}
+                      </div>
+                    </div>
+                    <button onClick={() => { setInspectUser(null); setInspectLoading(false); }} className="text-slate-400 hover:text-white transition-colors"><X className="w-5 h-5" /></button>
+                  </div>
+
+                  {inspectLoading ? (
+                    <div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 text-indigo-400 animate-spin" /></div>
+                  ) : inspectUser ? (
+                    <div className="overflow-y-auto flex-1 px-6 py-4 space-y-5">
+                      {/* Section 1: Communication Summary */}
+                      <div className="space-y-2">
+                        <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2"><Send className="w-3.5 h-3.5" /> Сводка связи</h4>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-3">
+                            <p className="text-[10px] text-slate-500 mb-1">Telegram</p>
+                            {inspectUser.is_telegram_linked ? (
+                              <p className="text-sm text-blue-400 font-medium">ID: {inspectUser.telegram_chat_id}</p>
+                            ) : (
+                              <p className="text-sm text-slate-600">Не привязан</p>
+                            )}
+                          </div>
+                          <div className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-3">
+                            <p className="text-[10px] text-slate-500 mb-1">Канал уведомлений</p>
+                            <p className="text-sm text-white font-medium">
+                              {inspectUser.notification_pref === 'both' ? '📩 TG + Email' : inspectUser.notification_pref === 'telegram' ? '📩 Telegram' : '📧 Email'}
+                            </p>
+                          </div>
+                          <div className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-3">
+                            <p className="text-[10px] text-slate-500 mb-1">Кошелёк (USD)</p>
+                            <p className="text-sm text-emerald-400 font-bold">${inspectUser.wallet_balance}</p>
+                          </div>
+                          <div className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-3">
+                            <p className="text-[10px] text-slate-500 mb-1">Статус</p>
+                            <p className={`text-sm font-medium ${inspectUser.is_blocked ? 'text-red-400' : 'text-emerald-400'}`}>
+                              {inspectUser.is_blocked ? 'Заблокирован' : inspectUser.status}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Section 2: Card Balances */}
+                      <div className="space-y-2">
+                        <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2"><CreditCard className="w-3.5 h-3.5" /> Балансы карт ({inspectUser.cards.length})</h4>
+                        {inspectUser.cards.length === 0 ? (
+                          <p className="text-sm text-slate-600 py-2">Нет карт</p>
+                        ) : (
+                          <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl overflow-hidden">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="border-b border-white/10">
+                                  <th className="text-left px-3 py-2 text-slate-500">Карта</th>
+                                  <th className="text-left px-3 py-2 text-slate-500">Баланс</th>
+                                  <th className="text-left px-3 py-2 text-slate-500">Статус</th>
+                                  <th className="text-left px-3 py-2 text-slate-500">Тип</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {inspectUser.cards.map(c => (
+                                  <tr key={c.id} className="border-b border-white/5">
+                                    <td className="px-3 py-2 text-white font-mono">•••• {c.last_4}</td>
+                                    <td className="px-3 py-2 text-emerald-400 font-medium">${c.card_balance}</td>
+                                    <td className="px-3 py-2">
+                                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                        c.card_status === 'ACTIVE' ? 'bg-emerald-500/20 text-emerald-400' :
+                                        c.card_status === 'FROZEN' ? 'bg-blue-500/20 text-blue-400' :
+                                        c.card_status === 'BLOCKED' ? 'bg-red-500/20 text-red-400' :
+                                        'bg-slate-500/20 text-slate-400'
+                                      }`}>{c.card_status}</span>
+                                    </td>
+                                    <td className="px-3 py-2 text-slate-400">{c.card_type} · {c.category}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Section 3: Transaction History */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2"><Activity className="w-3.5 h-3.5" /> История операций ({inspectUser.transactions.length})</h4>
+                          <div className="flex items-center gap-1">
+                            <Filter className="w-3 h-3 text-slate-500" />
+                            <select
+                              value={txFilter}
+                              onChange={e => setTxFilter(e.target.value)}
+                              className="bg-white/[0.06] border border-white/10 rounded-lg px-2 py-1 text-[10px] text-slate-300 outline-none"
+                            >
+                              <option value="">Все</option>
+                              <option value="FUND">Пополнение</option>
+                              <option value="CAPTURE">Списание</option>
+                              <option value="FEE">Комиссия</option>
+                              <option value="CARD_REFUND">Возврат</option>
+                            </select>
+                          </div>
+                        </div>
+                        {(() => {
+                          const filtered = txFilter
+                            ? inspectUser.transactions.filter(t => t.transaction_type === txFilter)
+                            : inspectUser.transactions;
+                          return filtered.length === 0 ? (
+                            <p className="text-sm text-slate-600 py-2">Нет операций{txFilter ? ' по фильтру' : ''}</p>
+                          ) : (
+                            <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl overflow-hidden max-h-[300px] overflow-y-auto">
+                              <table className="w-full text-xs">
+                                <thead className="sticky top-0 bg-[#0c0c18]">
+                                  <tr className="border-b border-white/10">
+                                    <th className="text-left px-3 py-2 text-slate-500">Дата</th>
+                                    <th className="text-left px-3 py-2 text-slate-500">Тип</th>
+                                    <th className="text-left px-3 py-2 text-slate-500">Сумма</th>
+                                    <th className="text-left px-3 py-2 text-slate-500">Карта</th>
+                                    <th className="text-left px-3 py-2 text-slate-500">Детали</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {filtered.slice(0, 100).map(tx => (
+                                    <tr key={tx.id} className="border-b border-white/5">
+                                      <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{tx.executed_at?.slice(0, 10)}</td>
+                                      <td className="px-3 py-2">
+                                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                          tx.transaction_type === 'FUND' ? 'bg-emerald-500/20 text-emerald-400' :
+                                          tx.transaction_type === 'CAPTURE' ? 'bg-orange-500/20 text-orange-400' :
+                                          tx.transaction_type === 'FEE' ? 'bg-purple-500/20 text-purple-400' :
+                                          'bg-slate-500/20 text-slate-400'
+                                        }`}>{tx.transaction_type}</span>
+                                      </td>
+                                      <td className="px-3 py-2 text-white font-medium">{tx.currency === 'USD' ? '$' : tx.currency}{tx.amount}</td>
+                                      <td className="px-3 py-2 text-slate-400 font-mono">{tx.card_last_4 ? `•••• ${tx.card_last_4}` : '—'}</td>
+                                      <td className="px-3 py-2 text-slate-500 max-w-[150px] truncate" title={tx.details}>{tx.details || '—'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             )}

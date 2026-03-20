@@ -250,6 +250,7 @@ func main() {
 	adminRouter.HandleFunc("/commissions/{id}", handlers.AdminUpdateCommissionConfigHandler).Methods("PATCH")
 	adminRouter.HandleFunc("/tickets", handlers.AdminGetSupportTicketsHandler).Methods("GET")
 	adminRouter.HandleFunc("/tickets/{id}", handlers.AdminUpdateTicketStatusHandler).Methods("PATCH")
+	adminRouter.HandleFunc("/users/{id}/full-details", handlers.AdminUserFullDetailsHandler).Methods("GET")
 	adminRouter.HandleFunc("/users/{id}/emergency-freeze", handlers.AdminEmergencyFreezeHandler).Methods("POST")
 	adminRouter.HandleFunc("/users/{id}/toggle-block", handlers.AdminToggleBlockHandler).Methods("POST")
 	adminRouter.HandleFunc("/chats", handlers.AdminGetChatsHandler).Methods("GET")

@@ -21,16 +21,19 @@ type AdminStats struct {
 
 // AdminUserRow is a simplified user for admin listing.
 type AdminUserRow struct {
-	ID         int    `json:"id"`
-	Email      string `json:"email"`
-	BalanceRub string `json:"balance_rub"`
-	Status     string `json:"status"`
-	IsAdmin    bool   `json:"is_admin"`
-	Role       string `json:"role"`
-	IsVerified bool   `json:"is_verified"`
-	IsBlocked  bool   `json:"is_blocked"`
-	CardCount  int    `json:"card_count"`
-	CreatedAt  string `json:"created_at"`
+	ID               int    `json:"id"`
+	Email            string `json:"email"`
+	BalanceRub       string `json:"balance_rub"`
+	Status           string `json:"status"`
+	IsAdmin          bool   `json:"is_admin"`
+	Role             string `json:"role"`
+	IsVerified       bool   `json:"is_verified"`
+	IsBlocked        bool   `json:"is_blocked"`
+	CardCount        int    `json:"card_count"`
+	WalletBalance    string `json:"wallet_balance"`
+	IsTelegramLinked bool   `json:"is_telegram_linked"`
+	NotificationPref string `json:"notification_pref"`
+	CreatedAt        string `json:"created_at"`
 }
 
 // GetAdminStats returns aggregate platform stats.
@@ -82,6 +85,9 @@ func GetAllUsersForAdmin() ([]AdminUserRow, error) {
 		SELECT u.id, u.email, COALESCE(u.balance_rub, 0), u.status, COALESCE(u.is_admin, FALSE),
 		       COALESCE(u.role, 'user'), COALESCE(u.is_verified, FALSE),
 		       (SELECT COUNT(*) FROM cards c WHERE c.user_id = u.id) as card_count,
+		       COALESCE((SELECT ib.master_balance FROM internal_balances ib WHERE ib.user_id = u.id), 0) as wallet_balance,
+		       (COALESCE(u.telegram_chat_id, 0) != 0) as is_telegram_linked,
+		       COALESCE(u.notification_pref, 'email') as notification_pref,
 		       u.created_at
 		FROM users u
 		ORDER BY u.id ASC
@@ -97,12 +103,14 @@ func GetAllUsersForAdmin() ([]AdminUserRow, error) {
 	for rows.Next() {
 		var u AdminUserRow
 		var bal decimal.Decimal
+		var walletBal decimal.Decimal
 		var createdAt interface{}
-		if err := rows.Scan(&u.ID, &u.Email, &bal, &u.Status, &u.IsAdmin, &u.Role, &u.IsVerified, &u.CardCount, &createdAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Email, &bal, &u.Status, &u.IsAdmin, &u.Role, &u.IsVerified, &u.CardCount, &walletBal, &u.IsTelegramLinked, &u.NotificationPref, &createdAt); err != nil {
 			log.Printf("AdminUsers: error scanning row: %v", err)
 			continue
 		}
 		u.BalanceRub = bal.String()
+		u.WalletBalance = walletBal.StringFixed(2)
 		u.CreatedAt = fmt.Sprintf("%v", createdAt)
 		users = append(users, u)
 	}
@@ -155,6 +163,137 @@ func AdminAdjustBalance(targetUserID int, amount decimal.Decimal) (string, error
 	GlobalDB.QueryRow("SELECT COALESCE(balance_rub, 0) FROM users WHERE id = $1", targetUserID).Scan(&newBal)
 	log.Printf("✅ Admin adjusted user %d balance by %s. New balance: %s", targetUserID, amount.String(), newBal.String())
 	return newBal.String(), nil
+}
+
+// UserFullDetails contains comprehensive user data for admin inspection.
+type UserFullDetails struct {
+	ID               int               `json:"id"`
+	Email            string            `json:"email"`
+	Status           string            `json:"status"`
+	WalletBalance    string            `json:"wallet_balance"`
+	BalanceRub       string            `json:"balance_rub"`
+	IsAdmin          bool              `json:"is_admin"`
+	IsVerified       bool              `json:"is_verified"`
+	IsBlocked        bool              `json:"is_blocked"`
+	TelegramChatID   int64             `json:"telegram_chat_id"`
+	IsTelegramLinked bool              `json:"is_telegram_linked"`
+	NotificationPref string            `json:"notification_pref"`
+	CreatedAt        string            `json:"created_at"`
+	Cards            []UserCardSummary `json:"cards"`
+	Transactions     []UserTxSummary   `json:"transactions"`
+}
+
+type UserCardSummary struct {
+	ID          int    `json:"id"`
+	Last4       string `json:"last_4"`
+	CardStatus  string `json:"card_status"`
+	CardBalance string `json:"card_balance"`
+	CardType    string `json:"card_type"`
+	Category    string `json:"category"`
+	Nickname    string `json:"nickname"`
+	CreatedAt   string `json:"created_at"`
+}
+
+type UserTxSummary struct {
+	ID              int    `json:"id"`
+	Amount          string `json:"amount"`
+	Fee             string `json:"fee"`
+	TransactionType string `json:"transaction_type"`
+	Status          string `json:"status"`
+	Details         string `json:"details"`
+	SourceType      string `json:"source_type"`
+	Currency        string `json:"currency"`
+	CardLast4       string `json:"card_last_4"`
+	ExecutedAt      string `json:"executed_at"`
+}
+
+// GetUserFullDetails returns full user profile, cards with balances, and transaction history.
+func GetUserFullDetails(userID int) (*UserFullDetails, error) {
+	if GlobalDB == nil {
+		return nil, fmt.Errorf("database connection not initialized")
+	}
+
+	d := &UserFullDetails{}
+	var balRub, walletBal decimal.Decimal
+	var tgChatID int64
+	var createdAt time.Time
+
+	err := GlobalDB.QueryRow(`
+		SELECT u.id, u.email, u.status, COALESCE(u.balance_rub, 0),
+		       COALESCE((SELECT ib.master_balance FROM internal_balances ib WHERE ib.user_id = u.id), 0),
+		       COALESCE(u.is_admin, FALSE), COALESCE(u.is_verified, FALSE),
+		       COALESCE(u.is_blocked, FALSE),
+		       COALESCE(u.telegram_chat_id, 0),
+		       COALESCE(u.notification_pref, 'email'),
+		       u.created_at
+		FROM users u WHERE u.id = $1
+	`, userID).Scan(&d.ID, &d.Email, &d.Status, &balRub, &walletBal,
+		&d.IsAdmin, &d.IsVerified, &d.IsBlocked,
+		&tgChatID, &d.NotificationPref, &createdAt)
+	if err != nil {
+		return nil, fmt.Errorf("user not found: %w", err)
+	}
+	d.BalanceRub = balRub.String()
+	d.WalletBalance = walletBal.StringFixed(2)
+	d.TelegramChatID = tgChatID
+	d.IsTelegramLinked = tgChatID != 0
+	d.CreatedAt = createdAt.Format(time.RFC3339)
+
+	// Cards
+	cardRows, err := GlobalDB.Query(`
+		SELECT id, COALESCE(last_4_digits,''), card_status, COALESCE(card_balance,0),
+		       COALESCE(card_type,'VISA'), COALESCE(category,''), COALESCE(nickname,''), created_at
+		FROM cards WHERE user_id = $1 ORDER BY created_at DESC
+	`, userID)
+	if err == nil {
+		defer cardRows.Close()
+		for cardRows.Next() {
+			var c UserCardSummary
+			var bal decimal.Decimal
+			var cat time.Time
+			if err := cardRows.Scan(&c.ID, &c.Last4, &c.CardStatus, &bal, &c.CardType, &c.Category, &c.Nickname, &cat); err != nil {
+				continue
+			}
+			c.CardBalance = bal.StringFixed(2)
+			c.CreatedAt = cat.Format(time.RFC3339)
+			d.Cards = append(d.Cards, c)
+		}
+	}
+	if d.Cards == nil {
+		d.Cards = []UserCardSummary{}
+	}
+
+	// Transactions (last 200)
+	txRows, err := GlobalDB.Query(`
+		SELECT t.id, t.amount, COALESCE(t.fee, 0), t.transaction_type, t.status,
+		       COALESCE(t.details,''), COALESCE(t.source_type,''), COALESCE(t.currency,'USD'),
+		       COALESCE(c.last_4_digits,''), t.executed_at
+		FROM transactions t
+		LEFT JOIN cards c ON t.card_id = c.id
+		WHERE t.user_id = $1
+		ORDER BY t.executed_at DESC LIMIT 200
+	`, userID)
+	if err == nil {
+		defer txRows.Close()
+		for txRows.Next() {
+			var tx UserTxSummary
+			var amt, fee decimal.Decimal
+			var execAt time.Time
+			if err := txRows.Scan(&tx.ID, &amt, &fee, &tx.TransactionType, &tx.Status,
+				&tx.Details, &tx.SourceType, &tx.Currency, &tx.CardLast4, &execAt); err != nil {
+				continue
+			}
+			tx.Amount = amt.StringFixed(2)
+			tx.Fee = fee.StringFixed(2)
+			tx.ExecutedAt = execAt.Format(time.RFC3339)
+			d.Transactions = append(d.Transactions, tx)
+		}
+	}
+	if d.Transactions == nil {
+		d.Transactions = []UserTxSummary{}
+	}
+
+	return d, nil
 }
 
 // AdminToggleRole toggles is_admin for a user.

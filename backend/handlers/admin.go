@@ -205,6 +205,24 @@ func AdminUsersHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(users)
 }
 
+// AdminUserFullDetailsHandler - GET /api/v1/admin/users/{id}/full-details
+func AdminUserFullDetailsHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	targetID, err := strconv.Atoi(vars["id"])
+	if err != nil || targetID <= 0 {
+		http.Error(w, "invalid user id", http.StatusBadRequest)
+		return
+	}
+	details, err := repository.GetUserFullDetails(targetID)
+	if err != nil {
+		log.Printf("[ADMIN] Failed to fetch full details for user %d: %v", targetID, err)
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(details)
+}
+
 // GetAdminTransactionReportHandler - Выдает отчет обо всех транзакциях платформы.
 func GetAdminTransactionReportHandler(w http.ResponseWriter, r *http.Request) {
 	// В этом обработчике мы уверены, что пользователь является Администратором
