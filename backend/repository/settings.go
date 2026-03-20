@@ -59,6 +59,23 @@ func GetRecentSessions(userID int, limit int) ([]UserSession, error) {
 	return sessions, nil
 }
 
+// IsNewIPForUser returns true if this IP has never been recorded in user_sessions for this user.
+func IsNewIPForUser(userID int, ip string) bool {
+	if GlobalDB == nil || ip == "" {
+		return false
+	}
+	var count int
+	err := GlobalDB.QueryRow(
+		`SELECT COUNT(*) FROM user_sessions WHERE user_id = $1 AND ip = $2`,
+		userID, ip,
+	).Scan(&count)
+	if err != nil {
+		log.Printf("[SESSION] Error checking IP history for user %d: %v", userID, err)
+		return false
+	}
+	return count == 0
+}
+
 func DeleteAllUserSessions(userID int) error {
 	if GlobalDB == nil {
 		return fmt.Errorf("database connection not initialized")

@@ -114,6 +114,27 @@ func AdminToggleBlockHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	repository.WriteAdminLog(adminID, fmt.Sprintf("Пользователь %s (ID %d) %s", email, targetID, action))
 	log.Printf("[ADMIN] User %d (%s) %s by admin %d", targetID, email, action, adminID)
+
+	// Notify user about block/unblock (email-only for block, since TG may be unavailable)
+	if newBlocked && email != "" {
+		log.Printf("[EVENT] Admin %d performed user_block (target=%d, email=%s). Triggering notifications...", adminID, targetID, email)
+		go func() {
+			if err := service.SendGenericEmail(email, "Аккаунт заблокирован",
+				"🔒 <b>Ваш аккаунт временно заблокирован администратором.</b><br><br>"+
+					"Если вы считаете, что это ошибка, обратитесь в поддержку: "+
+					"<a href=\"mailto:admin@xplr.pro\">admin@xplr.pro</a>"); err != nil {
+				log.Printf("[NOTIFY] ❌ Failed to send block email to user %d (%s): %v", targetID, email, err)
+			} else {
+				log.Printf("[NOTIFY] ✅ Block notification email sent to user %d (%s)", targetID, email)
+			}
+		}()
+	} else if !newBlocked {
+		log.Printf("[EVENT] Admin %d performed user_unblock (target=%d, email=%s). Triggering notifications...", adminID, targetID, email)
+		go service.NotifyUser(targetID, "Аккаунт разблокирован",
+			"✅ <b>Ваш аккаунт был разблокирован.</b>\n\nВы снова можете пользоваться всеми сервисами XPLR.\n\n"+
+				"<a href=\"https://xplr.pro\">Открыть XPLR</a>")
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"is_blocked": newBlocked,

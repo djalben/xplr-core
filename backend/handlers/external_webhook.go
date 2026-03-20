@@ -121,6 +121,8 @@ func ExternalTopUpWebhookHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("✅ [EXT-WEBHOOK] Credited %s %s to wallet (user %d, tx=%s)",
 		amount.String(), payload.Currency, payload.UserID, payload.ExternalTxID)
+	log.Printf("[EVENT] User %d performed external_topup (amount=%s %s, tx=%s). Triggering notifications...",
+		payload.UserID, amount.String(), payload.Currency, payload.ExternalTxID)
 
 	// Notify user about successful top-up
 	go func() {

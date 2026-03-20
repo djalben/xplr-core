@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -228,6 +229,14 @@ func PatchCardStatusHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Fetch card details before status change for notification (last4 + balance for refund)
+	var cardLast4 string
+	var cardBalanceBefore decimal.Decimal
+	if card, err := repository.GetCardByID(cardID); err == nil {
+		cardLast4 = card.Last4Digits
+		cardBalanceBefore = card.CardBalance
+	}
+
 	if err := repository.UpdateCardStatus(cardID, userID, status); err != nil {
 		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "access denied") {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -237,14 +246,46 @@ func PatchCardStatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("[EVENT] User %d performed card_status_change (card=%d, last4=%s, status=%s). Triggering notifications...", userID, cardID, cardLast4, status)
+
 	// Notify user about card status change
-	statusLabels := map[string]string{"FROZEN": "❄️ Карта заморожена", "ACTIVE": "✅ Карта активирована", "BLOCKED": "🔒 Карта заблокирована", "CLOSED": "❌ Карта закрыта"}
+	statusLabels := map[string]string{
+		"FROZEN":  "❄️ Карта заморожена",
+		"ACTIVE":  "✅ Карта активирована",
+		"BLOCKED": "🔒 Карта заблокирована",
+		"CLOSED":  "❌ Карта закрыта",
+	}
 	label := statusLabels[status]
 	if label == "" {
 		label = status
 	}
-	go service.NotifyUser(userID, label,
-		fmt.Sprintf("%s\n\nКарта ID: <b>%d</b>\nСтатус: <b>%s</b>\n\n<a href=\"https://xplr.pro/cards\">Открыть карты</a>", label, cardID, status))
+
+	var msg string
+	switch status {
+	case "CLOSED":
+		msg = fmt.Sprintf("❌ <b>Карта закрыта</b>\n\nВаша карта *%s успешно закрыта и аннулирована.\n\n<a href=\"https://xplr.pro/cards\">Открыть карты</a>", cardLast4)
+	case "FROZEN":
+		msg = fmt.Sprintf("❄️ <b>Карта заморожена</b>\n\nСтатус вашей карты *%s изменён на: <b>FROZEN</b>\n\n<a href=\"https://xplr.pro/cards\">Открыть карты</a>", cardLast4)
+	case "ACTIVE":
+		msg = fmt.Sprintf("✅ <b>Карта разморожена</b>\n\nСтатус вашей карты *%s изменён на: <b>ACTIVE</b>\n\n<a href=\"https://xplr.pro/cards\">Открыть карты</a>", cardLast4)
+	case "BLOCKED":
+		msg = fmt.Sprintf("🔒 <b>Карта заблокирована</b>\n\nСтатус вашей карты *%s изменён на: <b>BLOCKED</b>\n\n<a href=\"https://xplr.pro/cards\">Открыть карты</a>", cardLast4)
+	default:
+		msg = fmt.Sprintf("%s\n\nКарта *%s\nСтатус: <b>%s</b>\n\n<a href=\"https://xplr.pro/cards\">Открыть карты</a>", label, cardLast4, status)
+	}
+	go service.NotifyUser(userID, label, msg)
+
+	// Refund notification: if card had balance and was closed/blocked, the balance was returned to wallet
+	if (status == "CLOSED" || status == "BLOCKED") && cardBalanceBefore.GreaterThan(decimal.Zero) {
+		log.Printf("[EVENT] User %d performed card_refund_to_wallet (card=%d, last4=%s, refunded=$%s). Triggering notifications...",
+			userID, cardID, cardLast4, cardBalanceBefore.StringFixed(2))
+		go service.NotifyUser(userID, "Возврат средств с карты",
+			fmt.Sprintf("💰 <b>Возврат средств</b>\n\n"+
+				"Списание с карты *%s произведено.\n"+
+				"Средства <b>$%s</b> возвращены на основной баланс.\n\n"+
+				"<a href=\"https://xplr.pro/wallet\">Открыть кошелёк</a>",
+				cardLast4, cardBalanceBefore.StringFixed(2)))
+	}
 
 	// Return updated wallet balance so frontend can refresh instantly
 	resp := map[string]interface{}{
@@ -321,6 +362,8 @@ func MassIssueCardsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	log.Printf("[EVENT] User %d performed card_issue (count=%d, category=%s, fee=$%s). Triggering notifications...", userID, req.Count, cat, totalFeeUSD.StringFixed(2))
 
 	// Notify user about card issue
 	go service.NotifyUser(userID, "Карта выпущена",

@@ -54,11 +54,11 @@ func sendMail(to, subject, htmlBody string) error {
 
 func sendMailWith(cfg *smtpConfig, to, subject, htmlBody string) error {
 	if cfg.Host == "" || cfg.Port == "" {
-		log.Printf("[EMAIL] ⚠️  SMTP not configured (SMTP_HOST=%q, SMTP_PORT=%q). Email to %s skipped.", cfg.Host, cfg.Port, to)
+		log.Printf("[SMTP-ERROR] SMTP not configured (SMTP_HOST=%q, SMTP_PORT=%q). Email to %s skipped.", cfg.Host, cfg.Port, to)
 		return fmt.Errorf("SMTP not configured: SMTP_HOST and SMTP_PORT are required")
 	}
 	if cfg.User == "" || cfg.Pass == "" {
-		log.Printf("[EMAIL] ⚠️  SMTP credentials missing (SMTP_USER=%q, SMTP_PASS length=%d). Email to %s skipped.", cfg.User, len(cfg.Pass), to)
+		log.Printf("[SMTP-ERROR] SMTP credentials missing (SMTP_USER=%q, SMTP_PASS length=%d). Email to %s skipped.", cfg.User, len(cfg.Pass), to)
 		return fmt.Errorf("SMTP credentials missing: SMTP_USER and SMTP_PASS are required")
 	}
 
@@ -385,10 +385,15 @@ func SendEmergencyFreezeNotification(toEmail string, frozenCards int) error {
 
 // SendGenericEmail — sends a generic HTML email (used by NotifyUser).
 func SendGenericEmail(toEmail, subject, htmlContent string) error {
+	if toEmail == "" {
+		log.Printf("[SMTP-ERROR] Cannot send email — recipient address is empty (subject=%q)", subject)
+		return fmt.Errorf("recipient email is empty")
+	}
 	html := wrapHTML(subject, htmlContent)
 	if err := sendMail(toEmail, "XPLR — "+subject, html); err != nil {
-		log.Printf("[EMAIL] SendGenericEmail to %s failed: %v", toEmail, err)
+		log.Printf("[SMTP-ERROR] Failed to send email to %s: %v (subject=%q)", toEmail, err, subject)
 		return err
 	}
+	log.Printf("[SMTP-OK] Email delivered to %s (subject=%q)", toEmail, subject)
 	return nil
 }

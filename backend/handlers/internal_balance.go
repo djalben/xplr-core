@@ -60,6 +60,8 @@ func TopUpWalletHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("[EVENT] User %d performed wallet_topup (amount=%s RUB, new_balance=$%s). Triggering notifications...", userID, req.Amount.StringFixed(0), ib.MasterBalance.StringFixed(2))
+
 	// Notify user about successful topup
 	go func() {
 		service.NotifyUser(userID, "Кошелёк пополнен",
@@ -118,6 +120,26 @@ func TransferWalletToCardHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+
+	log.Printf("[EVENT] User %d performed fund_card (card=%d, amount=%s %s). Triggering notifications...", userID, cardID, amount.StringFixed(2), req.Currency)
+
+	// Notify user about card funding
+	go func() {
+		var cardLast4 string
+		if card, err := repository.GetCardByID(cardID); err == nil {
+			cardLast4 = card.Last4Digits
+		}
+		curr := req.Currency
+		if curr == "" {
+			curr = "USD"
+		}
+		service.NotifyUser(userID, "Карта пополнена",
+			fmt.Sprintf("💳 <b>Карта пополнена</b>\n\n"+
+				"Карта: *%s\n"+
+				"Сумма: <b>%s %s</b>\n\n"+
+				"<a href=\"https://xplr.pro/cards\">Открыть карты</a>",
+				cardLast4, amount.StringFixed(2), curr))
+	}()
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(ib)

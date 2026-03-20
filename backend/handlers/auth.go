@@ -410,6 +410,19 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if len(device) > 200 {
 		device = device[:200]
 	}
+
+	// ── Шаг 7b: Проверка нового IP — уведомление о входе с нового устройства ──
+	if repository.IsNewIPForUser(user.ID, ip) {
+		log.Printf("[SECURITY] New IP detected for user %d (%s): ip=%s", user.ID, user.Email, ip)
+		go service.NotifyUser(user.ID, "Вход с нового устройства",
+			fmt.Sprintf("⚠️ <b>Вход в аккаунт с нового устройства/IP</b>\n\n"+
+				"IP: <b>%s</b>\n"+
+				"Устройство: <b>%s</b>\n\n"+
+				"Если это были не вы, немедленно смените пароль.\n\n"+
+				"<a href=\"https://xplr.pro/settings\">Настройки безопасности</a>",
+				ip, device))
+	}
+
 	if err := repository.CreateUserSession(user.ID, ip, device); err != nil {
 		log.Printf("[LOGIN] Warning: failed to create session for user %d: %v", user.ID, err)
 	}
