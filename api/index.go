@@ -60,16 +60,22 @@ func ensureDB() {
 	handlers.GlobalDB = db
 	repository.GlobalDB = db
 
-	// 3. Telegram
-	if token := os.Getenv("TELEGRAM_BOT_TOKEN"); token != "" {
-		telegram.SetBotToken(token)
-		telegram.AdminChatIDsProvider = repository.GetAdminChatIDs
-		log.Println("✅ [INIT] Telegram bot token set")
+	// 3. Telegram — ОБЯЗАТЕЛЬНО
+	tgToken := os.Getenv("TELEGRAM_BOT_TOKEN")
+	if tgToken == "" {
+		log.Println("🚨🚨🚨 [FATAL] TELEGRAM_BOT_TOKEN is EMPTY — ALL Telegram notifications are BROKEN")
 	} else {
-		log.Println("[ERROR] Notification service not initialized: TELEGRAM_BOT_TOKEN is empty — TG notifications DISABLED")
+		telegram.SetBotToken(tgToken)
+		telegram.AdminChatIDsProvider = repository.GetAdminChatIDs
+		log.Printf("✅ [INIT] Telegram bot token set (%d chars)", len(tgToken))
 	}
+	// SMTP — ОБЯЗАТЕЛЬНО
 	if os.Getenv("SMTP_HOST") == "" || os.Getenv("SMTP_PORT") == "" {
-		log.Println("[ERROR] Notification service not initialized: SMTP not configured — Email notifications DISABLED")
+		log.Println("🚨🚨🚨 [FATAL] SMTP_HOST/SMTP_PORT not set — ALL email notifications are BROKEN")
+	} else if os.Getenv("SMTP_USER") == "" || os.Getenv("SMTP_PASS") == "" {
+		log.Println("🚨🚨🚨 [FATAL] SMTP_USER/SMTP_PASS not set — email auth will FAIL")
+	} else {
+		log.Printf("✅ [INIT] SMTP configured: host=%s, port=%s, user=%s", os.Getenv("SMTP_HOST"), os.Getenv("SMTP_PORT"), os.Getenv("SMTP_USER"))
 	}
 
 	// 4. Wallester
@@ -398,6 +404,7 @@ func buildRouter() *mux.Router {
 	admin.HandleFunc("/translations", handlers.AdminUpsertTranslationHandler).Methods("PUT")
 	admin.HandleFunc("/translations/{id}", handlers.AdminDeleteTranslationHandler).Methods("DELETE")
 	admin.HandleFunc("/logs", handlers.AdminGetLogsHandler).Methods("GET")
+	admin.HandleFunc("/test-notify", handlers.AdminTestNotifyHandler).Methods("GET")
 
 	return r
 }

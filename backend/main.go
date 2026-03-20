@@ -96,22 +96,27 @@ func main() {
 	}
 
 	// Telegram bot token (для реальной отправки уведомлений)
-	if token := os.Getenv("TELEGRAM_BOT_TOKEN"); token != "" {
-		telegram.SetBotToken(token)
-		telegram.AdminChatIDsProvider = repository.GetAdminChatIDs
-		log.Println("✅ [INIT] Telegram bot token set: real notifications enabled")
-	} else {
-		log.Println("[ERROR] Notification service not initialized: TELEGRAM_BOT_TOKEN is empty — Telegram notifications will be DISABLED")
+	// CRITICAL: Сервер НЕ запустится без токена — уведомления обязательны
+	tgToken := os.Getenv("TELEGRAM_BOT_TOKEN")
+	if tgToken == "" {
+		log.Fatal("🚨 [FATAL] TELEGRAM_BOT_TOKEN is EMPTY — server cannot start without notification service. Set the env var and restart.")
 	}
+	telegram.SetBotToken(tgToken)
+	telegram.AdminChatIDsProvider = repository.GetAdminChatIDs
+	log.Printf("✅ [INIT] Telegram bot token set (%d chars): real notifications enabled", len(tgToken))
 
-	// SMTP check
-	if os.Getenv("SMTP_HOST") == "" || os.Getenv("SMTP_PORT") == "" {
-		log.Println("[ERROR] Notification service not initialized: SMTP_HOST/SMTP_PORT not set — Email notifications will be DISABLED")
-	} else if os.Getenv("SMTP_USER") == "" || os.Getenv("SMTP_PASS") == "" {
-		log.Println("[ERROR] Notification service not initialized: SMTP_USER/SMTP_PASS not set — Email notifications will FAIL")
-	} else {
-		log.Printf("✅ [INIT] SMTP configured: host=%s, port=%s, user=%s", os.Getenv("SMTP_HOST"), os.Getenv("SMTP_PORT"), os.Getenv("SMTP_USER"))
+	// SMTP check — fatal if not configured
+	smtpHost := os.Getenv("SMTP_HOST")
+	smtpPort := os.Getenv("SMTP_PORT")
+	smtpUser := os.Getenv("SMTP_USER")
+	smtpPass := os.Getenv("SMTP_PASS")
+	if smtpHost == "" || smtpPort == "" {
+		log.Fatal("🚨 [FATAL] SMTP_HOST/SMTP_PORT not set — server cannot start without email notification service.")
 	}
+	if smtpUser == "" || smtpPass == "" {
+		log.Fatal("🚨 [FATAL] SMTP_USER/SMTP_PASS not set — server cannot start without email credentials.")
+	}
+	log.Printf("✅ [INIT] SMTP configured: host=%s, port=%s, user=%s", smtpHost, smtpPort, smtpUser)
 
 	// Инициализация Wallester Repository
 	handlers.InitWallesterRepository()
@@ -270,6 +275,7 @@ func main() {
 	adminRouter.HandleFunc("/translations", handlers.AdminUpsertTranslationHandler).Methods("PUT")
 	adminRouter.HandleFunc("/translations/{id}", handlers.AdminDeleteTranslationHandler).Methods("DELETE")
 	adminRouter.HandleFunc("/logs", handlers.AdminGetLogsHandler).Methods("GET")
+	adminRouter.HandleFunc("/test-notify", handlers.AdminTestNotifyHandler).Methods("GET")
 	// --------------------------------------------------------
 
 	// CORS: dynamic origins from ALLOWED_ORIGINS env var (comma-separated)
