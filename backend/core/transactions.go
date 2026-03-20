@@ -6,16 +6,16 @@ import (
 
 	"github.com/djalben/xplr-core/backend/config"
 	"github.com/djalben/xplr-core/backend/models"
-	"github.com/djalben/xplr-core/backend/notification"
 	"github.com/djalben/xplr-core/backend/repository"
+	"github.com/djalben/xplr-core/backend/service"
 	"github.com/shopspring/decimal"
 )
 
 // AuthorizeCardRequest - запрос авторизации от провайдера
 type AuthorizeCardRequest struct {
-	CardID      int             `json:"card_id"`       // ID карты в нашей системе
-	Amount      decimal.Decimal `json:"amount"`        // Сумма транзакции
-	MerchantName string         `json:"merchant_name"` // Название мерчанта
+	CardID       int             `json:"card_id"`       // ID карты в нашей системе
+	Amount       decimal.Decimal `json:"amount"`        // Сумма транзакции
+	MerchantName string          `json:"merchant_name"` // Название мерчанта
 }
 
 // authorizeCard - Центральная функция, которая обрабатывает все проверки и записывает транзакцию.
@@ -26,9 +26,9 @@ func AuthorizeCard(req AuthorizeCardRequest) models.AuthResponse {
 	if err != nil {
 		return models.AuthResponse{
 			Success: false,
-			Status: "DECLINED",
+			Status:  "DECLINED",
 			Message: "Card not found.",
-			Fee: decimal.NewFromFloat(config.DeclineFee),
+			Fee:     decimal.NewFromFloat(config.DeclineFee),
 		}
 	}
 
@@ -37,9 +37,9 @@ func AuthorizeCard(req AuthorizeCardRequest) models.AuthResponse {
 	if err != nil {
 		return models.AuthResponse{
 			Success: false,
-			Status: "DECLINED",
+			Status:  "DECLINED",
 			Message: "User not found.",
-			Fee: decimal.NewFromFloat(config.DeclineFee),
+			Fee:     decimal.NewFromFloat(config.DeclineFee),
 		}
 	}
 
@@ -53,11 +53,12 @@ func AuthorizeCard(req AuthorizeCardRequest) models.AuthResponse {
 			log.Printf("ERROR: Failed to block card %d: %v", card.ID, err)
 		}
 
-		// Уведомление о блокировке
-		if user.TelegramChatID.Valid {
-			notification.SendTelegramMessage(user.TelegramChatID.Int64,
-				fmt.Sprintf("🔒 *Card Blocked:* Карта `...%s` заблокирована из-за множественных неудачных попыток авторизации.", card.Last4Digits))
-		}
+		// Уведомление о блокировке (TG + Email)
+		go service.NotifyUser(user.ID, "Карта заблокирована",
+			fmt.Sprintf("🔒 <b>Карта *%s заблокирована</b>\n\n"+
+				"Причина: множественные неудачные попытки авторизации.\n\n"+
+				"<a href=\"https://xplr.pro/cards\">Открыть карты</a>",
+				card.Last4Digits))
 
 		return models.AuthResponse{
 			Success: false,
@@ -68,23 +69,23 @@ func AuthorizeCard(req AuthorizeCardRequest) models.AuthResponse {
 	}
 
 	// 3. БИЗНЕС-ЛОГИКА: Проверка баланса и лимитов (Zero Decline Logic)
-	
+
 	// Проверка 3.1: Статус карты (блокировка)
 	if card.CardStatus != "ACTIVE" {
 		log.Printf("DECLINED: Card %d is not active (Status: %s)", req.CardID, card.CardStatus)
-		
-		// Уведомление о DECLINE
-		// ИСПРАВЛЕНИЕ: используем .Valid и .Int64 для sql.NullInt64
-		if user.TelegramChatID.Valid { 
-			notification.SendTelegramMessage(user.TelegramChatID.Int64, 
-				fmt.Sprintf("❌ *Decline:* Карта `...%s` не активна.", card.Last4Digits))
-		}
-		
+
+		// Уведомление о DECLINE (TG + Email)
+		go service.NotifyUser(user.ID, "Транзакция отклонена",
+			fmt.Sprintf("❌ <b>Транзакция по карте *%s отклонена</b>\n\n"+
+				"Причина: карта не активна (статус: %s).\n\n"+
+				"<a href=\"https://xplr.pro/cards\">Открыть карты</a>",
+				card.Last4Digits, card.CardStatus))
+
 		return models.AuthResponse{
 			Success: false,
-			Status: "DECLINED",
+			Status:  "DECLINED",
 			Message: "Card is blocked or inactive.",
-			Fee: decimal.NewFromFloat(config.DeclineFee),
+			Fee:     decimal.NewFromFloat(config.DeclineFee),
 		}
 	}
 
@@ -92,42 +93,44 @@ func AuthorizeCard(req AuthorizeCardRequest) models.AuthResponse {
 	if user.BalanceRub.LessThan(req.Amount) {
 		log.Printf("DECLINED: User %d balance_rub (%s) is insufficient for transaction %s", user.ID, user.BalanceRub.String(), req.Amount.String())
 
-		if user.TelegramChatID.Valid {
-			notification.SendTelegramMessage(user.TelegramChatID.Int64,
-				fmt.Sprintf("❌ *Decline:* Недостаточно средств. Баланс: `%s`. Попытка списания: `%s`.", user.BalanceRub.String(), req.Amount.String()))
-		}
+		go service.NotifyUser(user.ID, "Транзакция отклонена",
+			fmt.Sprintf("❌ <b>Транзакция по карте *%s отклонена</b>\n\n"+
+				"Причина: недостаточно средств.\n"+
+				"Баланс: <b>%s</b>, сумма: <b>%s</b>\n\n"+
+				"<a href=\"https://xplr.pro/wallet\">Пополнить кошелёк</a>",
+				card.Last4Digits, user.BalanceRub.String(), req.Amount.String()))
 
 		repository.IncrementFailedAuthCount(card.ID)
 
 		return models.AuthResponse{
 			Success: false,
-			Status: "DECLINED",
+			Status:  "DECLINED",
 			Message: "Insufficient user balance.",
-			Fee: decimal.NewFromFloat(config.DeclineFee),
+			Fee:     decimal.NewFromFloat(config.DeclineFee),
 		}
 	}
-	
+
 	// Проверка 3.3: Дневной лимит (Rule-Based Blocking)
 	if req.Amount.GreaterThan(card.DailySpendLimit) && card.DailySpendLimit.GreaterThan(decimal.Zero) {
 		log.Printf("DECLINED: Card %d daily limit (%s) exceeded by transaction %s", req.CardID, card.DailySpendLimit.String(), req.Amount.String())
-		
-		// Уведомление о DECLINE
-		// ИСПРАВЛЕНИЕ: используем .Valid и .Int64 для sql.NullInt64
-		if user.TelegramChatID.Valid {
-			notification.SendTelegramMessage(user.TelegramChatID.Int64,
-				fmt.Sprintf("❌ *Decline:* Превышен дневной лимит карты `...%s` (Лимит: `%s`).", card.Last4Digits, card.DailySpendLimit.String()))
-		}
-		
+
+		// Уведомление о DECLINE (TG + Email)
+		go service.NotifyUser(user.ID, "Транзакция отклонена",
+			fmt.Sprintf("❌ <b>Транзакция по карте *%s отклонена</b>\n\n"+
+				"Причина: превышен дневной лимит (лимит: <b>$%s</b>).\n\n"+
+				"<a href=\"https://xplr.pro/cards\">Открыть карты</a>",
+				card.Last4Digits, card.DailySpendLimit.String()))
+
 		return models.AuthResponse{
 			Success: false,
-			Status: "DECLINED",
+			Status:  "DECLINED",
 			Message: "Daily spend limit exceeded.",
-			Fee: decimal.NewFromFloat(config.DeclineFee),
+			Fee:     decimal.NewFromFloat(config.DeclineFee),
 		}
 	}
 
 	// 4. УСПЕХ (APPROVED)
-	
+
 	// 4.1. Получить Grade пользователя и вычислить комиссию ПЕРЕД обработкой платежа
 	userGrade, err := repository.GetUserGrade(user.ID)
 	if err != nil {
@@ -140,33 +143,34 @@ func AuthorizeCard(req AuthorizeCardRequest) models.AuthResponse {
 
 	// Вычислить комиссию на основе Grade (fee_percent в процентах, например 6.70 = 6.7%)
 	fee := req.Amount.Mul(userGrade.FeePercent).Div(decimal.NewFromInt(100))
-	
+
 	// 4.2. Списание средств и запись транзакции в рамках атомарной операции (с комиссией)
-	err = repository.ProcessCardPayment(user.ID, card.ID, req.Amount, fee, req.MerchantName, card.Last4Digits) 
+	err = repository.ProcessCardPayment(user.ID, card.ID, req.Amount, fee, req.MerchantName, card.Last4Digits)
 	if err != nil {
 		log.Printf("CRITICAL DB ERROR: Failed to process payment for user %d: %v", user.ID, err)
 		// Если произошла ошибка БД, отклоняем списание, но БЕЗ комиссии.
 		return models.AuthResponse{
 			Success: false,
-			Status: "DECLINED",
+			Status:  "DECLINED",
 			Message: "Internal system error during payment processing.",
-			Fee: decimal.NewFromFloat(config.DeclineFee),
+			Fee:     decimal.NewFromFloat(config.DeclineFee),
 		}
 	}
-	
-	// 4.3. Уведомление об УСПЕШНОЙ транзакции
-	// ИСПРАВЛЕНИЕ: используем .Valid и .Int64 для sql.NullInt64
-	if user.TelegramChatID.Valid {
-		notification.SendTelegramMessage(user.TelegramChatID.Int64,
-			fmt.Sprintf("✅ *Approved:* `%s` с карты `...%s` (Merchant: %s, Fee: %s).", 
-				req.Amount.String(), card.Last4Digits, req.MerchantName, fee.String()))
-	}
+
+	// 4.3. Уведомление об УСПЕШНОЙ транзакции (TG + Email)
+	go service.NotifyUser(user.ID, "Списание с карты",
+		fmt.Sprintf("💸 <b>Списание с карты *%s</b>\n\n"+
+			"Сумма: <b>%s</b>\n"+
+			"Магазин: %s\n"+
+			"Комиссия: %s\n\n"+
+			"<a href=\"https://xplr.pro/cards\">Открыть карты</a>",
+			card.Last4Digits, req.Amount.String(), req.MerchantName, fee.String()))
 
 	return models.AuthResponse{
 		Success: true,
-		Status: "APPROVED",
+		Status:  "APPROVED",
 		Message: "Transaction approved.",
-		Fee: fee, // Комиссия на основе Grade пользователя
+		Fee:     fee, // Комиссия на основе Grade пользователя
 	}
 }
 

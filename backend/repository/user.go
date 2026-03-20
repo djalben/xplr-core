@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/djalben/xplr-core/backend/models"
-	"github.com/djalben/xplr-core/backend/notification"
 	"github.com/shopspring/decimal"
 )
 
@@ -269,14 +268,6 @@ func ProcessDeposit(userID int, amount decimal.Decimal) error {
 
 	log.Printf("User %d successfully deposited %s. Transaction committed.", userID, amount.String())
 
-	// 5. ОТПРАВКА TELEGRAM УВЕДОМЛЕНИЯ
-	user, err := GetUserByID(userID)
-	if err == nil && user.TelegramChatID.Valid {
-		message := fmt.Sprintf("✅ Deposit Successful!\n\nAmount: %s ₽\nNew Balance: %s ₽",
-			amount.String(),
-			user.BalanceRub.String())
-		notification.SendTelegramMessage(user.TelegramChatID.Int64, message)
-	}
-
+	// Уведомление пользователю отправляется в handler (service.NotifyUser) — единое для TG+Email.
 	return nil
 }

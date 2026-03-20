@@ -2,10 +2,13 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/djalben/xplr-core/backend/middleware"
 	"github.com/djalben/xplr-core/backend/repository"
+	"github.com/djalben/xplr-core/backend/service"
 	"github.com/shopspring/decimal"
 )
 
@@ -27,10 +30,18 @@ func ProcessDepositHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := repository.ProcessDeposit(userID, decimal.NewFromFloat(req.Amount)); err != nil {
+	amount := decimal.NewFromFloat(req.Amount)
+	if err := repository.ProcessDeposit(userID, amount); err != nil {
 		http.Error(w, "Deposit failed", http.StatusInternalServerError)
 		return
 	}
+
+	log.Printf("[EVENT] User %d performed deposit (amount=%s ₽). Triggering notifications...", userID, amount.StringFixed(2))
+	go service.NotifyUser(userID, "Пополнение баланса",
+		fmt.Sprintf("💰 <b>Баланс пополнен</b>\n\n"+
+			"Сумма: <b>%s ₽</b>\n\n"+
+			"<a href=\"https://xplr.pro/wallet\">Открыть кошелёк</a>",
+			amount.StringFixed(2)))
 
 	user, _ := repository.GetUserByID(userID)
 	w.Header().Set("Content-Type", "application/json")

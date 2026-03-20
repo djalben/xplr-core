@@ -557,22 +557,9 @@ func IssueCards(userID int, req models.MassIssueRequest) (interface{}, error) {
 
 	log.Printf("✅ Issued %d cards successfully, %d failed for user %d", successCount, failedCount, userID)
 
-	// ОТПРАВКА TELEGRAM УВЕДОМЛЕНИЯ
+	// Уведомление пользователю отправляется в handler (service.NotifyUser) — единое для TG+Email.
+	// Здесь только уведомление админам.
 	if successCount > 0 {
-		user, err := GetUserByID(userID)
-		if err == nil && user.TelegramChatID.Valid {
-			userMsg := fmt.Sprintf(
-				"💳 <b>Карта выпущена!</b>\n\n"+
-					"📦 <b>Количество:</b> %d\n"+
-					"🏷 <b>Категория:</b> %s\n"+
-					"💰 <b>Комиссия:</b> $%s\n"+
-					"📊 <b>Дневной лимит:</b> $%s\n\n"+
-					"Карта уже доступна в <a href=\"https://xplr.pro/cards\">личном кабинете</a>.",
-				successCount, cat, feePerCard.Mul(decimal.NewFromInt(int64(successCount))).StringFixed(2), req.DailyLimit.StringFixed(2),
-			)
-			telegram.SendMessageHTML(user.TelegramChatID.Int64, userMsg)
-		}
-
 		// Уведомление админам
 		go func() {
 			email := ""

@@ -2,12 +2,14 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/djalben/xplr-core/backend/middleware"
 	"github.com/djalben/xplr-core/backend/models"
 	"github.com/djalben/xplr-core/backend/repository"
+	"github.com/djalben/xplr-core/backend/service"
 	"github.com/shopspring/decimal"
 )
 
@@ -69,6 +71,12 @@ func TopUpBalanceHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Failed to top up balance", http.StatusInternalServerError)
 			return
 		}
+		log.Printf("[EVENT] User %d performed topup (flat $%s). Triggering notifications...", userID, amount.StringFixed(2))
+		go service.NotifyUser(userID, "Пополнение баланса",
+			fmt.Sprintf("💰 <b>Баланс пополнен</b>\n\n"+
+				"Сумма: <b>$%s</b>\n\n"+
+				"<a href=\"https://xplr.pro/wallet\">Открыть кошелёк</a>",
+				amount.StringFixed(2)))
 		user, _ := repository.GetUserByID(userID)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -102,6 +110,13 @@ func TopUpBalanceHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to top up balance", http.StatusInternalServerError)
 		return
 	}
+
+	log.Printf("[EVENT] User %d performed topup (amount=%s ₽ → $%s). Triggering notifications...", userID, amountRub.StringFixed(2), amountUsd.StringFixed(2))
+	go service.NotifyUser(userID, "Пополнение баланса",
+		fmt.Sprintf("💰 <b>Баланс пополнен</b>\n\n"+
+			"Сумма: <b>%s ₽</b> → <b>$%s</b>\n\n"+
+			"<a href=\"https://xplr.pro/wallet\">Открыть кошелёк</a>",
+			amountRub.StringFixed(2), amountUsd.StringFixed(2)))
 
 	// Credit the specific wallet
 	walletCol := "balance_arbitrage"

@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/djalben/xplr-core/backend/models"
-	"github.com/djalben/xplr-core/backend/notification"
 	"github.com/shopspring/decimal"
 )
 
@@ -565,34 +564,8 @@ func (wr *WallesterRepository) ProcessWebhook(payload WallesterWebhookPayload) e
 			return nil // Не критичная ошибка, просто логируем
 		}
 
-		// Получаем пользователя для отправки уведомления
-		user, err := GetUserByID(userID)
-		if err != nil {
-			log.Printf("⚠️  Failed to get user for 3DS notification: %v", err)
-			return nil // Не прерываем обработку, только логируем
-		}
-
-		// Отправляем уведомление о 3DS коде
-		if user.TelegramChatID.Valid {
-			message := fmt.Sprintf(
-				"🔑 Код подтверждения: %s | Магазин: %s\n\n⚠️ Внимание: не сообщайте код третьим лицам!",
-				authCode,
-				merchantName,
-			)
-			// Отправка уведомления (не блокируем обработку при ошибке)
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						log.Printf("⚠️  Panic in 3DS notification: %v", r)
-					}
-				}()
-				notification.SendTelegramMessage(user.TelegramChatID.Int64, message)
-			}()
-		} else {
-			log.Printf("⚠️  User %d has no Telegram chat ID, skipping 3DS notification", userID)
-		}
-
-		log.Printf("✅ 3DS notification sent: auth_code=%s, merchant=%s, user=%d",
+		// Уведомление пользователю отправляется в handler (sendWallesterNotification)
+		log.Printf("✅ 3DS processed: auth_code=%s, merchant=%s, user=%d",
 			authCode, merchantName, userID)
 		return nil
 
@@ -604,12 +577,6 @@ func (wr *WallesterRepository) ProcessWebhook(payload WallesterWebhookPayload) e
 		// 3. Если ОК — списываем из Кошелька и одобряем транзакцию
 		// ═══════════════════════════════════════════════════════════════
 		if payload.Status == "approved" || payload.Status == "completed" || payload.EventType == "payment_success" {
-			// Получаем данные пользователя для уведомлений
-			user, err := GetUserByID(userID)
-			if err != nil {
-				return fmt.Errorf("failed to get user: %w", err)
-			}
-
 			// Начинаем транзакцию БД для атомарности
 			tx, err := GlobalDB.Begin()
 			if err != nil {
@@ -704,29 +671,7 @@ func (wr *WallesterRepository) ProcessWebhook(payload WallesterWebhookPayload) e
 			log.Printf("✅ Bridge: Deducted %s from wallet (user %d, card %s, tx_id=%s). Wallet balance: %s",
 				amount.String(), userID, payload.CardID, payload.TransactionID, newWalletBalance.String())
 
-			// 8. Telegram-уведомление
-			if user.TelegramChatID.Valid {
-				currency := payload.Currency
-				if currency == "" {
-					currency = "RUB"
-				}
-				message := fmt.Sprintf(
-					"💸 Списание: %s %s | Карта: *%s | Магазин: %s\n\n👛 Остаток в Кошельке: %s₽",
-					amount.String(),
-					currency,
-					last4Digits,
-					merchantName,
-					newWalletBalance.String(),
-				)
-				func() {
-					defer func() {
-						if r := recover(); r != nil {
-							log.Printf("⚠️  Panic in transaction notification: %v", r)
-						}
-					}()
-					notification.SendTelegramMessage(user.TelegramChatID.Int64, message)
-				}()
-			}
+			// Уведомление пользователю отправляется в handler (sendWallesterNotification → service.NotifyUser)
 		}
 
 	case "refund", "reversal":

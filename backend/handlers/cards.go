@@ -365,13 +365,15 @@ func MassIssueCardsHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[EVENT] User %d performed card_issue (count=%d, category=%s, fee=$%s). Triggering notifications...", userID, req.Count, cat, totalFeeUSD.StringFixed(2))
 
-	// Notify user about card issue
+	// Notify user about card issue (single unified notification — TG + Email)
 	go service.NotifyUser(userID, "Карта выпущена",
-		fmt.Sprintf("💳 <b>Карта успешно выпущена</b>\n\n"+
-			"🏷 Категория: <b>%s</b>\n"+
-			"📦 Количество: <b>%d</b>\n\n"+
-			"<a href=\"https://xplr.pro/cards\">Открыть карты</a>",
-			cat, req.Count))
+		fmt.Sprintf("💳 <b>Карта успешно выпущена!</b>\n\n"+
+			"📦 <b>Количество:</b> %d\n"+
+			"🏷 <b>Категория:</b> %s\n"+
+			"💰 <b>Комиссия:</b> $%s\n"+
+			"� <b>Дневной лимит:</b> $%s\n\n"+
+			"Карта уже доступна в <a href=\"https://xplr.pro/cards\">личном кабинете</a>.",
+			req.Count, cat, totalFeeUSD.StringFixed(2), req.DailyLimit.StringFixed(2)))
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)

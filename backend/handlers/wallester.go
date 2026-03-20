@@ -9,10 +9,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gorilla/mux"
 	"github.com/djalben/xplr-core/backend/middleware"
 	"github.com/djalben/xplr-core/backend/notification"
 	"github.com/djalben/xplr-core/backend/repository"
+	"github.com/djalben/xplr-core/backend/service"
+	"github.com/gorilla/mux"
 )
 
 var wallesterRepo *repository.WallesterRepository
@@ -106,10 +107,10 @@ func WallesterWebhookHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 6. Отправка Telegram-уведомлений для событий 3DS и успешных платежей
-	// (дополнительно к уведомлениям в ProcessWebhook для явности и контроля)
-	if payload.EventType == "3ds_authentication" || payload.EventType == "payment_success" {
-		sendWallesterNotification(payload)
+	// 6. Отправка уведомлений для всех значимых событий (3DS, платеж, возврат)
+	switch payload.EventType {
+	case "3ds_authentication", "payment_success", "transaction", "capture", "authorization", "refund", "reversal":
+		go sendWallesterNotification(payload)
 	}
 
 	// Успешный ответ
@@ -121,8 +122,8 @@ func WallesterWebhookHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// sendWallesterNotification отправляет Telegram-уведомления для событий Wallester
-// Вызывается из хендлера для явного контроля уведомлений
+// sendWallesterNotification отправляет уведомления (TG + Email) для событий Wallester
+// Вызывается из хендлера в горутине после успешного ProcessWebhook
 func sendWallesterNotification(payload repository.WallesterWebhookPayload) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -140,67 +141,53 @@ func sendWallesterNotification(payload repository.WallesterWebhookPayload) {
 		return
 	}
 
-	// Получаем пользователя
-	user, err := repository.GetUserByID(userID)
-	if err != nil {
-		log.Printf("⚠️  Failed to get user for notification: %v", err)
-		return
-	}
+	log.Printf("[EVENT] Wallester webhook %s for card %d (user %d, last4=%s). Triggering notifications...",
+		payload.EventType, cardID, userID, last4Digits)
 
-	if !user.TelegramChatID.Valid {
-		log.Printf("⚠️  User %d has no Telegram chat ID, skipping notification", userID)
-		return
+	amount := payload.Amount
+	if amount == "" {
+		amount = "0"
+	}
+	currency := payload.Currency
+	if currency == "" {
+		currency = "USD"
+	}
+	merchantName := payload.MerchantName
+	if merchantName == "" {
+		merchantName = "Unknown"
 	}
 
 	// Формируем и отправляем уведомление в зависимости от типа события
 	switch payload.EventType {
 	case "3ds_authentication":
 		if payload.AuthCode != "" {
-			merchantName := payload.MerchantName
-			if merchantName == "" {
-				merchantName = "Unknown"
+			// 3DS код срочный — отправляем только в TG (быстрее email)
+			user, uErr := repository.GetUserByID(userID)
+			if uErr == nil && user.TelegramChatID.Valid {
+				notification.SendTelegramMessage(user.TelegramChatID.Int64,
+					fmt.Sprintf("🔑 Код подтверждения: %s | Магазин: %s\n\n⚠️ Внимание: не сообщайте код третьим лицам!",
+						payload.AuthCode, merchantName))
 			}
-			message := fmt.Sprintf(
-				"🔑 Код подтверждения: %s | Магазин: %s\n\n⚠️ Внимание: не сообщайте код третьим лицам!",
-				payload.AuthCode,
-				merchantName,
-			)
-			notification.SendTelegramMessage(user.TelegramChatID.Int64, message)
 			log.Printf("✅ 3DS notification sent to user %d", userID)
 		}
 
-	case "payment_success":
-		amount := payload.Amount
-		if amount == "" {
-			amount = "0"
-		}
-		currency := payload.Currency
-		if currency == "" {
-			currency = "RUB"
-		}
-		merchantName := payload.MerchantName
-		if merchantName == "" {
-			merchantName = "Unknown"
-		}
+	case "payment_success", "transaction", "capture", "authorization":
+		service.NotifyUser(userID, "Списание с карты",
+			fmt.Sprintf("💸 <b>Списание с карты *%s</b>\n\n"+
+				"Сумма: <b>%s %s</b>\n"+
+				"Магазин: %s\n\n"+
+				"<a href=\"https://xplr.pro/cards\">Открыть карты</a>",
+				last4Digits, amount, currency, merchantName))
+		log.Printf("✅ Payment notification sent to user %d (card=%d)", userID, cardID)
 
-		// Получаем текущий баланс пользователя
-		var balanceRub string
-		err := repository.GlobalDB.QueryRow("SELECT balance_rub FROM users WHERE id = $1", userID).Scan(&balanceRub)
-		if err != nil {
-			log.Printf("⚠️  Failed to get balance for notification: %v", err)
-			balanceRub = "N/A"
-		}
-
-		message := fmt.Sprintf(
-			"💸 Списание: %s %s | Карта: *%s | Магазин: %s\n\nВаш новый баланс: %s₽",
-			amount,
-			currency,
-			last4Digits,
-			merchantName,
-			balanceRub,
-		)
-		notification.SendTelegramMessage(user.TelegramChatID.Int64, message)
-		log.Printf("✅ Payment success notification sent to user %d", userID)
+	case "refund", "reversal":
+		service.NotifyUser(userID, "Возврат средств",
+			fmt.Sprintf("💰 <b>Возврат средств на кошелёк</b>\n\n"+
+				"Карта: *%s\n"+
+				"Сумма возврата: <b>%s %s</b>\n\n"+
+				"<a href=\"https://xplr.pro/wallet\">Открыть кошелёк</a>",
+				last4Digits, amount, currency))
+		log.Printf("✅ Refund notification sent to user %d (card=%d)", userID, cardID)
 	}
 }
 
@@ -325,7 +312,7 @@ func SyncCardBalanceHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{
-		"status": "ok",
+		"status":  "ok",
 		"message": "Balance synced successfully",
 	})
 }
