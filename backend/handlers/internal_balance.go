@@ -2,12 +2,14 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/djalben/xplr-core/backend/middleware"
 	"github.com/djalben/xplr-core/backend/models"
 	"github.com/djalben/xplr-core/backend/repository"
+	"github.com/djalben/xplr-core/backend/service"
 	"github.com/gorilla/mux"
 	"github.com/shopspring/decimal"
 )
@@ -56,6 +58,14 @@ func TopUpWalletHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	// Notify user about successful topup
+	go service.NotifyUser(userID, "Кошелёк пополнен",
+		fmt.Sprintf("💰 <b>Кошелёк пополнен</b>\n\n"+
+			"Сумма: <b>%s ₽</b>\n"+
+			"Баланс: <b>$%s</b>\n\n"+
+			"<a href=\"https://xplr.pro/wallet\">Открыть кошелёк</a>",
+			req.Amount.StringFixed(0), ib.MasterBalance.StringFixed(2)))
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(ib)

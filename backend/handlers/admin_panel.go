@@ -159,6 +159,7 @@ func AdminGetSupportTicketsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // AdminUpdateTicketStatusHandler - PATCH /api/v1/admin/tickets/{id}
+// SECURITY: Only the claiming admin or super-admin can close/resolve a ticket.
 func AdminUpdateTicketStatusHandler(w http.ResponseWriter, r *http.Request) {
 	adminID, _ := r.Context().Value(middleware.UserIDKey).(int)
 	vars := mux.Vars(r)
@@ -174,7 +175,23 @@ func AdminUpdateTicketStatusHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
-	if err := repository.UpdateSupportTicketStatus(ticketID, req.Status); err != nil {
+
+	// Ownership check for close/resolve: only claimer or super-admin
+	status := strings.ToLower(strings.TrimSpace(req.Status))
+	if status == "resolved" || status == "closed" {
+		claimedBy := repository.GetSupportTicketClaimedBy(ticketID)
+		if claimedBy != 0 && claimedBy != adminID {
+			// Check if super-admin
+			caller, err := repository.GetUserByID(adminID)
+			if err != nil || caller.Email != superAdminEmail {
+				log.Printf("[SECURITY] ⛔ Admin %d tried to %s ticket %d owned by admin %d", adminID, status, ticketID, claimedBy)
+				http.Error(w, "Этот тикет находится в работе у другого администратора", http.StatusForbidden)
+				return
+			}
+		}
+	}
+
+	if err := repository.UpdateSupportTicketStatus(ticketID, req.Status, adminID); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -210,6 +227,14 @@ func AdminEmergencyFreezeHandler(w http.ResponseWriter, r *http.Request) {
 			log.Printf("[EMAIL] Failed to send freeze notification to user %d: %v", uid, err)
 		}
 	}(targetID, frozenCards)
+
+	// Notify user via NotifyUser (respects user's channel pref)
+	go service.NotifyUser(targetID, "Аккаунт заблокирован",
+		fmt.Sprintf("🚨 <b>Ваш аккаунт заблокирован</b>\n\n"+
+			"Заморожено карт: <b>%d</b>\n"+
+			"Статус: <b>BANNED</b>\n"+
+			"Баланс: <b>обнулён</b>\n\n"+
+			"Если вы считаете, что это ошибка — свяжитесь с поддержкой.", frozenCards))
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{

@@ -60,6 +60,9 @@ var allRequiredColumns = []requiredColumn{
 	{"users", "is_blocked", "BOOLEAN DEFAULT FALSE"},
 	{"users", "fixed_telegram_id", "BIGINT"},
 	{"users", "notification_pref", "VARCHAR(20) DEFAULT 'both'"},
+
+	// --- support_tickets: admin ownership ---
+	{"support_tickets", "claimed_by", "INTEGER DEFAULT 0"},
 }
 
 // RunSchemaGuard checks all required columns exist and creates missing ones.

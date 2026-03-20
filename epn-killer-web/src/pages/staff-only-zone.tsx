@@ -72,6 +72,7 @@ interface SupportTicket {
   subject: string;
   message: string;
   status: string;
+  claimed_by: number;
   created_at: string;
 }
 
@@ -797,7 +798,7 @@ export const StaffOnlyZone = () => {
           type UnifiedItem = {
             uid: string; id: number; source: 'ticket' | 'chat';
             status: string; topic: string; client: string;
-            claimer: string; date: string; msgCount?: number;
+            claimer: string; claimedById: number; date: string; msgCount?: number;
           };
 
           const unified: UnifiedItem[] = [
@@ -805,14 +806,14 @@ export const StaffOnlyZone = () => {
               uid: `t-${t.id}`, id: t.id, source: 'ticket' as const,
               status: normalizeStatus(t.status),
               topic: t.subject || t.message || '—',
-              client: t.email, claimer: '',
+              client: t.email, claimer: '', claimedById: t.claimed_by || 0,
               date: t.created_at || '',
             })),
             ...liveChats.map(c => ({
               uid: `c-${c.id}`, id: c.id, source: 'chat' as const,
               status: normalizeStatus(c.claimed_by > 0 && c.status === 'open' ? 'in_progress' : c.status),
               topic: c.topic || 'Живой чат',
-              client: c.user_email, claimer: c.claimer_email || '',
+              client: c.user_email, claimer: c.claimer_email || '', claimedById: c.claimed_by || 0,
               date: c.updated_at || c.created_at || '',
               msgCount: c.message_count,
             })),
@@ -895,22 +896,49 @@ export const StaffOnlyZone = () => {
                           В работу
                         </button>
                       )}
-                      {item.source === 'ticket' && item.status !== 'closed' && (
-                        <button
-                          onClick={() => updateTicketStatus(item.id, 'resolved')}
-                          className="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-lg text-[11px] font-medium transition-all"
-                        >
-                          Решено
-                        </button>
-                      )}
-                      {item.source === 'ticket' && item.status !== 'closed' && (
-                        <button
-                          onClick={() => updateTicketStatus(item.id, 'closed')}
-                          className="px-2.5 py-1.5 bg-slate-500/10 hover:bg-slate-500/20 border border-slate-500/30 text-slate-400 rounded-lg text-[11px] font-medium transition-all"
-                        >
-                          Закрыть
-                        </button>
-                      )}
+                      {item.source === 'ticket' && item.status !== 'closed' && (() => {
+                        const ownedByOther = item.claimedById > 0 && item.claimedById !== Number(currentUser?.id) && !isSuperAdmin;
+                        return (
+                          <>
+                            <div className="relative group">
+                              <button
+                                onClick={() => !ownedByOther && updateTicketStatus(item.id, 'resolved')}
+                                disabled={ownedByOther}
+                                className={`px-2.5 py-1.5 border rounded-lg text-[11px] font-medium transition-all ${
+                                  ownedByOther
+                                    ? 'bg-emerald-500/5 border-emerald-500/10 text-emerald-400/40 cursor-not-allowed'
+                                    : 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
+                                }`}
+                              >
+                                Решено
+                              </button>
+                              {ownedByOther && (
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-slate-800 border border-white/10 text-[10px] text-slate-300 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                  Этот тикет в работе у другого администратора
+                                </div>
+                              )}
+                            </div>
+                            <div className="relative group">
+                              <button
+                                onClick={() => !ownedByOther && updateTicketStatus(item.id, 'closed')}
+                                disabled={ownedByOther}
+                                className={`px-2.5 py-1.5 border rounded-lg text-[11px] font-medium transition-all ${
+                                  ownedByOther
+                                    ? 'bg-slate-500/5 border-slate-500/10 text-slate-400/40 cursor-not-allowed'
+                                    : 'bg-slate-500/10 hover:bg-slate-500/20 border-slate-500/30 text-slate-400'
+                                }`}
+                              >
+                                Закрыть
+                              </button>
+                              {ownedByOther && (
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-slate-800 border border-white/10 text-[10px] text-slate-300 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                  Этот тикет в работе у другого администратора
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>

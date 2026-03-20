@@ -378,6 +378,7 @@ type SupportTicketRow struct {
 	Message   string `json:"message"`
 	Status    string `json:"status"`
 	TgChatID  *int64 `json:"tg_chat_id"`
+	ClaimedBy int    `json:"claimed_by"`
 	CreatedAt string `json:"created_at"`
 }
 
@@ -385,7 +386,7 @@ func GetAllSupportTickets(statusFilter string) ([]SupportTicketRow, error) {
 	if GlobalDB == nil {
 		return nil, fmt.Errorf("database connection not initialized")
 	}
-	q := `SELECT st.id, st.user_id, COALESCE(st.email, u.email), st.subject, COALESCE(st.message, ''), st.status, st.tg_chat_id, st.created_at
+	q := `SELECT st.id, st.user_id, COALESCE(st.email, u.email), st.subject, COALESCE(st.message, ''), st.status, st.tg_chat_id, COALESCE(st.claimed_by, 0), st.created_at
 	      FROM support_tickets st JOIN users u ON u.id = st.user_id`
 	var args []interface{}
 	if statusFilter != "" {
@@ -402,7 +403,7 @@ func GetAllSupportTickets(statusFilter string) ([]SupportTicketRow, error) {
 	for rows.Next() {
 		var t SupportTicketRow
 		var createdAt time.Time
-		if err := rows.Scan(&t.ID, &t.UserID, &t.Email, &t.Subject, &t.Message, &t.Status, &t.TgChatID, &createdAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.UserID, &t.Email, &t.Subject, &t.Message, &t.Status, &t.TgChatID, &t.ClaimedBy, &createdAt); err != nil {
 			continue
 		}
 		t.CreatedAt = createdAt.Format(time.RFC3339)
@@ -431,15 +432,33 @@ func CreateSupportTicket(userID int, email, subject, message string) (int, error
 	return id, nil
 }
 
-func UpdateSupportTicketStatus(ticketID int, status string) error {
+func UpdateSupportTicketStatus(ticketID int, status string, adminID int) error {
 	if GlobalDB == nil {
 		return fmt.Errorf("database connection not initialized")
+	}
+	// When taking a ticket "in_progress", set claimed_by
+	if status == "in_progress" {
+		_, err := GlobalDB.Exec(
+			`UPDATE support_tickets SET status = $1, claimed_by = $2, updated_at = NOW() WHERE id = $3`,
+			status, adminID, ticketID,
+		)
+		return err
 	}
 	_, err := GlobalDB.Exec(
 		`UPDATE support_tickets SET status = $1, updated_at = NOW() WHERE id = $2`,
 		status, ticketID,
 	)
 	return err
+}
+
+// GetSupportTicketClaimedBy returns the claimed_by value for a ticket.
+func GetSupportTicketClaimedBy(ticketID int) int {
+	if GlobalDB == nil {
+		return 0
+	}
+	var claimedBy int
+	_ = GlobalDB.QueryRow(`SELECT COALESCE(claimed_by, 0) FROM support_tickets WHERE id = $1`, ticketID).Scan(&claimedBy)
+	return claimedBy
 }
 
 // --- Emergency Freeze ---

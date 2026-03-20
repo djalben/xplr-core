@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/djalben/xplr-core/backend/middleware"
 	"github.com/djalben/xplr-core/backend/models"
 	"github.com/djalben/xplr-core/backend/repository"
+	"github.com/djalben/xplr-core/backend/service"
 	"github.com/gorilla/mux"
 	"github.com/shopspring/decimal"
 )
@@ -235,6 +237,15 @@ func PatchCardStatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Notify user about card status change
+	statusLabels := map[string]string{"FROZEN": "❄️ Карта заморожена", "ACTIVE": "✅ Карта активирована", "BLOCKED": "🔒 Карта заблокирована", "CLOSED": "❌ Карта закрыта"}
+	label := statusLabels[status]
+	if label == "" {
+		label = status
+	}
+	go service.NotifyUser(userID, label,
+		fmt.Sprintf("%s\n\nКарта ID: <b>%d</b>\nСтатус: <b>%s</b>\n\n<a href=\"https://xplr.pro/cards\">Открыть карты</a>", label, cardID, status))
+
 	// Return updated wallet balance so frontend can refresh instantly
 	resp := map[string]interface{}{
 		"card_id": cardID,
@@ -310,6 +321,14 @@ func MassIssueCardsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	// Notify user about card issue
+	go service.NotifyUser(userID, "Карта выпущена",
+		fmt.Sprintf("💳 <b>Карта успешно выпущена</b>\n\n"+
+			"🏷 Категория: <b>%s</b>\n"+
+			"📦 Количество: <b>%d</b>\n\n"+
+			"<a href=\"https://xplr.pro/cards\">Открыть карты</a>",
+			cat, req.Count))
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)

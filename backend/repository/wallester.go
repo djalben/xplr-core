@@ -141,7 +141,7 @@ func (wr *WallesterRepository) IssueCard(
 
 	// 3. Подготовка запроса к Wallester API
 	reqBody := WallesterCardRequest{
-		Currency: "RUB",
+		Currency: "USD",
 		CardType: cardType,
 		CardName: nickname,
 		Amount:   "0", // Начальный баланс 0, пополнение через наш баланс

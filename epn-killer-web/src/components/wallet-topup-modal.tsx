@@ -59,20 +59,19 @@ export const WalletTopUpModal = ({ onClose, onSuccess }: WalletTopUpModalProps) 
   const { rates } = useRates();
   const [selectedCurrency, setSelectedCurrency] = useState<'USD' | 'EUR'>('USD');
   const [foreignAmount, setForeignAmount] = useState('');
+  const [rubInput, setRubInput] = useState('');
   const [activeRubPreset, setActiveRubPreset] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
   const currentRate = selectedCurrency === 'USD' ? rates.usd : rates.eur;
   const currencySymbol = selectedCurrency === 'USD' ? '$' : '€';
-  const rubAmount = foreignAmount && !isNaN(parseFloat(foreignAmount))
-    ? (parseFloat(foreignAmount) * currentRate).toFixed(0)
-    : '';
 
   const rubPresets = [1000, 2000, 5000, 10000, 20000, 50000, 100000];
 
   const handleRubPreset = (rub: number) => {
     setActiveRubPreset(rub);
+    setRubInput(String(rub));
     const converted = (rub / currentRate).toFixed(2);
     setForeignAmount(converted);
   };
@@ -80,6 +79,21 @@ export const WalletTopUpModal = ({ onClose, onSuccess }: WalletTopUpModalProps) 
   const handleForeignInput = (val: string) => {
     setForeignAmount(val);
     setActiveRubPreset(null);
+    if (val && !isNaN(parseFloat(val))) {
+      setRubInput((parseFloat(val) * currentRate).toFixed(0));
+    } else {
+      setRubInput('');
+    }
+  };
+
+  const handleRubInput = (val: string) => {
+    setRubInput(val);
+    setActiveRubPreset(null);
+    if (val && !isNaN(parseFloat(val))) {
+      setForeignAmount((parseFloat(val) / currentRate).toFixed(2));
+    } else {
+      setForeignAmount('');
+    }
   };
 
   return (
@@ -172,11 +186,12 @@ export const WalletTopUpModal = ({ onClose, onSuccess }: WalletTopUpModalProps) 
               <div className="flex-1 relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50 text-sm font-bold">₽</span>
                 <input
-                  type="text"
-                  readOnly
-                  value={rubAmount ? Number(rubAmount).toLocaleString('ru-RU') : ''}
+                  type="number"
+                  inputMode="numeric"
+                  value={rubInput}
+                  onChange={(e) => handleRubInput(e.target.value)}
                   placeholder="0"
-                  className="w-full h-11 pl-9 pr-3 bg-white/[0.04] border border-white/[0.08] rounded-xl text-white text-base font-semibold placeholder:text-slate-600 cursor-default"
+                  className="w-full h-11 pl-9 pr-3 bg-white/[0.04] border border-white/[0.10] rounded-xl text-white text-base font-semibold focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/50 transition-colors placeholder:text-slate-600"
                 />
               </div>
               <div className="px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.06] text-[11px] text-slate-400 whitespace-nowrap">
@@ -192,11 +207,11 @@ export const WalletTopUpModal = ({ onClose, onSuccess }: WalletTopUpModalProps) 
             )}
             <button
               onClick={async () => {
-                if (!rubAmount) return;
+                if (!rubInput) return;
                 setIsLoading(true);
                 setError('');
                 try {
-                  await topUpWallet(Number(rubAmount));
+                  await topUpWallet(Number(rubInput));
                   onSuccess?.();
                   onClose();
                 } catch (err: any) {
@@ -205,11 +220,11 @@ export const WalletTopUpModal = ({ onClose, onSuccess }: WalletTopUpModalProps) 
                   setIsLoading(false);
                 }
               }}
-              disabled={!foreignAmount || parseFloat(foreignAmount) <= 0 || isLoading}
+              disabled={!rubInput || parseFloat(rubInput) <= 0 || isLoading}
               className="w-full py-4 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2.5 text-base"
             >
               <SbpLogo />
-              <span>{isLoading ? 'Обработка...' : `Пополнить через СБП${rubAmount ? ` — ${Number(rubAmount).toLocaleString('ru-RU')} ₽` : ''}`}</span>
+              <span>{isLoading ? 'Обработка...' : `Пополнить через СБП${rubInput ? ` — ${Number(rubInput).toLocaleString('ru-RU')} ₽` : ''}`}</span>
             </button>
             {/* Bank icons row */}
             <div className="flex items-center justify-center gap-3">
