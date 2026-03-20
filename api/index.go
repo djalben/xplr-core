@@ -64,6 +64,12 @@ func ensureDB() {
 	if token := os.Getenv("TELEGRAM_BOT_TOKEN"); token != "" {
 		telegram.SetBotToken(token)
 		telegram.AdminChatIDsProvider = repository.GetAdminChatIDs
+		log.Println("✅ [INIT] Telegram bot token set")
+	} else {
+		log.Println("[ERROR] Notification service not initialized: TELEGRAM_BOT_TOKEN is empty — TG notifications DISABLED")
+	}
+	if os.Getenv("SMTP_HOST") == "" || os.Getenv("SMTP_PORT") == "" {
+		log.Println("[ERROR] Notification service not initialized: SMTP not configured — Email notifications DISABLED")
 	}
 
 	// 4. Wallester

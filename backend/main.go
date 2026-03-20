@@ -99,7 +99,18 @@ func main() {
 	if token := os.Getenv("TELEGRAM_BOT_TOKEN"); token != "" {
 		telegram.SetBotToken(token)
 		telegram.AdminChatIDsProvider = repository.GetAdminChatIDs
-		log.Println("Telegram bot token set: real notifications enabled")
+		log.Println("✅ [INIT] Telegram bot token set: real notifications enabled")
+	} else {
+		log.Println("[ERROR] Notification service not initialized: TELEGRAM_BOT_TOKEN is empty — Telegram notifications will be DISABLED")
+	}
+
+	// SMTP check
+	if os.Getenv("SMTP_HOST") == "" || os.Getenv("SMTP_PORT") == "" {
+		log.Println("[ERROR] Notification service not initialized: SMTP_HOST/SMTP_PORT not set — Email notifications will be DISABLED")
+	} else if os.Getenv("SMTP_USER") == "" || os.Getenv("SMTP_PASS") == "" {
+		log.Println("[ERROR] Notification service not initialized: SMTP_USER/SMTP_PASS not set — Email notifications will FAIL")
+	} else {
+		log.Printf("✅ [INIT] SMTP configured: host=%s, port=%s, user=%s", os.Getenv("SMTP_HOST"), os.Getenv("SMTP_PORT"), os.Getenv("SMTP_USER"))
 	}
 
 	// Инициализация Wallester Repository

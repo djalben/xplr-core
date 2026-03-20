@@ -102,9 +102,11 @@ func SendMessage(chatID int64, message string) {
 // SendMessageHTML отправляет сообщение с HTML-разметкой (parse_mode=HTML).
 func SendMessageHTML(chatID int64, message string) {
 	if botToken == "" {
+		log.Printf("[TELEGRAM] ⚠️ SendMessageHTML skipped: TELEGRAM_BOT_TOKEN not set (chat_id=%d)", chatID)
 		return
 	}
 	if chatID == 0 {
+		log.Printf("[TELEGRAM] ⚠️ SendMessageHTML skipped: chatID is 0")
 		return
 	}
 	chatIDStr := fmt.Sprintf("%d", chatID)
@@ -113,13 +115,39 @@ func SendMessageHTML(chatID int64, message string) {
 		botToken, chatIDStr, encodedMessage)
 	resp, err := http.Get(apiURL)
 	if err != nil {
-		log.Printf("Telegram SendMessageHTML failed (Chat %d): %v", chatID, err)
+		log.Printf("[TELEGRAM] ❌ SendMessageHTML failed (Chat %d): %v", chatID, err)
 		return
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		log.Printf("Telegram SendMessageHTML failed (Chat %d): API returned %d", chatID, resp.StatusCode)
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("[TELEGRAM] ❌ SendMessageHTML failed (Chat %d): API status %d, body: %s", chatID, resp.StatusCode, string(body))
 	}
+}
+
+// SendMessageHTMLSafe — error-returning version of SendMessageHTML for use in NotifyUser.
+// Returns an error instead of silently swallowing failures, enabling proper logging upstream.
+func SendMessageHTMLSafe(chatID int64, message string) error {
+	if botToken == "" {
+		return fmt.Errorf("TELEGRAM_BOT_TOKEN not set — Telegram notifications disabled")
+	}
+	if chatID == 0 {
+		return fmt.Errorf("chatID is 0 — cannot send Telegram message")
+	}
+	chatIDStr := fmt.Sprintf("%d", chatID)
+	encodedMessage := url.QueryEscape(message)
+	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?chat_id=%s&parse_mode=HTML&text=%s",
+		botToken, chatIDStr, encodedMessage)
+	resp, err := http.Get(apiURL)
+	if err != nil {
+		return fmt.Errorf("HTTP request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("Telegram API returned %d: %s", resp.StatusCode, string(body))
+	}
+	return nil
 }
 
 // NotifyAdmins отправляет HTML-сообщение всем админам с привязанным Telegram.
