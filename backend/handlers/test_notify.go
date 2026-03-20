@@ -77,6 +77,34 @@ func AdminTestNotifyHandler(w http.ResponseWriter, r *http.Request) {
 	var tgValid bool
 	var notifPref string
 
+	// If no userId provided, discover real users from DB
+	if userID == 0 {
+		if repository.GlobalDB != nil {
+			rows, err := repository.GlobalDB.Query(
+				`SELECT id, COALESCE(email,''), COALESCE(telegram_chat_id,0), COALESCE(notification_pref,'both')
+				 FROM users ORDER BY id LIMIT 5`)
+			if err != nil {
+				result["db_discovery_error"] = err.Error()
+			} else {
+				defer rows.Close()
+				var users []map[string]interface{}
+				for rows.Next() {
+					var uid int
+					var em string
+					var tcid int64
+					var pf string
+					if err := rows.Scan(&uid, &em, &tcid, &pf); err == nil {
+						users = append(users, map[string]interface{}{
+							"id": uid, "email": em, "tg_chat_id": tcid, "pref": pf,
+						})
+					}
+				}
+				result["db_users_sample"] = users
+				result["hint"] = "Add ?userId=<id> to test a specific user"
+			}
+		}
+	}
+
 	if userID > 0 {
 		notifPref = repository.GetNotificationPref(userID)
 		user, err := repository.GetUserByID(userID)
