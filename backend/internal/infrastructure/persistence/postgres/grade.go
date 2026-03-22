@@ -34,6 +34,21 @@ func (r *gradeRepo) GetByUserID(ctx context.Context, userID domain.UUID) (*domai
 	return &g, nil
 }
 
+// EnsureGrade — создаёт дефолтный грейд STANDARD при регистрации.
+func (r *gradeRepo) EnsureGrade(ctx context.Context, userID domain.UUID) error {
+	const query = `
+		INSERT INTO user_grades (user_id, grade, total_spent, fee_percent)
+		VALUES ($1, 'STANDARD', 0, 6.70)
+		ON CONFLICT (user_id) DO NOTHING`
+
+	_, err := r.store.ExecContext(ctx, query, userID)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	return nil
+}
+
 // Update — обновление грейда.
 func (r *gradeRepo) Update(ctx context.Context, grade *domain.UserGrade) error {
 	const query = `

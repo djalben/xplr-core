@@ -30,15 +30,13 @@ func NewHandler(cardUC *card.UseCase, commissionUC *commission.UseCase, ticketUC
 }
 
 func (h *Handler) Register(r chi.Router) {
-	r.Route("/admin", func(r chi.Router) {
-		r.Post("/tariffs", h.ChangeTariffs)
-		r.Post("/referrals", h.ChangeReferralBonuses)
-		r.Put("/cards/{id}/block", h.BlockCard)
-		r.Put("/cards/{id}/unblock", h.UnblockCard)
-		r.Put("/tickets/{id}/take", h.TakeTicket)
-		r.Put("/tickets/{id}/close", h.CloseTicket)
-		r.Put("/users/{id}/grade", h.ChangeUserGrade)
-	})
+	r.Post("/tariffs", h.ChangeTariffs)
+	r.Post("/referrals", h.ChangeReferralBonuses)
+	r.Put("/cards/{id}/block", h.BlockCard)
+	r.Put("/cards/{id}/unblock", h.UnblockCard)
+	r.Put("/tickets/{id}/take", h.TakeTicket)
+	r.Put("/tickets/{id}/close", h.CloseTicket)
+	r.Put("/users/{id}/grade", h.ChangeUserGrade)
 }
 
 // ChangeTariffs — POST /admin/tariffs.

@@ -8,39 +8,36 @@ import (
 )
 
 // Auth — проверка JWT токена.
-func Auth(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tokenStr := r.Header.Get("Authorization")
-		if tokenStr == "" {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+func Auth(jwtSecret []byte) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			tokenStr := r.Header.Get("Authorization")
+			if tokenStr == "" {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 
-			return
-		}
+				return
+			}
 
-		// Парсим JWT
-		userID, err := utils.ValidateJWT(tokenStr)
-		if err != nil {
-			http.Error(w, "Invalid token", http.StatusUnauthorized)
+			userID, err := utils.ValidateJWT(jwtSecret, tokenStr)
+			if err != nil {
+				http.Error(w, "Invalid token", http.StatusUnauthorized)
 
-			return
-		}
+				return
+			}
 
-		// Добавляем userID в контекст
-		ctx := r.Context()
-		ctx = context.WithValue(ctx, "userID", userID)
-		r = r.WithContext(ctx)
+			ctx := r.Context()
+			ctx = context.WithValue(ctx, "userID", userID)
+			r = r.WithContext(ctx)
 
-		next.ServeHTTP(w, r)
-	})
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
-// AdminOnly — проверка на админа.
+// AdminOnly — проверка на админа (заглушка до добавления is_admin в users).
 func AdminOnly(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// userID := handler.GetUserIDFromContext(r)
-
-		// TODO: проверь роль юзера (из userRepo, user.Role == "admin")
-		isAdmin := true // заглушка, замени на реальную проверку
+		isAdmin := true
 
 		if !isAdmin {
 			http.Error(w, "Forbidden", http.StatusForbidden)

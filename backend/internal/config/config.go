@@ -14,6 +14,9 @@ type ENV struct {
 	ServerHost string `env:"SERVER_HOST" default:"0.0.0.0"`
 	ServerPort int    `env:"SERVER_PORT" default:"8080"`
 
+	// JWT
+	JWTSecret string `env:"JWT_SECRET" required:"true"`
+
 	// Логи
 	LogLevel string `env:"LOG_LEVEL" default:"info"`
 	LogPlain bool   `env:"LOG_PLAIN" default:"false"`

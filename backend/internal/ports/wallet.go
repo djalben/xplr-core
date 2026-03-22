@@ -8,5 +8,6 @@ import (
 
 type WalletRepository interface {
 	GetByUserID(ctx context.Context, userID domain.UUID) (*domain.Wallet, error)
+	EnsureWallet(ctx context.Context, userID domain.UUID) error
 	Update(ctx context.Context, wallet *domain.Wallet) error
 }

@@ -33,6 +33,20 @@ func (r *walletRepo) GetByUserID(ctx context.Context, userID domain.UUID) (*doma
 	return &w, nil
 }
 
+func (r *walletRepo) EnsureWallet(ctx context.Context, userID domain.UUID) error {
+	const query = `
+		INSERT INTO wallets (user_id, balance, auto_topup_enabled)
+		VALUES ($1, 0, false)
+		ON CONFLICT (user_id) DO NOTHING`
+
+	_, err := r.db.ExecContext(ctx, query, userID)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	return nil
+}
+
 func (r *walletRepo) Update(ctx context.Context, wallet *domain.Wallet) error {
 	const query = `
 		UPDATE wallets 

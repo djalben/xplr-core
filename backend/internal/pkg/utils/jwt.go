@@ -1,42 +1,68 @@
 package utils
 
 import (
-	"log"
+	"strings"
 	"time"
 
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"gitlab.com/libs-artifex/wrapper/v2"
 )
 
-var jwtKey = []byte("my_super_secret_jwt_key")
+const bearerPrefix = "Bearer "
 
-// GenerateJWT создает JWT для данного ID пользователя.
-func GenerateJWT(userID int) (string, error) {
+// GenerateJWT создаёт JWT для данного пользователя.
+func GenerateJWT(secret []byte, userID domain.UUID, email string) (string, error) {
 	expirationTime := time.Now().Add(24 * time.Hour)
 	claims := jwt.MapClaims{
-		"user_id": userID,
+		"user_id": userID.String(),
+		"email":   email,
 		"exp":     expirationTime.Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	tokenString, err := token.SignedString(jwtKey)
+	tokenString, err := token.SignedString(secret)
 	if err != nil {
-		log.Printf("Error creating JWT: %v", err)
-
 		return "", wrapper.Wrap(err)
 	}
 
 	return tokenString, nil
 }
 
-// GetJWTSecret возвращает секретный ключ для проверки токена.
-func GetJWTSecret() []byte {
-	return jwtKey
-}
+// ValidateJWT парсит Bearer токен и возвращает user_id.
+func ValidateJWT(secret []byte, tokenStr string) (domain.UUID, error) {
+	tokenStr = strings.TrimPrefix(tokenStr, bearerPrefix)
+	if tokenStr == "" {
+		return domain.UUID{}, wrapper.Wrap(jwt.ErrTokenMalformed)
+	}
 
-func ValidateJWT(tokenStr string) (domain.UUID, error) {
-	// TODO: парсинг JWT с jwt.Parse и извлечение userID
-	return domain.NewUUID(), nil // заглушка
+	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (any, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, jwt.ErrSignatureInvalid
+		}
+
+		return secret, nil
+	})
+	if err != nil {
+		return domain.UUID{}, wrapper.Wrap(err)
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok || !token.Valid {
+		return domain.UUID{}, wrapper.Wrap(jwt.ErrTokenInvalidClaims)
+	}
+
+	userIDStr, ok := claims["user_id"].(string)
+	if !ok || userIDStr == "" {
+		return domain.UUID{}, wrapper.Wrap(jwt.ErrTokenInvalidClaims)
+	}
+
+	parsed, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return domain.UUID{}, wrapper.Wrap(err)
+	}
+
+	return parsed, nil
 }

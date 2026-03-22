@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 
+	"github.com/djalben/xplr-core/backend/internal/application/auth"
 	"github.com/djalben/xplr-core/backend/internal/application/card"
 	"github.com/djalben/xplr-core/backend/internal/application/commission"
 	"github.com/djalben/xplr-core/backend/internal/application/grades"
@@ -27,6 +28,7 @@ type Container struct {
 	CommissionRepo  ports.CommissionConfigRepository
 	GradeRepo       ports.GradeRepository
 
+	AuthUseCase        *auth.UseCase
 	WalletUseCase      *wallet.UseCase
 	CardUseCase        *card.UseCase
 	TransactionUseCase *transaction.UseCase
@@ -53,6 +55,7 @@ func NewContainer(cfg *config.ENV) (*Container, error) {
 
 	// WalletUseCase создаём первым — он нужен для CardUseCase
 	walletUC := wallet.NewUseCase(walletRepo, transactionRepo)
+	authUC := auth.NewUseCase(userRepo, walletRepo, gradeRepo, []byte(cfg.JWTSecret))
 
 	return &Container{
 		DB: db,
@@ -65,6 +68,7 @@ func NewContainer(cfg *config.ENV) (*Container, error) {
 		CommissionRepo:  commissionRepo,
 		GradeRepo:       gradeRepo,
 
+		AuthUseCase:        authUC,
 		WalletUseCase:      walletUC,
 		CardUseCase:        card.NewUseCase(cardRepo, walletRepo, transactionRepo, walletUC),
 		TransactionUseCase: transaction.NewUseCase(transactionRepo),

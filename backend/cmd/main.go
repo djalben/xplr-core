@@ -44,7 +44,7 @@ func main() {
 	}()
 
 	// Запуск сервера
-	server := httpServer.NewServer(container, cfg.ServerHost, cfg.ServerPort)
+	server := httpServer.NewServer(container, cfg.ServerHost, cfg.ServerPort, []byte(cfg.JWTSecret))
 
 	go func() {
 		err := server.Start()

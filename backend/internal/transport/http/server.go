@@ -9,6 +9,8 @@ import (
 	"github.com/djalben/xplr-core/backend/internal/app"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler"
 	adminApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/admin"
+	authApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/auth"
+	authMiddleware "github.com/djalben/xplr-core/backend/internal/transport/http/middleware"
 	cardApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/card"
 	ticketApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/ticket"
 	transactionApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/transaction"
@@ -25,7 +27,7 @@ type Server struct {
 	router    *chi.Mux
 }
 
-func NewServer(container *app.Container, host string, port int) *Server {
+func NewServer(container *app.Container, host string, port int, jwtSecret []byte) *Server {
 	r := chi.NewRouter()
 
 	s := &Server{
@@ -41,7 +43,7 @@ func NewServer(container *app.Container, host string, port int) *Server {
 	}
 
 	s.setupMiddleware()
-	s.setupRoutes()
+	s.setupRoutes(jwtSecret)
 
 	return s
 }
@@ -51,6 +53,7 @@ func (s *Server) Start() error {
 	if err != nil {
 		return wrapper.Wrap(err)
 	}
+
 	return nil
 }
 
@@ -59,6 +62,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	if err != nil {
 		return wrapper.Wrap(err)
 	}
+
 	return nil
 }
 
@@ -71,26 +75,39 @@ func (s *Server) setupMiddleware() {
 
 	s.router.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders:   []string{"*"},
 		AllowCredentials: true,
 	}))
 }
 
-func (s *Server) setupRoutes() {
-	s.router.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
-	})
+func (s *Server) setupRoutes(jwtSecret []byte) {
+	s.router.Route("/api", func(r chi.Router) {
+		r.Get("/health", func(w http.ResponseWriter, req *http.Request) {
+			handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+		})
 
-	s.router.Route("/v1", func(r chi.Router) {
-		walletApi.NewHandler(s.container.WalletUseCase).Register(r)
-		cardApi.NewHandler(s.container.CardUseCase).Register(r)
-		ticketApi.NewHandler(s.container.TicketUseCase).Register(r)
-		transactionApi.NewHandler(s.container.TransactionUseCase).Register(r)
-	})
+		r.Route("/v1", func(r chi.Router) {
+			// Public: auth
+			authApi.NewHandler(s.container.AuthUseCase, s.container.WalletUseCase, s.container.UserRepo, jwtSecret).Register(r)
 
-	s.router.Route("/admin", func(r chi.Router) {
-		// adminApi.NewHandler(...) уже добавлен в предыдущем шаге
-		adminApi.NewHandler(s.container.CardUseCase, s.container.CommissionUseCase, s.container.TicketUseCase, s.container.GradesUseCase).Register(r)
+			// Protected: wallet, card, transaction, ticket
+			r.Group(func(r chi.Router) {
+				r.Use(authMiddleware.Auth(jwtSecret))
+				walletApi.NewHandler(s.container.WalletUseCase).Register(r)
+				cardApi.NewHandler(s.container.CardUseCase).Register(r)
+				ticketApi.NewHandler(s.container.TicketUseCase).Register(r)
+				transactionApi.NewHandler(s.container.TransactionUseCase).Register(r)
+			})
+		})
+
+		r.Route("/admin", func(r chi.Router) {
+			r.Group(func(r chi.Router) {
+				r.Use(authMiddleware.Auth(jwtSecret))
+				r.Use(authMiddleware.AdminOnly)
+				adminApi.NewHandler(s.container.CardUseCase, s.container.CommissionUseCase,
+					s.container.TicketUseCase, s.container.GradesUseCase).Register(r)
+			})
+		})
 	})
 }
