@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/djalben/xplr-core/backend/internal/domain"
+	"github.com/djalben/xplr-core/backend/internal/ports"
 	"github.com/djalben/xplr-core/backend/internal/pkg/utils"
 )
 
@@ -34,17 +36,31 @@ func Auth(jwtSecret []byte) func(http.Handler) http.Handler {
 	}
 }
 
-// AdminOnly — проверка на админа (заглушка до добавления is_admin в users).
-func AdminOnly(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		isAdmin := true
+// AdminOnly — проверка на админа через UserRepository.
+func AdminOnly(userRepo ports.UserRepository) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			userID, ok := r.Context().Value("userID").(domain.UUID)
+			if !ok {
+				http.Error(w, "Forbidden", http.StatusForbidden)
 
-		if !isAdmin {
-			http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
 
-			return
-		}
+			user, err := userRepo.GetByID(r.Context(), userID)
+			if err != nil || user == nil {
+				http.Error(w, "Forbidden", http.StatusForbidden)
 
-		next.ServeHTTP(w, r)
-	})
+				return
+			}
+
+			if !user.IsAdmin {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
 }

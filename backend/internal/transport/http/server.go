@@ -12,6 +12,7 @@ import (
 	authApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/auth"
 	authMiddleware "github.com/djalben/xplr-core/backend/internal/transport/http/middleware"
 	cardApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/card"
+	userApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/user"
 	ticketApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/ticket"
 	transactionApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/transaction"
 	walletApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/wallet"
@@ -91,9 +92,18 @@ func (s *Server) setupRoutes(jwtSecret []byte) {
 			// Public: auth
 			authApi.NewHandler(s.container.AuthUseCase, s.container.WalletUseCase, s.container.UserRepo, jwtSecret).Register(r)
 
-			// Protected: wallet, card, transaction, ticket
+			// Public: rates (курсы валют)
+			r.Get("/rates", func(w http.ResponseWriter, r *http.Request) {
+				handler.WriteJSON(w, http.StatusOK, map[string]any{
+					"usd": 89.45,
+					"eur": 97.82,
+				})
+			})
+
+			// Protected: user (BFF), wallet, card, transaction, ticket
 			r.Group(func(r chi.Router) {
 				r.Use(authMiddleware.Auth(jwtSecret))
+				userApi.NewHandler(s.container.UserUseCase, s.container.WalletUseCase, s.container.GradesUseCase, s.container.CardUseCase, s.container.TransactionUseCase, s.container.TicketUseCase, s.container.ReferralRepo).Register(r)
 				walletApi.NewHandler(s.container.WalletUseCase).Register(r)
 				cardApi.NewHandler(s.container.CardUseCase).Register(r)
 				ticketApi.NewHandler(s.container.TicketUseCase).Register(r)
@@ -104,7 +114,7 @@ func (s *Server) setupRoutes(jwtSecret []byte) {
 		r.Route("/admin", func(r chi.Router) {
 			r.Group(func(r chi.Router) {
 				r.Use(authMiddleware.Auth(jwtSecret))
-				r.Use(authMiddleware.AdminOnly)
+				r.Use(authMiddleware.AdminOnly(s.container.UserRepo))
 				adminApi.NewHandler(s.container.CardUseCase, s.container.CommissionUseCase,
 					s.container.TicketUseCase, s.container.GradesUseCase).Register(r)
 			})

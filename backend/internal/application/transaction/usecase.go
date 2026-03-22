@@ -36,3 +36,13 @@ func (uc *UseCase) GetCardTransactions(ctx context.Context, cardID domain.UUID, 
 
 	return list, nil
 }
+
+// GetUnifiedTransactions — вся история пользователя (BFF).
+func (uc *UseCase) GetUnifiedTransactions(ctx context.Context, userID domain.UUID, from, to time.Time, limit int) ([]*domain.Transaction, error) {
+	list, err := uc.txRepo.GetByUserID(ctx, userID, from, to, limit)
+	if err != nil {
+		return nil, wrapper.Wrap(err)
+	}
+
+	return list, nil
+}

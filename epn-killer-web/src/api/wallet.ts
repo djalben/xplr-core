@@ -20,8 +20,8 @@ export const topUpWallet = async (amount: number): Promise<InternalBalance> => {
 };
 
 // Установить лимит списания карты из Кошелька
-export const setCardSpendingLimit = async (cardId: number, spendingLimit: number): Promise<void> => {
-  await apiClient.patch(`/user/cards/${cardId}/spending-limit`, {
+export const setCardSpendingLimit = async (cardId: string | number, spendingLimit: number): Promise<void> => {
+  await apiClient.patch(`/user/cards/${String(cardId)}/spending-limit`, {
     spending_limit: spendingLimit,
   });
 };

@@ -8,6 +8,7 @@ type User struct {
 	ID             UUID       `json:"id" db:"id"`
 	Email          string     `json:"email" db:"email"`
 	PasswordHash   string     `json:"-" db:"-"`
+	IsAdmin        bool       `json:"isAdmin" db:"is_admin"`
 	KYCStatus      KYCStatus  `json:"kycStatus" db:"kyc_status"`
 	Status         UserStatus `json:"status" db:"status"`
 	TelegramChatID *int64     `json:"telegramChatId,omitempty" db:"telegram_chat_id"`

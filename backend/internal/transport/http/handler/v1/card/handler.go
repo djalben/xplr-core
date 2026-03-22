@@ -31,6 +31,7 @@ func (h *Handler) BuyCard(w http.ResponseWriter, r *http.Request) {
 
 	type request struct {
 		CardType string `json:"cardType"`
+		Nickname string `json:"nickname"`
 	}
 
 	var req request
@@ -42,7 +43,7 @@ func (h *Handler) BuyCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	card, err := h.useCase.BuyCard(r.Context(), userID, domain.CardType(req.CardType))
+	card, err := h.useCase.BuyCard(r.Context(), userID, domain.CardType(req.CardType), req.Nickname)
 	if err != nil {
 		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
 

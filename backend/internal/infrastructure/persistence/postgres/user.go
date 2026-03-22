@@ -19,7 +19,7 @@ func NewUserRepository(db *sqlx.DB) ports.UserRepository {
 
 // GetByID — получение пользователя.
 func (r *userRepo) GetByID(ctx context.Context, id domain.UUID) (*domain.User, error) {
-	const query = `SELECT id, email, password_hash, kyc_status, status, telegram_chat_id, 
+	const query = `SELECT id, email, password_hash, is_admin, kyc_status, status, telegram_chat_id, 
 	                      referral_code, referred_by, created_at 
 	               FROM users WHERE id = $1`
 
@@ -35,7 +35,7 @@ func (r *userRepo) GetByID(ctx context.Context, id domain.UUID) (*domain.User, e
 
 // GetByEmail — по email.
 func (r *userRepo) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
-	const query = `SELECT id, email, password_hash, kyc_status, status, telegram_chat_id, 
+	const query = `SELECT id, email, password_hash, is_admin, kyc_status, status, telegram_chat_id, 
 	                      referral_code, referred_by, created_at 
 	               FROM users WHERE email = $1`
 
@@ -52,12 +52,12 @@ func (r *userRepo) GetByEmail(ctx context.Context, email string) (*domain.User, 
 // Save — создание пользователя.
 func (r *userRepo) Save(ctx context.Context, user *domain.User) error {
 	const query = `
-		INSERT INTO users (id, email, password_hash, kyc_status, status, 
+		INSERT INTO users (id, email, password_hash, is_admin, kyc_status, status, 
 		                   telegram_chat_id, referral_code, referred_by, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
 
 	_, err := r.store.ExecContext(ctx, query,
-		user.ID, user.Email, user.PasswordHash, user.KYCStatus,
+		user.ID, user.Email, user.PasswordHash, user.IsAdmin, user.KYCStatus,
 		user.Status, user.TelegramChatID, user.ReferralCode,
 		user.ReferredBy, user.CreatedAt,
 	)

@@ -176,6 +176,7 @@
       "notVerified": "Not verified",
       "displayName": "Display Name",
       "displayNamePlaceholder": "Your name",
+      "edit": "Edit",
       "saveProfile": "Save",
       "profileUpdated": "Profile updated",
       "saveError": "Save failed"
@@ -273,7 +274,15 @@
       "submitReview": "Submit for Review",
       "submitSuccess": "Request submitted for review",
       "submitError": "Failed to submit request",
-      "fillRequired": "Fill in all required fields"
+      "fillRequired": "Fill in all required fields",
+      "countries": {
+        "RU": "🇷🇺 Russia",
+        "BY": "🇧🇾 Belarus",
+        "KZ": "🇰🇿 Kazakhstan",
+        "UA": "🇺🇦 Ukraine",
+        "US": "🇺🇸 USA",
+        "DE": "🇩🇪 Germany"
+      }
     },
     "error": "Error",
     "emailVerify": {
@@ -291,9 +300,27 @@
   },
   "support": {
     "title": "Support",
-    "subtitle": "How can we help?",
-    "newTicket": "New Ticket",
-    "faq": "FAQ"
+    "subtitle": "Select a topic to start a chat",
+    "chatTitle": "Support Chat",
+    "online": "Online",
+    "closeChat": "Close chat",
+    "chatClosed": "Chat closed",
+    "placeholder": "Type a message...",
+    "welcomeMsg": "A specialist will connect shortly",
+    "avgResponse": "Average response time:",
+    "avgResponseTime": "up to 5 minutes",
+    "error": "Something went wrong. Please try again.",
+    "sendError": "Failed to send message",
+    "topics": {
+      "cards": "Cards",
+      "cardsDesc": "Issuance, blocking, limits",
+      "payments": "Payments & Balance",
+      "paymentsDesc": "Top-up, withdrawal, transactions",
+      "security": "Security",
+      "securityDesc": "2FA, verification, access",
+      "other": "Other",
+      "otherDesc": "Everything else"
+    }
   },
   "auth": {
     "login": "Login",
@@ -360,10 +387,5 @@
     "back": "Back",
     "next": "Next",
     "search": "Search..."
-  },
-  "clocks": {
-    "moscow": "Moscow",
-    "london": "London",
-    "newYork": "New York"
   }
 }

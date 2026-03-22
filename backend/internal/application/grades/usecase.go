@@ -16,6 +16,16 @@ func NewUseCase(gr ports.GradeRepository) *UseCase {
 	return &UseCase{gradeRepo: gr}
 }
 
+// GetByUserID — возвращает грейд пользователя.
+func (uc *UseCase) GetByUserID(ctx context.Context, userID domain.UUID) (*domain.UserGrade, error) {
+	g, err := uc.gradeRepo.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, wrapper.Wrap(err)
+	}
+
+	return g, nil
+}
+
 // ChangeGrade — меняет грейд пользователя.
 func (uc *UseCase) ChangeGrade(ctx context.Context, userID domain.UUID, grade string) error {
 	g, err := uc.gradeRepo.GetByUserID(ctx, userID)

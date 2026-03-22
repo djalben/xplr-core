@@ -9,6 +9,7 @@ import (
 	"github.com/djalben/xplr-core/backend/internal/application/grades"
 	"github.com/djalben/xplr-core/backend/internal/application/ticket"
 	"github.com/djalben/xplr-core/backend/internal/application/transaction"
+	"github.com/djalben/xplr-core/backend/internal/application/user"
 	"github.com/djalben/xplr-core/backend/internal/application/wallet"
 	"github.com/djalben/xplr-core/backend/internal/config"
 	"github.com/djalben/xplr-core/backend/internal/infrastructure/persistence/postgres"
@@ -25,10 +26,12 @@ type Container struct {
 	TransactionRepo ports.TransactionRepository
 	TicketRepo      ports.TicketRepository
 	UserRepo        ports.UserRepository
+	ReferralRepo    ports.ReferralRepository
 	CommissionRepo  ports.CommissionConfigRepository
 	GradeRepo       ports.GradeRepository
 
 	AuthUseCase        *auth.UseCase
+	UserUseCase        *user.UseCase
 	WalletUseCase      *wallet.UseCase
 	CardUseCase        *card.UseCase
 	TransactionUseCase *transaction.UseCase
@@ -52,10 +55,12 @@ func NewContainer(cfg *config.ENV) (*Container, error) {
 	userRepo := postgres.NewUserRepository(db)
 	commissionRepo := postgres.NewCommissionConfigRepository(db)
 	gradeRepo := postgres.NewGradeRepository(db)
+	referralRepo := postgres.NewReferralRepository(db)
 
 	// WalletUseCase создаём первым — он нужен для CardUseCase
 	walletUC := wallet.NewUseCase(walletRepo, transactionRepo)
 	authUC := auth.NewUseCase(userRepo, walletRepo, gradeRepo, []byte(cfg.JWTSecret))
+	userUC := user.NewUseCase(userRepo, walletRepo, gradeRepo, referralRepo)
 
 	return &Container{
 		DB: db,
@@ -65,10 +70,12 @@ func NewContainer(cfg *config.ENV) (*Container, error) {
 		TransactionRepo: transactionRepo,
 		TicketRepo:      ticketRepo,
 		UserRepo:        userRepo,
+		ReferralRepo:    referralRepo,
 		CommissionRepo:  commissionRepo,
 		GradeRepo:       gradeRepo,
 
 		AuthUseCase:        authUC,
+		UserUseCase:        userUC,
 		WalletUseCase:      walletUC,
 		CardUseCase:        card.NewUseCase(cardRepo, walletRepo, transactionRepo, walletUC),
 		TransactionUseCase: transaction.NewUseCase(transactionRepo),

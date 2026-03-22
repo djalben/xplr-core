@@ -26,7 +26,7 @@ type Card struct {
 	CreatedAt       time.Time  `json:"createdAt" db:"created_at"`
 }
 
-func NewCard(userID UUID, cardType CardType, providerCardID string) (*Card, error) {
+func NewCard(userID UUID, cardType CardType, providerCardID string, nickname string) (*Card, error) {
 	if !isValidCardType(cardType) {
 		return nil, NewInvalidInput("invalid card_type: must be subscriptions, travel or premium")
 	}
@@ -38,6 +38,7 @@ func NewCard(userID UUID, cardType CardType, providerCardID string) (*Card, erro
 		Bin:             "424242",
 		Last4Digits:     "0000",
 		CardStatus:      "ACTIVE",
+		Nickname:        nickname,
 		CardType:        cardType,
 		DailySpendLimit: NewNumeric(1000),
 		Balance:         NewNumeric(0),

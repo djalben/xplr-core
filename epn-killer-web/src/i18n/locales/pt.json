@@ -181,6 +181,7 @@
       "notVerified": "Não verificado",
       "displayName": "Nome de exibição",
       "displayNamePlaceholder": "Seu nome",
+      "edit": "Editar",
       "saveProfile": "Salvar",
       "profileUpdated": "Perfil atualizado",
       "saveError": "Erro ao salvar"
@@ -278,7 +279,15 @@
       "submitReview": "Enviar para revisão",
       "submitSuccess": "Solicitação enviada para revisão",
       "submitError": "Erro ao enviar solicitação",
-      "fillRequired": "Preencha todos os campos obrigatórios"
+      "fillRequired": "Preencha todos os campos obrigatórios",
+      "countries": {
+        "RU": "🇷🇺 Rússia",
+        "BY": "🇧🇾 Bielorrússia",
+        "KZ": "🇰🇿 Cazaquistão",
+        "UA": "🇺🇦 Ucrânia",
+        "US": "🇺🇸 EUA",
+        "DE": "🇩🇪 Alemanha"
+      }
     },
     "error": "Erro",
     "emailVerify": {
@@ -296,9 +305,27 @@
   },
   "support": {
     "title": "Suporte",
-    "subtitle": "Como podemos ajudar?",
-    "newTicket": "Novo ticket",
-    "faq": "Perguntas frequentes"
+    "subtitle": "Selecione um tema para iniciar o chat",
+    "chatTitle": "Chat de suporte",
+    "online": "Online",
+    "closeChat": "Fechar chat",
+    "chatClosed": "Chat encerrado",
+    "placeholder": "Digite uma mensagem...",
+    "welcomeMsg": "Um especialista se conectará em breve",
+    "avgResponse": "Tempo médio de resposta:",
+    "avgResponseTime": "até 5 minutos",
+    "error": "Algo deu errado. Tente novamente.",
+    "sendError": "Falha ao enviar mensagem",
+    "topics": {
+      "cards": "Cartões",
+      "cardsDesc": "Emissão, bloqueio, limites",
+      "payments": "Pagamentos e saldo",
+      "paymentsDesc": "Recarga, saque, transações",
+      "security": "Segurança",
+      "securityDesc": "2FA, verificação, acesso",
+      "other": "Outro",
+      "otherDesc": "Tudo mais"
+    }
   },
   "auth": {
     "login": "Entrar",
@@ -365,10 +392,5 @@
     "back": "Voltar",
     "next": "Próximo",
     "search": "Buscar..."
-  },
-  "clocks": {
-    "moscow": "Moscou",
-    "london": "Londres",
-    "newYork": "Nova York"
   }
 }

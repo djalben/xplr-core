@@ -181,6 +181,7 @@
       "notVerified": "未验证",
       "displayName": "显示名称",
       "displayNamePlaceholder": "您的名字",
+      "edit": "编辑",
       "saveProfile": "保存",
       "profileUpdated": "资料已更新",
       "saveError": "保存失败"
@@ -278,7 +279,15 @@
       "submitReview": "提交审核",
       "submitSuccess": "申请已提交审核",
       "submitError": "提交申请失败",
-      "fillRequired": "请填写所有必填字段"
+      "fillRequired": "请填写所有必填字段",
+      "countries": {
+        "RU": "🇷🇺 俄罗斯",
+        "BY": "🇧🇾 白俄罗斯",
+        "KZ": "🇰🇿 哈萨克斯坦",
+        "UA": "🇺🇦 乌克兰",
+        "US": "🇺🇸 美国",
+        "DE": "🇩🇪 德国"
+      }
     },
     "error": "错误",
     "emailVerify": {
@@ -296,9 +305,27 @@
   },
   "support": {
     "title": "支持",
-    "subtitle": "我们能帮您什么？",
-    "newTicket": "新工单",
-    "faq": "常见问题"
+    "subtitle": "选择主题以开始聊天",
+    "chatTitle": "支持聊天",
+    "online": "在线",
+    "closeChat": "关闭聊天",
+    "chatClosed": "聊天已关闭",
+    "placeholder": "输入消息...",
+    "welcomeMsg": "专员即将接入",
+    "avgResponse": "平均响应时间：",
+    "avgResponseTime": "5分钟内",
+    "error": "出了点问题，请重试。",
+    "sendError": "发送消息失败",
+    "topics": {
+      "cards": "银行卡",
+      "cardsDesc": "开卡、冻结、限额",
+      "payments": "支付与余额",
+      "paymentsDesc": "充值、提现、交易",
+      "security": "安全",
+      "securityDesc": "双重认证、验证、访问",
+      "other": "其他",
+      "otherDesc": "其他问题"
+    }
   },
   "auth": {
     "login": "登录",
@@ -365,10 +392,5 @@
     "back": "返回",
     "next": "下一步",
     "search": "搜索..."
-  },
-  "clocks": {
-    "moscow": "莫斯科",
-    "london": "伦敦",
-    "newYork": "纽约"
   }
 }

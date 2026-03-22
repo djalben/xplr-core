@@ -31,8 +31,8 @@ func NewUseCase(
 }
 
 // BuyCard — выпуск новой карты.
-func (uc *UseCase) BuyCard(ctx context.Context, userID domain.UUID, cardType domain.CardType) (*domain.Card, error) {
-	card, err := domain.NewCard(userID, cardType, "TEMP_PROVIDER_ID")
+func (uc *UseCase) BuyCard(ctx context.Context, userID domain.UUID, cardType domain.CardType, nickname string) (*domain.Card, error) {
+	card, err := domain.NewCard(userID, cardType, "TEMP_PROVIDER_ID", nickname)
 	if err != nil {
 		return nil, wrapper.Wrap(err)
 	}
@@ -45,6 +45,11 @@ func (uc *UseCase) BuyCard(ctx context.Context, userID domain.UUID, cardType dom
 	tx := domain.NewTransaction(userID, &card.ID, domain.NewNumeric(2.00), domain.NewNumeric(0),
 		"CARD_ISSUE", "COMPLETED", "Выпуск виртуальной карты")
 	return card, uc.txRepo.Save(ctx, tx)
+}
+
+// ListByUserID — список карт пользователя.
+func (uc *UseCase) ListByUserID(ctx context.Context, userID domain.UUID) ([]*domain.Card, error) {
+	return uc.cardRepo.ListByUserID(ctx, userID)
 }
 
 // GetByID — получение карты по ID.
@@ -160,4 +165,33 @@ func (uc *UseCase) UnblockCard(ctx context.Context, cardID domain.UUID) error {
 	}
 
 	return nil
+}
+
+// SetSpendingLimit — устанавливает дневной лимит карты.
+func (uc *UseCase) SetSpendingLimit(ctx context.Context, userID domain.UUID, cardID domain.UUID, limit domain.Numeric) error {
+	card, err := uc.cardRepo.GetByID(ctx, cardID)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	if card.UserID != userID {
+		return domain.NewInvalidInput("card not found")
+	}
+
+	card.DailySpendLimit = limit
+
+	return uc.cardRepo.Update(ctx, card)
+}
+
+// UpdateStatus — меняет статус карты (ACTIVE/CLOSED).
+func (uc *UseCase) UpdateStatus(ctx context.Context, userID domain.UUID, cardID domain.UUID, status string) error {
+	if status == "CLOSED" {
+		return uc.CloseCard(ctx, userID, cardID)
+	}
+
+	if status == "ACTIVE" {
+		return uc.UnblockCard(ctx, cardID)
+	}
+
+	return domain.NewInvalidInput("invalid status")
 }

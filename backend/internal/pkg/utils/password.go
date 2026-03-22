@@ -1,8 +1,6 @@
 package utils
 
 import (
-	"log"
-
 	"gitlab.com/libs-artifex/wrapper/v2"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -11,8 +9,6 @@ import (
 func HashPassword(password string) (string, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		log.Printf("Error hashing password: %v", err)
-
 		return "", wrapper.Wrap(err)
 	}
 

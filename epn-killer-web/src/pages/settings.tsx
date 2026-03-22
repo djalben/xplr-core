@@ -1,14 +1,16 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LANG_KEY } from '../i18n';
 import { DashboardLayout } from '../components/dashboard-layout';
 import { BackButton } from '../components/back-button';
 import apiClient from '../api/axios';
 import { useAuth } from '../store/auth-context';
+import { QRCodeSVG } from 'qrcode.react';
 import { 
   User, Lock, Bell, Shield, Eye, EyeOff, Save, Check, Smartphone, Globe, Mail,
   FileText, Upload, CheckCircle, AlertCircle, MessageCircle, LogOut, Loader2,
-  MonitorSmartphone, ShieldCheck, ShieldAlert, ExternalLink, Clock, X
+  MonitorSmartphone, ShieldCheck, ShieldAlert, ExternalLink, Clock, X, Pencil,
+  Copy, PartyPopper
 } from 'lucide-react';
 
 type SettingsTab = 'profile' | 'security' | 'notifications' | 'kyc' | 'language';
@@ -56,61 +58,181 @@ const Toast = ({ msg, type }: { msg: string; type: 'ok' | 'err' }) => (
 );
 
 // ══════════════════════════════════════
-// TELEGRAM CARD (used inside ProfileTab)
+// TELEGRAM LINK MODAL
 // ══════════════════════════════════════
-const TelegramCard = ({ profile, reload, showToast }: { profile: ProfileData | null; reload: () => void; showToast: (m: string, t: 'ok' | 'err') => void }) => {
-  const { t } = useTranslation();
-  const [linking, setLinking] = useState(false);
+const TelegramLinkModal = ({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) => {
+  const [link, setLink] = useState('');
+  const [code, setCode] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const handleLink = async () => {
-    setLinking(true);
-    try {
-      const res = await apiClient.get('/user/settings/telegram-link');
-      const link = res.data?.link;
-      if (link) {
-        window.open(link, '_blank', 'noopener,noreferrer');
-        // Poll for status update after user completes linking in Telegram
-        let attempts = 0;
-        const poll = setInterval(async () => {
-          attempts++;
-          if (attempts > 20) { clearInterval(poll); return; }
-          try {
-            const me = await apiClient.get('/user/settings/profile');
-            if (me.data?.telegram_linked) {
-              clearInterval(poll);
-              showToast(t('settings.telegram.linkedSuccess'), 'ok');
-              reload();
-            }
-          } catch { /* ignore */ }
-        }, 3000);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiClient.get('/user/settings/telegram-link');
+        if (!cancelled) {
+          setLink(res.data?.link || '');
+          setCode(res.data?.code || '');
+          setLoading(false);
+        }
+      } catch {
+        if (!cancelled) setLoading(false);
       }
-    } catch {
-      showToast(t('settings.telegram.linkError'), 'err');
-    } finally {
-      setLinking(false);
-    }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Polling for link status
+  useEffect(() => {
+    if (!code || success) return;
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await apiClient.get('/user/settings/telegram/check-status');
+        if (res.data?.linked) {
+          if (pollRef.current) clearInterval(pollRef.current);
+          setSuccess(true);
+          setTimeout(() => { onSuccess(); }, 2000);
+        }
+      } catch { /* ignore */ }
+    }, 2500);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [code, success, onSuccess]);
+
+  const copyCode = () => {
+    navigator.clipboard.writeText(code).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   };
 
   return (
-    <div className="glass-card p-6">
-      <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><MessageCircle className="w-5 h-5 text-blue-400" />{t('settings.telegram.title')}</h3>
-      <div className="flex items-center justify-between">
-        {profile?.telegram_linked ? (
-          <>
-            <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-400" /><p className="text-white font-medium">{t('settings.telegram.connected')}</p></div>
-            <span className="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 text-xs font-medium rounded-lg">{t('settings.telegram.connected')}</span>
-          </>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="relative w-full max-w-md bg-slate-900/95 border border-white/10 rounded-2xl shadow-2xl p-6 space-y-5" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <MessageCircle className="w-5 h-5 text-blue-400" />
+            Привязка Telegram
+          </h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors"><X className="w-5 h-5" /></button>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-blue-400" /></div>
+        ) : success ? (
+          <div className="flex flex-col items-center gap-4 py-8">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center">
+              <CheckCircle className="w-10 h-10 text-emerald-400" />
+            </div>
+            <p className="text-xl font-bold text-white">Telegram привязан!</p>
+            <p className="text-sm text-slate-400">Уведомления теперь приходят в оба канала</p>
+          </div>
         ) : (
           <>
-            <p className="text-sm text-slate-400">{t('settings.telegram.linkDesc')}</p>
-            <button onClick={handleLink} disabled={linking} className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap">
-              {linking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
-              {t('settings.telegram.link')}
-            </button>
+            {/* QR Code */}
+            <div className="flex flex-col items-center gap-3">
+              <div className="bg-white p-3 rounded-xl">
+                <QRCodeSVG value={link} size={180} level="M" />
+              </div>
+              <p className="text-xs text-slate-500">Отсканируйте QR-код камерой телефона</p>
+            </div>
+
+            {/* Open Telegram button */}
+            <a
+              href={link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-xl transition-colors text-sm"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Открыть Telegram
+            </a>
+
+            {/* Manual code */}
+            <div className="bg-white/[0.03] border border-white/5 rounded-xl p-4 space-y-2">
+              <p className="text-xs text-slate-400">Или отправьте боту <span className="text-blue-400 font-medium">@xplr_notify_bot</span> команду:</p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 bg-slate-800 text-blue-300 px-3 py-2 rounded-lg text-sm font-mono truncate">/start {code}</code>
+                <button
+                  onClick={copyCode}
+                  className="shrink-0 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors"
+                  title="Скопировать код"
+                >
+                  {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <p className="text-xs text-slate-500 text-center">
+              Если Telegram не установлен — <a href="https://web.telegram.org" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">используйте Telegram Web</a>
+            </p>
+
+            {/* Polling indicator */}
+            <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Ожидание привязки...
+            </div>
           </>
         )}
       </div>
     </div>
+  );
+};
+
+// ══════════════════════════════════════
+// TELEGRAM CARD (used inside ProfileTab)
+// ══════════════════════════════════════
+const TelegramCard = ({ profile, reload, showToast }: { profile: ProfileData | null; reload: () => void; showToast: (m: string, t: 'ok' | 'err') => void }) => {
+  const { t } = useTranslation();
+  const [showModal, setShowModal] = useState(false);
+
+  const handleLinkSuccess = () => {
+    setShowModal(false);
+    showToast('✅ Telegram успешно привязан!', 'ok');
+    reload();
+  };
+
+  return (
+    <>
+      <div className="glass-card p-4 sm:p-6">
+        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><MessageCircle className="w-5 h-5 text-blue-400" />{t('settings.telegram.title')}</h3>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          {profile?.telegram_linked ? (
+            <>
+              <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-400" /><p className="text-white font-medium">{t('settings.telegram.connected')}</p></div>
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 text-xs font-medium rounded-lg">{t('settings.telegram.connected')}</span>
+                <button
+                  onClick={async () => {
+                    try {
+                      await apiClient.post('/user/settings/telegram/unlink');
+                      showToast('Telegram отвязан', 'ok');
+                      reload();
+                    } catch { showToast('Ошибка отвязки Telegram', 'err'); }
+                  }}
+                  className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-medium rounded-lg transition-colors"
+                >
+                  Отвязать
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-slate-400">{t('settings.telegram.linkDesc')}</p>
+              <button onClick={() => setShowModal(true)} className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-xl transition-colors whitespace-nowrap w-full sm:w-auto">
+                <MessageCircle className="w-3.5 h-3.5" />
+                {t('settings.telegram.link')}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+      {showModal && <TelegramLinkModal onClose={() => setShowModal(false)} onSuccess={handleLinkSuccess} />}
+    </>
   );
 };
 
@@ -121,6 +243,7 @@ const ProfileTab = ({ profile, reload, showToast, setActiveTab }: { profile: Pro
   const { t } = useTranslation();
   const { updateUserName } = useAuth();
   const [displayName, setDisplayName] = useState(profile?.display_name || '');
+  const [isEditingName, setIsEditingName] = useState(false);
   const [saving, setSaving] = useState(false);
   const [emailVerifyOpen, setEmailVerifyOpen] = useState(false);
   const [emailCode, setEmailCode] = useState('');
@@ -134,6 +257,7 @@ const ProfileTab = ({ profile, reload, showToast, setActiveTab }: { profile: Pro
     try {
       await apiClient.patch('/user/settings/profile', { display_name: displayName.trim() });
       updateUserName(displayName.trim());
+      setIsEditingName(false);
       showToast(t('settings.profileSection.profileUpdated'), 'ok');
       reload();
     } catch { showToast(t('settings.profileSection.saveError'), 'err'); }
@@ -169,38 +293,65 @@ const ProfileTab = ({ profile, reload, showToast, setActiveTab }: { profile: Pro
 
   return (
     <div className="space-y-6">
-      <div className="glass-card p-6">
+      <div className="glass-card p-4 sm:p-6">
         <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><User className="w-5 h-5 text-blue-400" />{t('settings.profileSection.title')}</h3>
         <div className="space-y-4">
           <div>
             <label className="block text-sm text-slate-400 mb-2">{t('settings.profileSection.email')}</label>
-            <div className="flex items-center gap-3">
-              <input type="text" value={profile?.email || ''} readOnly className="xplr-input w-full bg-white/[0.02] cursor-not-allowed" />
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+              <input type="text" value={profile?.email || ''} readOnly className="xplr-input w-full min-w-0 bg-white/[0.02] cursor-not-allowed" />
               {profile?.is_verified
-                ? <span className="flex items-center gap-1 text-xs text-emerald-400 whitespace-nowrap"><CheckCircle className="w-3.5 h-3.5" />{t('settings.profileSection.verified')}</span>
-                : <button onClick={handleRequestEmailCode} disabled={emailSending} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 text-blue-400 text-xs font-medium rounded-lg transition-colors whitespace-nowrap">
+                ? <span className="flex items-center gap-1 text-xs text-emerald-400 whitespace-nowrap shrink-0"><CheckCircle className="w-3.5 h-3.5" />{t('settings.profileSection.verified')}</span>
+                : <button onClick={handleRequestEmailCode} disabled={emailSending} className="flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 text-blue-400 text-xs font-medium rounded-lg transition-colors whitespace-nowrap w-full sm:w-auto shrink-0">
                     {emailSending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />}{t('settings.emailVerify.verify')}
                   </button>}
             </div>
           </div>
           <div>
             <label className="block text-sm text-slate-400 mb-2">{t('settings.profileSection.displayName')}</label>
-            <input type="text" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder={t('settings.profileSection.displayNamePlaceholder')} className="xplr-input w-full" />
+            <div className="flex items-center gap-2 w-full min-w-0">
+              <input
+                type="text"
+                value={displayName}
+                onChange={e => setDisplayName(e.target.value)}
+                placeholder={t('settings.profileSection.displayNamePlaceholder')}
+                readOnly={!isEditingName}
+                onKeyDown={e => { if (e.key === 'Enter' && isEditingName) handleSave(); if (e.key === 'Escape') { setDisplayName(profile?.display_name || ''); setIsEditingName(false); } }}
+                className={`xplr-input w-full min-w-0 transition-colors ${
+                  isEditingName ? 'border-blue-500/50 bg-white/[0.04]' : 'bg-white/[0.02] cursor-default'
+                }`}
+              />
+              {!isEditingName ? (
+                <button
+                  onClick={() => setIsEditingName(true)}
+                  className="shrink-0 p-2.5 hover:bg-white/10 rounded-xl transition-colors group"
+                  title={t('settings.profileSection.edit')}
+                >
+                  <Pencil className="w-4 h-4 text-slate-400 group-hover:text-blue-400 transition-colors" />
+                </button>
+              ) : (
+                <button
+                  onClick={handleSave}
+                  disabled={saving || !displayName.trim()}
+                  className="shrink-0 flex items-center gap-1.5 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors whitespace-nowrap"
+                >
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  {t('settings.profileSection.saveProfile')}
+                </button>
+              )}
+            </div>
           </div>
-          <button onClick={handleSave} disabled={saving || !displayName.trim()} className="flex items-center gap-2 px-5 py-2.5 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors">
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}{t('settings.profileSection.saveProfile')}
-          </button>
         </div>
       </div>
 
-      <div className="glass-card p-6">
+      <div className="glass-card p-4 sm:p-6">
         <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><FileText className="w-5 h-5 text-purple-400" />{t('settings.verification.title')}</h3>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className={`px-3 py-1 rounded-full text-xs font-medium ${verColors[verStatus] || verColors.pending}`}>{verLabel}</span>
-            <p className="text-sm text-slate-400">{verStatus === 'verified' ? t('settings.verification.accountVerified') : t('settings.verification.needVerification')}</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 ${verColors[verStatus] || verColors.pending}`}>{verLabel}</span>
+            <p className="text-sm text-slate-400 truncate">{verStatus === 'verified' ? t('settings.verification.accountVerified') : t('settings.verification.needVerification')}</p>
           </div>
-          {verStatus !== 'verified' && <button onClick={() => setActiveTab('kyc')} className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap">{t('settings.verification.startVerification')}</button>}
+          {verStatus !== 'verified' && <button onClick={() => setActiveTab('kyc')} className="w-full sm:w-auto px-4 py-2.5 bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium rounded-xl transition-colors whitespace-nowrap text-center">{t('settings.verification.startVerification')}</button>}
         </div>
       </div>
 
@@ -312,7 +463,7 @@ const SecurityTab = ({ profile, reload, showToast }: { profile: ProfileData | nu
   return (
     <div className="space-y-6">
       {/* Change Password */}
-      <div className="glass-card p-6">
+      <div className="glass-card p-4 sm:p-6">
         <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><Lock className="w-5 h-5 text-amber-400" />{t('settings.password.title')}</h3>
         <div className="space-y-3 max-w-md">
           <div className="relative">
@@ -331,15 +482,15 @@ const SecurityTab = ({ profile, reload, showToast }: { profile: ProfileData | nu
       </div>
 
       {/* 2FA */}
-      <div className="glass-card p-6">
+      <div className="glass-card p-4 sm:p-6">
         <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><Smartphone className="w-5 h-5 text-emerald-400" />{t('settings.twoFa.title')}</h3>
         {profile?.two_factor_enabled ? (
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-3">
-              <ShieldCheck className="w-6 h-6 text-emerald-400" />
+              <ShieldCheck className="w-6 h-6 text-emerald-400 shrink-0" />
               <div><p className="text-white font-medium">{t('settings.twoFa.enabled')}</p><p className="text-sm text-slate-400">{t('settings.twoFa.enabledDesc')}</p></div>
             </div>
-            <button onClick={handleDisable2FA} className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-sm font-medium rounded-lg transition-colors">{t('settings.twoFa.disable')}</button>
+            <button onClick={handleDisable2FA} className="w-full sm:w-auto px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-sm font-medium rounded-xl transition-colors text-center">{t('settings.twoFa.disable')}</button>
           </div>
         ) : totpSecret ? (
           <div className="space-y-4">
@@ -358,21 +509,21 @@ const SecurityTab = ({ profile, reload, showToast }: { profile: ProfileData | nu
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-3">
-              <ShieldAlert className="w-6 h-6 text-orange-400" />
+              <ShieldAlert className="w-6 h-6 text-orange-400 shrink-0" />
               <div><p className="text-white font-medium">{t('settings.twoFa.notConfigured')}</p><p className="text-sm text-slate-400">{t('settings.twoFa.notConfiguredDesc')}</p></div>
             </div>
-            <button onClick={handleSetup2FA} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-lg transition-colors">{t('settings.twoFa.setup')}</button>
+            <button onClick={handleSetup2FA} className="w-full sm:w-auto px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-xl transition-colors text-center">{t('settings.twoFa.setup')}</button>
           </div>
         )}
       </div>
 
       {/* Sessions */}
-      <div className="glass-card p-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="glass-card p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <h3 className="text-lg font-semibold text-white flex items-center gap-2"><MonitorSmartphone className="w-5 h-5 text-blue-400" />{t('settings.sessions.title')}</h3>
-          <button onClick={handleLogoutAll} disabled={logoutSaving} className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-medium rounded-lg transition-colors">
+          <button onClick={handleLogoutAll} disabled={logoutSaving} className="flex items-center justify-center gap-2 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-medium rounded-lg transition-colors w-full sm:w-auto">
             {logoutSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LogOut className="w-3.5 h-3.5" />}{t('settings.sessions.logoutAll')}
           </button>
         </div>
@@ -402,19 +553,36 @@ const SecurityTab = ({ profile, reload, showToast }: { profile: ProfileData | nu
 // ══════════════════════════════════════
 // NOTIFICATIONS TAB
 // ══════════════════════════════════════
-const NotificationsTab = ({ showToast }: { showToast: (m: string, t: 'ok' | 'err') => void }) => {
+const CHANNEL_OPTIONS: { value: string; label: string; desc: string }[] = [
+  { value: 'both', label: 'Email + Telegram', desc: 'Уведомления в оба канала' },
+  { value: 'email', label: 'Только Email', desc: 'Уведомления только на почту' },
+  { value: 'telegram', label: 'Только Telegram', desc: 'Уведомления только в Telegram' },
+];
+
+const NotificationsTab = ({ showToast, telegramLinked }: { showToast: (m: string, t: 'ok' | 'err') => void; telegramLinked: boolean }) => {
   const { t } = useTranslation();
   const [prefs, setPrefs] = useState<NotifPrefs>({ notify_transactions: true, notify_balance: true, notify_security: true });
+  const [notifChannel, setNotifChannel] = useState('both');
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    apiClient.get('/user/settings/notifications').then(res => { setPrefs(res.data); setLoaded(true); }).catch(() => setLoaded(true));
+    apiClient.get('/user/settings/notifications').then(res => {
+      setPrefs({ notify_transactions: res.data.notify_transactions, notify_balance: res.data.notify_balance, notify_security: res.data.notify_security });
+      setNotifChannel(res.data.notification_pref || 'both');
+      setLoaded(true);
+    }).catch(() => setLoaded(true));
   }, []);
 
   const savePrefs = async (updated: NotifPrefs) => {
     setPrefs(updated);
     try { await apiClient.patch('/user/settings/notifications', updated); }
     catch { showToast(t('settings.notif.saveError'), 'err'); }
+  };
+
+  const saveChannel = async (ch: string) => {
+    setNotifChannel(ch);
+    try { await apiClient.patch('/user/settings/notifications', { notification_pref: ch }); showToast('Канал уведомлений обновлён', 'ok'); }
+    catch { showToast('Необходимо оставить хотя бы один способ связи', 'err'); }
   };
 
   if (!loaded) return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-blue-400" /></div>;
@@ -427,12 +595,47 @@ const NotificationsTab = ({ showToast }: { showToast: (m: string, t: 'ok' | 'err
 
   return (
     <div className="space-y-6">
-      <div className="glass-card p-6">
+      {/* Notification Channel Selector */}
+      <div className="glass-card p-4 sm:p-6">
+        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><Globe className="w-5 h-5 text-purple-400" />Канал уведомлений</h3>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {CHANNEL_OPTIONS.map(opt => {
+            const needsTG = opt.value === 'both' || opt.value === 'telegram';
+            const isDisabled = needsTG && !telegramLinked;
+            return (
+              <div key={opt.value} className="relative group">
+                <button
+                  onClick={() => !isDisabled && saveChannel(opt.value)}
+                  disabled={isDisabled}
+                  className={`w-full p-4 rounded-xl border text-left transition-all ${
+                    isDisabled
+                      ? 'border-white/5 bg-white/[0.01] opacity-40 cursor-not-allowed'
+                      : notifChannel === opt.value
+                        ? 'border-blue-500/50 bg-blue-500/10'
+                        : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.05]'
+                  }`}
+                >
+                  <p className={`text-sm font-medium ${isDisabled ? 'text-slate-500' : notifChannel === opt.value ? 'text-blue-400' : 'text-white'}`}>{opt.label}</p>
+                  <p className="text-xs text-slate-500 mt-1">{opt.desc}</p>
+                </button>
+                {isDisabled && (
+                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-slate-800 border border-white/10 rounded-lg text-xs text-slate-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                    Сначала привяжите Telegram в блоке выше
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Toggle Prefs */}
+      <div className="glass-card p-4 sm:p-6">
         <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><Bell className="w-5 h-5 text-blue-400" />{t('settings.notif.title')}</h3>
         <div className="space-y-4">
           {items.map(item => (
-            <div key={item.key} className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/5">
-              <div><p className="text-white font-medium">{item.label}</p><p className="text-sm text-slate-500">{item.desc}</p></div>
+            <div key={item.key} className="flex items-center justify-between gap-4 p-4 rounded-xl bg-white/[0.03] border border-white/5">
+              <div className="min-w-0"><p className="text-white font-medium">{item.label}</p><p className="text-sm text-slate-500">{item.desc}</p></div>
               <Toggle checked={prefs[item.key]} onChange={v => savePrefs({ ...prefs, [item.key]: v })} />
             </div>
           ))}
@@ -507,14 +710,14 @@ const KYCTab = ({ profile, reload, showToast }: { profile: ProfileData | null; r
     <div className="space-y-6">
       <div className="glass-card p-6">
         <h3 className="text-lg font-semibold text-white mb-6">{t('settings.kycForm.title')}</h3>
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-8 overflow-x-auto pb-2">
           {steps.map((s, i) => (
-            <div key={s.id} className="flex items-center">
+            <div key={s.id} className="flex items-center shrink-0">
               <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
                 s.status === 'completed' ? 'bg-emerald-500 text-white' : s.status === 'current' ? 'bg-blue-500 text-white' : 'bg-white/10 text-slate-500'
               }`}>{s.status === 'completed' ? <Check className="w-5 h-5" /> : s.id}</div>
-              <span className={`ml-3 ${s.status === 'current' ? 'text-white' : 'text-slate-500'}`}>{s.title}</span>
-              {i < steps.length - 1 && <div className="w-16 md:w-24 h-0.5 bg-white/10 mx-4" />}
+              <span className={`ml-2 sm:ml-3 text-sm sm:text-base hidden sm:inline ${s.status === 'current' ? 'text-white' : 'text-slate-500'}`}>{s.title}</span>
+              {i < steps.length - 1 && <div className="w-8 sm:w-16 md:w-24 h-0.5 bg-white/10 mx-2 sm:mx-4" />}
             </div>
           ))}
         </div>
@@ -525,12 +728,12 @@ const KYCTab = ({ profile, reload, showToast }: { profile: ProfileData | null; r
           <h3 className="text-lg font-semibold text-white mb-4">{t('settings.kycForm.stepCitizenship')}</h3>
           <select value={country} onChange={e => setCountry(e.target.value)} className="xplr-select w-full mb-4">
             <option value="">{t('settings.kycForm.selectCountry')}</option>
-            <option value="RU">🇷🇺 Россия / Russia</option>
-            <option value="BY">🇧🇾 Беларусь / Belarus</option>
-            <option value="KZ">🇰🇿 Казахстан / Kazakhstan</option>
-            <option value="UA">🇺🇦 Украина / Ukraine</option>
-            <option value="US">🇺🇸 США / USA</option>
-            <option value="DE">🇩🇪 Германия / Germany</option>
+            <option value="RU">{t('settings.kycForm.countries.RU')}</option>
+            <option value="BY">{t('settings.kycForm.countries.BY')}</option>
+            <option value="KZ">{t('settings.kycForm.countries.KZ')}</option>
+            <option value="UA">{t('settings.kycForm.countries.UA')}</option>
+            <option value="US">{t('settings.kycForm.countries.US')}</option>
+            <option value="DE">{t('settings.kycForm.countries.DE')}</option>
           </select>
           <button onClick={() => country && setStep(2)} disabled={!country} className="w-full px-4 py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-medium rounded-xl transition-colors">{t('settings.kycForm.continue')}</button>
         </div>
@@ -564,12 +767,12 @@ const KYCTab = ({ profile, reload, showToast }: { profile: ProfileData | null; r
               { id: 'selfie', label: t('settings.kycForm.selfie'), desc: t('settings.kycForm.selfieDesc') },
             ].map(doc => (
               <div key={doc.id} className="p-4 rounded-xl bg-white/[0.03] border border-white/10 border-dashed">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Upload className="w-5 h-5 text-slate-400" />
-                    <div><p className="text-white font-medium">{doc.label}</p><p className="text-sm text-slate-500">{doc.desc}</p></div>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Upload className="w-5 h-5 text-slate-400 shrink-0" />
+                    <div className="min-w-0"><p className="text-white font-medium">{doc.label}</p><p className="text-sm text-slate-500 truncate">{doc.desc}</p></div>
                   </div>
-                  <button className="px-4 py-2 glass-card hover:bg-white/10 text-slate-300 text-sm rounded-lg transition-colors">{t('settings.kycForm.upload')}</button>
+                  <button className="w-full sm:w-auto px-4 py-2.5 glass-card hover:bg-white/10 text-slate-300 text-sm rounded-xl transition-colors text-center shrink-0">{t('settings.kycForm.upload')}</button>
                 </div>
               </div>
             ))}
@@ -603,7 +806,7 @@ const LanguageTab = () => {
   const handleChange = (code: string) => { i18n.changeLanguage(code); localStorage.setItem(LANG_KEY, code); };
 
   return (
-    <div className="glass-card p-6">
+    <div className="glass-card p-4 sm:p-6">
       <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><Globe className="w-5 h-5 text-blue-400" />{t('settings.languageTitle')}</h3>
       <div className="space-y-3">
         {languages.map(lang => (
@@ -648,7 +851,7 @@ export const SettingsPage = () => {
 
   return (
     <DashboardLayout>
-      <div className="stagger-fade-in max-w-4xl">
+      <div className="stagger-fade-in w-full max-w-4xl overflow-hidden">
         <BackButton />
         {toast && <Toast msg={toast.msg} type={toast.type} />}
         <div className="mb-8">
@@ -664,7 +867,7 @@ export const SettingsPage = () => {
         </div>
         {activeTab === 'profile' && <ProfileTab profile={profile} reload={loadProfile} showToast={showToast} setActiveTab={setActiveTab} />}
         {activeTab === 'security' && <SecurityTab profile={profile} reload={loadProfile} showToast={showToast} />}
-        {activeTab === 'notifications' && <NotificationsTab showToast={showToast} />}
+        {activeTab === 'notifications' && <NotificationsTab showToast={showToast} telegramLinked={profile?.telegram_linked ?? false} />}
         {activeTab === 'kyc' && <KYCTab profile={profile} reload={loadProfile} showToast={showToast} />}
         {activeTab === 'language' && <LanguageTab />}
       </div>

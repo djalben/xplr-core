@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { DashboardLayout } from '../components/dashboard-layout';
 import { BackButton } from '../components/back-button';
 import { 
@@ -7,11 +8,24 @@ import {
   Search,
   Wallet,
   CreditCard,
-  Clock
+  Clock,
+  FileText,
+  TableProperties,
+  Loader2,
+  Calendar,
+  Filter,
 } from 'lucide-react';
 import apiClient from '../api/axios';
+import { API_BASE_URL } from '../api/axios';
 
-type Period = 'day' | 'week' | 'month';
+type Period = 'day' | 'week' | 'month' | 'custom';
+
+interface UserCard {
+  id: number;
+  last_4_digits: string;
+  card_type: string;
+  card_status: string;
+}
 
 interface HistoryTx {
   id: string;
@@ -28,32 +42,60 @@ const periodLabels: Record<Period, string> = {
   day: 'День',
   week: 'Неделя',
   month: 'Месяц',
+  custom: 'Период',
 };
 
 export const HistoryPage = () => {
+  const [searchParams] = useSearchParams();
   const [period, setPeriod] = useState<Period>('month');
   const [searchQuery, setSearchQuery] = useState('');
   const [transactions, setTransactions] = useState<HistoryTx[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
+  const [cards, setCards] = useState<UserCard[]>([]);
+  const [selectedCardId, setSelectedCardId] = useState<number | null>(
+    searchParams.get('type') === 'wallet' ? 0 : null
+  );
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
 
   const fmt = (d: Date) => d.toISOString().slice(0, 10);
 
+  // Fetch user cards for filter dropdown
   useEffect(() => {
+    apiClient.get('/user/cards').then(res => {
+      setCards(res.data?.cards || res.data || []);
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (period === 'custom' && (!customStart || !customEnd)) return;
     fetchTransactions();
-  }, [period]);
+  }, [period, selectedCardId, customStart, customEnd]);
 
   const fetchTransactions = async () => {
     setIsLoading(true);
     try {
-      const now = new Date();
-      const start = new Date(now);
-      if (period === 'day') start.setDate(now.getDate() - 1);
-      else if (period === 'week') start.setDate(now.getDate() - 7);
-      else start.setDate(now.getDate() - 31);
+      let startDate: string;
+      let endDate: string;
+      if (period === 'custom') {
+        startDate = customStart;
+        endDate = customEnd;
+      } else {
+        const now = new Date();
+        const start = new Date(now);
+        if (period === 'day') start.setDate(now.getDate() - 1);
+        else if (period === 'week') start.setDate(now.getDate() - 7);
+        else start.setDate(now.getDate() - 31);
+        startDate = fmt(start);
+        endDate = fmt(now);
+      }
 
-      const res = await apiClient.get('/user/transactions', {
-        params: { start_date: fmt(start), end_date: fmt(now), limit: 200 }
-      });
+      const params: Record<string, string | number> = { start_date: startDate, end_date: endDate, limit: 200 };
+      if (selectedCardId !== null) params.card_id = selectedCardId;
+
+      const res = await apiClient.get('/user/transactions', { params });
       const txs: any[] = res.data?.transactions ?? [];
       const sourceLabels: Record<string, string> = {
         wallet_topup: 'Пополнение кошелька',
@@ -93,6 +135,44 @@ export const HistoryPage = () => {
     return true;
   });
 
+  const downloadExport = async (format: 'pdf' | 'excel') => {
+    const setter = format === 'pdf' ? setExportingPdf : setExportingExcel;
+    setter(true);
+    try {
+      const now = new Date();
+      const start = new Date(now);
+      if (period === 'day') start.setDate(now.getDate() - 1);
+      else if (period === 'week') start.setDate(now.getDate() - 7);
+      else start.setDate(now.getDate() - 31);
+
+      const token = localStorage.getItem('token');
+      const params = new URLSearchParams({
+        format,
+        start_date: fmt(start),
+        end_date: fmt(now),
+      });
+      const res = await fetch(`${API_BASE_URL}/user/transactions/export?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const ext = format === 'pdf' ? 'pdf' : 'xlsx';
+      const filename = `XPLR_transactions_${fmt(now)}.${ext}`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export error:', err);
+    } finally {
+      setter(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="stagger-fade-in">
@@ -104,10 +184,29 @@ export const HistoryPage = () => {
             <h1 className="text-2xl md:text-3xl font-bold text-white mb-1">История</h1>
             <p className="text-slate-400 text-sm">Все операции по кошельку и картам</p>
           </div>
+          {/* Export buttons */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => downloadExport('pdf')}
+              disabled={exportingPdf}
+              className="flex items-center gap-2 px-3 py-2 md:px-4 md:py-2.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-sm font-medium hover:bg-red-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {exportingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+              <span className="hidden sm:inline">Скачать PDF</span>
+            </button>
+            <button
+              onClick={() => downloadExport('excel')}
+              disabled={exportingExcel}
+              className="flex items-center gap-2 px-3 py-2 md:px-4 md:py-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-sm font-medium hover:bg-emerald-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {exportingExcel ? <Loader2 className="w-4 h-4 animate-spin" /> : <TableProperties className="w-4 h-4" />}
+              <span className="hidden sm:inline">Скачать Excel</span>
+            </button>
+          </div>
         </div>
 
         {/* Period filters */}
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
           {(Object.keys(periodLabels) as Period[]).map(p => (
             <button
               key={p}
@@ -121,6 +220,51 @@ export const HistoryPage = () => {
               {periodLabels[p]}
             </button>
           ))}
+        </div>
+
+        {/* Custom date range + Card filter */}
+        <div className="flex items-center gap-3 mb-4 flex-wrap">
+          {period === 'custom' && (
+            <>
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-slate-400" />
+                <input
+                  type="date"
+                  value={customStart}
+                  onChange={e => setCustomStart(e.target.value)}
+                  className="h-10 px-3 bg-white/[0.04] border border-white/[0.08] rounded-xl text-white text-sm focus:outline-none focus:border-blue-400 transition-colors"
+                />
+                <span className="text-slate-500 text-sm">—</span>
+                <input
+                  type="date"
+                  value={customEnd}
+                  onChange={e => setCustomEnd(e.target.value)}
+                  className="h-10 px-3 bg-white/[0.04] border border-white/[0.08] rounded-xl text-white text-sm focus:outline-none focus:border-blue-400 transition-colors"
+                />
+              </div>
+            </>
+          )}
+          {(
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-slate-400" />
+              <select
+                value={selectedCardId === null ? '' : selectedCardId}
+                onChange={e => {
+                  const v = e.target.value;
+                  setSelectedCardId(v === '' ? null : Number(v));
+                }}
+                className="h-10 px-3 bg-white/[0.04] border border-white/[0.08] rounded-xl text-white text-sm focus:outline-none focus:border-blue-400 transition-colors appearance-none cursor-pointer min-w-[180px]"
+              >
+                <option value="" className="bg-slate-900">Все операции</option>
+                <option value="0" className="bg-slate-900">Основной кошелёк</option>
+                {cards.map(c => (
+                  <option key={c.id} value={c.id} className="bg-slate-900">
+                    •••• {c.last_4_digits} ({c.card_type})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         {/* Search */}

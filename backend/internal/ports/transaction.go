@@ -15,4 +15,7 @@ type TransactionRepository interface {
 
 	// История по конкретной карте
 	GetCardTransactions(ctx context.Context, cardID domain.UUID, from, to time.Time) ([]*domain.Transaction, error)
+
+	// История по пользователю (все транзакции)
+	GetByUserID(ctx context.Context, userID domain.UUID, from, to time.Time, limit int) ([]*domain.Transaction, error)
 }

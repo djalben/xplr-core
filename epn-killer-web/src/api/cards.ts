@@ -1,8 +1,8 @@
 import apiClient from './axios';
 
 export interface Card {
-  id: number;
-  user_id: number;
+  id: string | number;
+  user_id: string | number;
   team_id?: number;
   provider_card_id: string;
   external_id?: string;
@@ -36,7 +36,7 @@ export interface MassIssueRequest {
   service_slug?: string;
   category?: string;
   team_id?: number;
-  price_rub?: number;
+  price_usd?: number;
 }
 
 export interface CardIssueResult {
@@ -63,7 +63,7 @@ export const issueCards = async (data: MassIssueRequest): Promise<MassIssueRespo
 // Выпустить персональную карту (subscriptions/travel/premium)
 export const issuePersonalCard = async (
   cardType: 'subscriptions' | 'travel' | 'premium',
-  priceRub: number
+  priceUsd: number
 ): Promise<MassIssueResponse> => {
   const categoryMap: Record<string, string> = {
     subscriptions: 'services',
@@ -84,7 +84,7 @@ export const issuePersonalCard = async (
     card_type: 'MasterCard',
     service_slug: cardType,
     category: categoryMap[cardType],
-    price_rub: priceRub,
+    price_usd: priceUsd,
   };
 
   return issueCards(data);
@@ -97,7 +97,7 @@ export const getUserCards = async (): Promise<Card[]> => {
 };
 
 // Получить детали карты (PAN, CVV, expiry)
-export const getCardDetails = async (cardId: number): Promise<{
+export const getCardDetails = async (cardId: string | number): Promise<{
   card_id: number;
   full_number: string;
   cvv: string;
@@ -106,13 +106,13 @@ export const getCardDetails = async (cardId: number): Promise<{
   bin: string;
   last_4: string;
 }> => {
-  const response = await apiClient.get(`/user/cards/${cardId}/details`);
+  const response = await apiClient.get(`/user/cards/${String(cardId)}/details`);
   return response.data;
 };
 
 // Установить автопополнение карты
 export const setCardAutoReplenishment = async (
-  cardId: number,
+  cardId: string | number,
   data: { enabled: boolean; threshold: number; amount: number }
 ) => {
   const response = await apiClient.post(`/user/cards/${cardId}/auto-replenishment`, data);
@@ -120,12 +120,12 @@ export const setCardAutoReplenishment = async (
 };
 
 // Отключить автопополнение карты
-export const unsetCardAutoReplenishment = async (cardId: number) => {
-  const response = await apiClient.delete(`/user/cards/${cardId}/auto-replenishment`);
+export const unsetCardAutoReplenishment = async (cardId: string | number) => {
+  const response = await apiClient.delete(`/user/cards/${String(cardId)}/auto-replenishment`);
   return response.data;
 };
 
 // Изменить статус карты
-export const updateCardStatus = async (cardId: number, status: string): Promise<void> => {
-  await apiClient.patch(`/user/cards/${cardId}/status`, { status });
+export const updateCardStatus = async (cardId: string | number, status: string): Promise<void> => {
+  await apiClient.patch(`/user/cards/${String(cardId)}/status`, { status });
 };

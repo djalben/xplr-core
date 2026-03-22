@@ -2,12 +2,13 @@ package main
 
 import (
 	"context"
-	"errors" // ← добавлен для errors.Is
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/djalben/xplr-core/backend/internal/app"
 	"github.com/djalben/xplr-core/backend/internal/config"
@@ -59,5 +60,12 @@ func main() {
 
 	<-ctx.Done()
 	logger.Info("Shutting down...")
-	server.Shutdown(context.Background())
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer shutdownCancel()
+
+	err = server.Shutdown(shutdownCtx)
+	if err != nil {
+		logger.Error("shutdown failed", "error", wrapper.Wrap(err))
+	}
 }

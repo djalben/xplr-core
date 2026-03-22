@@ -924,8 +924,8 @@ export const LandingPage = () => {
                 <ul className="space-y-2">
                   <li><a href="#faq" className="text-slate-400 hover:text-white transition-colors text-sm">FAQ</a></li>
                   <li><a href="#" className="text-slate-400 hover:text-white transition-colors text-sm">Контакты</a></li>
-                  <li><a href="#" className="text-slate-400 hover:text-white transition-colors text-sm flex items-center gap-2">
-                    <MessageCircle className="w-4 h-4" /> Telegram
+                  <li><a href="/support" className="text-slate-400 hover:text-white transition-colors text-sm flex items-center gap-2">
+                    <MessageCircle className="w-4 h-4" /> Live Chat
                   </a></li>
                 </ul>
               </div>

@@ -181,6 +181,7 @@
       "notVerified": "No verificado",
       "displayName": "Nombre visible",
       "displayNamePlaceholder": "Tu nombre",
+      "edit": "Editar",
       "saveProfile": "Guardar",
       "profileUpdated": "Perfil actualizado",
       "saveError": "Error al guardar"
@@ -278,7 +279,15 @@
       "submitReview": "Enviar a revisión",
       "submitSuccess": "Solicitud enviada a revisión",
       "submitError": "Error al enviar solicitud",
-      "fillRequired": "Completa todos los campos obligatorios"
+      "fillRequired": "Completa todos los campos obligatorios",
+      "countries": {
+        "RU": "🇷🇺 Rusia",
+        "BY": "🇧🇾 Bielorrusia",
+        "KZ": "🇰🇿 Kazajistán",
+        "UA": "🇺🇦 Ucrania",
+        "US": "🇺🇸 EE.UU.",
+        "DE": "🇩🇪 Alemania"
+      }
     },
     "error": "Error",
     "emailVerify": {
@@ -296,9 +305,27 @@
   },
   "support": {
     "title": "Soporte",
-    "subtitle": "¿Cómo podemos ayudarte?",
-    "newTicket": "Nuevo ticket",
-    "faq": "Preguntas frecuentes"
+    "subtitle": "Selecciona un tema para iniciar el chat",
+    "chatTitle": "Chat de soporte",
+    "online": "En línea",
+    "closeChat": "Cerrar chat",
+    "chatClosed": "Chat cerrado",
+    "placeholder": "Escribe un mensaje...",
+    "welcomeMsg": "Un especialista se conectará en breve",
+    "avgResponse": "Tiempo medio de respuesta:",
+    "avgResponseTime": "hasta 5 minutos",
+    "error": "Algo salió mal. Inténtalo de nuevo.",
+    "sendError": "No se pudo enviar el mensaje",
+    "topics": {
+      "cards": "Tarjetas",
+      "cardsDesc": "Emisión, bloqueo, límites",
+      "payments": "Pagos y saldo",
+      "paymentsDesc": "Recarga, retiro, transacciones",
+      "security": "Seguridad",
+      "securityDesc": "2FA, verificación, acceso",
+      "other": "Otro",
+      "otherDesc": "Todo lo demás"
+    }
   },
   "auth": {
     "login": "Iniciar sesión",
@@ -365,10 +392,5 @@
     "back": "Atrás",
     "next": "Siguiente",
     "search": "Buscar..."
-  },
-  "clocks": {
-    "moscow": "Moscú",
-    "london": "Londres",
-    "newYork": "Nueva York"
   }
 }

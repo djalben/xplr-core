@@ -80,3 +80,29 @@ func (r *transactionRepo) GetCardTransactions(ctx context.Context, cardID domain
 
 	return list, nil
 }
+
+// GetByUserID — все транзакции пользователя.
+func (r *transactionRepo) GetByUserID(ctx context.Context, userID domain.UUID, from, to time.Time, limit int) ([]*domain.Transaction, error) {
+	const query = `
+		SELECT 
+			id, user_id, card_id, amount, fee, transaction_type, 
+			status, details, provider_tx_id, executed_at
+		FROM transactions 
+		WHERE user_id = $1 
+		  AND executed_at BETWEEN $2 AND $3 
+		ORDER BY executed_at DESC 
+		LIMIT $4`
+
+	if limit <= 0 {
+		limit = 200
+	}
+
+	var list []*domain.Transaction
+
+	err := r.store.SelectContext(ctx, &list, query, userID, from, to, limit)
+	if err != nil {
+		return nil, wrapper.Wrap(err)
+	}
+
+	return list, nil
+}

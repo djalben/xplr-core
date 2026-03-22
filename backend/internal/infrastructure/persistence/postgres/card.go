@@ -56,13 +56,31 @@ func (r *cardRepo) GetByID(ctx context.Context, id domain.UUID) (*domain.Card, e
 	return &c, nil
 }
 
+func (r *cardRepo) ListByUserID(ctx context.Context, userID domain.UUID) ([]*domain.Card, error) {
+	const query = `
+		SELECT id, user_id, provider_card_id, bin, last_4_digits, card_status,
+		       nickname, daily_spend_limit, failed_auth_count, card_type,
+		       balance, expiry_date, created_at
+		FROM cards WHERE user_id = $1 ORDER BY created_at DESC`
+
+	var cards []*domain.Card
+
+	err := r.store.SelectContext(ctx, &cards, query, userID)
+	if err != nil {
+		return nil, wrapper.Wrap(err)
+	}
+
+	return cards, nil
+}
+
 func (r *cardRepo) Update(ctx context.Context, card *domain.Card) error {
 	const query = `
 		UPDATE cards 
-		SET balance = $1, card_status = $2 
-		WHERE id = $3`
+		SET balance = $1, card_status = $2, daily_spend_limit = $3, nickname = $4
+		WHERE id = $5`
 
-	_, err := r.store.ExecContext(ctx, query, card.Balance, card.CardStatus, card.ID)
+	_, err := r.store.ExecContext(ctx, query,
+		card.Balance, card.CardStatus, card.DailySpendLimit, card.Nickname, card.ID)
 	if err != nil {
 		return wrapper.Wrap(err)
 	}
