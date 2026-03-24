@@ -172,6 +172,9 @@ func main() {
 	// Notification diagnostic (secret-key protected, for direct testing)
 	router.HandleFunc("/api/v1/diag/test-notify", handlers.DiagTestNotifyHandler).Methods("GET")
 
+	// Staff PIN verification (JWT-protected, but NOT behind AdminOnly — handler checks is_admin itself)
+	router.Handle("/api/v1/verify-staff-pin", middleware.JWTAuthMiddleware(http.HandlerFunc(handlers.VerifyStaffPINHandler))).Methods("POST")
+
 	// --- НАСТРОЙКА ЗАЩИЩЕННЫХ МАРШРУТОВ (Protected Routes) ---
 	// Создаем Subrouter с префиксом /api/v1/user
 	protectedRouter := router.PathPrefix("/api/v1/user").Subrouter()
@@ -201,7 +204,6 @@ func main() {
 	verifiedWallet.HandleFunc("/topup", handlers.TopUpWalletHandler).Methods("POST")
 	verifiedWallet.HandleFunc("/auto-topup", handlers.SetAutoTopupHandler).Methods("PATCH")
 	protectedRouter.HandleFunc("/settings/auto-replenish", handlers.SetAutoTopupHandler).Methods("PATCH")
-	protectedRouter.HandleFunc("/verify-staff-pin", handlers.VerifyStaffPINHandler).Methods("POST")
 	protectedRouter.HandleFunc("/report", handlers.GetUserTransactionReportHandler).Methods("GET")
 	protectedRouter.HandleFunc("/transactions", handlers.GetUnifiedTransactionsHandler).Methods("GET")
 	protectedRouter.HandleFunc("/transactions/export", handlers.ExportTransactionsHandler).Methods("GET")

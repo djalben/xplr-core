@@ -387,14 +387,14 @@ func VerifyStaffPINHandler(w http.ResponseWriter, r *http.Request) {
 
 	expectedPIN := strings.TrimSpace(fmt.Sprintf("%s", getEnvOrDefault("STAFF_PIN", "1337")))
 	if req.PIN != expectedPIN {
-		log.Printf("[STAFF-PIN] ❌ Admin %d (%s): wrong PIN", userID, user.Email)
+		log.Printf("[AUTH] PIN attempt for user %d: %v", userID, "DENIED — wrong PIN")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(map[string]interface{}{"error": "invalid_pin"})
 		return
 	}
 
-	log.Printf("[STAFF-PIN] ✅ Admin %d (%s): PIN verified, staff access granted", userID, user.Email)
+	log.Printf("[AUTH] PIN attempt for user %d: %v", userID, "GRANTED — staff access")
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{"status": "ok", "access": "granted"})
 }

@@ -61,6 +61,7 @@ var allRequiredColumns = []requiredColumn{
 	{"users", "is_blocked", "BOOLEAN DEFAULT FALSE"},
 	{"users", "fixed_telegram_id", "BIGINT"},
 	{"users", "notification_pref", "VARCHAR(20) DEFAULT 'both'"},
+	{"users", "auto_topup_enabled", "BOOLEAN DEFAULT FALSE"},
 
 	// --- support_tickets: admin ownership ---
 	{"support_tickets", "claimed_by", "INTEGER DEFAULT 0"},
