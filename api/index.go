@@ -306,6 +306,10 @@ func buildRouter() *mux.Router {
 	// Public exchange rates
 	r.HandleFunc("/api/v1/rates", handlers.PublicGetExchangeRatesHandler).Methods("GET")
 
+	// Staff PIN verification (JWT-protected, NOT behind AdminOnly — handler checks is_admin itself)
+	r.Handle("/api/v1/verify-staff-pin", middleware.JWTAuthMiddleware(http.HandlerFunc(handlers.VerifyStaffPINHandler))).Methods("POST")
+	log.Println("Registered route: POST /api/v1/verify-staff-pin")
+
 	// Protected routes under /api/v1/user
 	protected := r.PathPrefix("/api/v1/user").Subrouter()
 	protected.Use(middleware.JWTAuthMiddleware)
@@ -332,7 +336,11 @@ func buildRouter() *mux.Router {
 	protected.HandleFunc("/wallet/auto-topup", handlers.SetAutoTopupHandler).Methods("PATCH")
 	protected.HandleFunc("/report", handlers.GetUserTransactionReportHandler).Methods("GET")
 	protected.HandleFunc("/transactions", handlers.GetUnifiedTransactionsHandler).Methods("GET")
+	protected.HandleFunc("/transactions/export", handlers.ExportTransactionsHandler).Methods("GET")
+	protected.HandleFunc("/dashboard-stats", handlers.GetDashboardStatsHandler).Methods("GET")
+	protected.HandleFunc("/settings/auto-replenish", handlers.SetAutoTopupHandler).Methods("PATCH")
 	protected.HandleFunc("/api-key", handlers.CreateAPIKeyHandler).Methods("POST")
+	log.Println("Registered route: GET /api/v1/user/dashboard-stats")
 
 	// Teams
 	protected.HandleFunc("/teams", handlers.GetUserTeamsHandler).Methods("GET")
@@ -409,6 +417,7 @@ func buildRouter() *mux.Router {
 	admin.HandleFunc("/logs", handlers.AdminGetLogsHandler).Methods("GET")
 	admin.HandleFunc("/test-notify", handlers.AdminTestNotifyHandler).Methods("GET")
 
+	log.Println("✅ [ROUTER] All routes registered successfully")
 	return r
 }
 

@@ -357,8 +357,11 @@ func AdminDeleteTranslationHandler(w http.ResponseWriter, r *http.Request) {
 // Проверяет ПИН-код для доступа к админке.
 // ПЕРВЫМ делом проверяет is_admin — если пользователь не админ, возвращает 403.
 func VerifyStaffPINHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[AUTH] VerifyStaffPIN handler called: method=%s path=%s", r.Method, r.URL.Path)
+
 	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
 	if !ok || userID == 0 {
+		log.Printf("[AUTH] PIN attempt: no userID in context — 401")
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -385,7 +388,8 @@ func VerifyStaffPINHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	expectedPIN := strings.TrimSpace(fmt.Sprintf("%s", getEnvOrDefault("STAFF_PIN", "1337")))
+	expectedPIN := getEnvOrDefault("STAFF_PIN", "1337")
+	log.Printf("[AUTH] PIN check for user %d: env STAFF_PIN set=%v, using default=%v", userID, os.Getenv("STAFF_PIN") != "", os.Getenv("STAFF_PIN") == "")
 	if req.PIN != expectedPIN {
 		log.Printf("[AUTH] PIN attempt for user %d: %v", userID, "DENIED — wrong PIN")
 		w.Header().Set("Content-Type", "application/json")
