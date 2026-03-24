@@ -3,7 +3,6 @@ package wallet
 import (
 	"net/http"
 
-	"github.com/djalben/xplr-core/backend/internal/application/wallet"
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler"
 	"github.com/go-chi/chi/v5"
@@ -11,10 +10,10 @@ import (
 )
 
 type Handler struct {
-	useCase *wallet.UseCase
+	useCase WalletUseCase
 }
 
-func NewHandler(uc *wallet.UseCase) *Handler {
+func NewHandler(uc WalletUseCase) *Handler {
 	return &Handler{useCase: uc}
 }
 

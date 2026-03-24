@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/djalben/xplr-core/backend/internal/application/transaction"
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler"
 	"github.com/go-chi/chi/v5"
@@ -12,10 +11,10 @@ import (
 )
 
 type Handler struct {
-	useCase *transaction.UseCase
+	useCase TransactionUseCase
 }
 
-func NewHandler(uc *transaction.UseCase) *Handler {
+func NewHandler(uc TransactionUseCase) *Handler {
 	return &Handler{useCase: uc}
 }
 

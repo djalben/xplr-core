@@ -13,6 +13,8 @@ type ENV struct {
 	// HTTP сервер
 	ServerHost string `env:"SERVER_HOST" default:"0.0.0.0"`
 	ServerPort int    `env:"SERVER_PORT" default:"8080"`
+	// CORS: пусто = dev (AllowedOrigins * без credentials). В проде — список через запятую, например https://app.example.com
+	CORSAllowedOrigins string `env:"CORS_ALLOWED_ORIGINS"`
 
 	// JWT
 	JWTSecret string `env:"JWT_SECRET" required:"true"`

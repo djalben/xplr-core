@@ -3,7 +3,6 @@ package card
 import (
 	"net/http"
 
-	"github.com/djalben/xplr-core/backend/internal/application/card"
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler"
 	"github.com/go-chi/chi/v5"
@@ -11,10 +10,10 @@ import (
 )
 
 type Handler struct {
-	useCase *card.UseCase
+	useCase CardUseCase
 }
 
-func NewHandler(uc *card.UseCase) *Handler {
+func NewHandler(uc CardUseCase) *Handler {
 	return &Handler{useCase: uc}
 }
 

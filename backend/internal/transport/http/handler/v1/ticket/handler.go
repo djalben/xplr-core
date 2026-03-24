@@ -3,7 +3,6 @@ package ticket
 import (
 	"net/http"
 
-	"github.com/djalben/xplr-core/backend/internal/application/ticket"
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler"
 	"github.com/go-chi/chi/v5"
@@ -11,10 +10,10 @@ import (
 )
 
 type Handler struct {
-	useCase *ticket.UseCase
+	useCase TicketUseCase
 }
 
-func NewHandler(uc *ticket.UseCase) *Handler {
+func NewHandler(uc TicketUseCase) *Handler {
 	return &Handler{useCase: uc}
 }
 

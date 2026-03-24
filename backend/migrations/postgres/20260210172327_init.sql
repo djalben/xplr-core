@@ -14,6 +14,7 @@ CREATE TABLE users (
     telegram_chat_id BIGINT DEFAULT NULL,
     referral_code VARCHAR(20) UNIQUE,
     referred_by UUID REFERENCES users(id),
+    is_admin BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

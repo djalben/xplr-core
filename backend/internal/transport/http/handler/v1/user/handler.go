@@ -5,14 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/djalben/xplr-core/backend/internal/application/card"
-	"github.com/djalben/xplr-core/backend/internal/application/grades"
-	"github.com/djalben/xplr-core/backend/internal/application/ticket"
-	"github.com/djalben/xplr-core/backend/internal/application/transaction"
-	"github.com/djalben/xplr-core/backend/internal/application/user"
-	"github.com/djalben/xplr-core/backend/internal/application/wallet"
 	"github.com/djalben/xplr-core/backend/internal/domain"
-	"github.com/djalben/xplr-core/backend/internal/ports"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -20,24 +13,29 @@ import (
 )
 
 type Handler struct {
-	userUC       *user.UseCase
-	walletUC     *wallet.UseCase
-	gradesUC     *grades.UseCase
-	cardUC       *card.UseCase
-	txUC         *transaction.UseCase
-	ticketUC     *ticket.UseCase
-	referralRepo ports.ReferralRepository
+	userUC   UserProfile
+	walletUC UserWallet
+	gradesUC UserGrades
+	cardUC   UserCards
+	txUC     UserTransactions
+	ticketUC UserTickets
 }
 
-func NewHandler(userUC *user.UseCase, walletUC *wallet.UseCase, gradesUC *grades.UseCase, cardUC *card.UseCase, txUC *transaction.UseCase, ticketUC *ticket.UseCase, referralRepo ports.ReferralRepository) *Handler {
+func NewHandler(
+	userUC UserProfile,
+	walletUC UserWallet,
+	gradesUC UserGrades,
+	cardUC UserCards,
+	txUC UserTransactions,
+	ticketUC UserTickets,
+) *Handler {
 	return &Handler{
-		userUC:       userUC,
-		walletUC:     walletUC,
-		gradesUC:     gradesUC,
-		cardUC:       cardUC,
-		txUC:         txUC,
-		ticketUC:     ticketUC,
-		referralRepo: referralRepo,
+		userUC:   userUC,
+		walletUC: walletUC,
+		gradesUC: gradesUC,
+		cardUC:   cardUC,
+		txUC:     txUC,
+		ticketUC: ticketUC,
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/djalben/xplr-core/backend/internal/app"
@@ -28,7 +29,7 @@ type Server struct {
 	router    *chi.Mux
 }
 
-func NewServer(container *app.Container, host string, port int, jwtSecret []byte) *Server {
+func NewServer(container *app.Container, host string, port int, jwtSecret []byte, corsAllowedOrigins string) *Server {
 	r := chi.NewRouter()
 
 	s := &Server{
@@ -43,7 +44,7 @@ func NewServer(container *app.Container, host string, port int, jwtSecret []byte
 		router:    r,
 	}
 
-	s.setupMiddleware()
+	s.setupMiddleware(corsAllowedOrigins)
 	s.setupRoutes(jwtSecret)
 
 	return s
@@ -67,19 +68,59 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func (s *Server) setupMiddleware() {
+func (s *Server) setupMiddleware(corsAllowedOrigins string) {
 	s.router.Use(middleware.RequestID)
 	s.router.Use(middleware.RealIP)
 	s.router.Use(middleware.Logger)
 	s.router.Use(middleware.Recoverer)
 	s.router.Use(middleware.Timeout(60 * time.Second))
 
-	s.router.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"*"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
-		AllowedHeaders:   []string{"*"},
-		AllowCredentials: true,
-	}))
+	s.router.Use(cors.Handler(buildCORSOptions(corsAllowedOrigins)))
+}
+
+// buildCORSOptions — Fetch: Access-Control-Allow-Origin=* несовместим с credentials; для dev без явных origin отключаем credentials.
+func buildCORSOptions(originsCSV string) cors.Options {
+	opts := cors.Options{
+		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
+		AllowedHeaders: []string{"Authorization", "Content-Type", "Accept", "X-Request-ID"},
+		MaxAge:         300,
+	}
+
+	list := parseCORSOrigins(originsCSV)
+	if len(list) == 0 {
+		opts.AllowedOrigins = []string{"*"}
+		opts.AllowCredentials = false
+
+		return opts
+	}
+
+	opts.AllowedOrigins = list
+	opts.AllowCredentials = true
+
+	return opts
+}
+
+func parseCORSOrigins(s string) []string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+
+	if len(out) == 0 {
+		return nil
+	}
+
+	return out
 }
 
 func (s *Server) setupRoutes(jwtSecret []byte) {
@@ -103,7 +144,7 @@ func (s *Server) setupRoutes(jwtSecret []byte) {
 			// Protected: user (BFF), wallet, card, transaction, ticket
 			r.Group(func(r chi.Router) {
 				r.Use(authMiddleware.Auth(jwtSecret))
-				userApi.NewHandler(s.container.UserUseCase, s.container.WalletUseCase, s.container.GradesUseCase, s.container.CardUseCase, s.container.TransactionUseCase, s.container.TicketUseCase, s.container.ReferralRepo).Register(r)
+				userApi.NewHandler(s.container.UserUseCase, s.container.WalletUseCase, s.container.GradesUseCase, s.container.CardUseCase, s.container.TransactionUseCase, s.container.TicketUseCase).Register(r)
 				walletApi.NewHandler(s.container.WalletUseCase).Register(r)
 				cardApi.NewHandler(s.container.CardUseCase).Register(r)
 				ticketApi.NewHandler(s.container.TicketUseCase).Register(r)

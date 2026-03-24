@@ -3,9 +3,6 @@ package auth
 import (
 	"net/http"
 
-	"github.com/djalben/xplr-core/backend/internal/application/auth"
-	"github.com/djalben/xplr-core/backend/internal/application/wallet"
-	"github.com/djalben/xplr-core/backend/internal/ports"
 	"github.com/djalben/xplr-core/backend/internal/pkg/utils"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler"
 	"github.com/go-chi/chi/v5"
@@ -13,13 +10,13 @@ import (
 )
 
 type Handler struct {
-	authUC    *auth.UseCase
-	walletUC  *wallet.UseCase
-	userRepo  ports.UserRepository
+	authUC    AuthRegisterLogin
+	walletUC  WalletBalanceProvider
+	userRepo  UserByIDReader
 	jwtSecret []byte
 }
 
-func NewHandler(authUC *auth.UseCase, walletUC *wallet.UseCase, userRepo ports.UserRepository, jwtSecret []byte) *Handler {
+func NewHandler(authUC AuthRegisterLogin, walletUC WalletBalanceProvider, userRepo UserByIDReader, jwtSecret []byte) *Handler {
 	return &Handler{
 		authUC:    authUC,
 		walletUC:  walletUC,
