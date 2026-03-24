@@ -35,9 +35,9 @@ func GetInternalBalance(userID int) (*models.InternalBalance, error) {
 
 	var ib models.InternalBalance
 	err := GlobalDB.QueryRow(
-		`SELECT id, user_id, master_balance, updated_at FROM internal_balances WHERE user_id = $1`,
+		`SELECT id, user_id, master_balance, COALESCE(auto_topup_enabled, FALSE), updated_at FROM internal_balances WHERE user_id = $1`,
 		userID,
-	).Scan(&ib.ID, &ib.UserID, &ib.MasterBalance, &ib.UpdatedAt)
+	).Scan(&ib.ID, &ib.UserID, &ib.MasterBalance, &ib.AutoTopupEnabled, &ib.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get internal balance: %w", err)
 	}

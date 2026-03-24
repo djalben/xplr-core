@@ -138,6 +138,7 @@ type Card struct {
 	FailedAuthCount        int             `json:"failed_auth_count"`
 	CardType               string          `json:"card_type"`
 	Category               string          `json:"category"` // 'arbitrage', 'travel', 'services'
+	Currency               string          `json:"currency"` // 'USD' or 'EUR'
 	AutoReplenishEnabled   bool            `json:"auto_replenish_enabled"`
 	AutoReplenishThreshold decimal.Decimal `json:"auto_replenish_threshold"`
 	AutoReplenishAmount    decimal.Decimal `json:"auto_replenish_amount"`
@@ -152,10 +153,11 @@ type Card struct {
 
 // InternalBalance - Внутренний баланс пользователя (Кошелёк)
 type InternalBalance struct {
-	ID            int             `json:"id"`
-	UserID        int             `json:"user_id"`
-	MasterBalance decimal.Decimal `json:"master_balance"`
-	UpdatedAt     time.Time       `json:"updated_at"`
+	ID               int             `json:"id"`
+	UserID           int             `json:"user_id"`
+	MasterBalance    decimal.Decimal `json:"master_balance"`
+	AutoTopupEnabled bool            `json:"auto_topup_enabled"`
+	UpdatedAt        time.Time       `json:"updated_at"`
 }
 
 // SpendingLimitRequest - Запрос на установку лимита списания карты
@@ -179,6 +181,7 @@ type MassIssueRequest struct {
 	Category     string          `json:"category"`     // 'arbitrage', 'travel', 'services'
 	TeamID       *int            `json:"team_id,omitempty"`
 	PriceUSD     decimal.Decimal `json:"price_usd"` // Цена в USD для личных карт (списывается из кошелька напрямую)
+	Currency     string          `json:"currency"`  // 'USD' or 'EUR' — валюта карты
 }
 
 // CardIssueResult - Результат выпуска одной карты

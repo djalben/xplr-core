@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -350,6 +351,59 @@ func AdminDeleteTranslationHandler(w http.ResponseWriter, r *http.Request) {
 	repository.WriteAdminLog(adminID, fmt.Sprintf("Перевод удалён: id=%d", id))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
+}
+
+// VerifyStaffPINHandler - POST /api/v1/verify-staff-pin
+// Проверяет ПИН-код для доступа к админке.
+// ПЕРВЫМ делом проверяет is_admin — если пользователь не админ, возвращает 403.
+func VerifyStaffPINHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// ═══ ЖЕЛЕЗНЫЙ БАРЬЕР: проверяем is_admin ПЕРВЫМ делом ═══
+	user, err := repository.GetUserByID(userID)
+	if err != nil {
+		log.Printf("[STAFF-PIN] ❌ User %d: DB error: %v", userID, err)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if !user.IsAdmin && user.Role != "admin" {
+		log.Printf("[STAFF-PIN] ⛔ DENIED: user %d (%s) is NOT admin — PIN check blocked", userID, user.Email)
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	// Только для админов: проверяем ПИН
+	var req struct {
+		PIN string `json:"pin"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	expectedPIN := strings.TrimSpace(fmt.Sprintf("%s", getEnvOrDefault("STAFF_PIN", "1337")))
+	if req.PIN != expectedPIN {
+		log.Printf("[STAFF-PIN] ❌ Admin %d (%s): wrong PIN", userID, user.Email)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]interface{}{"error": "invalid_pin"})
+		return
+	}
+
+	log.Printf("[STAFF-PIN] ✅ Admin %d (%s): PIN verified, staff access granted", userID, user.Email)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"status": "ok", "access": "granted"})
+}
+
+func getEnvOrDefault(key, fallback string) string {
+	if v, ok := os.LookupEnv(key); ok && strings.TrimSpace(v) != "" {
+		return strings.TrimSpace(v)
+	}
+	return fallback
 }
 
 // AdminGetLogsHandler - GET /api/v1/admin/logs

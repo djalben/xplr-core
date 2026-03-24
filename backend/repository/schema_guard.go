@@ -37,6 +37,7 @@ var allRequiredColumns = []requiredColumn{
 	{"cards", "spent_from_wallet", "NUMERIC(20,4) DEFAULT 0.0000"},
 	{"cards", "expiry_date", "TIMESTAMP WITH TIME ZONE"},
 	{"cards", "default_max_limit", "NUMERIC(20,4) DEFAULT 0.0000"},
+	{"cards", "currency", "VARCHAR(10) DEFAULT 'USD'"},
 	// --- transactions ---
 	{"transactions", "source_type", "VARCHAR(50) DEFAULT 'card_charge'"},
 	{"transactions", "source_id", "INTEGER"},

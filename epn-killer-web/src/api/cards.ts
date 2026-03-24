@@ -37,6 +37,7 @@ export interface MassIssueRequest {
   category?: string;
   team_id?: number;
   price_usd?: number;
+  currency?: string;
 }
 
 export interface CardIssueResult {
@@ -85,6 +86,7 @@ export const issuePersonalCard = async (
     service_slug: cardType,
     category: categoryMap[cardType],
     price_usd: priceUsd,
+    currency: 'USD',
   };
 
   return issueCards(data);

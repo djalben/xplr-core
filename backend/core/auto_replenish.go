@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/djalben/xplr-core/backend/models"
-	"github.com/djalben/xplr-core/backend/notification"
 	"github.com/djalben/xplr-core/backend/repository"
+	"github.com/djalben/xplr-core/backend/service"
 	"github.com/shopspring/decimal"
 )
 
@@ -45,27 +45,27 @@ func processCardReplenishment(card models.Card) error {
 	log.Printf("[AUTO-REPLENISH] Processing card %d (user %d, balance: %s, threshold: %s)",
 		card.ID, card.UserID, card.CardBalance.String(), card.AutoReplenishThreshold.String())
 
-	// 1. Получить пользователя
-	user, err := repository.GetUserByID(card.UserID)
+	// 1. Проверить Кошелёк пользователя
+	wallet, err := repository.GetInternalBalance(card.UserID)
 	if err != nil {
-		return fmt.Errorf("failed to get user: %w", err)
+		return fmt.Errorf("failed to get wallet: %w", err)
 	}
 
-	// 2. Проверить баланс пользователя
-	if user.BalanceRub.LessThan(card.AutoReplenishAmount) {
-		log.Printf("[AUTO-REPLENISH] Insufficient user balance for card %d. User balance_rub: %s, Required: %s",
-			card.ID, user.BalanceRub.String(), card.AutoReplenishAmount.String())
+	// 2. Проверить баланс Кошелька
+	if wallet.MasterBalance.LessThan(card.AutoReplenishAmount) {
+		log.Printf("[AUTO-REPLENISH] Insufficient wallet balance for card %d. Wallet: $%s, Required: $%s",
+			card.ID, wallet.MasterBalance.StringFixed(2), card.AutoReplenishAmount.StringFixed(2))
 
-		if user.TelegramChatID.Valid {
-			notification.SendTelegramMessage(user.TelegramChatID.Int64,
-				fmt.Sprintf("⚠️ *Auto-replenishment failed:* Недостаточно средств для пополнения карты `...%s`. Требуется: `%s`, доступно: `%s`",
-					card.Last4Digits, card.AutoReplenishAmount.String(), user.BalanceRub.String()))
-		}
-		return fmt.Errorf("insufficient user balance")
+		go service.NotifyUser(card.UserID, "Автопополнение не удалось",
+			fmt.Sprintf("⚠️ <b>Автопополнение не удалось</b>\n\n"+
+				"Недостаточно средств для пополнения карты *%s.\n"+
+				"Требуется: <b>$%s</b>, доступно: <b>$%s</b>\n\n"+
+				"<a href=\"https://xplr.pro/wallet\">Пополнить кошелёк</a>",
+				card.Last4Digits, card.AutoReplenishAmount.StringFixed(2), wallet.MasterBalance.StringFixed(2)))
+		return fmt.Errorf("insufficient wallet balance")
 	}
 
 	// 3. Начать транзакцию БД для атомарности
-	// Списать с баланса пользователя и пополнить карту
 	if repository.GlobalDB == nil {
 		return fmt.Errorf("database connection not initialized")
 	}
@@ -75,13 +75,13 @@ func processCardReplenishment(card models.Card) error {
 	}
 	defer tx.Rollback()
 
-	// 4. Списать с баланса пользователя (XPLR: balance_rub)
+	// 4. Списать из Кошелька (internal_balances.master_balance)
 	_, err = tx.Exec(
-		"UPDATE users SET balance_rub = COALESCE(balance_rub, 0) - $1, balance = balance - $2 WHERE id = $3",
-		card.AutoReplenishAmount, card.AutoReplenishAmount, card.UserID,
+		"UPDATE internal_balances SET master_balance = master_balance - $1, updated_at = NOW() WHERE user_id = $2 AND master_balance >= $1",
+		card.AutoReplenishAmount, card.UserID,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to deduct from user balance: %w", err)
+		return fmt.Errorf("failed to deduct from wallet: %w", err)
 	}
 
 	// 5. Пополнить карту
@@ -115,12 +115,14 @@ func processCardReplenishment(card models.Card) error {
 
 	log.Printf("[AUTO-REPLENISH] ✅ Card %d replenished successfully with %s", card.ID, card.AutoReplenishAmount.String())
 
-	// 8. Отправить уведомление пользователю
-	if user.TelegramChatID.Valid {
-		notification.SendTelegramMessage(user.TelegramChatID.Int64,
-			fmt.Sprintf("✅ *Auto-replenishment:* Карта `...%s` пополнена на `%s`. Новый баланс карты: `%s`",
-				card.Last4Digits, card.AutoReplenishAmount.String(), card.CardBalance.Add(card.AutoReplenishAmount).String()))
-	}
+	// 8. Отправить уведомление пользователю (TG + Email)
+	go service.NotifyUser(card.UserID, "Автопополнение карты",
+		fmt.Sprintf("✅ <b>Автопополнение</b>\n\n"+
+			"С вашего кошелька переведено <b>$%s</b> на карту *%s.\n"+
+			"Новый баланс карты: <b>$%s</b>\n\n"+
+			"<a href=\"https://xplr.pro/cards\">Открыть карты</a>",
+			card.AutoReplenishAmount.StringFixed(2), card.Last4Digits,
+			card.CardBalance.Add(card.AutoReplenishAmount).StringFixed(2)))
 
 	return nil
 }

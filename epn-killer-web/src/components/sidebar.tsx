@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
+import apiClient from '../api/axios';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useRates } from '../store/rates-context';
@@ -138,26 +139,34 @@ const BottomNavItem = ({ href, icon, label, isActive }: { href: string; icon: Re
 );
 
 // ── Staff PIN Modal ──
-const STAFF_PIN = '1337';
-
 const StaffPinModal = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   if (!open) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (pin === STAFF_PIN) {
-      sessionStorage.setItem('_xplr_staff', 'granted');
-      setPin('');
-      setError(false);
-      onClose();
-      navigate('/staff-only-zone');
-    } else {
+    setLoading(true);
+    setError(false);
+    try {
+      const res = await apiClient.post('/verify-staff-pin', { pin });
+      if (res.data?.access === 'granted') {
+        sessionStorage.setItem('_xplr_staff', 'granted');
+        setPin('');
+        onClose();
+        navigate('/staff-only-zone');
+      } else {
+        setError(true);
+        setPin('');
+      }
+    } catch {
       setError(true);
       setPin('');
+    } finally {
+      setLoading(false);
     }
   };
 
