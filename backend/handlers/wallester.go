@@ -100,18 +100,12 @@ func WallesterWebhookHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 5. Обработка webhook (включает проверку idempotency внутри ProcessWebhook)
-	if err := wallesterRepo.ProcessWebhook(payload); err != nil {
-		log.Printf("Error processing webhook: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	// REMOVED: Wallester webhook processing - provider interface will handle callbacks differently
+	// Each provider (Armenia, etc.) will have its own webhook handler
+	log.Printf("[WEBHOOK] Received webhook (provider interface pending): event_type=%s", payload.EventType)
 
-	// 6. Отправка уведомлений для всех значимых событий (3DS, платеж, возврат)
-	switch payload.EventType {
-	case "3ds_authentication", "payment_success", "transaction", "capture", "authorization", "refund", "reversal":
-		go sendWallesterNotification(payload)
-	}
+	// TODO: Implement provider-specific webhook handling
+	// For now, just acknowledge receipt
 
 	// Успешный ответ
 	w.Header().Set("Content-Type", "application/json")
@@ -200,11 +194,6 @@ func GetCardDetailsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if wallesterRepo == nil {
-		http.Error(w, "Wallester repository not initialized", http.StatusInternalServerError)
-		return
-	}
-
 	vars := mux.Vars(r)
 	idStr := vars["id"]
 	if idStr == "" {
@@ -230,21 +219,11 @@ func GetCardDetailsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Используем external_id или provider_card_id для запроса к Wallester
-	externalID := card.ExternalID
-	if externalID == "" {
-		externalID = card.ProviderCardID
-	}
-
-	if externalID == "" {
-		http.Error(w, "Card external ID not found", http.StatusBadRequest)
-		return
-	}
-
-	// Получаем детали из Wallester
-	details, err := wallesterRepo.GetCardDetails(externalID)
+	// Получаем детали через провайдерский интерфейс (MockProvider или ArmeniaProvider)
+	provider := service.GetCardProvider()
+	details, err := provider.GetCardDetails(cardID)
 	if err != nil {
-		log.Printf("Error getting card details from Wallester: %v", err)
+		log.Printf("[CARD-DETAILS] Error getting card details from %s: %v", provider.GetProviderName(), err)
 		http.Error(w, "Failed to get card details: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -259,11 +238,6 @@ func SyncCardBalanceHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
 	if !ok || userID == 0 {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	if wallesterRepo == nil {
-		http.Error(w, "Wallester repository not initialized", http.StatusInternalServerError)
 		return
 	}
 
@@ -292,22 +266,9 @@ func SyncCardBalanceHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	externalID := card.ExternalID
-	if externalID == "" {
-		externalID = card.ProviderCardID
-	}
-
-	if externalID == "" {
-		http.Error(w, "Card external ID not found", http.StatusBadRequest)
-		return
-	}
-
-	// Синхронизация баланса
-	if err := wallesterRepo.SyncBalance(cardID, externalID); err != nil {
-		log.Printf("Error syncing balance: %v", err)
-		http.Error(w, "Failed to sync balance: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
+	// REMOVED: Wallester sync - provider interface will handle balance sync
+	// Balance sync functionality will be implemented through provider interface
+	log.Printf("[SYNC-BALANCE] Balance sync requested for card %d (provider interface pending)", cardID)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

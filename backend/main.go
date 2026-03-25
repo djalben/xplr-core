@@ -20,6 +20,7 @@ import (
 	"github.com/djalben/xplr-core/backend/handlers"
 	"github.com/djalben/xplr-core/backend/middleware"
 	"github.com/djalben/xplr-core/backend/repository"
+	"github.com/djalben/xplr-core/backend/service"
 	"github.com/djalben/xplr-core/backend/telegram"
 )
 
@@ -118,9 +119,9 @@ func main() {
 	}
 	log.Printf("✅ [INIT] SMTP configured: host=%s, port=%s, user=%s", smtpHost, smtpPort, smtpUser)
 
-	// Инициализация Wallester Repository
-	handlers.InitWallesterRepository()
-	log.Println("Wallester repository initialized")
+	// Initialize card provider (MockProvider by default, ArmeniaProvider if configured)
+	service.InitCardProvider(repository.GlobalDB)
+	log.Printf("✅ [INIT] Card provider: %s", service.GetCardProvider().GetProviderName())
 
 	// 1.5. Запуск фонового процесса автопополнения карт
 	go core.StartAutoReplenishmentWorker()
@@ -128,18 +129,18 @@ func main() {
 	// 1.7. Запуск cron-задачи: возврат остатков истёкших карт в Кошелёк
 	go core.StartExpiryReclaimWorker()
 
-	// 1.6. Запуск периодической синхронизации балансов карт из Wallester
-	go func() {
-		ticker := time.NewTicker(5 * time.Minute) // Синхронизация каждые 5 минут
-		defer ticker.Stop()
-		for range ticker.C {
-			if wallesterRepo := repository.NewWallesterRepository(); wallesterRepo != nil {
-				if err := wallesterRepo.SyncAllCardsBalances(); err != nil {
-					log.Printf("Error syncing all card balances: %v", err)
-				}
-			}
-		}
-	}()
+	// REMOVED: Wallester balance sync - provider interface will handle this
+	// go func() {
+	// 	ticker := time.NewTicker(5 * time.Minute)
+	// 	defer ticker.Stop()
+	// 	for range ticker.C {
+	// 		if wallesterRepo := repository.NewWallesterRepository(); wallesterRepo != nil {
+	// 			if err := wallesterRepo.SyncAllCardsBalances(); err != nil {
+	// 				log.Printf("Error syncing all card balances: %v", err)
+	// 			}
+	// 		}
+	// 	}
+	// }()
 
 	// 2. Инициализация маршрутизатора (Router)
 	router := mux.NewRouter()
@@ -157,8 +158,8 @@ func main() {
 	router.HandleFunc("/api/v1/auth/reset-password", handlers.ResetPasswordHandler).Methods("POST")
 	router.HandleFunc("/api/v1/auth/refresh-token", handlers.RefreshTokenHandler).Methods("POST")
 
-	// Webhook от Wallester (публичный, без middleware)
-	router.HandleFunc("/api/v1/webhooks/wallester", handlers.WallesterWebhookHandler).Methods("POST")
+	// REMOVED: Wallester webhook - provider interface will handle callbacks differently
+	// router.HandleFunc("/api/v1/webhooks/wallester", handlers.WallesterWebhookHandler).Methods("POST")
 
 	// Webhook от зарубежной организации — подтверждение пополнения (публичный)
 	router.HandleFunc("/api/v1/webhooks/external-topup", handlers.ExternalTopUpWebhookHandler).Methods("POST")
