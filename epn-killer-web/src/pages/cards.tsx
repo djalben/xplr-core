@@ -6,6 +6,7 @@ import { ModalPortal } from '../components/modal-portal';
 import { BackButton } from '../components/back-button';
 import { getWallet, transferWalletToCard, type InternalBalance } from '../api/wallet';
 import { getUserCards, issuePersonalCard, getCardDetails, updateCardStatus, type Card as BackendCard } from '../api/cards';
+import { getTierInfo, type TierInfo } from '../api/tier';
 import { 
   Plus, 
   CreditCard as CardIcon,
@@ -1056,6 +1057,7 @@ export const CardsPage = () => {
   const [personalCards, setPersonalCards] = useState<PersonalCard[]>([]);
   const [isLoadingCards, setIsLoadingCards] = useState(true);
   const [isIssuing, setIsIssuing] = useState(false);
+  const [tierInfo, setTierInfo] = useState<TierInfo | null>(null);
 
   // Map backend card type to PersonalCard color
   const typeColorMap: Record<string, 'blue' | 'purple' | 'gold'> = {
@@ -1116,9 +1118,10 @@ export const CardsPage = () => {
     }
   };
 
-  // Fetch wallet + cards on mount, auto-refresh wallet every 30s
+  // Fetch wallet + cards + tier info on mount, auto-refresh wallet every 30s
   useEffect(() => {
     fetchCards();
+    getTierInfo().then(setTierInfo).catch(() => {});
     const refreshWallet = () => {
       getWallet()
         .then((v) => setWalletBalance(Number(v.master_balance) || 0))
@@ -1131,12 +1134,19 @@ export const CardsPage = () => {
 
   // Handle card issuance via real API
   const handleIssueCard = async (cardType: 'subscriptions' | 'travel' | 'premium', priceUsd: number) => {
+    // Check card limit before issuing
+    if (tierInfo && !tierInfo.can_issue_more) {
+      alert(`Достигнут лимит карт для вашего уровня (${tierInfo.current_cards}/${tierInfo.card_limit}). Улучшите уровень до GOLD для выпуска до 15 карт.`);
+      return;
+    }
+
     setIsIssuing(true);
     try {
       const result = await issuePersonalCard(cardType, priceUsd);
       if (result.successful_count > 0) {
         await fetchCards(); // Refresh card list from DB
-        // Refresh wallet balance after card issue
+        // Refresh tier info and wallet balance after card issue
+        getTierInfo().then(setTierInfo).catch(() => {});
         getWallet().then((v) => setWalletBalance(Number(v.master_balance) || 0)).catch(() => {});
         setIssueModal(null);
         setActiveTab('my-cards');

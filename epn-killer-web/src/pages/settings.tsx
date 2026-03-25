@@ -858,7 +858,7 @@ export const SettingsPage = () => {
           <h1 className="text-3xl font-bold text-white mb-2">{t('settings.title')}</h1>
           <p className="text-slate-400">{t('settings.subtitle')}</p>
         </div>
-        <div className="flex gap-2 mb-8 overflow-x-auto pb-2">
+        <div className="flex flex-wrap gap-2 mb-8">
           {tabs.map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-3 rounded-xl font-medium transition-all whitespace-nowrap ${
               activeTab === tab.id ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25' : 'glass-card text-slate-400 hover:text-white'

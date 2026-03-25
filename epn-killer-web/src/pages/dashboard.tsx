@@ -358,6 +358,9 @@ export const DashboardPage = () => {
                 {t('dashboard.personalSubtitle')}
               </p>
             </div>
+            <div className="w-full md:w-auto md:min-w-[280px]">
+              <TierBadge />
+            </div>
           </div>
         </div>
 
@@ -445,9 +448,6 @@ export const DashboardPage = () => {
               Расходы за сегодня: <span className="text-white font-semibold">${parseFloat(dashStats?.today_total ?? '0').toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </p>
           </div>
-
-          {/* Tier Status and Upgrade */}
-          <TierBadge />
         </div>
 
         {/* Charts and Transactions */}

@@ -62,17 +62,17 @@ export const TierBadge = () => {
           <div className="flex items-center gap-2">
             {isGold && !isExpired && <Crown className="w-4 h-4 text-yellow-400" />}
             <div>
-              <p className="text-xs text-slate-400">Your Tier</p>
+              <p className="text-xs text-slate-400">Ваш уровень</p>
               <p className={`text-sm font-bold ${
                 isGold && !isExpired ? 'text-yellow-400' : 'text-white'
               }`}>
-                {isGold && !isExpired ? 'GOLD' : 'STANDARD'}
+                {isGold && !isExpired ? 'GOLD' : 'СТАНДАРТ'}
               </p>
             </div>
           </div>
 
           <div className="text-right">
-            <p className="text-xs text-slate-400">Cards</p>
+            <p className="text-xs text-slate-400">Карт</p>
             <p className="text-sm font-bold text-white">
               {tierInfo.current_cards}/{tierInfo.card_limit}
             </p>
@@ -85,14 +85,14 @@ export const TierBadge = () => {
             className="w-full mt-3 py-2 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 hover:from-yellow-500/30 hover:to-orange-500/30 text-yellow-400 rounded-lg transition-all text-xs font-semibold border border-yellow-500/30 flex items-center justify-center gap-1"
           >
             <Crown className="w-3.5 h-3.5" />
-            Upgrade to GOLD
+            Улучшить до GOLD
             <ArrowUpRight className="w-3.5 h-3.5" />
           </button>
         )}
 
         {isGold && !isExpired && tierInfo.tier_expires_at && (
           <p className="text-xs text-slate-400 mt-2 text-center">
-            Expires: {new Date(tierInfo.tier_expires_at).toLocaleDateString()}
+            Истекает: {new Date(tierInfo.tier_expires_at).toLocaleDateString('ru-RU')}
           </p>
         )}
       </div>
