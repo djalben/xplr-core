@@ -27,6 +27,7 @@ import apiClient, { API_BASE_URL } from '../api/axios';
 import { getUserGrade, type GradeInfo } from '../api/grade';
 import { getWallet, type InternalBalance } from '../api/wallet';
 import { WalletTopUpModal } from '../components/wallet-topup-modal';
+import { TierBadge } from '../components/tier-badge';
 
 interface StatCardProps {
   title: string;
@@ -444,6 +445,9 @@ export const DashboardPage = () => {
               Расходы за сегодня: <span className="text-white font-semibold">${parseFloat(dashStats?.today_total ?? '0').toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </p>
           </div>
+
+          {/* Tier Status and Upgrade */}
+          <TierBadge />
         </div>
 
         {/* Charts and Transactions */}

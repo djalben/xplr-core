@@ -16,10 +16,12 @@ export const TierBadge = () => {
         getTierInfo(),
         getWallet()
       ]);
+      console.log('[TierBadge] Tier info from API:', tierData);
+      console.log('[TierBadge] Wallet data:', walletData);
       setTierInfo(tierData);
       setWallet(walletData);
     } catch (error) {
-      console.error('Failed to fetch tier info:', error);
+      console.error('[TierBadge] Failed to fetch tier info:', error);
     } finally {
       setLoading(false);
     }

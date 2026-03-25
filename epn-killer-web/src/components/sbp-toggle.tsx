@@ -10,12 +10,16 @@ export const SBPToggle = () => {
     const fetchSettings = async () => {
       try {
         const settings = await getSystemSettings();
+        console.log('[SBPToggle] All system settings:', settings);
         const sbpSetting = settings.find(s => s.key === 'sbp_enabled');
+        console.log('[SBPToggle] SBP setting found:', sbpSetting);
         if (sbpSetting) {
-          setSbpEnabled(sbpSetting.value === 'true');
+          const enabled = sbpSetting.value === 'true';
+          console.log('[SBPToggle] Setting SBP enabled to:', enabled, '(value was:', sbpSetting.value, ')');
+          setSbpEnabled(enabled);
         }
       } catch (error) {
-        console.error('Failed to fetch SBP settings:', error);
+        console.error('[SBPToggle] Failed to fetch SBP settings:', error);
       } finally {
         setLoading(false);
       }
@@ -28,10 +32,12 @@ export const SBPToggle = () => {
     setUpdating(true);
     try {
       const newValue = !sbpEnabled;
+      console.log('[SBPToggle] Toggling SBP from', sbpEnabled, 'to', newValue);
       await updateSystemSetting('sbp_enabled', newValue ? 'true' : 'false');
       setSbpEnabled(newValue);
+      console.log('[SBPToggle] SBP toggle successful, new value:', newValue);
     } catch (error) {
-      console.error('Failed to update SBP setting:', error);
+      console.error('[SBPToggle] Failed to update SBP setting:', error);
     } finally {
       setUpdating(false);
     }

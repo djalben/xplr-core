@@ -76,9 +76,11 @@ export const WalletTopUpModal = ({ onClose, onSuccess }: WalletTopUpModalProps) 
     const checkSBPStatus = async () => {
       try {
         const status = await getSBPStatus();
+        console.log('[WalletTopUpModal] SBP Status from API:', status);
+        console.log('[WalletTopUpModal] SBP Enabled:', status.enabled);
         setSbpEnabled(status.enabled);
       } catch (error) {
-        console.error('Failed to check SBP status:', error);
+        console.error('[WalletTopUpModal] Failed to check SBP status:', error);
         setSbpEnabled(true); // Fail open
       } finally {
         setCheckingSBP(false);
