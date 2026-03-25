@@ -938,24 +938,6 @@ export const StaffOnlyZone = () => {
           </div>
         )}
 
-        {/* ════════════ FINANCES TAB ════════════ */}
-        {tab === 'finances' && (
-          <div className="space-y-4">
-            <div className="glass-card p-6">
-              <h3 className="text-lg font-bold text-white mb-4">Заявки на вывод средств</h3>
-              <p className="text-sm text-slate-400">
-                Функционал заявок на вывод (Withdrawal Requests) будет подключён после интеграции платёжного шлюза.
-                Текущая архитектура готова — добавьте таблицу <code className="text-blue-400">withdrawal_requests</code> и обработчик.
-              </p>
-              <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <StatCard icon={DollarSign} label="Сумма в кошельках" value={stats ? `$${parseFloat(stats.total_balance).toLocaleString()}` : '—'} accent="bg-emerald-500" />
-                <StatCard icon={CreditCard} label="Активные карты" value={stats?.active_cards ?? '—'} accent="bg-purple-500" />
-                <StatCard icon={Users} label="Всего юзеров" value={stats?.total_users ?? '—'} accent="bg-blue-500" />
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* ════════════ COMMISSIONS TAB ════════════ */}
         {tab === 'commissions' && (
           <div className="space-y-4">
