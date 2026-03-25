@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, AlertCircle } from 'lucide-react';
 import { useRates } from '../store/rates-context';
 import { ModalPortal } from './modal-portal';
 import { topUpWallet } from '../api/wallet';
+import { getSBPStatus } from '../api/system-settings';
 
 // Inline SVG bank logos
 const SbpLogo = () => (
@@ -63,11 +64,29 @@ export const WalletTopUpModal = ({ onClose, onSuccess }: WalletTopUpModalProps) 
   const [activeRubPreset, setActiveRubPreset] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [sbpEnabled, setSbpEnabled] = useState(true);
+  const [checkingSBP, setCheckingSBP] = useState(true);
 
   const currentRate = selectedCurrency === 'USD' ? rates.usd : rates.eur;
   const currencySymbol = selectedCurrency === 'USD' ? '$' : '€';
 
   const rubPresets = [1000, 2000, 5000, 10000, 20000, 50000, 100000];
+
+  useEffect(() => {
+    const checkSBPStatus = async () => {
+      try {
+        const status = await getSBPStatus();
+        setSbpEnabled(status.enabled);
+      } catch (error) {
+        console.error('Failed to check SBP status:', error);
+        setSbpEnabled(true); // Fail open
+      } finally {
+        setCheckingSBP(false);
+      }
+    };
+
+    checkSBPStatus();
+  }, []);
 
   const handleRubPreset = (rub: number) => {
     setActiveRubPreset(rub);
@@ -132,6 +151,21 @@ export const WalletTopUpModal = ({ onClose, onSuccess }: WalletTopUpModalProps) 
 
           {/* Body — no scroll */}
           <div className="shrink-0 px-5 pb-3 space-y-3">
+            {/* SBP Disabled Warning */}
+            {!checkingSBP && !sbpEnabled && (
+              <div className="p-4 bg-orange-500/10 rounded-xl border border-orange-500/30">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="text-white font-semibold text-sm mb-1">СБП временно недоступен</h4>
+                    <p className="text-xs text-orange-300 leading-relaxed">
+                      Извините, пополнение кошелька через СБП временно не работает. Мы делаем всё возможное, чтобы решить проблему. Попробуйте позже.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Currency toggle */}
             <div className="flex gap-2">
               <button
@@ -214,7 +248,7 @@ export const WalletTopUpModal = ({ onClose, onSuccess }: WalletTopUpModalProps) 
             )}
             <button
               onClick={async () => {
-                if (!rubInput) return;
+                if (!rubInput || !sbpEnabled) return;
                 setIsLoading(true);
                 setError('');
                 try {
@@ -227,11 +261,11 @@ export const WalletTopUpModal = ({ onClose, onSuccess }: WalletTopUpModalProps) 
                   setIsLoading(false);
                 }
               }}
-              disabled={!rubInput || parseFloat(rubInput) <= 0 || isLoading}
+              disabled={!rubInput || parseFloat(rubInput) <= 0 || isLoading || !sbpEnabled || checkingSBP}
               className="w-full py-4 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2.5 text-base"
             >
               <SbpLogo />
-              <span>{isLoading ? 'Обработка...' : `Пополнить через СБП${rubInput ? ` — ${Number(rubInput).toLocaleString('ru-RU')} ₽` : ''}`}</span>
+              <span>{isLoading ? 'Обработка...' : !sbpEnabled ? 'СБП недоступен' : `Пополнить через СБП${rubInput ? ` — ${Number(rubInput).toLocaleString('ru-RU')} ₽` : ''}`}</span>
             </button>
             {/* Bank icons row */}
             <div className="flex items-center justify-center gap-3">

@@ -733,6 +733,162 @@ const WalletTopUpModal = ({ card, walletBalance, onClose, onTransfer }: {
   );
 };
 
+// Card Details Modal with Billing Address
+const CardDetailsModal = ({ 
+  card, 
+  onClose 
+}: { 
+  card: PersonalCard; 
+  onClose: () => void;
+}) => {
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const handleCopy = (text: string, field: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const billingAddress = "XPLR Tech Solutions LLC, 15/1 Vardanants St, Yerevan 0010, Armenia";
+
+  return (
+    <ModalPortal>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
+        
+        <div className="relative bg-[#050507]/95 backdrop-blur-3xl border border-white/10 rounded-2xl w-full max-w-[440px] max-h-[90dvh] flex flex-col animate-scale-in shadow-2xl shadow-black/60">
+          {/* Header */}
+          <div className="shrink-0 p-5 pb-3 border-b border-white/[0.06]">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-bold text-white">Card Details</h2>
+              <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            
+            {/* Card preview */}
+            <div className="flex justify-center mb-3">
+              {card.type === 'subscriptions' && <SubscriptionsCardVisual mini={false} currencySymbol={card.currency} />}
+              {card.type === 'travel' && <TravelCardVisual mini={false} currencySymbol={card.currency} />}
+              {card.type === 'premium' && <PremiumCardVisual mini={false} currencySymbol={card.currency} />}
+            </div>
+          </div>
+
+          {/* Scrollable body */}
+          <div className="flex-1 overflow-y-auto min-h-0 px-5 py-4 space-y-4">
+            {/* Card Information */}
+            <div className="space-y-3">
+              <h3 className="text-white font-semibold text-sm mb-3">Card Information</h3>
+              
+              {/* Card Number */}
+              <div className="p-3 bg-white/5 rounded-xl border border-white/10">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-slate-400">Card Number</span>
+                  <button 
+                    onClick={() => handleCopy(card.number.replace(/\s/g, ''), 'number')}
+                    className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                  >
+                    {copiedField === 'number' ? (
+                      <Check className="w-4 h-4 text-emerald-400" />
+                    ) : (
+                      <Copy className="w-4 h-4 text-slate-400" />
+                    )}
+                  </button>
+                </div>
+                <p className="text-white font-mono text-base tracking-wider">{card.number}</p>
+              </div>
+
+              {/* Expiry and CVV */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-white/5 rounded-xl border border-white/10">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-slate-400">Expiry Date</span>
+                    <button 
+                      onClick={() => handleCopy(card.expiry, 'expiry')}
+                      className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                    >
+                      {copiedField === 'expiry' ? (
+                        <Check className="w-4 h-4 text-emerald-400" />
+                      ) : (
+                        <Copy className="w-4 h-4 text-slate-400" />
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-white font-mono text-base">{card.expiry}</p>
+                </div>
+
+                <div className="p-3 bg-white/5 rounded-xl border border-white/10">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-slate-400">CVV</span>
+                    <button 
+                      onClick={() => handleCopy(card.cvv, 'cvv')}
+                      className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                    >
+                      {copiedField === 'cvv' ? (
+                        <Check className="w-4 h-4 text-emerald-400" />
+                      ) : (
+                        <Copy className="w-4 h-4 text-slate-400" />
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-white font-mono text-base">{card.cvv}</p>
+                </div>
+              </div>
+
+              {/* Cardholder Name */}
+              <div className="p-3 bg-white/5 rounded-xl border border-white/10">
+                <span className="text-xs text-slate-400 block mb-1">Cardholder Name</span>
+                <p className="text-white font-medium">{card.holderName}</p>
+              </div>
+
+              {/* Balance */}
+              <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/30">
+                <span className="text-xs text-emerald-400 block mb-1">Current Balance</span>
+                <p className="text-white font-bold text-xl">{card.currency}{card.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              </div>
+            </div>
+
+            {/* Billing Address */}
+            <div className="pt-3 border-t border-white/10">
+              <h3 className="text-white font-semibold text-sm mb-3">Billing Address</h3>
+              <div className="p-4 bg-blue-500/10 rounded-xl border border-blue-500/30">
+                <p className="text-white text-sm leading-relaxed mb-3">{billingAddress}</p>
+                <button 
+                  onClick={() => handleCopy(billingAddress, 'address')}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg transition-colors text-sm font-medium border border-blue-500/40"
+                >
+                  {copiedField === 'address' ? (
+                    <>
+                      <Check className="w-4 h-4" />
+                      Address Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      Copy Address
+                    </>
+                  )}
+                </button>
+              </div>
+              <p className="text-xs text-slate-400 mt-2 text-center">Use this address for billing when making online payments</p>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="shrink-0 p-5 pt-3 border-t border-white/[0.06]">
+            <button 
+              onClick={onClose}
+              className="w-full py-3 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-xl transition-all"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </ModalPortal>
+  );
+};
+
 // Realistic Credit Card display for "Your Cards" section
 const RealisticCreditCard = ({ 
   card, 
@@ -748,61 +904,43 @@ const RealisticCreditCard = ({
   onGooglePay: () => void;
 }) => {
   const { t } = useTranslation();
-  const [showDetails, setShowDetails] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   
   const canAddToWallet = card.type === 'travel' || card.type === 'premium';
 
-  const handleCopy = () => {
-    if (showDetails) {
-      navigator.clipboard.writeText(card.number.replace(/\s/g, ''));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  const formatCardNumber = (num: string, show: boolean) => {
-    if (show) return num;
-    return `**** **** **** ${num.slice(-4)}`;
-  };
-
   return (
-    <div className="group">
-      {/* Card visual based on type */}
-      <div className="relative">
-        {card.type === 'subscriptions' && <SubscriptionsCardVisual mini={true} />}
-        {card.type === 'travel' && <TravelCardVisual mini={true} />}
-        {card.type === 'premium' && <PremiumCardVisual mini={true} />}
-        
-        {/* Overlay for card details */}
-        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center gap-2">
-          <button 
-            onClick={() => setShowDetails(!showDetails)}
-            className="p-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
-          >
-            {showDetails ? <EyeOff className="w-5 h-5 text-white" /> : <Eye className="w-5 h-5 text-white" />}
-          </button>
-          {showDetails && (
-            <button onClick={handleCopy} className="p-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
-              {copied ? <Check className="w-5 h-5 text-emerald-400" /> : <Copy className="w-5 h-5 text-white" />}
-            </button>
-          )}
-        </div>
-      </div>
+    <>
+      {showDetailsModal && (
+        <CardDetailsModal card={card} onClose={() => setShowDetailsModal(false)} />
+      )}
       
-      {/* Card Info */}
-      <div className="mt-3 p-3 bg-white/5 rounded-xl">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-white font-medium text-sm">{card.name}</span>
-          <span className="text-emerald-400 font-bold">{card.currency}{card.balance.toLocaleString()}</span>
-        </div>
-        {showDetails && (
-          <div className="space-y-1 text-xs text-slate-400 animate-fade-in">
-            <p>Номер: <span className="text-white font-mono">{card.number}</span></p>
-            <p>Срок: <span className="text-white">{card.expiry}</span> | CVV: <span className="text-white">{card.cvv}</span></p>
+      <div className="group">
+        {/* Card visual based on type */}
+        <div className="relative">
+          {card.type === 'subscriptions' && <SubscriptionsCardVisual mini={true} />}
+          {card.type === 'travel' && <TravelCardVisual mini={true} />}
+          {card.type === 'premium' && <PremiumCardVisual mini={true} />}
+          
+          {/* Overlay for card details */}
+          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center gap-2">
+            <button 
+              onClick={() => setShowDetailsModal(true)}
+              className="p-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+              title="View card details"
+            >
+              <Eye className="w-5 h-5 text-white" />
+            </button>
           </div>
-        )}
-      </div>
+        </div>
+        
+        {/* Card Info */}
+        <div className="mt-3 p-3 bg-white/5 rounded-xl">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-white font-medium text-sm">{card.name}</span>
+            <span className="text-emerald-400 font-bold">{card.currency}{card.balance.toLocaleString()}</span>
+          </div>
+          <p className="text-xs text-slate-400">**** **** **** {card.number.slice(-4)}</p>
+        </div>
 
       {/* Action Buttons */}
       <div className="mt-3 flex gap-2">
@@ -833,7 +971,8 @@ const RealisticCreditCard = ({
           </button>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 };
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import apiClient from '../api/axios';
 import { useAuth } from '../store/auth-context';
+import { SBPToggle } from '../components/sbp-toggle';
 import {
   Users,
   DollarSign,
@@ -518,6 +519,12 @@ export const StaffOnlyZone = () => {
               <StatCard icon={MessageSquare} label="Открытые тикеты" value={stats?.open_tickets ?? '—'} accent="bg-orange-500" />
               <StatCard icon={UserCheck} label="Регистрации сегодня" value={stats?.today_signups ?? '—'} accent="bg-cyan-500" />
               <StatCard icon={CreditCard} label="Всего карт" value={stats?.total_cards ?? '—'} accent="bg-slate-500" />
+            </div>
+
+            {/* System Settings */}
+            <div className="glass-card p-6">
+              <h3 className="text-lg font-bold text-white mb-4">Системные настройки</h3>
+              <SBPToggle />
             </div>
           </div>
         )}
