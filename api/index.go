@@ -252,6 +252,13 @@ func ensureDB() {
 		log.Println("[CHAT-MIGRATION] ✅ claimed_by column ensured via direct ALTER TABLE")
 	}
 
+	// 9c2. CRITICAL: Force currency column in cards table (fixes 500 error on /details)
+	if _, err := db.Exec(`ALTER TABLE cards ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'USD'`); err != nil {
+		log.Printf("[CARDS-MIGRATION] currency ALTER TABLE: %v (may already exist, OK)", err)
+	} else {
+		log.Println("[CARDS-MIGRATION] ✅ currency column ensured via direct ALTER TABLE")
+	}
+
 	// 9d. Force admin rights for known admins
 	adminEmails := []string{"aalabin5@gmail.com", "vardump@inbox.ru"}
 	for _, email := range adminEmails {
