@@ -1,6 +1,4 @@
-import axios from 'axios';
-
-const baseURL = '/api/v1';
+import apiClient from './axios';
 
 export interface TierInfo {
   tier: 'standard' | 'gold';
@@ -13,11 +11,11 @@ export interface TierInfo {
 }
 
 export const getTierInfo = async (): Promise<TierInfo> => {
-  const response = await axios.get(`${baseURL}/user/tier-info`);
+  const response = await apiClient.get('/user/tier-info');
   return response.data;
 };
 
 export const upgradeTier = async (): Promise<{ status: string; tier: string; expires_at: string; paid: number }> => {
-  const response = await axios.post(`${baseURL}/user/upgrade-tier`);
+  const response = await apiClient.post('/user/upgrade-tier');
   return response.data;
 };
