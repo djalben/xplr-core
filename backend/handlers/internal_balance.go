@@ -43,6 +43,14 @@ func TopUpWalletHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if SBP is enabled
+	var sbpEnabled string
+	err := GlobalDB.QueryRow(`SELECT setting_value FROM system_settings WHERE setting_key = 'sbp_enabled'`).Scan(&sbpEnabled)
+	if err == nil && sbpEnabled != "true" {
+		http.Error(w, "СБП временно недоступен. Попробуйте позже.", http.StatusServiceUnavailable)
+		return
+	}
+
 	var req models.TopUpWalletRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)

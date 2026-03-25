@@ -62,6 +62,8 @@ var allRequiredColumns = []requiredColumn{
 	{"users", "fixed_telegram_id", "BIGINT"},
 	{"users", "notification_pref", "VARCHAR(20) DEFAULT 'both'"},
 	{"users", "auto_topup_enabled", "BOOLEAN DEFAULT FALSE"},
+	{"users", "tier", "VARCHAR(20) DEFAULT 'standard'"},
+	{"users", "tier_expires_at", "TIMESTAMP WITH TIME ZONE"},
 
 	// --- support_tickets: admin ownership ---
 	{"support_tickets", "claimed_by", "INTEGER DEFAULT 0"},

@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/djalben/xplr-core/backend/middleware"
 	"github.com/djalben/xplr-core/backend/models"
@@ -319,6 +321,31 @@ func MassIssueCardsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Count > 100 {
 		http.Error(w, "Максимум 100 карт за раз", http.StatusBadRequest)
+		return
+	}
+
+	// Check tier-based card limit
+	var tier string
+	var tierExpiresAt sql.NullTime
+	var currentCardCount int
+	err := GlobalDB.QueryRow(`
+		SELECT COALESCE(tier, 'standard'), tier_expires_at, 
+		       (SELECT COUNT(*) FROM cards WHERE user_id = $1)
+		FROM users WHERE id = $1
+	`, userID).Scan(&tier, &tierExpiresAt, &currentCardCount)
+	if err != nil {
+		http.Error(w, "Ошибка проверки лимита", http.StatusInternalServerError)
+		return
+	}
+
+	// Determine card limit based on tier
+	cardLimit := 3 // standard tier
+	if tier == "gold" && tierExpiresAt.Valid && tierExpiresAt.Time.After(time.Now()) {
+		cardLimit = 15 // gold tier
+	}
+
+	if currentCardCount+req.Count > cardLimit {
+		http.Error(w, fmt.Sprintf("Превышен лимит карт. Ваш лимит: %d карт (текущих: %d). Обновитесь до Gold tier для лимита 15 карт.", cardLimit, currentCardCount), http.StatusForbidden)
 		return
 	}
 

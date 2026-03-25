@@ -182,6 +182,26 @@ func ensureDB() {
 			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 		)`,
+		// Card configs - flexible fees and limits per card type
+		`CREATE TABLE IF NOT EXISTS card_configs (
+			id SERIAL PRIMARY KEY,
+			card_type VARCHAR(50) UNIQUE NOT NULL,
+			issue_fee NUMERIC(10,2) DEFAULT 2.00,
+			transaction_fee_percent NUMERIC(5,2) DEFAULT 0.00,
+			max_single_topup NUMERIC(20,4) DEFAULT 1000.0000,
+			daily_spend_limit NUMERIC(20,4) DEFAULT 500.0000,
+			description TEXT,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		// System settings - global toggles
+		`CREATE TABLE IF NOT EXISTS system_settings (
+			id SERIAL PRIMARY KEY,
+			setting_key VARCHAR(100) UNIQUE NOT NULL,
+			setting_value TEXT NOT NULL,
+			description TEXT,
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
 		// Seed default commission values (idempotent)
 		`INSERT INTO commission_config (key, value, description) VALUES
 			('fee_standard', 6.70, 'Комиссия для грейда STANDARD (%)'),
@@ -192,6 +212,19 @@ func ensureDB() {
 			('referral_percent', 5.00, 'Процент реферальной комиссии'),
 			('card_issue_fee', 2.00, 'Стоимость выпуска карты ($)')
 		ON CONFLICT (key) DO NOTHING`,
+		// Seed card configs (idempotent)
+		`INSERT INTO card_configs (card_type, issue_fee, transaction_fee_percent, max_single_topup, daily_spend_limit, description) VALUES
+			('subscriptions', 2.00, 0.50, 500.00, 300.00, 'Карта для подписок и сервисов'),
+			('travel', 3.00, 0.75, 1000.00, 500.00, 'Карта для путешествий'),
+			('premium', 5.00, 1.00, 2000.00, 1000.00, 'Премиум карта с расширенными лимитами'),
+			('universal', 2.50, 0.60, 750.00, 400.00, 'Универсальная карта')
+		ON CONFLICT (card_type) DO NOTHING`,
+		// Seed system settings (idempotent)
+		`INSERT INTO system_settings (setting_key, setting_value, description) VALUES
+			('sbp_enabled', 'true', 'Включить/выключить пополнение через СБП'),
+			('gold_tier_price', '50.00', 'Цена апгрейда до Gold tier (USD)'),
+			('gold_tier_duration_days', '30', 'Длительность Gold tier в днях')
+		ON CONFLICT (setting_key) DO NOTHING`,
 	}
 	for _, m := range tableMigrations {
 		if _, err := db.Exec(m); err != nil {
@@ -306,6 +339,9 @@ func buildRouter() *mux.Router {
 	// Public exchange rates
 	r.HandleFunc("/api/v1/rates", handlers.PublicGetExchangeRatesHandler).Methods("GET")
 
+	// Public SBP status check
+	r.HandleFunc("/api/v1/sbp-status", handlers.GetSBPStatusHandler).Methods("GET")
+
 	// Staff PIN verification (JWT-protected, NOT behind AdminOnly — handler checks is_admin itself)
 	r.Handle("/api/v1/verify-staff-pin", middleware.JWTAuthMiddleware(http.HandlerFunc(handlers.VerifyStaffPINHandler))).Methods("POST")
 	log.Println("Registered route: POST /api/v1/verify-staff-pin")
@@ -340,6 +376,8 @@ func buildRouter() *mux.Router {
 	protected.HandleFunc("/dashboard-stats", handlers.GetDashboardStatsHandler).Methods("GET")
 	protected.HandleFunc("/settings/auto-replenish", handlers.SetAutoTopupHandler).Methods("PATCH")
 	protected.HandleFunc("/api-key", handlers.CreateAPIKeyHandler).Methods("POST")
+	protected.HandleFunc("/upgrade-tier", handlers.UpgradeTierHandler).Methods("POST")
+	protected.HandleFunc("/tier-info", handlers.GetTierInfoHandler).Methods("GET")
 	log.Println("Registered route: GET /api/v1/user/dashboard-stats")
 
 	// Teams
@@ -416,6 +454,8 @@ func buildRouter() *mux.Router {
 	admin.HandleFunc("/translations/{id}", handlers.AdminDeleteTranslationHandler).Methods("DELETE")
 	admin.HandleFunc("/logs", handlers.AdminGetLogsHandler).Methods("GET")
 	admin.HandleFunc("/test-notify", handlers.AdminTestNotifyHandler).Methods("GET")
+	admin.HandleFunc("/system-settings", handlers.GetSystemSettingsHandler).Methods("GET")
+	admin.HandleFunc("/system-settings/{key}", handlers.UpdateSystemSettingHandler).Methods("PATCH")
 
 	log.Println("✅ [ROUTER] All routes registered successfully")
 	return r

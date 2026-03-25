@@ -175,6 +175,9 @@ func main() {
 	// Staff PIN verification (JWT-protected, but NOT behind AdminOnly — handler checks is_admin itself)
 	router.Handle("/api/v1/verify-staff-pin", middleware.JWTAuthMiddleware(http.HandlerFunc(handlers.VerifyStaffPINHandler))).Methods("POST")
 
+	// Public SBP status check
+	router.HandleFunc("/api/v1/sbp-status", handlers.GetSBPStatusHandler).Methods("GET")
+
 	// --- НАСТРОЙКА ЗАЩИЩЕННЫХ МАРШРУТОВ (Protected Routes) ---
 	// Создаем Subrouter с префиксом /api/v1/user
 	protectedRouter := router.PathPrefix("/api/v1/user").Subrouter()
@@ -209,6 +212,8 @@ func main() {
 	protectedRouter.HandleFunc("/transactions/export", handlers.ExportTransactionsHandler).Methods("GET")
 	protectedRouter.HandleFunc("/dashboard-stats", handlers.GetDashboardStatsHandler).Methods("GET")
 	protectedRouter.HandleFunc("/api-key", handlers.CreateAPIKeyHandler).Methods("POST")
+	protectedRouter.HandleFunc("/upgrade-tier", handlers.UpgradeTierHandler).Methods("POST")
+	protectedRouter.HandleFunc("/tier-info", handlers.GetTierInfoHandler).Methods("GET")
 
 	// Команды (Teams)
 	protectedRouter.HandleFunc("/teams", handlers.GetUserTeamsHandler).Methods("GET")
@@ -283,6 +288,8 @@ func main() {
 	adminRouter.HandleFunc("/translations/{id}", handlers.AdminDeleteTranslationHandler).Methods("DELETE")
 	adminRouter.HandleFunc("/logs", handlers.AdminGetLogsHandler).Methods("GET")
 	adminRouter.HandleFunc("/test-notify", handlers.AdminTestNotifyHandler).Methods("GET")
+	adminRouter.HandleFunc("/system-settings", handlers.GetSystemSettingsHandler).Methods("GET")
+	adminRouter.HandleFunc("/system-settings/{key}", handlers.UpdateSystemSettingHandler).Methods("PATCH")
 	// --------------------------------------------------------
 
 	// CORS: dynamic origins from ALLOWED_ORIGINS env var (comma-separated)

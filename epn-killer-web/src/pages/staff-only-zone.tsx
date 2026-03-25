@@ -31,7 +31,7 @@ import {
   Filter,
 } from 'lucide-react';
 
-type Tab = 'dashboard' | 'users' | 'finances' | 'commissions' | 'tickets' | 'translations' | 'logs';
+type Tab = 'dashboard' | 'users' | 'commissions' | 'tickets' | 'translations' | 'logs';
 
 interface DashboardStats {
   total_users: number;
@@ -502,7 +502,6 @@ export const StaffOnlyZone = () => {
         <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
           <TabBtn id="dashboard" icon={Activity} label="Dashboard" />
           <TabBtn id="users" icon={Users} label="Юзеры" />
-          <TabBtn id="finances" icon={TrendingUp} label="Финансы" />
           <TabBtn id="commissions" icon={Settings} label="Комиссии" />
           <TabBtn id="tickets" icon={MessageSquare} label="Тикеты" />
           <TabBtn id="translations" icon={Languages} label="Словари" />
