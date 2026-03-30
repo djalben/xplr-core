@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/djalben/xplr-core/backend/internal/domain"
-	"github.com/djalben/xplr-core/backend/internal/ports"
 	"github.com/djalben/xplr-core/backend/internal/pkg/utils"
+	"github.com/djalben/xplr-core/backend/internal/ports"
 )
 
 // Auth — проверка JWT токена.

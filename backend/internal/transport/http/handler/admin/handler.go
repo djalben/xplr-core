@@ -175,29 +175,20 @@ func (h *Handler) TakeTicket(w http.ResponseWriter, r *http.Request) {
 
 // CloseTicket — PUT /admin/tickets/{id}/close.
 func (h *Handler) CloseTicket(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
-
-	id, err := domain.ParseUUID(idStr)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-
+	id, ok := adminChiUUID(w, r)
+	if !ok {
 		return
 	}
 
-	type request struct {
+	var req struct {
 		Reply string `json:"reply"`
 	}
 
-	var req request
-
-	err = handler.ReadJSON(r, &req)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-
+	if !adminReadJSON(w, r, &req) {
 		return
 	}
 
-	err = h.ticketUseCase.Close(r.Context(), id, req.Reply)
+	err := h.ticketUseCase.Close(r.Context(), id, req.Reply)
 	if err != nil {
 		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
 
@@ -209,29 +200,20 @@ func (h *Handler) CloseTicket(w http.ResponseWriter, r *http.Request) {
 
 // ChangeUserGrade — PUT /admin/users/{id}/grade.
 func (h *Handler) ChangeUserGrade(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
-
-	id, err := domain.ParseUUID(idStr)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-
+	id, ok := adminChiUUID(w, r)
+	if !ok {
 		return
 	}
 
-	type request struct {
+	var req struct {
 		Grade string `json:"grade"`
 	}
 
-	var req request
-
-	err = handler.ReadJSON(r, &req)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-
+	if !adminReadJSON(w, r, &req) {
 		return
 	}
 
-	err = h.gradesUseCase.ChangeGrade(r.Context(), id, req.Grade)
+	err := h.gradesUseCase.ChangeGrade(r.Context(), id, req.Grade)
 	if err != nil {
 		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
 
@@ -239,4 +221,28 @@ func (h *Handler) ChangeUserGrade(w http.ResponseWriter, r *http.Request) {
 	}
 
 	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+func adminChiUUID(w http.ResponseWriter, r *http.Request) (domain.UUID, bool) {
+	idStr := chi.URLParam(r, "id")
+
+	id, err := domain.ParseUUID(idStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+
+		return domain.UUID{}, false
+	}
+
+	return id, true
+}
+
+func adminReadJSON(w http.ResponseWriter, r *http.Request, v any) bool {
+	err := handler.ReadJSON(r, v)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+
+		return false
+	}
+
+	return true
 }

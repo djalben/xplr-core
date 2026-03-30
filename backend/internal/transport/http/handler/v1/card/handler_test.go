@@ -9,23 +9,25 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
-
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	handlercard "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/card"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/card/mocks"
 	"github.com/go-chi/chi/v5"
+	"github.com/golang/mock/gomock"
+	"github.com/google/uuid"
 )
+
+var errTestCardUseCaseFail = errors.New("fail")
 
 func reqCard(uid domain.UUID, method, path string, body *bytes.Buffer) *http.Request {
 	var r *http.Request
 	if body != nil {
-		r = httptest.NewRequest(method, path, body)
+		r = httptest.NewRequestWithContext(context.Background(), method, path, body)
 	} else {
-		r = httptest.NewRequest(method, path, nil)
+		r = httptest.NewRequestWithContext(context.Background(), method, path, nil)
 	}
 	ctx := context.WithValue(r.Context(), "userID", uid)
+
 	return r.WithContext(ctx)
 }
 
@@ -33,6 +35,7 @@ func reqCardChi(uid domain.UUID, method, path, cardID string, body *bytes.Buffer
 	r := reqCard(uid, method, path, body)
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", cardID)
+
 	return r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
 }
 
@@ -71,7 +74,7 @@ func TestHandler_BuyCard(t *testing.T) {
 			setup: func(m *mocks.MockCardUseCase) {
 				m.EXPECT().
 					BuyCard(gomock.Any(), uid, domain.CardTypeSubscriptions, "n").
-					Return(nil, errors.New("fail"))
+					Return(nil, errTestCardUseCaseFail)
 			},
 			wantCode: http.StatusBadRequest,
 		},
@@ -104,8 +107,10 @@ func TestHandler_BuyCard(t *testing.T) {
 			if tt.wantCardID == "" {
 				return
 			}
+
 			var got map[string]any
-			if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+			err := json.NewDecoder(rec.Body).Decode(&got)
+			if err != nil {
 				t.Fatal(err)
 			}
 			if got["id"] != tt.wantCardID {

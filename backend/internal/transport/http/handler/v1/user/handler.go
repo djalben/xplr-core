@@ -232,17 +232,22 @@ func (h *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
 	limit := 200
 
 	if startStr != "" {
-		if t, err := time.Parse("2006-01-02", startStr); err == nil {
+		t, err := time.Parse("2006-01-02", startStr)
+		if err == nil {
 			from = t
 		}
 	}
+
 	if endStr != "" {
-		if t, err := time.Parse("2006-01-02", endStr); err == nil {
+		t, err := time.Parse("2006-01-02", endStr)
+		if err == nil {
 			to = t
 		}
 	}
+
 	if limitStr != "" {
-		if n, err := strconv.Atoi(limitStr); err == nil && n > 0 {
+		n, err := strconv.Atoi(limitStr)
+		if err == nil && n > 0 {
 			limit = n
 		}
 	}
@@ -255,14 +260,14 @@ func (h *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type txResp struct {
-		TransactionID   string  `json:"transaction_id"`
-		Amount          string  `json:"amount"`
-		Currency        string  `json:"currency"`
-		TransactionType string  `json:"transaction_type"`
-		SourceType      string  `json:"source_type"`
-		Details         string  `json:"details"`
-		ExecutedAt      string  `json:"executed_at"`
-		CardLast4       string  `json:"card_last_4_digits"`
+		TransactionID   string `json:"transaction_id"`
+		Amount          string `json:"amount"`
+		Currency        string `json:"currency"`
+		TransactionType string `json:"transaction_type"`
+		SourceType      string `json:"source_type"`
+		Details         string `json:"details"`
+		ExecutedAt      string `json:"executed_at"`
+		CardLast4       string `json:"card_last_4_digits"`
 	}
 
 	sourceMap := map[string]string{
@@ -281,8 +286,10 @@ func (h *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
 		}
 
 		cardLast4 := ""
+
 		if tx.CardID != nil {
-			if c, err := h.cardUC.GetByID(r.Context(), *tx.CardID); err == nil {
+			c, errCard := h.cardUC.GetByID(r.Context(), *tx.CardID)
+			if errCard == nil {
 				cardLast4 = c.Last4Digits
 			}
 		}
@@ -394,17 +401,17 @@ func (h *Handler) GetCards(w http.ResponseWriter, r *http.Request) {
 
 	for _, c := range cards {
 		out = append(out, map[string]any{
-			"id":               c.ID.String(),
-			"user_id":          c.UserID.String(),
-			"provider_card_id": c.ProviderCardID,
-			"bin":              c.Bin,
-			"last_4_digits":    c.Last4Digits,
-			"card_status":      c.CardStatus,
-			"nickname":         c.Nickname,
+			"id":                c.ID.String(),
+			"user_id":           c.UserID.String(),
+			"provider_card_id":  c.ProviderCardID,
+			"bin":               c.Bin,
+			"last_4_digits":     c.Last4Digits,
+			"card_status":       c.CardStatus,
+			"nickname":          c.Nickname,
 			"daily_spend_limit": c.DailySpendLimit.String(),
-			"card_type":        string(c.CardType),
-			"balance":          c.Balance.String(),
-			"created_at":       c.CreatedAt,
+			"card_type":         string(c.CardType),
+			"balance":           c.Balance.String(),
+			"created_at":        c.CreatedAt,
 		})
 	}
 
@@ -420,8 +427,8 @@ func (h *Handler) IssueCards(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type req struct {
-		Count    int    `json:"count"`
-		Nickname string `json:"nickname"`
+		Count       int    `json:"count"`
+		Nickname    string `json:"nickname"`
 		ServiceSlug string `json:"service_slug"`
 	}
 
@@ -446,7 +453,7 @@ func (h *Handler) IssueCards(w http.ResponseWriter, r *http.Request) {
 
 	var results []map[string]any
 
-	for i := 0; i < max(1, body.Count); i++ {
+	for range max(1, body.Count) {
 		card, err := h.cardUC.BuyCard(r.Context(), userID, cardType, nickname)
 		if err != nil {
 			handler.WriteJSON(w, http.StatusOK, map[string]any{
@@ -461,11 +468,11 @@ func (h *Handler) IssueCards(w http.ResponseWriter, r *http.Request) {
 		}
 
 		results = append(results, map[string]any{
-			"success":    true,
-			"status":     "issued",
+			"success":     true,
+			"status":      "issued",
 			"card_last_4": card.Last4Digits,
-			"nickname":   card.Nickname,
-			"message":   "Карта выпущена",
+			"nickname":    card.Nickname,
+			"message":     "Карта выпущена",
 			"card": map[string]any{
 				"id": card.ID.String(), "last_4_digits": card.Last4Digits,
 			},
@@ -509,13 +516,13 @@ func (h *Handler) GetCardDetails(w http.ResponseWriter, r *http.Request) {
 	}
 
 	handler.WriteJSON(w, http.StatusOK, map[string]any{
-		"card_id":   card.ID.String(),
+		"card_id":     card.ID.String(),
 		"full_number": "424242******" + card.Last4Digits,
-		"cvv":       "***",
-		"expiry":    "MM/YY",
-		"card_type": string(card.CardType),
-		"bin":       card.Bin,
-		"last_4":    card.Last4Digits,
+		"cvv":         "***",
+		"expiry":      "MM/YY",
+		"card_type":   string(card.CardType),
+		"bin":         card.Bin,
+		"last_4":      card.Last4Digits,
 	})
 }
 

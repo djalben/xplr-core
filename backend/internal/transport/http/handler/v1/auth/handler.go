@@ -3,10 +3,16 @@ package auth
 import (
 	"net/http"
 
+	"github.com/djalben/xplr-core/backend/internal/domain"
 	"github.com/djalben/xplr-core/backend/internal/pkg/utils"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler"
 	"github.com/go-chi/chi/v5"
 	"gitlab.com/libs-artifex/wrapper/v2"
+)
+
+const (
+	roleUser  = "user"
+	roleAdmin = "admin"
 )
 
 type Handler struct {
@@ -67,22 +73,7 @@ func (h *Handler) DoRegister(w http.ResponseWriter, r *http.Request) {
 	balance, _ := h.walletUC.GetBalance(r.Context(), user.ID)
 	balanceStr := balance.String()
 
-	role := "user"
-	if user.IsAdmin {
-		role = "admin"
-	}
-
-	handler.WriteJSON(w, http.StatusOK, map[string]any{
-		"token": token,
-		"user": map[string]any{
-			"id":      user.ID.String(),
-			"email":   user.Email,
-			"balance": balanceStr,
-			"status":  string(user.Status),
-			"is_admin": user.IsAdmin,
-			"role":    role,
-		},
-	})
+	h.writeAuthSuccess(w, token, user, balanceStr)
 }
 
 func (h *Handler) DoLogin(w http.ResponseWriter, r *http.Request) {
@@ -117,22 +108,7 @@ func (h *Handler) DoLogin(w http.ResponseWriter, r *http.Request) {
 	balance, _ := h.walletUC.GetBalance(r.Context(), user.ID)
 	balanceStr := balance.String()
 
-	role := "user"
-	if user.IsAdmin {
-		role = "admin"
-	}
-
-	handler.WriteJSON(w, http.StatusOK, map[string]any{
-		"token": token,
-		"user": map[string]any{
-			"id":      user.ID.String(),
-			"email":   user.Email,
-			"balance": balanceStr,
-			"status":  string(user.Status),
-			"is_admin": user.IsAdmin,
-			"role":    role,
-		},
-	})
+	h.writeAuthSuccess(w, token, user, balanceStr)
 }
 
 func (h *Handler) RefreshToken(w http.ResponseWriter, r *http.Request) {
@@ -167,28 +143,32 @@ func (h *Handler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	balance, _ := h.walletUC.GetBalance(r.Context(), user.ID)
 	balanceStr := balance.String()
 
-	role := "user"
+	h.writeAuthSuccess(w, newToken, user, balanceStr)
+}
+
+func (h *Handler) ResetPasswordRequest(w http.ResponseWriter, _ *http.Request) {
+	http.Error(w, "reset password not implemented", http.StatusNotImplemented)
+}
+
+func (h *Handler) ResetPassword(w http.ResponseWriter, _ *http.Request) {
+	http.Error(w, "reset password not implemented", http.StatusNotImplemented)
+}
+
+func (h *Handler) writeAuthSuccess(w http.ResponseWriter, token string, user *domain.User, balanceStr string) {
+	role := roleUser
 	if user.IsAdmin {
-		role = "admin"
+		role = roleAdmin
 	}
 
 	handler.WriteJSON(w, http.StatusOK, map[string]any{
-		"token": newToken,
+		"token": token,
 		"user": map[string]any{
-			"id":      user.ID.String(),
-			"email":   user.Email,
-			"balance": balanceStr,
-			"status":  string(user.Status),
+			"id":       user.ID.String(),
+			"email":    user.Email,
+			"balance":  balanceStr,
+			"status":   string(user.Status),
 			"is_admin": user.IsAdmin,
-			"role":    role,
+			"role":     role,
 		},
 	})
-}
-
-func (h *Handler) ResetPasswordRequest(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "reset password not implemented", http.StatusNotImplemented)
-}
-
-func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "reset password not implemented", http.StatusNotImplemented)
 }

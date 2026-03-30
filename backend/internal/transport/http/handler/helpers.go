@@ -36,5 +36,6 @@ func GetUserIDFromContext(r *http.Request) domain.UUID {
 	if !ok {
 		return domain.UUID{}
 	}
+
 	return userID
 }

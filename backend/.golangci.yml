@@ -5,6 +5,8 @@ linters:
   default: all
   disable:
     - wsl
+    - wsl_v5
+    - dupl
     - containedctx
     - cyclop
     - exhaustruct
@@ -62,6 +64,11 @@ linters:
           deny:
             - pkg: "github.com/djalben/xplr-core/internal/config"
             - pkg: "github.com/djalben/xplr-core/internal/infrastructure"
+    # Строковый ключ userID в контексте согласован с middleware; typed key — отдельный рефакторинг.
+    staticcheck:
+      checks:
+        - all
+        - '-SA1029'
   exclusions:
     generated: lax
     presets:
@@ -73,6 +80,37 @@ linters:
       - third_party$
       - builtin$
       - examples$
+    rules:
+      - path: _test\.go$
+        linters:
+          - err113
+      # SUT против одной БД — параллель ломает TRUNCATE.
+      - path: internal/infrastructure/persistence/postgres/.*_test\.go$
+        linters:
+          - paralleltest
+      # BFF: контракт JSON для фронта в snake_case.
+      - path: internal/transport/http/handler/v1/user/handler\.go$
+        linters:
+          - tagliatelle
+      # Имена интерфейсов для gomock осознанно с префиксом пакета.
+      - path: internal/transport/http/handler/v1/.*/contracts\.go$
+        linters:
+          - revive
+      - path: internal/transport/http/middleware/auth\.go$
+        text: context-keys-type
+        linters:
+          - revive
+      - path: internal/transport/http/handler/v1/.*/.*_test\.go$
+        text: context-keys-type
+        linters:
+          - revive
+      - path: internal/application/.*\.go$
+        linters:
+          - wrapcheck
+      - path: internal/app/.*\.go$
+        linters:
+          - wrapcheck
+
 formatters:
   enable:
     - gci

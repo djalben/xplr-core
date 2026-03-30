@@ -21,11 +21,11 @@ func (h *Handler) Register(r chi.Router) {
 	r.Route("/wallet", func(r chi.Router) {
 		r.Get("/balance", h.GetBalance)
 		r.Post("/topup", h.TopUp)
-		r.Post("/autotopup", h.ToggleAutoTopUp)   // ← глобальный автотопап
+		r.Post("/autotopup", h.ToggleAutoTopUp) // ← глобальный автотопап
 	})
 }
 
-// GetBalance — GET /v1/wallet/balance
+// GetBalance — GET /v1/wallet/balance.
 func (h *Handler) GetBalance(w http.ResponseWriter, r *http.Request) {
 	userID := handler.GetUserIDFromContext(r)
 
@@ -39,7 +39,7 @@ func (h *Handler) GetBalance(w http.ResponseWriter, r *http.Request) {
 	handler.WriteJSON(w, http.StatusOK, map[string]any{"balance": balance})
 }
 
-// TopUp — POST /v1/wallet/topup
+// TopUp — POST /v1/wallet/topup.
 func (h *Handler) TopUp(w http.ResponseWriter, r *http.Request) {
 	userID := handler.GetUserIDFromContext(r)
 
@@ -65,7 +65,7 @@ func (h *Handler) TopUp(w http.ResponseWriter, r *http.Request) {
 	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
-// ToggleAutoTopUp — POST /v1/wallet/autotopup
+// ToggleAutoTopUp — POST /v1/wallet/autotopup.
 func (h *Handler) ToggleAutoTopUp(w http.ResponseWriter, r *http.Request) {
 	userID := handler.GetUserIDFromContext(r)
 

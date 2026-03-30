@@ -16,7 +16,9 @@ func BenchmarkNewNumeric(b *testing.B) {
 
 func BenchmarkNumeric_Add_Sub(b *testing.B) {
 	a := domain.NewNumeric(1000.5)
+
 	c := domain.NewNumeric(0.25)
+
 	for b.Loop() {
 		x := a.Add(c)
 		_ = x.Sub(c)
@@ -51,6 +53,7 @@ func BenchmarkNewUser(b *testing.B) {
 
 func BenchmarkNewWallet(b *testing.B) {
 	uid := domain.NewUUID()
+
 	for b.Loop() {
 		_ = domain.NewWallet(uid)
 	}
@@ -62,7 +65,8 @@ func BenchmarkWallet_TopUp(b *testing.B) {
 	w := domain.NewWallet(uid)
 	for b.Loop() {
 		w.Balance = domain.NewNumeric(0)
-		if err := w.TopUp(amt); err != nil {
+		err := w.TopUp(amt)
+		if err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -74,7 +78,8 @@ func BenchmarkWallet_Withdraw(b *testing.B) {
 	w := domain.NewWallet(uid)
 	for b.Loop() {
 		w.Balance = domain.NewNumeric(1000)
-		if err := w.Withdraw(amt); err != nil {
+		err := w.Withdraw(amt)
+		if err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -92,8 +97,11 @@ func BenchmarkNewCard(b *testing.B) {
 
 func BenchmarkNewTransaction(b *testing.B) {
 	uid := domain.NewUUID()
+
 	amount := domain.NewNumeric(50)
+
 	fee := domain.NewNumeric(0)
+
 	for b.Loop() {
 		_ = domain.NewTransaction(uid, nil, amount, fee, "TYPE", "OK", "details")
 	}
@@ -108,7 +116,9 @@ func BenchmarkNewTicket(b *testing.B) {
 
 func BenchmarkTicket_TakeClose(b *testing.B) {
 	uid := domain.NewUUID()
+
 	admin := domain.NewUUID()
+
 	for b.Loop() {
 		tk := domain.NewTicket(uid, "s", "m", nil)
 		tk.Take(admin)

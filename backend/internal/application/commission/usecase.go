@@ -35,13 +35,10 @@ func (uc *UseCase) Update(ctx context.Context, cfg *domain.CommissionConfig) err
 }
 
 func (uc *UseCase) ListAll(ctx context.Context) ([]*domain.CommissionConfig, error) {
-	temp, err := uc.configRepo.ListAll(ctx)
+	list, err := uc.configRepo.ListAll(ctx)
 	if err != nil {
 		return nil, wrapper.Wrap(err)
 	}
-
-	var list []*domain.CommissionConfig
-	list = temp // явное присваивание
 
 	return list, nil
 }

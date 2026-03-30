@@ -84,10 +84,10 @@ func (uc *UseCase) GetReferralInfo(ctx context.Context, userID domain.UUID) (map
 	link := "https://xplr.app/ref/" + code
 
 	return map[string]any{
-		"referral_code":      code,
-		"referral_link":      link,
+		"referral_code":       code,
+		"referral_link":       link,
 		"reward_per_referral": 10,
-		"bonus_for_new":      5,
+		"bonus_for_new":       5,
 		"stats": map[string]any{
 			"total_referrals": totalReferrals,
 			"total_earnings":  earnings.String(),

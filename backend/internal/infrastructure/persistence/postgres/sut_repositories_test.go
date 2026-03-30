@@ -35,7 +35,8 @@ func TestUserRepository_SaveGetByEmailUpdate(t *testing.T) {
 	}
 
 	u.KYCStatus = domain.KYCApproved
-	if err := repo.Update(ctx, u); err != nil {
+	err = repo.Update(ctx, u)
+	if err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -61,10 +62,12 @@ func TestWalletRepository_EnsureGetUpdate(t *testing.T) {
 	u := newTestUser(t, db, uniqueEmail(t))
 	wrepo := postgres.NewWalletRepository(db)
 
-	if err := wrepo.EnsureWallet(ctx, u.ID); err != nil {
+	err := wrepo.EnsureWallet(ctx, u.ID)
+	if err != nil {
 		t.Fatalf("EnsureWallet: %v", err)
 	}
-	if err := wrepo.EnsureWallet(ctx, u.ID); err != nil {
+	err = wrepo.EnsureWallet(ctx, u.ID)
+	if err != nil {
 		t.Fatalf("EnsureWallet idempotent: %v", err)
 	}
 
@@ -81,7 +84,8 @@ func TestWalletRepository_EnsureGetUpdate(t *testing.T) {
 
 	w.Balance = domain.NewNumeric(100.5)
 	w.AutoTopUpEnabled = true
-	if err := wrepo.Update(ctx, w); err != nil {
+	err = wrepo.Update(ctx, w)
+	if err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -105,7 +109,8 @@ func TestGradeRepository_EnsureGetUpdate(t *testing.T) {
 	u := newTestUser(t, db, uniqueEmail(t))
 	grepo := postgres.NewGradeRepository(db)
 
-	if err := grepo.EnsureGrade(ctx, u.ID); err != nil {
+	err := grepo.EnsureGrade(ctx, u.ID)
+	if err != nil {
 		t.Fatalf("EnsureGrade: %v", err)
 	}
 
@@ -120,7 +125,8 @@ func TestGradeRepository_EnsureGetUpdate(t *testing.T) {
 	g.Grade = "SILVER"
 	g.TotalSpent = domain.NewNumeric(50)
 	g.FeePercent = domain.NewNumeric(5.5)
-	if err := grepo.Update(ctx, g); err != nil {
+	err = grepo.Update(ctx, g)
+	if err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -145,7 +151,8 @@ func TestCardRepository_SaveGetListUpdate(t *testing.T) {
 	}
 
 	repo := postgres.NewCardRepository(db)
-	if err := repo.Save(ctx, card); err != nil {
+	err = repo.Save(ctx, card)
+	if err != nil {
 		t.Fatalf("Save: %v", err)
 	}
 
@@ -168,7 +175,8 @@ func TestCardRepository_SaveGetListUpdate(t *testing.T) {
 	got.Balance = domain.NewNumeric(25)
 	got.CardStatus = "ACTIVE"
 	got.Nickname = "n2"
-	if err := repo.Update(ctx, got); err != nil {
+	err = repo.Update(ctx, got)
+	if err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -195,7 +203,8 @@ func TestTransactionRepository_SaveAndQueries(t *testing.T) {
 		t.Fatalf("NewCard: %v", err)
 	}
 	cardRepo := postgres.NewCardRepository(db)
-	if err := cardRepo.Save(ctx, card); err != nil {
+	err = cardRepo.Save(ctx, card)
+	if err != nil {
 		t.Fatalf("card save: %v", err)
 	}
 
@@ -212,10 +221,12 @@ func TestTransactionRepository_SaveAndQueries(t *testing.T) {
 	txCard.ExecutedAt = t0
 
 	repo := postgres.NewTransactionRepository(db)
-	if err := repo.Save(ctx, txWallet); err != nil {
+	err = repo.Save(ctx, txWallet)
+	if err != nil {
 		t.Fatalf("Save wallet tx: %v", err)
 	}
-	if err := repo.Save(ctx, txCard); err != nil {
+	err = repo.Save(ctx, txCard)
+	if err != nil {
 		t.Fatalf("Save card tx: %v", err)
 	}
 
@@ -256,7 +267,8 @@ func TestTicketRepository_SaveGetUpdate(t *testing.T) {
 	tk := domain.NewTicket(u.ID, "subj", "msg", nil)
 
 	repo := postgres.NewTicketRepository(db)
-	if err := repo.Save(ctx, tk); err != nil {
+	err := repo.Save(ctx, tk)
+	if err != nil {
 		t.Fatalf("Save: %v", err)
 	}
 
@@ -270,7 +282,8 @@ func TestTicketRepository_SaveGetUpdate(t *testing.T) {
 
 	admin := domain.NewUUID()
 	got.Take(admin)
-	if err := repo.Update(ctx, got); err != nil {
+	err = repo.Update(ctx, got)
+	if err != nil {
 		t.Fatalf("Update take: %v", err)
 	}
 
@@ -345,14 +358,16 @@ func TestCommissionRepository_GetListUpdate(t *testing.T) {
 		}
 		cfg2.Value = origVal
 		cfg2.Description = origDesc
-		if err := repo.Update(context.Background(), cfg2); err != nil {
+		err = repo.Update(context.Background(), cfg2)
+		if err != nil {
 			t.Fatalf("cleanup Update: %v", err)
 		}
 	})
 
 	cfg.Value = domain.NewNumeric(6.71)
 	cfg.Description = "SUT"
-	if err := repo.Update(ctx, cfg); err != nil {
+	err = repo.Update(ctx, cfg)
+	if err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 

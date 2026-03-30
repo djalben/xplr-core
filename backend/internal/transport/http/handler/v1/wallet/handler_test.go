@@ -7,22 +7,22 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
-
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	handlerwallet "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/wallet"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/wallet/mocks"
+	"github.com/golang/mock/gomock"
+	"github.com/google/uuid"
 )
 
 func reqWallet(uid domain.UUID, method, path string, body *bytes.Buffer) *http.Request {
 	var r *http.Request
 	if body != nil {
-		r = httptest.NewRequest(method, path, body)
+		r = httptest.NewRequestWithContext(context.Background(), method, path, body)
 	} else {
-		r = httptest.NewRequest(method, path, nil)
+		r = httptest.NewRequestWithContext(context.Background(), method, path, nil)
 	}
 	ctx := context.WithValue(r.Context(), "userID", uid)
+
 	return r.WithContext(ctx)
 }
 

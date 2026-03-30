@@ -2,22 +2,27 @@ package auth_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
-
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	"github.com/djalben/xplr-core/backend/internal/pkg/utils"
 	handlerauth "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/auth"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/auth/mocks"
+	"github.com/golang/mock/gomock"
+	"github.com/google/uuid"
 )
 
 const testJWTSecret = "test-jwt-secret-for-handler-tests-ok"
+
+var (
+	errTestRegisterEmailTaken = errors.New("email already registered")
+	errTestUserNotFound       = errors.New("not found")
+)
 
 func TestHandler_DoRegister(t *testing.T) {
 	t.Parallel()
@@ -63,7 +68,7 @@ func TestHandler_DoRegister(t *testing.T) {
 				setupMocks: func(authMock *mocks.MockAuthRegisterLogin, _ *mocks.MockWalletBalanceProvider, _ *mocks.MockUserByIDReader) {
 					authMock.EXPECT().
 						Register(gomock.Any(), "a@example.com", "secret").
-						Return(nil, errors.New("email already registered"))
+						Return(nil, errTestRegisterEmailTaken)
 				},
 				wantStatusCode: http.StatusBadRequest,
 				wantOK:         false,
@@ -72,8 +77,9 @@ func TestHandler_DoRegister(t *testing.T) {
 		{
 			name: "invalid json body -> 400",
 			args: args{
-				body:           `{`,
-				setupMocks:     func(_ *mocks.MockAuthRegisterLogin, _ *mocks.MockWalletBalanceProvider, _ *mocks.MockUserByIDReader) {},
+				body: `{`,
+				setupMocks: func(_ *mocks.MockAuthRegisterLogin, _ *mocks.MockWalletBalanceProvider, _ *mocks.MockUserByIDReader) {
+				},
 				wantStatusCode: http.StatusBadRequest,
 				wantOK:         false,
 			},
@@ -94,7 +100,7 @@ func TestHandler_DoRegister(t *testing.T) {
 
 			h := handlerauth.NewHandler(authMock, walletMock, userReaderMock, []byte(testJWTSecret))
 
-			req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBufferString(tt.args.body))
+			req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/auth/register", bytes.NewBufferString(tt.args.body))
 			req.Header.Set("Content-Type", "application/json")
 			rec := httptest.NewRecorder()
 
@@ -109,7 +115,8 @@ func TestHandler_DoRegister(t *testing.T) {
 			}
 
 			var got map[string]any
-			if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+			err := json.NewDecoder(rec.Body).Decode(&got)
+			if err != nil {
 				t.Fatalf("decode response: %v", err)
 			}
 			if got["token"] == nil || got["token"] == "" {
@@ -154,7 +161,7 @@ func TestHandler_DoLogin(t *testing.T) {
 		Return(domain.NewNumeric(0), nil)
 
 	h := handlerauth.NewHandler(authMock, walletMock, userReaderMock, []byte(testJWTSecret))
-	req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBufferString(`{"email":"b@example.com","password":"x"}`))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/auth/login", bytes.NewBufferString(`{"email":"b@example.com","password":"x"}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
@@ -214,7 +221,7 @@ func TestHandler_RefreshToken(t *testing.T) {
 			args: args{
 				header: "Bearer " + validTok,
 				setupMocks: func(_ *mocks.MockWalletBalanceProvider, ur *mocks.MockUserByIDReader, id uuid.UUID, _ *domain.User) {
-					ur.EXPECT().GetByID(gomock.Any(), id).Return(nil, errors.New("not found"))
+					ur.EXPECT().GetByID(gomock.Any(), id).Return(nil, errTestUserNotFound)
 				},
 				wantStatusCode: http.StatusUnauthorized,
 				decodeJSON:     false,
@@ -248,7 +255,7 @@ func TestHandler_RefreshToken(t *testing.T) {
 			tt.args.setupMocks(walletMock, userReaderMock, uid, u)
 
 			h := handlerauth.NewHandler(authMock, walletMock, userReaderMock, []byte(testJWTSecret))
-			req := httptest.NewRequest(http.MethodPost, "/auth/refresh-token", nil)
+			req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/auth/refresh-token", nil)
 			if tt.args.header != "" {
 				req.Header.Set("Authorization", tt.args.header)
 			}
@@ -265,7 +272,8 @@ func TestHandler_RefreshToken(t *testing.T) {
 			}
 
 			var got map[string]any
-			if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+			err := json.NewDecoder(rec.Body).Decode(&got)
+			if err != nil {
 				t.Fatalf("decode: %v", err)
 			}
 			if got["token"] == nil || got["token"] == "" {

@@ -28,5 +28,6 @@ func ParseUUID(s string) (UUID, error) {
 	if err != nil {
 		return uuid.Nil, wrapper.Wrap(err)
 	}
+
 	return u, nil
 }

@@ -44,6 +44,7 @@ func (uc *UseCase) BuyCard(ctx context.Context, userID domain.UUID, cardType dom
 
 	tx := domain.NewTransaction(userID, &card.ID, domain.NewNumeric(2.00), domain.NewNumeric(0),
 		"CARD_ISSUE", "COMPLETED", "Выпуск виртуальной карты")
+
 	return card, uc.txRepo.Save(ctx, tx)
 }
 
@@ -92,6 +93,7 @@ func (uc *UseCase) TopUpCard(ctx context.Context, userID domain.UUID, cardID dom
 
 	tx := domain.NewTransaction(userID, &cardID, amount, domain.NewNumeric(0),
 		"TOPUP_CARD", "COMPLETED", "Ручное пополнение карты")
+
 	return uc.txRepo.Save(ctx, tx)
 }
 

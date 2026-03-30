@@ -9,25 +9,28 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
-
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	handlerticket "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/ticket"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/ticket/mocks"
 	"github.com/go-chi/chi/v5"
+	"github.com/golang/mock/gomock"
+	"github.com/google/uuid"
 )
 
+var errTestTicketCloseFail = errors.New("x")
+
 func reqTicket(uid domain.UUID, method, path string, body *bytes.Buffer) *http.Request {
-	r := httptest.NewRequest(method, path, body)
+	r := httptest.NewRequestWithContext(context.Background(), method, path, body)
 	ctx := context.WithValue(r.Context(), "userID", uid)
+
 	return r.WithContext(ctx)
 }
 
 func reqTicketChi(method, path, idParam string, body *bytes.Buffer) *http.Request {
-	r := httptest.NewRequest(method, path, body)
+	r := httptest.NewRequestWithContext(context.Background(), method, path, body)
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", idParam)
+
 	return r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
 }
 
@@ -80,7 +83,7 @@ func TestHandler_Take(t *testing.T) {
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", ticketID.String())
 	ctx = context.WithValue(ctx, chi.RouteCtxKey, rctx)
-	r := httptest.NewRequest(http.MethodPut, "/ticket/"+ticketID.String()+"/take", nil).WithContext(ctx)
+	r := httptest.NewRequestWithContext(ctx, http.MethodPut, "/ticket/"+ticketID.String()+"/take", nil)
 
 	h.Take(rec, r)
 
@@ -98,7 +101,7 @@ func TestHandler_Close(t *testing.T) {
 	t.Cleanup(ctrl.Finish)
 
 	mockUC := mocks.NewMockTicketUseCase(ctrl)
-	mockUC.EXPECT().Close(gomock.Any(), ticketID, "done").Return(errors.New("x"))
+	mockUC.EXPECT().Close(gomock.Any(), ticketID, "done").Return(errTestTicketCloseFail)
 
 	h := handlerticket.NewHandler(mockUC)
 	rec := httptest.NewRecorder()

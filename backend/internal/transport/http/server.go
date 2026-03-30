@@ -11,12 +11,12 @@ import (
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler"
 	adminApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/admin"
 	authApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/auth"
-	authMiddleware "github.com/djalben/xplr-core/backend/internal/transport/http/middleware"
 	cardApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/card"
-	userApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/user"
 	ticketApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/ticket"
 	transactionApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/transaction"
+	userApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/user"
 	walletApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/wallet"
+	authMiddleware "github.com/djalben/xplr-core/backend/internal/transport/http/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -125,7 +125,7 @@ func parseCORSOrigins(s string) []string {
 
 func (s *Server) setupRoutes(jwtSecret []byte) {
 	s.router.Route("/api", func(r chi.Router) {
-		r.Get("/health", func(w http.ResponseWriter, req *http.Request) {
+		r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
 			handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 		})
 
@@ -134,7 +134,7 @@ func (s *Server) setupRoutes(jwtSecret []byte) {
 			authApi.NewHandler(s.container.AuthUseCase, s.container.WalletUseCase, s.container.UserRepo, jwtSecret).Register(r)
 
 			// Public: rates (курсы валют)
-			r.Get("/rates", func(w http.ResponseWriter, r *http.Request) {
+			r.Get("/rates", func(w http.ResponseWriter, _ *http.Request) {
 				handler.WriteJSON(w, http.StatusOK, map[string]any{
 					"usd": 89.45,
 					"eur": 97.82,

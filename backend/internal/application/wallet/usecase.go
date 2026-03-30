@@ -56,6 +56,7 @@ func (uc *UseCase) TopUpWallet(ctx context.Context, userID domain.UUID, amount d
 		"COMPLETED",
 		"Пополнение кошелька",
 	)
+
 	return uc.txRepo.Save(ctx, tx)
 }
 
@@ -106,5 +107,6 @@ func (uc *UseCase) AutoTopUpCard(ctx context.Context, userID domain.UUID, cardID
 		"COMPLETED",
 		"Автоматическое пополнение карты с кошелька",
 	)
+
 	return uc.txRepo.Save(ctx, tx)
 }

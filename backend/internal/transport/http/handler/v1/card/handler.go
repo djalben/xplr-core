@@ -57,6 +57,7 @@ func (h *Handler) TopUpCard(w http.ResponseWriter, r *http.Request) {
 	userID := handler.GetUserIDFromContext(r)
 
 	cardIDStr := chi.URLParam(r, "id")
+
 	cardID, err := domain.ParseUUID(cardIDStr)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)

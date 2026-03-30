@@ -87,7 +87,8 @@ func NewContainer(cfg *config.ENV) (*Container, error) {
 
 func (c *Container) Close() error {
 	if c.DB != nil {
-		return c.DB.Close()
+		return wrapper.Wrap(c.DB.Close())
 	}
+
 	return nil
 }

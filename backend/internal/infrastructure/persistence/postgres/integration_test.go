@@ -2,7 +2,6 @@ package postgres_test
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"testing"
 
@@ -54,7 +53,7 @@ func truncateData(t *testing.T, db *sqlx.DB) {
 func uniqueEmail(t *testing.T) string {
 	t.Helper()
 
-	return fmt.Sprintf("%s@example.test", domain.NewUUID().String())
+	return domain.NewUUID().String() + "@example.test"
 }
 
 func newTestUser(t *testing.T, db *sqlx.DB, email string) *domain.User {
@@ -66,7 +65,8 @@ func newTestUser(t *testing.T, db *sqlx.DB, email string) *domain.User {
 	}
 
 	repo := postgres.NewUserRepository(db)
-	if err := repo.Save(context.Background(), u); err != nil {
+	err = repo.Save(context.Background(), u)
+	if err != nil {
 		t.Fatalf("user save: %v", err)
 	}
 

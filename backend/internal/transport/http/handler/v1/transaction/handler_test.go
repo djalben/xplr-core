@@ -7,25 +7,26 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
-
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	handlertr "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/transaction"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/transaction/mocks"
 	"github.com/go-chi/chi/v5"
+	"github.com/golang/mock/gomock"
+	"github.com/google/uuid"
 )
 
 func reqTx(uid domain.UUID, method, path string) *http.Request {
-	r := httptest.NewRequest(method, path, nil)
+	r := httptest.NewRequestWithContext(context.Background(), method, path, nil)
 	ctx := context.WithValue(r.Context(), "userID", uid)
+
 	return r.WithContext(ctx)
 }
 
 func reqTxChi(method, path, cardID string) *http.Request {
-	r := httptest.NewRequest(method, path, nil)
+	r := httptest.NewRequestWithContext(context.Background(), method, path, nil)
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", cardID)
+
 	return r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
 }
 

@@ -10,44 +10,55 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
-
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	handleruser "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/user"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/user/mocks"
+	"github.com/golang/mock/gomock"
+	"github.com/google/uuid"
 )
 
 func reqUser(uid domain.UUID, method, path string, body *bytes.Buffer) *http.Request {
 	var r *http.Request
 	if body != nil {
-		r = httptest.NewRequest(method, path, body)
+		r = httptest.NewRequestWithContext(context.Background(), method, path, body)
 	} else {
-		r = httptest.NewRequest(method, path, nil)
+		r = httptest.NewRequestWithContext(context.Background(), method, path, nil)
 	}
 	if uid != uuid.Nil {
 		ctx := context.WithValue(r.Context(), "userID", uid)
 		r = r.WithContext(ctx)
 	}
+
 	return r
 }
 
-func newHandlerAllMocks(ctrl *gomock.Controller) (
-	*handleruser.Handler,
-	*mocks.MockUserProfile,
-	*mocks.MockUserWallet,
-	*mocks.MockUserGrades,
-	*mocks.MockUserCards,
-	*mocks.MockUserTransactions,
-	*mocks.MockUserTickets,
-) {
+type mockBundle struct {
+	H       *handleruser.Handler
+	Profile *mocks.MockUserProfile
+	Wallet  *mocks.MockUserWallet
+	Grades  *mocks.MockUserGrades
+	Cards   *mocks.MockUserCards
+	Tx      *mocks.MockUserTransactions
+	Tickets *mocks.MockUserTickets
+}
+
+func newMockBundle(ctrl *gomock.Controller) mockBundle {
 	up := mocks.NewMockUserProfile(ctrl)
 	w := mocks.NewMockUserWallet(ctrl)
 	g := mocks.NewMockUserGrades(ctrl)
 	c := mocks.NewMockUserCards(ctrl)
 	tx := mocks.NewMockUserTransactions(ctrl)
 	tk := mocks.NewMockUserTickets(ctrl)
-	return handleruser.NewHandler(up, w, g, c, tx, tk), up, w, g, c, tx, tk
+
+	return mockBundle{
+		H:       handleruser.NewHandler(up, w, g, c, tx, tk),
+		Profile: up,
+		Wallet:  w,
+		Grades:  g,
+		Cards:   c,
+		Tx:      tx,
+		Tickets: tk,
+	}
 }
 
 func TestHandler_GetMe_unauthorized(t *testing.T) {
@@ -56,9 +67,9 @@ func TestHandler_GetMe_unauthorized(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	t.Cleanup(ctrl.Finish)
 
-	h, _, _, _, _, _, _ := newHandlerAllMocks(ctrl)
+	m := newMockBundle(ctrl)
 	rec := httptest.NewRecorder()
-	h.GetMe(rec, reqUser(uuid.Nil, http.MethodGet, "/user/me", nil))
+	m.H.GetMe(rec, reqUser(uuid.Nil, http.MethodGet, "/user/me", nil))
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("code=%d", rec.Code)
@@ -73,13 +84,13 @@ func TestHandler_GetMe_ok(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	t.Cleanup(ctrl.Finish)
 
-	h, up, _, _, _, _, _ := newHandlerAllMocks(ctrl)
-	up.EXPECT().GetMe(gomock.Any(), uid).Return(map[string]any{
+	m := newMockBundle(ctrl)
+	m.Profile.EXPECT().GetMe(gomock.Any(), uid).Return(map[string]any{
 		"id": uid.String(), "email": "a@b.c", "balance": "0",
 	}, nil)
 
 	rec := httptest.NewRecorder()
-	h.GetMe(rec, reqUser(uid, http.MethodGet, "/user/me", nil))
+	m.H.GetMe(rec, reqUser(uid, http.MethodGet, "/user/me", nil))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("code=%d %s", rec.Code, rec.Body.String())
@@ -100,11 +111,11 @@ func TestHandler_GetGrade_ok(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	t.Cleanup(ctrl.Finish)
 
-	h, _, _, g, _, _, _ := newHandlerAllMocks(ctrl)
-	g.EXPECT().GetByUserID(gomock.Any(), uid).Return(ug, nil)
+	m := newMockBundle(ctrl)
+	m.Grades.EXPECT().GetByUserID(gomock.Any(), uid).Return(ug, nil)
 
 	rec := httptest.NewRecorder()
-	h.GetGrade(rec, reqUser(uid, http.MethodGet, "/user/grade", nil))
+	m.H.GetGrade(rec, reqUser(uid, http.MethodGet, "/user/grade", nil))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("code=%d %s", rec.Code, rec.Body.String())
@@ -119,17 +130,23 @@ func TestHandler_GetWallet_ok(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	t.Cleanup(ctrl.Finish)
 
-	h, _, w, _, _, _, _ := newHandlerAllMocks(ctrl)
-	w.EXPECT().GetBalance(gomock.Any(), uid).Return(domain.NewNumeric(7), nil)
+	m := newMockBundle(ctrl)
+	m.Wallet.EXPECT().GetBalance(gomock.Any(), uid).Return(domain.NewNumeric(7), nil)
 
 	rec := httptest.NewRecorder()
-	h.GetWallet(rec, reqUser(uid, http.MethodGet, "/user/wallet", nil))
+	m.H.GetWallet(rec, reqUser(uid, http.MethodGet, "/user/wallet", nil))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("code=%d %s", rec.Code, rec.Body.String())
 	}
+
 	var got map[string]any
-	_ = json.NewDecoder(rec.Body).Decode(&got)
+
+	err := json.NewDecoder(rec.Body).Decode(&got)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
 	if got["master_balance"] != "7" {
 		t.Errorf("master_balance=%v", got["master_balance"])
 	}
@@ -143,9 +160,9 @@ func TestHandler_Support_emptyMessage(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	t.Cleanup(ctrl.Finish)
 
-	h, _, _, _, _, _, _ := newHandlerAllMocks(ctrl)
+	m := newMockBundle(ctrl)
 	rec := httptest.NewRecorder()
-	h.Support(rec, reqUser(uid, http.MethodPost, "/user/support", bytes.NewBufferString(`{"message":""}`)))
+	m.H.Support(rec, reqUser(uid, http.MethodPost, "/user/support", bytes.NewBufferString(`{"message":""}`)))
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("code=%d", rec.Code)
@@ -161,18 +178,20 @@ func TestHandler_Support_ok(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	t.Cleanup(ctrl.Finish)
 
-	h, _, _, _, _, _, tk := newHandlerAllMocks(ctrl)
-	tk.EXPECT().
+	m := newMockBundle(ctrl)
+	m.Tickets.EXPECT().
 		Create(gomock.Any(), uid, "Support", "hello", (*int64)(nil)).
 		Return(&domain.Ticket{ID: ticketID, UserID: uid, CreatedAt: time.Now().UTC()}, nil)
 
 	rec := httptest.NewRecorder()
-	h.Support(rec, reqUser(uid, http.MethodPost, "/user/support", bytes.NewBufferString(`{"message":"hello"}`)))
+	m.H.Support(rec, reqUser(uid, http.MethodPost, "/user/support", bytes.NewBufferString(`{"message":"hello"}`)))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("code=%d %s", rec.Code, rec.Body.String())
 	}
 }
+
+var errTestReferralDB = errors.New("db")
 
 func TestHandler_GetReferralsInfo_error(t *testing.T) {
 	t.Parallel()
@@ -182,11 +201,11 @@ func TestHandler_GetReferralsInfo_error(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	t.Cleanup(ctrl.Finish)
 
-	h, up, _, _, _, _, _ := newHandlerAllMocks(ctrl)
-	up.EXPECT().GetReferralInfo(gomock.Any(), uid).Return(nil, errors.New("db"))
+	m := newMockBundle(ctrl)
+	m.Profile.EXPECT().GetReferralInfo(gomock.Any(), uid).Return(nil, errTestReferralDB)
 
 	rec := httptest.NewRecorder()
-	h.GetReferralsInfo(rec, reqUser(uid, http.MethodGet, "/user/referrals/info", nil))
+	m.H.GetReferralsInfo(rec, reqUser(uid, http.MethodGet, "/user/referrals/info", nil))
 
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("code=%d", rec.Code)
