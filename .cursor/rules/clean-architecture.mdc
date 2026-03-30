@@ -12,7 +12,7 @@ alwaysApply: true
   • gitlab.com/libs-artifex/envparse — для парсинга конфига
 - Никогда не пиши самописные обёртки ошибок и config.MustLoad
 - Карты: только 3 типа (Subscription, Travel, Premium)
-- Киллер-фичи: Wallet + AutoReplenish + AntiFraud (3 неудачных попытки = блок карты)
+- Киллер-фичи: Wallet + AutoTopUp + AntiFraud (3 неудачных попытки = блок карты)
 - Все ошибки оборачивай через wrapper (см. документацию библиотеки)
 - Тесты: SUT + gomock/testify/mock
 - Go 1.26: используй generics, iter, errors.Join

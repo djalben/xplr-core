@@ -21,5 +21,5 @@ description: Добавляет новый тип карты в проект XPL
 
 ## Ограничения (из правил)
 
-- Только 3 типа: Subscription, Travel, Premium — не добавляй новые без явного запроса
+- Только 3 типа: Subscription, Travel, Prime — не добавляй новые без явного запроса
 - Соблюдай Dependency Rule: domain не импортирует application/infrastructure
