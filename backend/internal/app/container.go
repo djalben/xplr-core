@@ -7,11 +7,13 @@ import (
 	"github.com/djalben/xplr-core/backend/internal/application/card"
 	"github.com/djalben/xplr-core/backend/internal/application/commission"
 	"github.com/djalben/xplr-core/backend/internal/application/grades"
+	"github.com/djalben/xplr-core/backend/internal/application/kyc"
 	"github.com/djalben/xplr-core/backend/internal/application/ticket"
 	"github.com/djalben/xplr-core/backend/internal/application/transaction"
 	"github.com/djalben/xplr-core/backend/internal/application/user"
 	"github.com/djalben/xplr-core/backend/internal/application/wallet"
 	"github.com/djalben/xplr-core/backend/internal/config"
+	"github.com/djalben/xplr-core/backend/internal/infrastructure/mailer"
 	"github.com/djalben/xplr-core/backend/internal/infrastructure/persistence/postgres"
 	"github.com/djalben/xplr-core/backend/internal/ports"
 	"github.com/jmoiron/sqlx"
@@ -38,6 +40,7 @@ type Container struct {
 	TicketUseCase      *ticket.UseCase
 	CommissionUseCase  *commission.UseCase
 	GradesUseCase      *grades.UseCase
+	KYCUseCase         *kyc.UseCase
 }
 
 func NewContainer(cfg *config.ENV) (*Container, error) {
@@ -56,11 +59,22 @@ func NewContainer(cfg *config.ENV) (*Container, error) {
 	commissionRepo := postgres.NewCommissionConfigRepository(db)
 	gradeRepo := postgres.NewGradeRepository(db)
 	referralRepo := postgres.NewReferralRepository(db)
+	kycRepo := postgres.NewKYCApplicationRepository(db)
+
+	var mail ports.Mailer = mailer.Noop{}
+	if cfg.SMTPHost != "" {
+		mail = &mailer.SMTP{
+			Host: cfg.SMTPHost, Port: cfg.SMTPPort,
+			User: cfg.SMTPUser, Password: cfg.SMTPPassword,
+			From: cfg.SMTPFrom,
+		}
+	}
 
 	// WalletUseCase создаём первым — он нужен для CardUseCase
-	walletUC := wallet.NewUseCase(walletRepo, transactionRepo)
-	authUC := auth.NewUseCase(userRepo, walletRepo, gradeRepo, []byte(cfg.JWTSecret))
-	userUC := user.NewUseCase(userRepo, walletRepo, gradeRepo, referralRepo)
+	walletUC := wallet.NewUseCase(walletRepo, transactionRepo, commissionRepo)
+	authUC := auth.NewUseCase(userRepo, walletRepo, gradeRepo, []byte(cfg.JWTSecret), mail, cfg.AppPublicURL)
+	userUC := user.NewUseCase(userRepo, walletRepo, gradeRepo, referralRepo, commissionRepo)
+	kycUC := kyc.NewUseCase(kycRepo, userRepo)
 
 	return &Container{
 		DB: db,
@@ -77,11 +91,12 @@ func NewContainer(cfg *config.ENV) (*Container, error) {
 		AuthUseCase:        authUC,
 		UserUseCase:        userUC,
 		WalletUseCase:      walletUC,
-		CardUseCase:        card.NewUseCase(cardRepo, walletRepo, transactionRepo, walletUC),
+		CardUseCase:        card.NewUseCase(cardRepo, walletRepo, transactionRepo, gradeRepo, walletUC),
 		TransactionUseCase: transaction.NewUseCase(transactionRepo),
 		TicketUseCase:      ticket.NewUseCase(ticketRepo),
 		CommissionUseCase:  commission.NewUseCase(commissionRepo),
 		GradesUseCase:      grades.NewUseCase(gradeRepo),
+		KYCUseCase:         kycUC,
 	}, nil
 }
 

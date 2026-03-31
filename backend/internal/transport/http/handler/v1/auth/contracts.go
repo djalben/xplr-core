@@ -5,13 +5,18 @@ package auth
 import (
 	"context"
 
+	authapp "github.com/djalben/xplr-core/backend/internal/application/auth"
 	"github.com/djalben/xplr-core/backend/internal/domain"
 )
 
-// AuthRegisterLogin — регистрация и вход (для HTTP-слоя и gomock-тестов хендлера).
-type AuthRegisterLogin interface {
+// AuthFlow — регистрация, вход, MFA, email, сброс пароля.
+type AuthFlow interface {
 	Register(ctx context.Context, email, password string) (*domain.User, error)
-	Login(ctx context.Context, email, password string) (*domain.User, error)
+	Login(ctx context.Context, email, password string) (*authapp.LoginResult, error)
+	CompleteMFALogin(ctx context.Context, mfaToken, totpCode string) (*domain.User, error)
+	VerifyEmail(ctx context.Context, token string) error
+	RequestPasswordReset(ctx context.Context, email string) error
+	ResetPassword(ctx context.Context, token, newPassword string) error
 }
 
 // WalletBalanceProvider — баланс в ответах auth-хендлера.

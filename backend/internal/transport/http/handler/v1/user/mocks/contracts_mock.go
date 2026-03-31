@@ -66,6 +66,153 @@ func (mr *MockUserProfileMockRecorder) GetReferralInfo(ctx, userID interface{}) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetReferralInfo", reflect.TypeOf((*MockUserProfile)(nil).GetReferralInfo), ctx, userID)
 }
 
+// IssueTelegramLinkCode mocks base method.
+func (m *MockUserProfile) IssueTelegramLinkCode(ctx context.Context, userID domain.UUID) (string, time.Time, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IssueTelegramLinkCode", ctx, userID)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(time.Time)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// IssueTelegramLinkCode indicates an expected call of IssueTelegramLinkCode.
+func (mr *MockUserProfileMockRecorder) IssueTelegramLinkCode(ctx, userID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IssueTelegramLinkCode", reflect.TypeOf((*MockUserProfile)(nil).IssueTelegramLinkCode), ctx, userID)
+}
+
+// LinkTelegram mocks base method.
+func (m *MockUserProfile) LinkTelegram(ctx context.Context, userID domain.UUID, chatID int64, code string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LinkTelegram", ctx, userID, chatID, code)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// LinkTelegram indicates an expected call of LinkTelegram.
+func (mr *MockUserProfileMockRecorder) LinkTelegram(ctx, userID, chatID, code interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LinkTelegram", reflect.TypeOf((*MockUserProfile)(nil).LinkTelegram), ctx, userID, chatID, code)
+}
+
+// SetNotificationPreferences mocks base method.
+func (m *MockUserProfile) SetNotificationPreferences(ctx context.Context, userID domain.UUID, notifyEmail, notifyTelegram bool) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetNotificationPreferences", ctx, userID, notifyEmail, notifyTelegram)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetNotificationPreferences indicates an expected call of SetNotificationPreferences.
+func (mr *MockUserProfileMockRecorder) SetNotificationPreferences(ctx, userID, notifyEmail, notifyTelegram interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetNotificationPreferences", reflect.TypeOf((*MockUserProfile)(nil).SetNotificationPreferences), ctx, userID, notifyEmail, notifyTelegram)
+}
+
+// MockKYCApplications is a mock of KYCApplications interface.
+type MockKYCApplications struct {
+	ctrl     *gomock.Controller
+	recorder *MockKYCApplicationsMockRecorder
+}
+
+// MockKYCApplicationsMockRecorder is the mock recorder for MockKYCApplications.
+type MockKYCApplicationsMockRecorder struct {
+	mock *MockKYCApplications
+}
+
+// NewMockKYCApplications creates a new mock instance.
+func NewMockKYCApplications(ctrl *gomock.Controller) *MockKYCApplications {
+	mock := &MockKYCApplications{ctrl: ctrl}
+	mock.recorder = &MockKYCApplicationsMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockKYCApplications) EXPECT() *MockKYCApplicationsMockRecorder {
+	return m.recorder
+}
+
+// SubmitApplication mocks base method.
+func (m *MockKYCApplications) SubmitApplication(ctx context.Context, userID domain.UUID, payloadJSON string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SubmitApplication", ctx, userID, payloadJSON)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SubmitApplication indicates an expected call of SubmitApplication.
+func (mr *MockKYCApplicationsMockRecorder) SubmitApplication(ctx, userID, payloadJSON interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubmitApplication", reflect.TypeOf((*MockKYCApplications)(nil).SubmitApplication), ctx, userID, payloadJSON)
+}
+
+// MockTOTPSettings is a mock of TOTPSettings interface.
+type MockTOTPSettings struct {
+	ctrl     *gomock.Controller
+	recorder *MockTOTPSettingsMockRecorder
+}
+
+// MockTOTPSettingsMockRecorder is the mock recorder for MockTOTPSettings.
+type MockTOTPSettingsMockRecorder struct {
+	mock *MockTOTPSettings
+}
+
+// NewMockTOTPSettings creates a new mock instance.
+func NewMockTOTPSettings(ctrl *gomock.Controller) *MockTOTPSettings {
+	mock := &MockTOTPSettings{ctrl: ctrl}
+	mock.recorder = &MockTOTPSettingsMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockTOTPSettings) EXPECT() *MockTOTPSettingsMockRecorder {
+	return m.recorder
+}
+
+// ConfirmTOTP mocks base method.
+func (m *MockTOTPSettings) ConfirmTOTP(ctx context.Context, userID domain.UUID, code string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ConfirmTOTP", ctx, userID, code)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ConfirmTOTP indicates an expected call of ConfirmTOTP.
+func (mr *MockTOTPSettingsMockRecorder) ConfirmTOTP(ctx, userID, code interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConfirmTOTP", reflect.TypeOf((*MockTOTPSettings)(nil).ConfirmTOTP), ctx, userID, code)
+}
+
+// DisableTOTP mocks base method.
+func (m *MockTOTPSettings) DisableTOTP(ctx context.Context, userID domain.UUID, password, code string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DisableTOTP", ctx, userID, password, code)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DisableTOTP indicates an expected call of DisableTOTP.
+func (mr *MockTOTPSettingsMockRecorder) DisableTOTP(ctx, userID, password, code interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DisableTOTP", reflect.TypeOf((*MockTOTPSettings)(nil).DisableTOTP), ctx, userID, password, code)
+}
+
+// SetupTOTP mocks base method.
+func (m *MockTOTPSettings) SetupTOTP(ctx context.Context, userID domain.UUID) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetupTOTP", ctx, userID)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SetupTOTP indicates an expected call of SetupTOTP.
+func (mr *MockTOTPSettingsMockRecorder) SetupTOTP(ctx, userID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetupTOTP", reflect.TypeOf((*MockTOTPSettings)(nil).SetupTOTP), ctx, userID)
+}
+
 // MockUserWallet is a mock of UserWallet interface.
 type MockUserWallet struct {
 	ctrl     *gomock.Controller
@@ -238,6 +385,20 @@ func (mr *MockUserCardsMockRecorder) ListByUserID(ctx, userID interface{}) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListByUserID", reflect.TypeOf((*MockUserCards)(nil).ListByUserID), ctx, userID)
 }
 
+// RecordFailedAuthorization mocks base method.
+func (m *MockUserCards) RecordFailedAuthorization(ctx context.Context, userID, cardID domain.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RecordFailedAuthorization", ctx, userID, cardID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RecordFailedAuthorization indicates an expected call of RecordFailedAuthorization.
+func (mr *MockUserCardsMockRecorder) RecordFailedAuthorization(ctx, userID, cardID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordFailedAuthorization", reflect.TypeOf((*MockUserCards)(nil).RecordFailedAuthorization), ctx, userID, cardID)
+}
+
 // SetSpendingLimit mocks base method.
 func (m *MockUserCards) SetSpendingLimit(ctx context.Context, userID, cardID domain.UUID, limit domain.Numeric) error {
 	m.ctrl.T.Helper()
@@ -250,6 +411,20 @@ func (m *MockUserCards) SetSpendingLimit(ctx context.Context, userID, cardID dom
 func (mr *MockUserCardsMockRecorder) SetSpendingLimit(ctx, userID, cardID, limit interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSpendingLimit", reflect.TypeOf((*MockUserCards)(nil).SetSpendingLimit), ctx, userID, cardID, limit)
+}
+
+// SpendFromCard mocks base method.
+func (m *MockUserCards) SpendFromCard(ctx context.Context, userID, cardID domain.UUID, amount domain.Numeric) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SpendFromCard", ctx, userID, cardID, amount)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SpendFromCard indicates an expected call of SpendFromCard.
+func (mr *MockUserCardsMockRecorder) SpendFromCard(ctx, userID, cardID, amount interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SpendFromCard", reflect.TypeOf((*MockUserCards)(nil).SpendFromCard), ctx, userID, cardID, amount)
 }
 
 // TopUpCard mocks base method.

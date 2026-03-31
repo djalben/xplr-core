@@ -12,4 +12,5 @@ import (
 type CardUseCase interface {
 	BuyCard(ctx context.Context, userID domain.UUID, cardType domain.CardType, nickname string) (*domain.Card, error)
 	TopUpCard(ctx context.Context, userID domain.UUID, cardID domain.UUID, amount domain.Numeric) error
+	SpendFromCard(ctx context.Context, userID domain.UUID, cardID domain.UUID, amount domain.Numeric) error
 }

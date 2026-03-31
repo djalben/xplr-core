@@ -13,6 +13,21 @@ import (
 type UserProfile interface {
 	GetMe(ctx context.Context, userID domain.UUID) (map[string]any, error)
 	GetReferralInfo(ctx context.Context, userID domain.UUID) (map[string]any, error)
+	SetNotificationPreferences(ctx context.Context, userID domain.UUID, notifyEmail, notifyTelegram bool) error
+	IssueTelegramLinkCode(ctx context.Context, userID domain.UUID) (code string, expiresAt time.Time, err error)
+	LinkTelegram(ctx context.Context, userID domain.UUID, chatID int64, code string) error
+}
+
+// KYCApplications — подача заявки KYC.
+type KYCApplications interface {
+	SubmitApplication(ctx context.Context, userID domain.UUID, payloadJSON string) error
+}
+
+// TOTPSettings — настройка 2FA (делегат application/auth).
+type TOTPSettings interface {
+	SetupTOTP(ctx context.Context, userID domain.UUID) (otpauthURL string, err error)
+	ConfirmTOTP(ctx context.Context, userID domain.UUID, code string) error
+	DisableTOTP(ctx context.Context, userID domain.UUID, password, code string) error
 }
 
 // UserWallet — кошелёк в user-хендлере.
@@ -35,6 +50,8 @@ type UserCards interface {
 	TopUpCard(ctx context.Context, userID domain.UUID, cardID domain.UUID, amount domain.Numeric) error
 	UpdateStatus(ctx context.Context, userID domain.UUID, cardID domain.UUID, status string) error
 	SetSpendingLimit(ctx context.Context, userID domain.UUID, cardID domain.UUID, limit domain.Numeric) error
+	SpendFromCard(ctx context.Context, userID domain.UUID, cardID domain.UUID, amount domain.Numeric) error
+	RecordFailedAuthorization(ctx context.Context, userID domain.UUID, cardID domain.UUID) error
 }
 
 // UserTransactions — единая лента транзакций.

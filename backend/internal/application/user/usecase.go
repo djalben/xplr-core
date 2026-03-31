@@ -3,25 +3,35 @@ package user
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/djalben/xplr-core/backend/internal/domain"
+	"github.com/djalben/xplr-core/backend/internal/pkg/utils"
 	"github.com/djalben/xplr-core/backend/internal/ports"
 	"gitlab.com/libs-artifex/wrapper/v2"
 )
 
 type UseCase struct {
-	userRepo     ports.UserRepository
-	walletRepo   ports.WalletRepository
-	gradeRepo    ports.GradeRepository
-	referralRepo ports.ReferralRepository
+	userRepo       ports.UserRepository
+	walletRepo     ports.WalletRepository
+	gradeRepo      ports.GradeRepository
+	referralRepo   ports.ReferralRepository
+	commissionRepo ports.CommissionConfigRepository
 }
 
-func NewUseCase(userRepo ports.UserRepository, walletRepo ports.WalletRepository, gradeRepo ports.GradeRepository, referralRepo ports.ReferralRepository) *UseCase {
+func NewUseCase(
+	userRepo ports.UserRepository,
+	walletRepo ports.WalletRepository,
+	gradeRepo ports.GradeRepository,
+	referralRepo ports.ReferralRepository,
+	commissionRepo ports.CommissionConfigRepository,
+) *UseCase {
 	return &UseCase{
-		userRepo:     userRepo,
-		walletRepo:   walletRepo,
-		gradeRepo:    gradeRepo,
-		referralRepo: referralRepo,
+		userRepo:       userRepo,
+		walletRepo:     walletRepo,
+		gradeRepo:      gradeRepo,
+		referralRepo:   referralRepo,
+		commissionRepo: commissionRepo,
 	}
 }
 
@@ -48,15 +58,117 @@ func (uc *UseCase) GetMe(ctx context.Context, userID domain.UUID) (map[string]an
 		role = "admin"
 	}
 
+	sbpEnabled := true
+	sbpMessage := ""
+
+	if uc.commissionRepo != nil {
+		cfg, err := uc.commissionRepo.GetByKey(ctx, "sbp_topup_enabled")
+		if err == nil && cfg.Value.LessThan(domain.NewNumeric(0.5)) {
+			sbpEnabled = false
+			sbpMessage = "Пополнение через СБП временно недоступно. Выберите другой способ или попробуйте позже."
+		}
+	}
+
 	return map[string]any{
-		"id":           user.ID.String(),
-		"email":        user.Email,
-		"display_name": displayName,
-		"balance":      balanceStr,
-		"status":       string(user.Status),
-		"is_admin":     user.IsAdmin,
-		"role":         role,
+		"id":                user.ID.String(),
+		"email":             user.Email,
+		"display_name":      displayName,
+		"balance":           balanceStr,
+		"status":            string(user.Status),
+		"is_admin":          user.IsAdmin,
+		"role":              role,
+		"email_verified":    user.EmailVerified,
+		"kyc_status":        string(user.KYCStatus),
+		"totp_enabled":      user.TOTPEnabled,
+		"notify_email":      user.NotifyEmail,
+		"notify_telegram":   user.NotifyTelegram,
+		"sbp_topup_enabled": sbpEnabled,
+		"sbp_topup_message": sbpMessage,
 	}, nil
+}
+
+// SetNotificationPreferences — минимум один канал (email и/или telegram).
+func (uc *UseCase) SetNotificationPreferences(ctx context.Context, userID domain.UUID, notifyEmail, notifyTelegram bool) error {
+	if !notifyEmail && !notifyTelegram {
+		return domain.NewInvalidInput("выберите хотя бы один канал уведомлений: email или telegram")
+	}
+
+	user, err := uc.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	user.NotifyEmail = notifyEmail
+	user.NotifyTelegram = notifyTelegram
+
+	return uc.userRepo.Update(ctx, user)
+}
+
+// IssueTelegramLinkCode — одноразовый код для привязки Telegram (бот передаёт пользователю).
+func (uc *UseCase) IssueTelegramLinkCode(ctx context.Context, userID domain.UUID) (code string, expiresAt time.Time, err error) {
+	user, err := uc.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return "", time.Time{}, wrapper.Wrap(err)
+	}
+
+	plain, _, err := utils.RandomTokenHex(4)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+
+	exp := time.Now().UTC().Add(15 * time.Minute)
+	user.TelegramLinkCode = &plain
+	user.TelegramLinkExpiresAt = &exp
+
+	err = uc.userRepo.Update(ctx, user)
+	if err != nil {
+		return "", time.Time{}, wrapper.Wrap(err)
+	}
+
+	return plain, exp, nil
+}
+
+// LinkTelegram — привязка chat_id после ввода кода (уникальность chat_id в БД).
+func (uc *UseCase) LinkTelegram(ctx context.Context, userID domain.UUID, chatID int64, code string) error {
+	if chatID == 0 || code == "" {
+		return domain.NewInvalidInput("chat_id and code are required")
+	}
+
+	user, err := uc.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	if user.TelegramLinkCode == nil || *user.TelegramLinkCode != code {
+		return domain.NewInvalidInput("invalid link code")
+	}
+
+	if user.TelegramLinkExpiresAt == nil || time.Now().UTC().After(*user.TelegramLinkExpiresAt) {
+		return domain.NewInvalidInput("link code expired")
+	}
+
+	other, err := uc.userRepo.GetByTelegramChatID(ctx, chatID)
+	if err != nil && !isNoRowsUser(err) {
+		return wrapper.Wrap(err)
+	}
+
+	if other != nil && other.ID != userID {
+		return domain.NewAlreadyExists("этот Telegram уже привязан к другому аккаунту")
+	}
+
+	user.TelegramChatID = &chatID
+	user.TelegramLinkCode = nil
+	user.TelegramLinkExpiresAt = nil
+
+	return uc.userRepo.Update(ctx, user)
+}
+
+func isNoRowsUser(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	return strings.Contains(strings.ToLower(err.Error()), "no rows")
 }
 
 // GetReferralInfo — данные реферальной программы.

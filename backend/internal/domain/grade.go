@@ -2,6 +2,12 @@ package domain
 
 import "time"
 
+// Допустимые грейды пользователя (только два уровня).
+const (
+	UserGradeStandard = "STANDARD"
+	UserGradeGold     = "GOLD"
+)
+
 type UserGrade struct {
 	ID         UUID      `json:"id" db:"id"`
 	UserID     UUID      `json:"userId" db:"user_id"`

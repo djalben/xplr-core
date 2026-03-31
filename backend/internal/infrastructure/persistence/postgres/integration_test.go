@@ -43,7 +43,7 @@ func truncateData(t *testing.T, db *sqlx.DB) {
 
 	ctx := context.Background()
 	_, err := db.ExecContext(ctx, `
-		TRUNCATE TABLE referrals, tickets, transactions, cards, wallets, user_grades, api_keys, users RESTART IDENTITY CASCADE;
+		TRUNCATE TABLE kyc_applications, referrals, tickets, transactions, cards, wallets, user_grades, api_keys, users RESTART IDENTITY CASCADE;
 	`)
 	if err != nil {
 		t.Fatalf("truncate: %v", err)

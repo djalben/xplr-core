@@ -1,6 +1,8 @@
 package user
 
 import (
+	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -19,6 +21,8 @@ type Handler struct {
 	cardUC   UserCards
 	txUC     UserTransactions
 	ticketUC UserTickets
+	totpUC   TOTPSettings
+	kycUC    KYCApplications
 }
 
 func NewHandler(
@@ -28,6 +32,8 @@ func NewHandler(
 	cardUC UserCards,
 	txUC UserTransactions,
 	ticketUC UserTickets,
+	totpUC TOTPSettings,
+	kycUC KYCApplications,
 ) *Handler {
 	return &Handler{
 		userUC:   userUC,
@@ -36,6 +42,8 @@ func NewHandler(
 		cardUC:   cardUC,
 		txUC:     txUC,
 		ticketUC: ticketUC,
+		totpUC:   totpUC,
+		kycUC:    kycUC,
 	}
 }
 
@@ -56,8 +64,18 @@ func (h *Handler) Register(r chi.Router) {
 		r.Get("/cards/{id}/details", h.GetCardDetails)
 		r.Patch("/cards/{id}/status", h.UpdateCardStatus)
 		r.Patch("/cards/{id}/spending-limit", h.SetCardSpendingLimit)
+		r.Post("/cards/{id}/spend", h.SpendFromCard)
+		r.Post("/cards/{id}/failed-auth", h.RecordCardFailedAuth)
 		r.Post("/cards/{id}/auto-replenishment", h.SetCardAutoReplenishment)
 		r.Delete("/cards/{id}/auto-replenishment", h.UnsetCardAutoReplenishment)
+
+		r.Patch("/me/notifications", h.PatchNotifications)
+		r.Post("/me/telegram/link-code", h.PostTelegramLinkCode)
+		r.Post("/me/telegram/link", h.PostTelegramLink)
+		r.Post("/me/totp/setup", h.PostTOTPSetup)
+		r.Post("/me/totp/confirm", h.PostTOTPConfirm)
+		r.Post("/me/totp/disable", h.PostTOTPDisable)
+		r.Post("/kyc/application", h.PostKYCApplication)
 	})
 }
 
@@ -145,6 +163,12 @@ func (h *Handler) TopUpWallet(w http.ResponseWriter, r *http.Request) {
 
 	err = h.walletUC.TopUpWallet(r.Context(), userID, domain.NewNumeric(body.Amount))
 	if err != nil {
+		if errors.Is(err, domain.ErrSBPTopUpDisabled) {
+			http.Error(w, err.Error(), http.StatusForbidden)
+
+			return
+		}
+
 		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
 
 		return
@@ -271,10 +295,11 @@ func (h *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sourceMap := map[string]string{
-		"TOPUP_WALLET": "wallet_topup",
-		"TOPUP_CARD":   "card_transfer",
-		"CARD_ISSUE":   "card_transfer",
-		"AUTO_TOPUP":   "card_transfer",
+		"TOPUP_WALLET":                  "wallet_topup",
+		"TOPUP_CARD":                    "card_transfer",
+		"CARD_ISSUE":                    "card_transfer",
+		"AUTO_TOPUP":                    "card_transfer",
+		domain.TransactionTypeCardSpend: "card_charge",
 	}
 
 	out := make([]txResp, 0, len(txs))
@@ -604,6 +629,46 @@ func (h *Handler) SetCardSpendingLimit(w http.ResponseWriter, r *http.Request) {
 	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
+// SpendFromCard — POST /user/cards/{id}/spend (списание с карты: лимиты день/месяц по типу).
+func (h *Handler) SpendFromCard(w http.ResponseWriter, r *http.Request) {
+	userID := handler.GetUserIDFromContext(r)
+	if userID == uuid.Nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+
+		return
+	}
+
+	idStr := chi.URLParam(r, "id")
+	cardID, err := domain.ParseUUID(idStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	type req struct {
+		Amount float64 `json:"amount"`
+	}
+
+	var body req
+
+	err = handler.ReadJSON(r, &body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	err = h.cardUC.SpendFromCard(r.Context(), userID, cardID, domain.NewNumeric(body.Amount))
+	if err != nil {
+		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
 func (h *Handler) SetCardAutoReplenishment(w http.ResponseWriter, r *http.Request) {
 	userID := handler.GetUserIDFromContext(r)
 	if userID == uuid.Nil {
@@ -653,4 +718,230 @@ func (h *Handler) UnsetCardAutoReplenishment(w http.ResponseWriter, r *http.Requ
 	}
 
 	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+// RecordCardFailedAuth — POST /user/cards/{id}/failed-auth (неудачная авторизация у провайдера; антифрод).
+func (h *Handler) RecordCardFailedAuth(w http.ResponseWriter, r *http.Request) {
+	userID := handler.GetUserIDFromContext(r)
+	if userID == uuid.Nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+
+		return
+	}
+
+	idStr := chi.URLParam(r, "id")
+	cardID, err := domain.ParseUUID(idStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	err = h.cardUC.RecordFailedAuthorization(r.Context(), userID, cardID)
+	if err != nil {
+		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "recorded"})
+}
+
+func (h *Handler) PatchNotifications(w http.ResponseWriter, r *http.Request) {
+	userID := handler.GetUserIDFromContext(r)
+	if userID == uuid.Nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+
+		return
+	}
+
+	var body struct {
+		NotifyEmail    bool `json:"notify_email"`
+		NotifyTelegram bool `json:"notify_telegram"`
+	}
+
+	err := handler.ReadJSON(r, &body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	err = h.userUC.SetNotificationPreferences(r.Context(), userID, body.NotifyEmail, body.NotifyTelegram)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+func (h *Handler) PostTelegramLinkCode(w http.ResponseWriter, r *http.Request) {
+	userID := handler.GetUserIDFromContext(r)
+	if userID == uuid.Nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+
+		return
+	}
+
+	code, exp, err := h.userUC.IssueTelegramLinkCode(r.Context(), userID)
+	if err != nil {
+		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+
+		return
+	}
+
+	handler.WriteJSON(w, http.StatusOK, map[string]any{
+		"link_code":  code,
+		"expires_at": exp.Format(time.RFC3339),
+	})
+}
+
+func (h *Handler) PostTelegramLink(w http.ResponseWriter, r *http.Request) {
+	userID := handler.GetUserIDFromContext(r)
+	if userID == uuid.Nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+
+		return
+	}
+
+	var body struct {
+		TelegramChatID int64  `json:"telegram_chat_id"`
+		LinkCode       string `json:"link_code"`
+	}
+
+	err := handler.ReadJSON(r, &body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	err = h.userUC.LinkTelegram(r.Context(), userID, body.TelegramChatID, body.LinkCode)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+func (h *Handler) PostTOTPSetup(w http.ResponseWriter, r *http.Request) {
+	userID := handler.GetUserIDFromContext(r)
+	if userID == uuid.Nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+
+		return
+	}
+
+	url, err := h.totpUC.SetupTOTP(r.Context(), userID)
+	if err != nil {
+		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	handler.WriteJSON(w, http.StatusOK, map[string]string{"otpauth_url": url})
+}
+
+func (h *Handler) PostTOTPConfirm(w http.ResponseWriter, r *http.Request) {
+	userID := handler.GetUserIDFromContext(r)
+	if userID == uuid.Nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+
+		return
+	}
+
+	var body struct {
+		Code string `json:"code"`
+	}
+
+	err := handler.ReadJSON(r, &body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	err = h.totpUC.ConfirmTOTP(r.Context(), userID, body.Code)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "totp enabled"})
+}
+
+func (h *Handler) PostTOTPDisable(w http.ResponseWriter, r *http.Request) {
+	userID := handler.GetUserIDFromContext(r)
+	if userID == uuid.Nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+
+		return
+	}
+
+	var body struct {
+		Password string `json:"password"`
+		Code     string `json:"code"`
+	}
+
+	err := handler.ReadJSON(r, &body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	err = h.totpUC.DisableTOTP(r.Context(), userID, body.Password, body.Code)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "totp disabled"})
+}
+
+func (h *Handler) PostKYCApplication(w http.ResponseWriter, r *http.Request) {
+	userID := handler.GetUserIDFromContext(r)
+	if userID == uuid.Nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+
+		return
+	}
+
+	var body struct {
+		Payload map[string]any `json:"payload"`
+	}
+
+	err := handler.ReadJSON(r, &body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	payloadJSON := "{}"
+	if len(body.Payload) > 0 {
+		b, jerr := json.Marshal(body.Payload)
+		if jerr != nil {
+			http.Error(w, jerr.Error(), http.StatusBadRequest)
+
+			return
+		}
+
+		payloadJSON = string(b)
+	}
+
+	err = h.kycUC.SubmitApplication(r.Context(), userID, payloadJSON)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	handler.WriteJSON(w, http.StatusCreated, map[string]string{"status": "submitted"})
 }

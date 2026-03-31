@@ -173,10 +173,7 @@ func ensureDB() {
 		// Seed default commission values (idempotent)
 		`INSERT INTO commission_config (key, value, description) VALUES
 			('fee_standard', 6.70, 'Комиссия для грейда STANDARD (%)'),
-			('fee_silver', 5.50, 'Комиссия для грейда SILVER (%)'),
 			('fee_gold', 4.50, 'Комиссия для грейда GOLD (%)'),
-			('fee_platinum', 3.50, 'Комиссия для грейда PLATINUM (%)'),
-			('fee_black', 2.50, 'Комиссия для грейда BLACK (%)'),
 			('referral_percent', 5.00, 'Процент реферальной комиссии'),
 			('card_issue_fee', 2.00, 'Стоимость выпуска карты ($)')
 		ON CONFLICT (key) DO NOTHING`,

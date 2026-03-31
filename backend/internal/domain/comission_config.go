@@ -12,10 +12,7 @@ type CommissionConfig struct {
 
 const (
 	FeeStandard     = "fee_standard"
-	FeeSilver       = "fee_silver"
 	FeeGold         = "fee_gold"
-	FeePlatinum     = "fee_platinum"
-	FeeBlack        = "fee_black"
 	ReferralPercent = "referral_percent"
 	CardIssueFee    = "card_issue_fee"
 )

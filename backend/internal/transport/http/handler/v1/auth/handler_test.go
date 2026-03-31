@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	authapp "github.com/djalben/xplr-core/backend/internal/application/auth"
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	"github.com/djalben/xplr-core/backend/internal/pkg/utils"
 	handlerauth "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/auth"
@@ -29,16 +30,17 @@ func TestHandler_DoRegister(t *testing.T) {
 
 	type args struct {
 		body           string
-		setupMocks     func(auth *mocks.MockAuthRegisterLogin, wallet *mocks.MockWalletBalanceProvider, userReader *mocks.MockUserByIDReader)
+		setupMocks     func(auth *mocks.MockAuthFlow, wallet *mocks.MockWalletBalanceProvider, userReader *mocks.MockUserByIDReader)
 		wantStatusCode int
-		wantOK         bool // true => JSON с token и user
+		wantOK         bool // true => JSON с сообщением о письме (без JWT)
 	}
 
 	uid := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	regUser := &domain.User{
-		ID:     uid,
-		Email:  "a@example.com",
-		Status: domain.UserStatusActive,
+		ID:            uid,
+		Email:         "a@example.com",
+		Status:        domain.UserStatusActive,
+		EmailVerified: false,
 	}
 
 	tests := []struct {
@@ -49,15 +51,12 @@ func TestHandler_DoRegister(t *testing.T) {
 			name: "happy path",
 			args: args{
 				body: `{"email":"a@example.com","password":"secret"}`,
-				setupMocks: func(authMock *mocks.MockAuthRegisterLogin, wallet *mocks.MockWalletBalanceProvider, _ *mocks.MockUserByIDReader) {
+				setupMocks: func(authMock *mocks.MockAuthFlow, _ *mocks.MockWalletBalanceProvider, _ *mocks.MockUserByIDReader) {
 					authMock.EXPECT().
 						Register(gomock.Any(), "a@example.com", "secret").
 						Return(regUser, nil)
-					wallet.EXPECT().
-						GetBalance(gomock.Any(), uid).
-						Return(domain.NewNumeric(42.5), nil)
 				},
-				wantStatusCode: http.StatusOK,
+				wantStatusCode: http.StatusCreated,
 				wantOK:         true,
 			},
 		},
@@ -65,7 +64,7 @@ func TestHandler_DoRegister(t *testing.T) {
 			name: "register error -> 400",
 			args: args{
 				body: `{"email":"a@example.com","password":"secret"}`,
-				setupMocks: func(authMock *mocks.MockAuthRegisterLogin, _ *mocks.MockWalletBalanceProvider, _ *mocks.MockUserByIDReader) {
+				setupMocks: func(authMock *mocks.MockAuthFlow, _ *mocks.MockWalletBalanceProvider, _ *mocks.MockUserByIDReader) {
 					authMock.EXPECT().
 						Register(gomock.Any(), "a@example.com", "secret").
 						Return(nil, errTestRegisterEmailTaken)
@@ -78,7 +77,7 @@ func TestHandler_DoRegister(t *testing.T) {
 			name: "invalid json body -> 400",
 			args: args{
 				body: `{`,
-				setupMocks: func(_ *mocks.MockAuthRegisterLogin, _ *mocks.MockWalletBalanceProvider, _ *mocks.MockUserByIDReader) {
+				setupMocks: func(_ *mocks.MockAuthFlow, _ *mocks.MockWalletBalanceProvider, _ *mocks.MockUserByIDReader) {
 				},
 				wantStatusCode: http.StatusBadRequest,
 				wantOK:         false,
@@ -93,7 +92,7 @@ func TestHandler_DoRegister(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			t.Cleanup(ctrl.Finish)
 
-			authMock := mocks.NewMockAuthRegisterLogin(ctrl)
+			authMock := mocks.NewMockAuthFlow(ctrl)
 			walletMock := mocks.NewMockWalletBalanceProvider(ctrl)
 			userReaderMock := mocks.NewMockUserByIDReader(ctrl)
 			tt.args.setupMocks(authMock, walletMock, userReaderMock)
@@ -119,18 +118,11 @@ func TestHandler_DoRegister(t *testing.T) {
 			if err != nil {
 				t.Fatalf("decode response: %v", err)
 			}
-			if got["token"] == nil || got["token"] == "" {
-				t.Fatal("expected non-empty token")
+			if got["email"] != "a@example.com" {
+				t.Errorf("email = %v", got["email"])
 			}
-			userObj, ok := got["user"].(map[string]any)
-			if !ok {
-				t.Fatalf("user field: %v", got["user"])
-			}
-			if userObj["email"] != "a@example.com" {
-				t.Errorf("user.email = %v", userObj["email"])
-			}
-			if userObj["balance"] != "42.5" {
-				t.Errorf("user.balance = %v, want 42.5", userObj["balance"])
+			if got["email_verified"] != false {
+				t.Errorf("email_verified = %v, want false", got["email_verified"])
 			}
 		})
 	}
@@ -141,21 +133,22 @@ func TestHandler_DoLogin(t *testing.T) {
 
 	uid := uuid.MustParse("22222222-2222-2222-2222-222222222222")
 	loginUser := &domain.User{
-		ID:     uid,
-		Email:  "b@example.com",
-		Status: domain.UserStatusActive,
+		ID:            uid,
+		Email:         "b@example.com",
+		Status:        domain.UserStatusActive,
+		EmailVerified: true,
 	}
 
 	ctrl := gomock.NewController(t)
 	t.Cleanup(ctrl.Finish)
 
-	authMock := mocks.NewMockAuthRegisterLogin(ctrl)
+	authMock := mocks.NewMockAuthFlow(ctrl)
 	walletMock := mocks.NewMockWalletBalanceProvider(ctrl)
 	userReaderMock := mocks.NewMockUserByIDReader(ctrl)
 
 	authMock.EXPECT().
 		Login(gomock.Any(), "b@example.com", "x").
-		Return(loginUser, nil)
+		Return(&authapp.LoginResult{User: loginUser}, nil)
 	walletMock.EXPECT().
 		GetBalance(gomock.Any(), uid).
 		Return(domain.NewNumeric(0), nil)
@@ -184,9 +177,10 @@ func TestHandler_RefreshToken(t *testing.T) {
 
 	uid := uuid.MustParse("33333333-3333-3333-3333-333333333333")
 	u := &domain.User{
-		ID:     uid,
-		Email:  "c@example.com",
-		Status: domain.UserStatusActive,
+		ID:            uid,
+		Email:         "c@example.com",
+		Status:        domain.UserStatusActive,
+		EmailVerified: true,
 	}
 
 	validTok, err := utils.GenerateJWT([]byte(testJWTSecret), uid, u.Email)
@@ -248,7 +242,7 @@ func TestHandler_RefreshToken(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			t.Cleanup(ctrl.Finish)
 
-			authMock := mocks.NewMockAuthRegisterLogin(ctrl)
+			authMock := mocks.NewMockAuthFlow(ctrl)
 			walletMock := mocks.NewMockWalletBalanceProvider(ctrl)
 			userReaderMock := mocks.NewMockUserByIDReader(ctrl)
 

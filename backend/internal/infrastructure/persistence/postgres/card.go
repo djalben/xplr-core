@@ -76,11 +76,11 @@ func (r *cardRepo) ListByUserID(ctx context.Context, userID domain.UUID) ([]*dom
 func (r *cardRepo) Update(ctx context.Context, card *domain.Card) error {
 	const query = `
 		UPDATE cards 
-		SET balance = $1, card_status = $2, daily_spend_limit = $3, nickname = $4
-		WHERE id = $5`
+		SET balance = $1, card_status = $2, daily_spend_limit = $3, nickname = $4, failed_auth_count = $5
+		WHERE id = $6`
 
 	_, err := r.store.ExecContext(ctx, query,
-		card.Balance, card.CardStatus, card.DailySpendLimit, card.Nickname, card.ID)
+		card.Balance, card.CardStatus, card.DailySpendLimit, card.Nickname, card.FailedAuthCount, card.ID)
 	if err != nil {
 		return wrapper.Wrap(err)
 	}

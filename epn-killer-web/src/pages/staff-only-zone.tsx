@@ -177,13 +177,10 @@ const StatusBadge = ({ status }: { status: string }) => {
 };
 
 // ── Grade Select ──
-const GRADES = ['STANDARD', 'SILVER', 'GOLD', 'PLATINUM', 'BLACK'] as const;
+const GRADES = ['STANDARD', 'GOLD'] as const;
 const gradeColors: Record<string, string> = {
   STANDARD: 'text-slate-400',
-  SILVER: 'text-slate-300',
   GOLD: 'text-yellow-400',
-  PLATINUM: 'text-blue-400',
-  BLACK: 'text-purple-400',
 };
 
 // ══════════════════════════════════════

@@ -143,3 +143,27 @@ func TestHandler_TopUpCard(t *testing.T) {
 		t.Fatalf("code=%d %s", rec.Code, rec.Body.String())
 	}
 }
+
+func TestHandler_SpendFromCard(t *testing.T) {
+	t.Parallel()
+
+	uid := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	cardID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	mockUC := mocks.NewMockCardUseCase(ctrl)
+	mockUC.EXPECT().
+		SpendFromCard(gomock.Any(), uid, cardID, gomock.Any()).
+		Return(nil)
+
+	h := handlercard.NewHandler(mockUC)
+	rec := httptest.NewRecorder()
+	h.SpendFromCard(rec, reqCardChi(uid, http.MethodPost, "/x/"+cardID.String()+"/spend", cardID.String(),
+		bytes.NewBufferString(`{"amount":3}`)))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("code=%d %s", rec.Code, rec.Body.String())
+	}
+}

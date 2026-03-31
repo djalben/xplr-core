@@ -13,6 +13,7 @@ import (
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	handleruser "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/user"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/user/mocks"
+	"github.com/go-chi/chi/v5"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 )
@@ -32,6 +33,14 @@ func reqUser(uid domain.UUID, method, path string, body *bytes.Buffer) *http.Req
 	return r
 }
 
+func reqUserCardRoute(uid domain.UUID, method, path, cardID string, body *bytes.Buffer) *http.Request {
+	r := reqUser(uid, method, path, body)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", cardID)
+
+	return r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
+}
+
 type mockBundle struct {
 	H       *handleruser.Handler
 	Profile *mocks.MockUserProfile
@@ -40,6 +49,8 @@ type mockBundle struct {
 	Cards   *mocks.MockUserCards
 	Tx      *mocks.MockUserTransactions
 	Tickets *mocks.MockUserTickets
+	TOTP    *mocks.MockTOTPSettings
+	KYC     *mocks.MockKYCApplications
 }
 
 func newMockBundle(ctrl *gomock.Controller) mockBundle {
@@ -49,15 +60,19 @@ func newMockBundle(ctrl *gomock.Controller) mockBundle {
 	c := mocks.NewMockUserCards(ctrl)
 	tx := mocks.NewMockUserTransactions(ctrl)
 	tk := mocks.NewMockUserTickets(ctrl)
+	totp := mocks.NewMockTOTPSettings(ctrl)
+	kyc := mocks.NewMockKYCApplications(ctrl)
 
 	return mockBundle{
-		H:       handleruser.NewHandler(up, w, g, c, tx, tk),
+		H:       handleruser.NewHandler(up, w, g, c, tx, tk, totp, kyc),
 		Profile: up,
 		Wallet:  w,
 		Grades:  g,
 		Cards:   c,
 		Tx:      tx,
 		Tickets: tk,
+		TOTP:    totp,
+		KYC:     kyc,
 	}
 }
 
@@ -192,6 +207,29 @@ func TestHandler_Support_ok(t *testing.T) {
 }
 
 var errTestReferralDB = errors.New("db")
+
+func TestHandler_SpendFromCard_ok(t *testing.T) {
+	t.Parallel()
+
+	uid := uuid.MustParse("77777777-7777-7777-7777-777777777777")
+	cardID := uuid.MustParse("88888888-8888-8888-8888-888888888888")
+
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	m := newMockBundle(ctrl)
+	m.Cards.EXPECT().
+		SpendFromCard(gomock.Any(), uid, cardID, gomock.Any()).
+		Return(nil)
+
+	rec := httptest.NewRecorder()
+	m.H.SpendFromCard(rec, reqUserCardRoute(uid, http.MethodPost, "/user/cards/"+cardID.String()+"/spend", cardID.String(),
+		bytes.NewBufferString(`{"amount":12.5}`)))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("code=%d %s", rec.Code, rec.Body.String())
+	}
+}
 
 func TestHandler_GetReferralsInfo_error(t *testing.T) {
 	t.Parallel()

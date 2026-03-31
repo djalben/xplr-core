@@ -8,50 +8,66 @@ import (
 	context "context"
 	reflect "reflect"
 
+	auth "github.com/djalben/xplr-core/backend/internal/application/auth"
 	domain "github.com/djalben/xplr-core/backend/internal/domain"
 	gomock "github.com/golang/mock/gomock"
 )
 
-// MockAuthRegisterLogin is a mock of AuthRegisterLogin interface.
-type MockAuthRegisterLogin struct {
+// MockAuthFlow is a mock of AuthFlow interface.
+type MockAuthFlow struct {
 	ctrl     *gomock.Controller
-	recorder *MockAuthRegisterLoginMockRecorder
+	recorder *MockAuthFlowMockRecorder
 }
 
-// MockAuthRegisterLoginMockRecorder is the mock recorder for MockAuthRegisterLogin.
-type MockAuthRegisterLoginMockRecorder struct {
-	mock *MockAuthRegisterLogin
+// MockAuthFlowMockRecorder is the mock recorder for MockAuthFlow.
+type MockAuthFlowMockRecorder struct {
+	mock *MockAuthFlow
 }
 
-// NewMockAuthRegisterLogin creates a new mock instance.
-func NewMockAuthRegisterLogin(ctrl *gomock.Controller) *MockAuthRegisterLogin {
-	mock := &MockAuthRegisterLogin{ctrl: ctrl}
-	mock.recorder = &MockAuthRegisterLoginMockRecorder{mock}
+// NewMockAuthFlow creates a new mock instance.
+func NewMockAuthFlow(ctrl *gomock.Controller) *MockAuthFlow {
+	mock := &MockAuthFlow{ctrl: ctrl}
+	mock.recorder = &MockAuthFlowMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockAuthRegisterLogin) EXPECT() *MockAuthRegisterLoginMockRecorder {
+func (m *MockAuthFlow) EXPECT() *MockAuthFlowMockRecorder {
 	return m.recorder
 }
 
-// Login mocks base method.
-func (m *MockAuthRegisterLogin) Login(ctx context.Context, email, password string) (*domain.User, error) {
+// CompleteMFALogin mocks base method.
+func (m *MockAuthFlow) CompleteMFALogin(ctx context.Context, mfaToken, totpCode string) (*domain.User, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Login", ctx, email, password)
+	ret := m.ctrl.Call(m, "CompleteMFALogin", ctx, mfaToken, totpCode)
 	ret0, _ := ret[0].(*domain.User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// Login indicates an expected call of Login.
-func (mr *MockAuthRegisterLoginMockRecorder) Login(ctx, email, password interface{}) *gomock.Call {
+// CompleteMFALogin indicates an expected call of CompleteMFALogin.
+func (mr *MockAuthFlowMockRecorder) CompleteMFALogin(ctx, mfaToken, totpCode interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Login", reflect.TypeOf((*MockAuthRegisterLogin)(nil).Login), ctx, email, password)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CompleteMFALogin", reflect.TypeOf((*MockAuthFlow)(nil).CompleteMFALogin), ctx, mfaToken, totpCode)
+}
+
+// Login mocks base method.
+func (m *MockAuthFlow) Login(ctx context.Context, email, password string) (*auth.LoginResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Login", ctx, email, password)
+	ret0, _ := ret[0].(*auth.LoginResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Login indicates an expected call of Login.
+func (mr *MockAuthFlowMockRecorder) Login(ctx, email, password interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Login", reflect.TypeOf((*MockAuthFlow)(nil).Login), ctx, email, password)
 }
 
 // Register mocks base method.
-func (m *MockAuthRegisterLogin) Register(ctx context.Context, email, password string) (*domain.User, error) {
+func (m *MockAuthFlow) Register(ctx context.Context, email, password string) (*domain.User, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Register", ctx, email, password)
 	ret0, _ := ret[0].(*domain.User)
@@ -60,9 +76,51 @@ func (m *MockAuthRegisterLogin) Register(ctx context.Context, email, password st
 }
 
 // Register indicates an expected call of Register.
-func (mr *MockAuthRegisterLoginMockRecorder) Register(ctx, email, password interface{}) *gomock.Call {
+func (mr *MockAuthFlowMockRecorder) Register(ctx, email, password interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockAuthRegisterLogin)(nil).Register), ctx, email, password)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockAuthFlow)(nil).Register), ctx, email, password)
+}
+
+// RequestPasswordReset mocks base method.
+func (m *MockAuthFlow) RequestPasswordReset(ctx context.Context, email string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RequestPasswordReset", ctx, email)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RequestPasswordReset indicates an expected call of RequestPasswordReset.
+func (mr *MockAuthFlowMockRecorder) RequestPasswordReset(ctx, email interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RequestPasswordReset", reflect.TypeOf((*MockAuthFlow)(nil).RequestPasswordReset), ctx, email)
+}
+
+// ResetPassword mocks base method.
+func (m *MockAuthFlow) ResetPassword(ctx context.Context, token, newPassword string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ResetPassword", ctx, token, newPassword)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ResetPassword indicates an expected call of ResetPassword.
+func (mr *MockAuthFlowMockRecorder) ResetPassword(ctx, token, newPassword interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResetPassword", reflect.TypeOf((*MockAuthFlow)(nil).ResetPassword), ctx, token, newPassword)
+}
+
+// VerifyEmail mocks base method.
+func (m *MockAuthFlow) VerifyEmail(ctx context.Context, token string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "VerifyEmail", ctx, token)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// VerifyEmail indicates an expected call of VerifyEmail.
+func (mr *MockAuthFlowMockRecorder) VerifyEmail(ctx, token interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyEmail", reflect.TypeOf((*MockAuthFlow)(nil).VerifyEmail), ctx, token)
 }
 
 // MockWalletBalanceProvider is a mock of WalletBalanceProvider interface.

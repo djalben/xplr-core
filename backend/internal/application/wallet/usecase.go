@@ -9,14 +9,16 @@ import (
 )
 
 type UseCase struct {
-	walletRepo ports.WalletRepository
-	txRepo     ports.TransactionRepository
+	commissionRepo ports.CommissionConfigRepository
+	txRepo         ports.TransactionRepository
+	walletRepo     ports.WalletRepository
 }
 
-func NewUseCase(wr ports.WalletRepository, tr ports.TransactionRepository) *UseCase {
+func NewUseCase(wr ports.WalletRepository, tr ports.TransactionRepository, commissionRepo ports.CommissionConfigRepository) *UseCase {
 	return &UseCase{
-		walletRepo: wr,
-		txRepo:     tr,
+		commissionRepo: commissionRepo,
+		txRepo:         tr,
+		walletRepo:     wr,
 	}
 }
 
@@ -30,8 +32,15 @@ func (uc *UseCase) GetBalance(ctx context.Context, userID domain.UUID) (domain.N
 	return wallet.Balance, nil
 }
 
-// TopUpWallet — пополнение кошелька.
+// TopUpWallet — пополнение кошелька (канал СБП; при отключённом флаге — ошибка).
 func (uc *UseCase) TopUpWallet(ctx context.Context, userID domain.UUID, amount domain.Numeric) error {
+	if uc.commissionRepo != nil {
+		cfg, err := uc.commissionRepo.GetByKey(ctx, "sbp_topup_enabled")
+		if err == nil && cfg.Value.LessThan(domain.NewNumeric(0.5)) {
+			return domain.NewSBPTopUpDisabled()
+		}
+	}
+
 	wallet, err := uc.walletRepo.GetByUserID(ctx, userID)
 	if err != nil {
 		return wrapper.Wrap(err)

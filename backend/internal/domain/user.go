@@ -7,7 +7,7 @@ import (
 type User struct {
 	ID             UUID       `json:"id" db:"id"`
 	Email          string     `json:"email" db:"email"`
-	PasswordHash   string     `json:"-" db:"-"`
+	PasswordHash   string     `json:"-" db:"password_hash"`
 	IsAdmin        bool       `json:"isAdmin" db:"is_admin"`
 	KYCStatus      KYCStatus  `json:"kycStatus" db:"kyc_status"`
 	Status         UserStatus `json:"status" db:"status"`
@@ -15,6 +15,18 @@ type User struct {
 	ReferralCode   string     `json:"referralCode" db:"referral_code"`
 	ReferredBy     *UUID      `json:"referredBy,omitempty" db:"referred_by"`
 	CreatedAt      time.Time  `json:"createdAt" db:"created_at"`
+
+	EmailVerified          bool       `json:"emailVerified" db:"email_verified"`
+	EmailVerifyTokenHash   *string    `json:"-" db:"email_verify_token_hash"`
+	EmailVerifyExpiresAt   *time.Time `json:"-" db:"email_verify_expires_at"`
+	PasswordResetTokenHash *string    `json:"-" db:"password_reset_token_hash"`
+	PasswordResetExpiresAt *time.Time `json:"-" db:"password_reset_expires_at"`
+	TOTPSecret             *string    `json:"-" db:"totp_secret"`
+	TOTPEnabled            bool       `json:"totpEnabled" db:"totp_enabled"`
+	NotifyEmail            bool       `json:"notifyEmail" db:"notify_email"`
+	NotifyTelegram         bool       `json:"notifyTelegram" db:"notify_telegram"`
+	TelegramLinkCode       *string    `json:"-" db:"telegram_link_code"`
+	TelegramLinkExpiresAt  *time.Time `json:"-" db:"telegram_link_expires_at"`
 }
 
 type (
@@ -37,11 +49,14 @@ func NewUser(email, passwordHash string) (*User, error) {
 	}
 
 	return &User{
-		ID:           NewUUID(),
-		Email:        email,
-		PasswordHash: passwordHash,
-		KYCStatus:    KYCPending,
-		Status:       UserStatusActive,
-		CreatedAt:    time.Now().UTC(),
+		ID:             NewUUID(),
+		Email:          email,
+		PasswordHash:   passwordHash,
+		KYCStatus:      KYCPending,
+		Status:         UserStatusActive,
+		EmailVerified:  false,
+		NotifyEmail:    true,
+		NotifyTelegram: true,
+		CreatedAt:      time.Now().UTC(),
 	}, nil
 }

@@ -2,6 +2,7 @@ package grades
 
 import (
 	"context"
+	"strings"
 
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	"github.com/djalben/xplr-core/backend/internal/ports"
@@ -33,12 +34,11 @@ func (uc *UseCase) ChangeGrade(ctx context.Context, userID domain.UUID, grade st
 		return wrapper.Wrap(err)
 	}
 
-	// Проверка на допустимый grade
-	switch grade {
-	case "STANDARD", "SILVER", "GOLD", "PLATINUM", "BLACK":
-		// OK
+	switch strings.ToUpper(strings.TrimSpace(grade)) {
+	case domain.UserGradeStandard, domain.UserGradeGold:
+		grade = strings.ToUpper(strings.TrimSpace(grade))
 	default:
-		return domain.NewInvalidInput("invalid grade")
+		return domain.NewInvalidInput("invalid grade: only STANDARD and GOLD are allowed")
 	}
 
 	g.Grade = grade

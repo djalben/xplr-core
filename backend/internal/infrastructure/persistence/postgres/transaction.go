@@ -7,6 +7,7 @@ import (
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	"github.com/djalben/xplr-core/backend/internal/ports"
 	"github.com/jmoiron/sqlx"
+	"github.com/shopspring/decimal"
 	"gitlab.com/libs-artifex/wrapper/v2"
 )
 
@@ -105,4 +106,58 @@ func (r *transactionRepo) GetByUserID(ctx context.Context, userID domain.UUID, f
 	}
 
 	return list, nil
+}
+
+// SumCardSpendByCardID — сумма успешных CARD_SPEND по карте за период.
+func (r *transactionRepo) SumCardSpendByCardID(ctx context.Context, cardID domain.UUID, from, end time.Time) (domain.Numeric, error) {
+	const query = `
+		SELECT COALESCE(SUM(amount), 0)::text
+		FROM transactions
+		WHERE card_id = $1
+		  AND transaction_type = $2
+		  AND status = 'COMPLETED'
+		  AND executed_at >= $3 AND executed_at < $4`
+
+	var s string
+
+	err := r.store.GetContext(ctx, &s, query, cardID, domain.TransactionTypeCardSpend, from, end)
+	if err != nil {
+		return domain.NewNumeric(0), wrapper.Wrap(err)
+	}
+
+	sum, err := decimal.NewFromString(s)
+	if err != nil {
+		return domain.NewNumeric(0), wrapper.Wrap(err)
+	}
+
+	return sum, nil
+}
+
+// SumCardSpendByUserAndCardType — сумма CARD_SPEND по типу карты пользователя за период.
+func (r *transactionRepo) SumCardSpendByUserAndCardType(
+	ctx context.Context, userID domain.UUID, cardType domain.CardType, from, end time.Time,
+) (domain.Numeric, error) {
+	const query = `
+		SELECT COALESCE(SUM(t.amount), 0)::text
+		FROM transactions t
+		INNER JOIN cards c ON c.id = t.card_id
+		WHERE t.user_id = $1
+		  AND c.card_type = $2
+		  AND t.transaction_type = $3
+		  AND t.status = 'COMPLETED'
+		  AND t.executed_at >= $4 AND t.executed_at < $5`
+
+	var s string
+
+	err := r.store.GetContext(ctx, &s, query, userID, string(cardType), domain.TransactionTypeCardSpend, from, end)
+	if err != nil {
+		return domain.NewNumeric(0), wrapper.Wrap(err)
+	}
+
+	sum, err := decimal.NewFromString(s)
+	if err != nil {
+		return domain.NewNumeric(0), wrapper.Wrap(err)
+	}
+
+	return sum, nil
 }

@@ -144,7 +144,7 @@ func (s *Server) setupRoutes(jwtSecret []byte) {
 			// Protected: user (BFF), wallet, card, transaction, ticket
 			r.Group(func(r chi.Router) {
 				r.Use(authMiddleware.Auth(jwtSecret))
-				userApi.NewHandler(s.container.UserUseCase, s.container.WalletUseCase, s.container.GradesUseCase, s.container.CardUseCase, s.container.TransactionUseCase, s.container.TicketUseCase).Register(r)
+				userApi.NewHandler(s.container.UserUseCase, s.container.WalletUseCase, s.container.GradesUseCase, s.container.CardUseCase, s.container.TransactionUseCase, s.container.TicketUseCase, s.container.AuthUseCase, s.container.KYCUseCase).Register(r)
 				walletApi.NewHandler(s.container.WalletUseCase).Register(r)
 				cardApi.NewHandler(s.container.CardUseCase).Register(r)
 				ticketApi.NewHandler(s.container.TicketUseCase).Register(r)
@@ -157,7 +157,7 @@ func (s *Server) setupRoutes(jwtSecret []byte) {
 				r.Use(authMiddleware.Auth(jwtSecret))
 				r.Use(authMiddleware.AdminOnly(s.container.UserRepo))
 				adminApi.NewHandler(s.container.CardUseCase, s.container.CommissionUseCase,
-					s.container.TicketUseCase, s.container.GradesUseCase).Register(r)
+					s.container.TicketUseCase, s.container.GradesUseCase, s.container.KYCUseCase).Register(r)
 			})
 		})
 	})

@@ -10,6 +10,16 @@ const (
 	CardTypePremium       CardType = "premium"
 )
 
+// Статусы карты (card_status в БД).
+const (
+	CardStatusActive  = "ACTIVE"
+	CardStatusClosed  = "CLOSED"
+	CardStatusBlocked = "BLOCKED"
+)
+
+// AntifraudMaxFailedAuthAttempts — после стольких неудачных авторизаций карта блокируется.
+const AntifraudMaxFailedAuthAttempts int64 = 3
+
 type Card struct {
 	ID              UUID       `json:"id" db:"id"`
 	UserID          UUID       `json:"userId" db:"user_id"`
@@ -37,7 +47,7 @@ func NewCard(userID UUID, cardType CardType, providerCardID string, nickname str
 		ProviderCardID:  providerCardID,
 		Bin:             "424242",
 		Last4Digits:     "0000",
-		CardStatus:      "ACTIVE",
+		CardStatus:      CardStatusActive,
 		Nickname:        nickname,
 		CardType:        cardType,
 		DailySpendLimit: NewNumeric(1000),

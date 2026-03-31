@@ -15,7 +15,32 @@ CREATE TABLE users (
     referral_code VARCHAR(20) UNIQUE,
     referred_by UUID REFERENCES users(id),
     is_admin BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    email_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    email_verify_token_hash VARCHAR(64),
+    email_verify_expires_at TIMESTAMPTZ,
+    password_reset_token_hash VARCHAR(64),
+    password_reset_expires_at TIMESTAMPTZ,
+    totp_secret VARCHAR(64),
+    totp_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    notify_email BOOLEAN NOT NULL DEFAULT TRUE,
+    notify_telegram BOOLEAN NOT NULL DEFAULT TRUE,
+    telegram_link_code VARCHAR(32),
+    telegram_link_expires_at TIMESTAMPTZ,
+    CONSTRAINT users_notify_channel_check CHECK (notify_email OR notify_telegram)
+);
+
+-- 2. Заявки KYC
+CREATE TABLE kyc_applications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+    payload_json TEXT NOT NULL DEFAULT '{}',
+    admin_comment TEXT,
+    reviewed_by UUID REFERENCES users(id),
+    reviewed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT kyc_applications_status_check CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED'))
 );
 
 -- 3. Таблица карт
@@ -78,7 +103,8 @@ CREATE TABLE user_grades (
     grade VARCHAR(50) DEFAULT 'STANDARD',
     total_spent NUMERIC(20, 4) DEFAULT 0.0000,
     fee_percent NUMERIC(5, 2) DEFAULT 6.70,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT user_grades_grade_check CHECK (grade IN ('STANDARD', 'GOLD'))
 );
 
 -- 8. Рефералка
@@ -132,18 +158,19 @@ CREATE TABLE commission_config (
 INSERT INTO commission_config (key, value, description)
 VALUES
     ('fee_standard',     6.70, 'Комиссия для грейда STANDARD (%)'),
-    ('fee_silver',       5.50, 'Комиссия для грейда SILVER (%)'),
     ('fee_gold',         4.50, 'Комиссия для грейда GOLD (%)'),
-    ('fee_platinum',     3.50, 'Комиссия для грейда PLATINUM (%)'),
-    ('fee_black',        2.50, 'Комиссия для грейда BLACK (%)'),
     ('referral_percent', 5.00, 'Реферальная комиссия (%)'),
-    ('card_issue_fee',   2.00, 'Стоимость выпуска виртуальной карты ($)')
+    ('card_issue_fee',   2.00, 'Стоимость выпуска виртуальной карты ($)'),
+    ('sbp_topup_enabled', 1.0000, '1 = пополнение через СБП включено, 0 = отключено')
 ON CONFLICT (key) DO NOTHING;
 
 -- Индексы (все внизу)
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_referral_code ON users(referral_code);
 CREATE INDEX idx_users_referred_by ON users(referred_by);
+CREATE UNIQUE INDEX idx_users_telegram_chat_id_unique ON users(telegram_chat_id) WHERE telegram_chat_id IS NOT NULL;
+CREATE INDEX idx_kyc_applications_user_id ON kyc_applications(user_id);
+CREATE INDEX idx_kyc_applications_status ON kyc_applications(status);
 CREATE INDEX idx_cards_user_id ON cards(user_id);
 CREATE INDEX idx_cards_user_status ON cards(user_id, card_status);
 CREATE INDEX idx_transactions_user_id ON transactions(user_id);
@@ -173,5 +200,6 @@ DROP TABLE IF EXISTS api_keys;
 DROP TABLE IF EXISTS transactions;
 DROP TABLE IF EXISTS cards;
 DROP TABLE IF EXISTS wallets;
+DROP TABLE IF EXISTS kyc_applications;
 DROP TABLE IF EXISTS users;
 -- +goose StatementEnd

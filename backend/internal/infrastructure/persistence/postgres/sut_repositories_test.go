@@ -122,7 +122,7 @@ func TestGradeRepository_EnsureGetUpdate(t *testing.T) {
 		t.Fatalf("grade: %s", g.Grade)
 	}
 
-	g.Grade = "SILVER"
+	g.Grade = "GOLD"
 	g.TotalSpent = domain.NewNumeric(50)
 	g.FeePercent = domain.NewNumeric(5.5)
 	err = grepo.Update(ctx, g)
@@ -134,7 +134,7 @@ func TestGradeRepository_EnsureGetUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetByUserID 2: %v", err)
 	}
-	if g2.Grade != "SILVER" {
+	if g2.Grade != "GOLD" {
 		t.Fatalf("grade after update: %s", g2.Grade)
 	}
 }
@@ -255,6 +255,96 @@ func TestTransactionRepository_SaveAndQueries(t *testing.T) {
 	}
 	if len(all) != 2 {
 		t.Fatalf("unified: %d", len(all))
+	}
+}
+
+func TestTransactionRepository_SumCardSpend(t *testing.T) {
+	db := openTestDB(t)
+	truncateData(t, db)
+
+	ctx := context.Background()
+	u := newTestUser(t, db, uniqueEmail(t))
+
+	cardSub, err := domain.NewCard(u.ID, domain.CardTypeSubscriptions, "p1", "n1")
+	if err != nil {
+		t.Fatalf("NewCard: %v", err)
+	}
+
+	cardTr, err := domain.NewCard(u.ID, domain.CardTypeTravel, "p2", "n2")
+	if err != nil {
+		t.Fatalf("NewCard: %v", err)
+	}
+
+	cardRepo := postgres.NewCardRepository(db)
+	err = cardRepo.Save(ctx, cardSub)
+	if err != nil {
+		t.Fatalf("save sub: %v", err)
+	}
+	err = cardRepo.Save(ctx, cardTr)
+	if err != nil {
+		t.Fatalf("save travel: %v", err)
+	}
+
+	tMarch := time.Date(2025, 3, 15, 12, 0, 0, 0, time.UTC)
+	mStart := time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC)
+	mEnd := time.Date(2025, 4, 1, 0, 0, 0, 0, time.UTC)
+
+	repo := postgres.NewTransactionRepository(db)
+
+	sp1 := domain.NewTransaction(u.ID, &cardSub.ID, domain.NewNumeric(100), domain.NewNumeric(0),
+		domain.TransactionTypeCardSpend, "COMPLETED", "a")
+	sp1.ExecutedAt = tMarch
+
+	sp2 := domain.NewTransaction(u.ID, &cardSub.ID, domain.NewNumeric(50), domain.NewNumeric(0),
+		domain.TransactionTypeCardSpend, "COMPLETED", "b")
+	sp2.ExecutedAt = tMarch
+
+	spTr := domain.NewTransaction(u.ID, &cardTr.ID, domain.NewNumeric(10), domain.NewNumeric(0),
+		domain.TransactionTypeCardSpend, "COMPLETED", "c")
+	spTr.ExecutedAt = tMarch
+
+	noise := domain.NewTransaction(u.ID, &cardSub.ID, domain.NewNumeric(999), domain.NewNumeric(0),
+		"TOPUP_CARD", "COMPLETED", "noise")
+	noise.ExecutedAt = tMarch
+
+	for _, tx := range []*domain.Transaction{sp1, sp2, spTr, noise} {
+		err = repo.Save(ctx, tx)
+		if err != nil {
+			t.Fatalf("Save tx: %v", err)
+		}
+	}
+
+	sumCard, err := repo.SumCardSpendByCardID(ctx, cardSub.ID, mStart, mEnd)
+	if err != nil {
+		t.Fatalf("SumCardSpendByCardID: %v", err)
+	}
+	if !sumCard.Equal(domain.NewNumeric(150)) {
+		t.Fatalf("sum by card: got %s want 150", sumCard.String())
+	}
+
+	sumSubType, err := repo.SumCardSpendByUserAndCardType(ctx, u.ID, domain.CardTypeSubscriptions, mStart, mEnd)
+	if err != nil {
+		t.Fatalf("SumCardSpendByUserAndCardType subscriptions: %v", err)
+	}
+	if !sumSubType.Equal(domain.NewNumeric(150)) {
+		t.Fatalf("sum subscriptions type: got %s want 150", sumSubType.String())
+	}
+
+	sumTravelType, err := repo.SumCardSpendByUserAndCardType(ctx, u.ID, domain.CardTypeTravel, mStart, mEnd)
+	if err != nil {
+		t.Fatalf("SumCardSpendByUserAndCardType travel: %v", err)
+	}
+	if !sumTravelType.Equal(domain.NewNumeric(10)) {
+		t.Fatalf("sum travel type: got %s want 10", sumTravelType.String())
+	}
+
+	dayStart, dayEnd := domain.DayBoundsUTC(tMarch)
+	sumDay, err := repo.SumCardSpendByCardID(ctx, cardSub.ID, dayStart, dayEnd)
+	if err != nil {
+		t.Fatalf("SumCardSpendByCardID day: %v", err)
+	}
+	if !sumDay.Equal(domain.NewNumeric(150)) {
+		t.Fatalf("sum same day: got %s want 150", sumDay.String())
 	}
 }
 

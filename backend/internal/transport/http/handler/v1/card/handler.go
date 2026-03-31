@@ -21,6 +21,7 @@ func (h *Handler) Register(r chi.Router) {
 	r.Route("/card", func(r chi.Router) {
 		r.Post("/buy", h.BuyCard)
 		r.Post("/{id}/topup", h.TopUpCard)
+		r.Post("/{id}/spend", h.SpendFromCard)
 	})
 }
 
@@ -79,6 +80,42 @@ func (h *Handler) TopUpCard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = h.useCase.TopUpCard(r.Context(), userID, cardID, domain.NewNumeric(req.Amount))
+	if err != nil {
+		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+// SpendFromCard — POST /v1/card/{id}/spend.
+func (h *Handler) SpendFromCard(w http.ResponseWriter, r *http.Request) {
+	userID := handler.GetUserIDFromContext(r)
+
+	cardIDStr := chi.URLParam(r, "id")
+
+	cardID, err := domain.ParseUUID(cardIDStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	type request struct {
+		Amount float64 `json:"amount"`
+	}
+
+	var req request
+
+	err = handler.ReadJSON(r, &req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	err = h.useCase.SpendFromCard(r.Context(), userID, cardID, domain.NewNumeric(req.Amount))
 	if err != nil {
 		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
 
