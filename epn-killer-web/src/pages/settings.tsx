@@ -16,7 +16,7 @@ import {
 type SettingsTab = 'profile' | 'security' | 'notifications' | 'kyc' | 'language';
 
 interface ProfileData {
-  id: number;
+  id: string;
   email: string;
   display_name: string;
   is_verified: boolean;
@@ -37,6 +37,7 @@ interface SessionData {
 
 interface NotifPrefs {
   notify_transactions: boolean;
+  notify_card_operations: boolean;
   notify_balance: boolean;
   notify_security: boolean;
 }
@@ -409,6 +410,10 @@ const SecurityTab = ({ profile, reload, showToast }: { profile: ProfileData | nu
   const [totpURI, setTotpURI] = useState('');
   const [totpCode, setTotpCode] = useState('');
   const [totpSaving, setTotpSaving] = useState(false);
+  const [disable2FAOpen, setDisable2FAOpen] = useState(false);
+  const [disablePw, setDisablePw] = useState('');
+  const [disableTotp, setDisableTotp] = useState('');
+  const [disableSaving, setDisableSaving] = useState(false);
   const [sessions, setSessions] = useState<SessionData[]>([]);
   const [logoutSaving, setLogoutSaving] = useState(false);
 
@@ -449,8 +454,24 @@ const SecurityTab = ({ profile, reload, showToast }: { profile: ProfileData | nu
   };
 
   const handleDisable2FA = async () => {
-    try { await apiClient.post('/user/settings/2fa/disable'); showToast(t('settings.twoFa.disabledToast'), 'ok'); reload(); }
-    catch { showToast(t('settings.error'), 'err'); }
+    if (disablePw.length < 1 || disableTotp.length < 6) {
+      showToast(t('settings.twoFa.disableFillBoth'), 'err');
+      return;
+    }
+    setDisableSaving(true);
+    try {
+      await apiClient.post('/user/settings/2fa/disable', { password: disablePw, code: disableTotp });
+      showToast(t('settings.twoFa.disabledToast'), 'ok');
+      setDisable2FAOpen(false);
+      setDisablePw('');
+      setDisableTotp('');
+      reload();
+    } catch (err: any) {
+      const msg = typeof err.response?.data === 'string' ? err.response.data : t('settings.error');
+      showToast(msg, 'err');
+    } finally {
+      setDisableSaving(false);
+    }
   };
 
   const handleLogoutAll = async () => {
@@ -485,12 +506,29 @@ const SecurityTab = ({ profile, reload, showToast }: { profile: ProfileData | nu
       <div className="glass-card p-4 sm:p-6">
         <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><Smartphone className="w-5 h-5 text-emerald-400" />{t('settings.twoFa.title')}</h3>
         {profile?.two_factor_enabled ? (
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <ShieldCheck className="w-6 h-6 text-emerald-400 shrink-0" />
-              <div><p className="text-white font-medium">{t('settings.twoFa.enabled')}</p><p className="text-sm text-slate-400">{t('settings.twoFa.enabledDesc')}</p></div>
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <ShieldCheck className="w-6 h-6 text-emerald-400 shrink-0" />
+                <div><p className="text-white font-medium">{t('settings.twoFa.enabled')}</p><p className="text-sm text-slate-400">{t('settings.twoFa.enabledDesc')}</p></div>
+              </div>
+              {!disable2FAOpen && (
+                <button type="button" onClick={() => setDisable2FAOpen(true)} className="w-full sm:w-auto px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-sm font-medium rounded-xl transition-colors text-center">{t('settings.twoFa.disable')}</button>
+              )}
             </div>
-            <button onClick={handleDisable2FA} className="w-full sm:w-auto px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-sm font-medium rounded-xl transition-colors text-center">{t('settings.twoFa.disable')}</button>
+            {disable2FAOpen && (
+              <div className="max-w-md space-y-3 p-4 rounded-xl border border-white/10 bg-white/[0.03]">
+                <p className="text-sm text-slate-400">{t('settings.twoFa.disableExplain')}</p>
+                <input type="password" value={disablePw} onChange={e => setDisablePw(e.target.value)} placeholder={t('settings.twoFa.disablePassword')} className="xplr-input w-full" autoComplete="current-password" />
+                <input type="text" inputMode="numeric" autoComplete="one-time-code" value={disableTotp} onChange={e => setDisableTotp(e.target.value.replace(/\D/g, '').slice(0, 8))} placeholder={t('settings.twoFa.disableCode')} className="xplr-input w-full font-mono" />
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={handleDisable2FA} disabled={disableSaving} className="px-4 py-2.5 bg-red-500/80 hover:bg-red-500 disabled:opacity-50 text-white text-sm font-medium rounded-xl">
+                    {disableSaving ? <Loader2 className="w-4 h-4 animate-spin inline" /> : null}{t('settings.twoFa.confirmDisable')}
+                  </button>
+                  <button type="button" onClick={() => { setDisable2FAOpen(false); setDisablePw(''); setDisableTotp(''); }} className="px-4 py-2.5 border border-white/15 text-slate-300 text-sm rounded-xl hover:bg-white/5">{t('settings.twoFa.cancelDisable')}</button>
+                </div>
+              </div>
+            )}
           </div>
         ) : totpSecret ? (
           <div className="space-y-4">
@@ -559,15 +597,21 @@ const CHANNEL_OPTIONS: { value: string; label: string; desc: string }[] = [
   { value: 'telegram', label: 'Только Telegram', desc: 'Уведомления только в Telegram' },
 ];
 
-const NotificationsTab = ({ showToast, telegramLinked }: { showToast: (m: string, t: 'ok' | 'err') => void; telegramLinked: boolean }) => {
+const NotificationsTab = ({ showToast, telegramLinked, emailVerified }: { showToast: (m: string, t: 'ok' | 'err') => void; telegramLinked: boolean; emailVerified: boolean }) => {
   const { t } = useTranslation();
-  const [prefs, setPrefs] = useState<NotifPrefs>({ notify_transactions: true, notify_balance: true, notify_security: true });
+  const defaultPrefs: NotifPrefs = { notify_transactions: true, notify_card_operations: true, notify_balance: true, notify_security: true };
+  const [prefs, setPrefs] = useState<NotifPrefs>(defaultPrefs);
   const [notifChannel, setNotifChannel] = useState('both');
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     apiClient.get('/user/settings/notifications').then(res => {
-      setPrefs({ notify_transactions: res.data.notify_transactions, notify_balance: res.data.notify_balance, notify_security: res.data.notify_security });
+      setPrefs({
+        notify_transactions: res.data.notify_transactions ?? true,
+        notify_card_operations: res.data.notify_card_operations ?? true,
+        notify_balance: res.data.notify_balance ?? true,
+        notify_security: res.data.notify_security ?? true,
+      });
       setNotifChannel(res.data.notification_pref || 'both');
       setLoaded(true);
     }).catch(() => setLoaded(true));
@@ -589,6 +633,7 @@ const NotificationsTab = ({ showToast, telegramLinked }: { showToast: (m: string
 
   const items = [
     { key: 'notify_transactions' as const, label: t('settings.notif.transactions'), desc: t('settings.notif.transactionsDesc') },
+    { key: 'notify_card_operations' as const, label: t('settings.notif.cardOperations'), desc: t('settings.notif.cardOperationsDesc') },
     { key: 'notify_balance' as const, label: t('settings.notif.balance'), desc: t('settings.notif.balanceDesc') },
     { key: 'notify_security' as const, label: t('settings.notif.security'), desc: t('settings.notif.securityDesc') },
   ];
@@ -601,7 +646,11 @@ const NotificationsTab = ({ showToast, telegramLinked }: { showToast: (m: string
         <div className="grid gap-3 sm:grid-cols-3">
           {CHANNEL_OPTIONS.map(opt => {
             const needsTG = opt.value === 'both' || opt.value === 'telegram';
-            const isDisabled = needsTG && !telegramLinked;
+            const needsEmail = opt.value === 'both' || opt.value === 'email';
+            const noTg = needsTG && !telegramLinked;
+            const noEmail = needsEmail && !emailVerified;
+            const isDisabled = noTg || noEmail;
+            const hint = noTg ? t('settings.notif.needTelegram') : noEmail ? t('settings.notif.needEmail') : '';
             return (
               <div key={opt.value} className="relative group">
                 <button
@@ -618,9 +667,9 @@ const NotificationsTab = ({ showToast, telegramLinked }: { showToast: (m: string
                   <p className={`text-sm font-medium ${isDisabled ? 'text-slate-500' : notifChannel === opt.value ? 'text-blue-400' : 'text-white'}`}>{opt.label}</p>
                   <p className="text-xs text-slate-500 mt-1">{opt.desc}</p>
                 </button>
-                {isDisabled && (
-                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-slate-800 border border-white/10 rounded-lg text-xs text-slate-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                    Сначала привяжите Telegram в блоке выше
+                {isDisabled && hint && (
+                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-slate-800 border border-white/10 rounded-lg text-xs text-slate-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 max-w-[240px] text-center">
+                    {hint}
                   </div>
                 )}
               </div>
@@ -867,7 +916,9 @@ export const SettingsPage = () => {
         </div>
         {activeTab === 'profile' && <ProfileTab profile={profile} reload={loadProfile} showToast={showToast} setActiveTab={setActiveTab} />}
         {activeTab === 'security' && <SecurityTab profile={profile} reload={loadProfile} showToast={showToast} />}
-        {activeTab === 'notifications' && <NotificationsTab showToast={showToast} telegramLinked={profile?.telegram_linked ?? false} />}
+        {activeTab === 'notifications' && (
+          <NotificationsTab showToast={showToast} telegramLinked={profile?.telegram_linked ?? false} emailVerified={profile?.is_verified ?? false} />
+        )}
         {activeTab === 'kyc' && <KYCTab profile={profile} reload={loadProfile} showToast={showToast} />}
         {activeTab === 'language' && <LanguageTab />}
       </div>

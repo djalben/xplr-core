@@ -25,7 +25,7 @@ type KYCApplications interface {
 
 // TOTPSettings — настройка 2FA (делегат application/auth).
 type TOTPSettings interface {
-	SetupTOTP(ctx context.Context, userID domain.UUID) (otpauthURL string, err error)
+	SetupTOTP(ctx context.Context, userID domain.UUID) (otpauthURL string, secret string, err error)
 	ConfirmTOTP(ctx context.Context, userID domain.UUID, code string) error
 	DisableTOTP(ctx context.Context, userID domain.UUID, password, code string) error
 }

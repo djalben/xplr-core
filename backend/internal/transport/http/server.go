@@ -12,6 +12,7 @@ import (
 	adminApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/admin"
 	authApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/auth"
 	cardApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/card"
+	settingscompatApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/settingscompat"
 	ticketApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/ticket"
 	transactionApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/transaction"
 	userApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/user"
@@ -149,6 +150,13 @@ func (s *Server) setupRoutes(jwtSecret []byte) {
 				cardApi.NewHandler(s.container.CardUseCase).Register(r)
 				ticketApi.NewHandler(s.container.TicketUseCase).Register(r)
 				transactionApi.NewHandler(s.container.TransactionUseCase).Register(r)
+				settingscompatApi.NewHandler(
+					s.container.UserUseCase,
+					s.container.AuthUseCase,
+					s.container.KYCUseCase,
+					s.container.KYCRepo,
+					s.container.TelegramBotUsername,
+				).Register(r)
 			})
 		})
 

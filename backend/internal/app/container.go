@@ -31,6 +31,9 @@ type Container struct {
 	ReferralRepo    ports.ReferralRepository
 	CommissionRepo  ports.CommissionConfigRepository
 	GradeRepo       ports.GradeRepository
+	KYCRepo         ports.KYCApplicationRepository
+
+	TelegramBotUsername string
 
 	AuthUseCase        *auth.UseCase
 	UserUseCase        *user.UseCase
@@ -87,6 +90,9 @@ func NewContainer(cfg *config.ENV) (*Container, error) {
 		ReferralRepo:    referralRepo,
 		CommissionRepo:  commissionRepo,
 		GradeRepo:       gradeRepo,
+		KYCRepo:         kycRepo,
+
+		TelegramBotUsername: cfg.TelegramBotUsername,
 
 		AuthUseCase:        authUC,
 		UserUseCase:        userUC,

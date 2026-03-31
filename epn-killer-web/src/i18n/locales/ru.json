@@ -227,7 +227,13 @@
       "setupError": "Ошибка настройки 2FA",
       "invalidCode": "Неверный код",
       "enabledToast": "2FA включена!",
-      "disabledToast": "2FA отключена"
+      "disabledToast": "2FA отключена",
+      "disableExplain": "Введите текущий пароль и одноразовый код из приложения-аутентификатора.",
+      "disablePassword": "Пароль",
+      "disableCode": "Код из приложения",
+      "confirmDisable": "Отключить 2FA",
+      "cancelDisable": "Отмена",
+      "disableFillBoth": "Укажите пароль и код (не менее 6 цифр)"
     },
     "sessions": {
       "title": "Последняя активность",
@@ -241,12 +247,16 @@
     "notif": {
       "title": "Уведомления",
       "transactions": "Транзакции",
-      "transactionsDesc": "Операции по картам, списания, пополнения",
+      "transactionsDesc": "Движения по кошельку, переводы",
+      "cardOperations": "Операции по картам",
+      "cardOperationsDesc": "Списания, пополнения, операции по картам",
       "balance": "Баланс",
       "balanceDesc": "Изменения баланса, низкий остаток",
       "security": "Безопасность",
       "securityDesc": "Входы, смена пароля, подозрительные действия",
-      "saveError": "Ошибка сохранения"
+      "saveError": "Ошибка сохранения",
+      "needTelegram": "Сначала привяжите Telegram",
+      "needEmail": "Сначала подтвердите e-mail"
     },
     "kycForm": {
       "title": "Верификация аккаунта",

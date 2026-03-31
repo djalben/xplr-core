@@ -35,6 +35,11 @@ func NewUseCase(
 	}
 }
 
+// GetByID — пользователь по id (BFF / совместимость).
+func (uc *UseCase) GetByID(ctx context.Context, userID domain.UUID) (*domain.User, error) {
+	return uc.userRepo.GetByID(ctx, userID)
+}
+
 // GetMe возвращает данные текущего пользователя для фронта (BFF-совместимость).
 func (uc *UseCase) GetMe(ctx context.Context, userID domain.UUID) (map[string]any, error) {
 	user, err := uc.userRepo.GetByID(ctx, userID)
@@ -70,29 +75,29 @@ func (uc *UseCase) GetMe(ctx context.Context, userID domain.UUID) (map[string]an
 	}
 
 	return map[string]any{
-		"id":                user.ID.String(),
-		"email":             user.Email,
-		"display_name":      displayName,
-		"balance":           balanceStr,
-		"status":            string(user.Status),
-		"is_admin":          user.IsAdmin,
-		"role":              role,
-		"email_verified":    user.EmailVerified,
-		"kyc_status":        string(user.KYCStatus),
-		"totp_enabled":      user.TOTPEnabled,
-		"notify_email":      user.NotifyEmail,
-		"notify_telegram":   user.NotifyTelegram,
-		"sbp_topup_enabled": sbpEnabled,
-		"sbp_topup_message": sbpMessage,
+		"id":                     user.ID.String(),
+		"email":                  user.Email,
+		"display_name":           displayName,
+		"balance":                balanceStr,
+		"status":                 string(user.Status),
+		"is_admin":               user.IsAdmin,
+		"role":                   role,
+		"email_verified":         user.EmailVerified,
+		"kyc_status":             string(user.KYCStatus),
+		"totp_enabled":           user.TOTPEnabled,
+		"notify_email":           user.NotifyEmail,
+		"notify_telegram":        user.NotifyTelegram,
+		"notify_transactions":    user.NotifyTransactions,
+		"notify_balance":         user.NotifyBalance,
+		"notify_security":        user.NotifySecurity,
+		"notify_card_operations": user.NotifyCardOperations,
+		"sbp_topup_enabled":      sbpEnabled,
+		"sbp_topup_message":      sbpMessage,
 	}, nil
 }
 
-// SetNotificationPreferences — минимум один канал (email и/или telegram).
+// SetNotificationPreferences — минимум один канал (email и/или telegram) + привязки аккаунтов.
 func (uc *UseCase) SetNotificationPreferences(ctx context.Context, userID domain.UUID, notifyEmail, notifyTelegram bool) error {
-	if !notifyEmail && !notifyTelegram {
-		return domain.NewInvalidInput("выберите хотя бы один канал уведомлений: email или telegram")
-	}
-
 	user, err := uc.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return wrapper.Wrap(err)
@@ -101,7 +106,105 @@ func (uc *UseCase) SetNotificationPreferences(ctx context.Context, userID domain
 	user.NotifyEmail = notifyEmail
 	user.NotifyTelegram = notifyTelegram
 
+	return uc.validateAndSaveNotificationChannels(ctx, user)
+}
+
+// PartnerNotifPatch — тело PATCH /user/settings/notifications (фронт партнёра).
+type PartnerNotifPatch struct {
+	NotificationPref     *string
+	NotifyTransactions   *bool
+	NotifyBalance        *bool
+	NotifySecurity       *bool
+	NotifyCardOperations *bool
+}
+
+// PatchPartnerNotificationSettings — канал (both|email|telegram) и типы уведомлений.
+func (uc *UseCase) PatchPartnerNotificationSettings(ctx context.Context, userID domain.UUID, p PartnerNotifPatch) error {
+	user, err := uc.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	if p.NotificationPref != nil {
+		switch *p.NotificationPref {
+		case "both":
+			user.NotifyEmail = true
+			user.NotifyTelegram = true
+		case "email":
+			user.NotifyEmail = true
+			user.NotifyTelegram = false
+		case "telegram":
+			user.NotifyEmail = false
+			user.NotifyTelegram = true
+		default:
+			return domain.NewInvalidInput("notification_pref must be both, email or telegram")
+		}
+	}
+
+	if p.NotifyTransactions != nil {
+		user.NotifyTransactions = *p.NotifyTransactions
+	}
+
+	if p.NotifyBalance != nil {
+		user.NotifyBalance = *p.NotifyBalance
+	}
+
+	if p.NotifySecurity != nil {
+		user.NotifySecurity = *p.NotifySecurity
+	}
+
+	if p.NotifyCardOperations != nil {
+		user.NotifyCardOperations = *p.NotifyCardOperations
+	}
+
+	return uc.validateAndSaveNotificationChannels(ctx, user)
+}
+
+// ChangePassword — смена пароля в ЛК.
+func (uc *UseCase) ChangePassword(ctx context.Context, userID domain.UUID, oldPassword, newPassword string) error {
+	if oldPassword == "" || newPassword == "" {
+		return domain.NewInvalidInput("old and new password are required")
+	}
+
+	user, err := uc.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	if !utils.CheckPasswordHash(oldPassword, user.PasswordHash) {
+		return domain.NewInvalidInput("invalid current password")
+	}
+
+	newHash, err := utils.HashPassword(newPassword)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	user.PasswordHash = newHash
+
 	return uc.userRepo.Update(ctx, user)
+}
+
+// UnlinkTelegram — отвязать чат; канал telegram в уведомлениях сбрасывается при необходимости.
+func (uc *UseCase) UnlinkTelegram(ctx context.Context, userID domain.UUID) error {
+	user, err := uc.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	user.TelegramChatID = nil
+	user.TelegramLinkCode = nil
+	user.TelegramLinkExpiresAt = nil
+
+	if user.NotifyTelegram {
+		user.NotifyTelegram = false
+	}
+
+	if !user.NotifyEmail {
+		user.NotifyEmail = true
+	}
+
+	return uc.validateAndSaveNotificationChannels(ctx, user)
 }
 
 // IssueTelegramLinkCode — одноразовый код для привязки Telegram (бот передаёт пользователю).
@@ -207,4 +310,20 @@ func (uc *UseCase) GetReferralInfo(ctx context.Context, userID domain.UUID) (map
 		},
 		"recent_referrals": []any{},
 	}, nil
+}
+
+func (uc *UseCase) validateAndSaveNotificationChannels(ctx context.Context, user *domain.User) error {
+	if !user.NotifyEmail && !user.NotifyTelegram {
+		return domain.NewInvalidInput("выберите хотя бы один канал уведомлений: email или telegram")
+	}
+
+	if user.NotifyEmail && !user.EmailVerified {
+		return domain.NewInvalidInput("подтвердите email, чтобы получать уведомления на почту")
+	}
+
+	if user.NotifyTelegram && (user.TelegramChatID == nil || *user.TelegramChatID == 0) {
+		return domain.NewInvalidInput("привяжите Telegram, чтобы получать уведомления в Telegram")
+	}
+
+	return uc.userRepo.Update(ctx, user)
 }

@@ -199,12 +199,13 @@ func (mr *MockTOTPSettingsMockRecorder) DisableTOTP(ctx, userID, password, code 
 }
 
 // SetupTOTP mocks base method.
-func (m *MockTOTPSettings) SetupTOTP(ctx context.Context, userID domain.UUID) (string, error) {
+func (m *MockTOTPSettings) SetupTOTP(ctx context.Context, userID domain.UUID) (string, string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SetupTOTP", ctx, userID)
 	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].(string)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // SetupTOTP indicates an expected call of SetupTOTP.

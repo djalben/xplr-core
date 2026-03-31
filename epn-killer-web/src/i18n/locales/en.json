@@ -227,7 +227,13 @@
       "setupError": "2FA setup error",
       "invalidCode": "Invalid code",
       "enabledToast": "2FA enabled!",
-      "disabledToast": "2FA disabled"
+      "disabledToast": "2FA disabled",
+      "disableExplain": "Enter your current password and a one-time code from your authenticator app.",
+      "disablePassword": "Password",
+      "disableCode": "Authenticator code",
+      "confirmDisable": "Disable 2FA",
+      "cancelDisable": "Cancel",
+      "disableFillBoth": "Enter password and code (at least 6 digits)"
     },
     "sessions": {
       "title": "Recent Activity",
@@ -241,12 +247,16 @@
     "notif": {
       "title": "Notifications",
       "transactions": "Transactions",
-      "transactionsDesc": "Card operations, charges, top-ups",
+      "transactionsDesc": "Wallet movements and transfers",
+      "cardOperations": "Card activity",
+      "cardOperationsDesc": "Card charges, top-ups, and card operations",
       "balance": "Balance",
       "balanceDesc": "Balance changes, low balance alerts",
       "security": "Security",
       "securityDesc": "Logins, password changes, suspicious activity",
-      "saveError": "Save failed"
+      "saveError": "Save failed",
+      "needTelegram": "Link Telegram first",
+      "needEmail": "Verify your email first"
     },
     "kycForm": {
       "title": "Account Verification",

@@ -25,6 +25,10 @@ CREATE TABLE users (
     totp_enabled BOOLEAN NOT NULL DEFAULT FALSE,
     notify_email BOOLEAN NOT NULL DEFAULT TRUE,
     notify_telegram BOOLEAN NOT NULL DEFAULT TRUE,
+    notify_transactions BOOLEAN NOT NULL DEFAULT TRUE,
+    notify_balance BOOLEAN NOT NULL DEFAULT TRUE,
+    notify_security BOOLEAN NOT NULL DEFAULT TRUE,
+    notify_card_operations BOOLEAN NOT NULL DEFAULT TRUE,
     telegram_link_code VARCHAR(32),
     telegram_link_expires_at TIMESTAMPTZ,
     CONSTRAINT users_notify_channel_check CHECK (notify_email OR notify_telegram)

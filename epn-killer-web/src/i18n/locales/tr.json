@@ -232,7 +232,13 @@
       "setupError": "2FA ayarlama hatası",
       "invalidCode": "Geçersiz kod",
       "enabledToast": "2FA etkinleştirildi!",
-      "disabledToast": "2FA devre dışı bırakıldı"
+      "disabledToast": "2FA devre dışı bırakıldı",
+      "disableExplain": "Mevcut şifrenizi ve kimlik doğrulama uygulamasından tek kullanımlık kodu girin.",
+      "disablePassword": "Şifre",
+      "disableCode": "Kimlik doğrulayıcı kodu",
+      "confirmDisable": "2FA'yı kapat",
+      "cancelDisable": "İptal",
+      "disableFillBoth": "Şifre ve kod girin (en az 6 rakam)"
     },
     "sessions": {
       "title": "Son aktivite",
@@ -246,12 +252,16 @@
     "notif": {
       "title": "Bildirimler",
       "transactions": "İşlemler",
-      "transactionsDesc": "Kart işlemleri, ödemeler, yüklemeler",
+      "transactionsDesc": "Cüzdan hareketleri ve transferler",
+      "cardOperations": "Kart işlemleri",
+      "cardOperationsDesc": "Karttan çekimler, yüklemeler ve kart işlemleri",
       "balance": "Bakiye",
       "balanceDesc": "Bakiye değişiklikleri, düşük bakiye uyarıları",
       "security": "Güvenlik",
       "securityDesc": "Girişler, şifre değişiklikleri, şüpheli aktivite",
-      "saveError": "Kaydetme hatası"
+      "saveError": "Kaydetme hatası",
+      "needTelegram": "Önce Telegram'ı bağlayın",
+      "needEmail": "Önce e-postanızı doğrulayın"
     },
     "kycForm": {
       "title": "Hesap doğrulama",

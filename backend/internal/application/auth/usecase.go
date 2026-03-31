@@ -275,10 +275,10 @@ func (uc *UseCase) ResetPassword(ctx context.Context, plainToken, newPassword st
 }
 
 // SetupTOTP — генерирует секрет и сохраняет в профиле (ещё без включения 2FA).
-func (uc *UseCase) SetupTOTP(ctx context.Context, userID domain.UUID) (otpauthURL string, err error) {
+func (uc *UseCase) SetupTOTP(ctx context.Context, userID domain.UUID) (otpauthURL, plainSecret string, err error) {
 	user, err := uc.userRepo.GetByID(ctx, userID)
 	if err != nil {
-		return "", wrapper.Wrap(err)
+		return "", "", wrapper.Wrap(err)
 	}
 
 	key, err := totp.Generate(totp.GenerateOpts{
@@ -286,7 +286,7 @@ func (uc *UseCase) SetupTOTP(ctx context.Context, userID domain.UUID) (otpauthUR
 		AccountName: user.Email,
 	})
 	if err != nil {
-		return "", wrapper.Wrap(err)
+		return "", "", wrapper.Wrap(err)
 	}
 
 	sec := key.Secret()
@@ -295,10 +295,10 @@ func (uc *UseCase) SetupTOTP(ctx context.Context, userID domain.UUID) (otpauthUR
 
 	err = uc.userRepo.Update(ctx, user)
 	if err != nil {
-		return "", wrapper.Wrap(err)
+		return "", "", wrapper.Wrap(err)
 	}
 
-	return key.URL(), nil
+	return key.URL(), sec, nil
 }
 
 // ConfirmTOTP — подтверждает код и включает 2FA.
@@ -352,6 +352,39 @@ func (uc *UseCase) DisableTOTP(ctx context.Context, userID domain.UUID, password
 	user.TOTPSecret = nil
 
 	return uc.userRepo.Update(ctx, user)
+}
+
+// ResendEmailVerification — повторная отправка письма с ссылкой подтверждения.
+func (uc *UseCase) ResendEmailVerification(ctx context.Context, userID domain.UUID) error {
+	user, err := uc.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	if user.EmailVerified {
+		return nil
+	}
+
+	plain, hashTok, err := utils.RandomTokenHex(32)
+	if err != nil {
+		return err
+	}
+
+	exp := time.Now().UTC().Add(emailVerifyTTL)
+	user.EmailVerifyTokenHash = &hashTok
+	user.EmailVerifyExpiresAt = &exp
+
+	err = uc.userRepo.Update(ctx, user)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	verifyURL := uc.publicBaseURL + "/api/v1/auth/verify-email?token=" + plain
+	body := "Подтвердите email:\n" + verifyURL
+
+	_ = uc.mailer.SendPlain(ctx, user.Email, "Подтверждение email XPLR", body)
+
+	return nil
 }
 
 func isNoRows(err error) bool {

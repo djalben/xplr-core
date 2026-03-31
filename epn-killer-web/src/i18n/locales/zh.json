@@ -232,7 +232,13 @@
       "setupError": "2FA设置错误",
       "invalidCode": "验证码无效",
       "enabledToast": "2FA已启用！",
-      "disabledToast": "2FA已禁用"
+      "disabledToast": "2FA已禁用",
+      "disableExplain": "请输入当前密码和身份验证应用中的一次性验证码。",
+      "disablePassword": "密码",
+      "disableCode": "验证器代码",
+      "confirmDisable": "关闭 2FA",
+      "cancelDisable": "取消",
+      "disableFillBoth": "请填写密码和验证码（至少6位数字）"
     },
     "sessions": {
       "title": "最近活动",
@@ -246,12 +252,16 @@
     "notif": {
       "title": "通知",
       "transactions": "交易",
-      "transactionsDesc": "卡片操作、扣款、充值",
+      "transactionsDesc": "钱包流水与转账",
+      "cardOperations": "卡片动态",
+      "cardOperationsDesc": "扣款、充值及卡片相关操作",
       "balance": "余额",
       "balanceDesc": "余额变动、低余额提醒",
       "security": "安全",
       "securityDesc": "登录、密码修改、可疑活动",
-      "saveError": "保存失败"
+      "saveError": "保存失败",
+      "needTelegram": "请先绑定 Telegram",
+      "needEmail": "请先验证邮箱"
     },
     "kycForm": {
       "title": "账户验证",

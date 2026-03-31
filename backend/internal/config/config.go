@@ -24,8 +24,9 @@ type ENV struct {
 	LogPlain bool   `env:"LOG_PLAIN" default:"false"`
 
 	// Telegram (для тикетов и уведомлений)
-	TelegramBotToken string `env:"TELEGRAM_BOT_TOKEN"`
-	TelegramChatID   int64  `env:"TELEGRAM_CHAT_ID"` // основной чат поддержки
+	TelegramBotToken    string `env:"TELEGRAM_BOT_TOKEN"`
+	TelegramChatID      int64  `env:"TELEGRAM_CHAT_ID"`                                // основной чат поддержки
+	TelegramBotUsername string `env:"TELEGRAM_BOT_USERNAME" default:"xplr_notify_bot"` // для deep-link привязки в настройках
 
 	// Эмитент карт (потом добавим)
 	CardEmitterAPIKey string `env:"CARD_EMITTER_API_KEY"`

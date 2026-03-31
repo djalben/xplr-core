@@ -23,6 +23,7 @@ const userSelectColumns = `id, email, password_hash, is_admin, kyc_status, statu
 	email_verified, email_verify_token_hash, email_verify_expires_at,
 	password_reset_token_hash, password_reset_expires_at,
 	totp_secret, totp_enabled, notify_email, notify_telegram,
+	notify_transactions, notify_balance, notify_security, notify_card_operations,
 	telegram_link_code, telegram_link_expires_at`
 
 // GetByID — получение пользователя.
@@ -104,10 +105,12 @@ func (r *userRepo) Save(ctx context.Context, user *domain.User) error {
 			email_verified, email_verify_token_hash, email_verify_expires_at,
 			password_reset_token_hash, password_reset_expires_at,
 			totp_secret, totp_enabled, notify_email, notify_telegram,
+			notify_transactions, notify_balance, notify_security, notify_card_operations,
 			telegram_link_code, telegram_link_expires_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-			$11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
+			$11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+			$21, $22, $23, $24, $25, $26
 		)`
 
 	_, err := r.store.ExecContext(ctx, query,
@@ -117,6 +120,7 @@ func (r *userRepo) Save(ctx context.Context, user *domain.User) error {
 		user.EmailVerified, user.EmailVerifyTokenHash, user.EmailVerifyExpiresAt,
 		user.PasswordResetTokenHash, user.PasswordResetExpiresAt,
 		user.TOTPSecret, user.TOTPEnabled, user.NotifyEmail, user.NotifyTelegram,
+		user.NotifyTransactions, user.NotifyBalance, user.NotifySecurity, user.NotifyCardOperations,
 		user.TelegramLinkCode, user.TelegramLinkExpiresAt,
 	)
 	if err != nil {
@@ -136,8 +140,9 @@ func (r *userRepo) Update(ctx context.Context, user *domain.User) error {
 			email_verified = $7, email_verify_token_hash = $8, email_verify_expires_at = $9,
 			password_reset_token_hash = $10, password_reset_expires_at = $11,
 			totp_secret = $12, totp_enabled = $13, notify_email = $14, notify_telegram = $15,
-			telegram_link_code = $16, telegram_link_expires_at = $17
-		WHERE id = $18`
+			notify_transactions = $16, notify_balance = $17, notify_security = $18, notify_card_operations = $19,
+			telegram_link_code = $20, telegram_link_expires_at = $21
+		WHERE id = $22`
 
 	_, err := r.store.ExecContext(ctx, query,
 		user.PasswordHash, user.KYCStatus, user.Status, user.TelegramChatID,
@@ -145,6 +150,7 @@ func (r *userRepo) Update(ctx context.Context, user *domain.User) error {
 		user.EmailVerified, user.EmailVerifyTokenHash, user.EmailVerifyExpiresAt,
 		user.PasswordResetTokenHash, user.PasswordResetExpiresAt,
 		user.TOTPSecret, user.TOTPEnabled, user.NotifyEmail, user.NotifyTelegram,
+		user.NotifyTransactions, user.NotifyBalance, user.NotifySecurity, user.NotifyCardOperations,
 		user.TelegramLinkCode, user.TelegramLinkExpiresAt,
 		user.ID,
 	)

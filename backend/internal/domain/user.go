@@ -25,6 +25,10 @@ type User struct {
 	TOTPEnabled            bool       `json:"totpEnabled" db:"totp_enabled"`
 	NotifyEmail            bool       `json:"notifyEmail" db:"notify_email"`
 	NotifyTelegram         bool       `json:"notifyTelegram" db:"notify_telegram"`
+	NotifyTransactions     bool       `json:"notifyTransactions" db:"notify_transactions"`
+	NotifyBalance          bool       `json:"notifyBalance" db:"notify_balance"`
+	NotifySecurity         bool       `json:"notifySecurity" db:"notify_security"`
+	NotifyCardOperations   bool       `json:"notifyCardOperations" db:"notify_card_operations"`
 	TelegramLinkCode       *string    `json:"-" db:"telegram_link_code"`
 	TelegramLinkExpiresAt  *time.Time `json:"-" db:"telegram_link_expires_at"`
 }
@@ -49,14 +53,18 @@ func NewUser(email, passwordHash string) (*User, error) {
 	}
 
 	return &User{
-		ID:             NewUUID(),
-		Email:          email,
-		PasswordHash:   passwordHash,
-		KYCStatus:      KYCPending,
-		Status:         UserStatusActive,
-		EmailVerified:  false,
-		NotifyEmail:    true,
-		NotifyTelegram: true,
-		CreatedAt:      time.Now().UTC(),
+		ID:                   NewUUID(),
+		Email:                email,
+		PasswordHash:         passwordHash,
+		KYCStatus:            KYCPending,
+		Status:               UserStatusActive,
+		EmailVerified:        false,
+		NotifyEmail:          true,
+		NotifyTelegram:       true,
+		NotifyTransactions:   true,
+		NotifyBalance:        true,
+		NotifySecurity:       true,
+		NotifyCardOperations: true,
+		CreatedAt:            time.Now().UTC(),
 	}, nil
 }

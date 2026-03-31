@@ -836,14 +836,14 @@ func (h *Handler) PostTOTPSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	url, err := h.totpUC.SetupTOTP(r.Context(), userID)
+	url, sec, err := h.totpUC.SetupTOTP(r.Context(), userID)
 	if err != nil {
 		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"otpauth_url": url})
+	handler.WriteJSON(w, http.StatusOK, map[string]string{"otpauth_url": url, "secret": sec})
 }
 
 func (h *Handler) PostTOTPConfirm(w http.ResponseWriter, r *http.Request) {

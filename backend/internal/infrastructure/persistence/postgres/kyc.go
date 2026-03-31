@@ -2,6 +2,8 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	"github.com/djalben/xplr-core/backend/internal/ports"
@@ -65,6 +67,25 @@ func (r *kycRepo) ListByStatus(ctx context.Context, status domain.KYCApplication
 	}
 
 	return list, nil
+}
+
+func (r *kycRepo) GetLatestByUserID(ctx context.Context, userID domain.UUID) (*domain.KYCApplication, error) {
+	const query = `
+		SELECT id, user_id, status, payload_json, admin_comment, reviewed_by, reviewed_at, created_at
+		FROM kyc_applications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`
+
+	var a domain.KYCApplication
+
+	err := r.store.GetContext(ctx, &a, query, userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil //nolint:nilnil // «нет заявки» — нормальный сценарий для GetLatest
+		}
+
+		return nil, wrapper.Wrap(err)
+	}
+
+	return &a, nil
 }
 
 func (r *kycRepo) HasPendingForUser(ctx context.Context, userID domain.UUID) (bool, error) {

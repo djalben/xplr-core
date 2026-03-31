@@ -232,7 +232,13 @@
       "setupError": "Error de configuración 2FA",
       "invalidCode": "Código inválido",
       "enabledToast": "¡2FA activado!",
-      "disabledToast": "2FA desactivado"
+      "disabledToast": "2FA desactivado",
+      "disableExplain": "Introduce tu contraseña actual y un código de un solo uso de tu app de autenticación.",
+      "disablePassword": "Contraseña",
+      "disableCode": "Código del autenticador",
+      "confirmDisable": "Desactivar 2FA",
+      "cancelDisable": "Cancelar",
+      "disableFillBoth": "Introduce contraseña y código (mín. 6 dígitos)"
     },
     "sessions": {
       "title": "Actividad reciente",
@@ -246,12 +252,16 @@
     "notif": {
       "title": "Notificaciones",
       "transactions": "Transacciones",
-      "transactionsDesc": "Operaciones con tarjetas, cargos, recargas",
+      "transactionsDesc": "Movimientos de cartera y transferencias",
+      "cardOperations": "Actividad con tarjetas",
+      "cardOperationsDesc": "Cargos, recargas y operaciones con tarjetas",
       "balance": "Saldo",
       "balanceDesc": "Cambios de saldo, alertas de saldo bajo",
       "security": "Seguridad",
       "securityDesc": "Inicios de sesión, cambios de contraseña, actividad sospechosa",
-      "saveError": "Error al guardar"
+      "saveError": "Error al guardar",
+      "needTelegram": "Vincula Telegram primero",
+      "needEmail": "Verifica tu correo primero"
     },
     "kycForm": {
       "title": "Verificación de cuenta",
