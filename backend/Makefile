@@ -50,13 +50,10 @@ bin-deps: ## Установить goose и другие инструменты
 
 # === DOCKER ===
 docker-up: ## Запустить dev-окружение (основной compose в корне)
-	docker compose -f ./docker-compose.yaml --env-file .env up --build
+	docker compose -f ./deployment/docker-compose.yaml --env-file ./deployment/.env up --build --remove-orphans
 
 docker-down: ## Остановить dev
-	docker compose -f ./docker-compose.yaml down
-
-docker-prod-up: ## Запустить прод-версию (из deployment/)
-	docker compose -f ./deployment/docker-compose.prod.yaml --env-file ./deployment/.env up --build
+	docker compose -f ./deployment/docker-compose.yaml --env-file ./deployment/.env down
 
 # === MIGRATIONS ===
 migrate-create: ## Создать миграцию: make migrate-create name=add_wallet_table
