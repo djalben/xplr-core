@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -367,6 +368,18 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	// Handle preflight
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	// Smart-mode fallback: /api/v1/rates should not hard-fail without DB.
+	// If DB isn't ready, return default rates in the shape the frontend expects.
+	if r.URL.Path == "/api/v1/rates" && !dbReady {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"usd":    89.45,
+			"eur":    97.82,
+			"source": "fallback",
+		})
 		return
 	}
 
