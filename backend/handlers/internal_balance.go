@@ -43,11 +43,11 @@ func TopUpWalletHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if SBP is enabled
+	// Check if SBP is enabled via admin toggle
 	var sbpEnabled string
 	err := GlobalDB.QueryRow(`SELECT setting_value FROM system_settings WHERE setting_key = 'sbp_enabled'`).Scan(&sbpEnabled)
 	if err == nil && sbpEnabled != "true" {
-		http.Error(w, "СБП временно недоступен. Попробуйте позже.", http.StatusServiceUnavailable)
+		http.Error(w, "Пополнение через СБП временно отключено администратором", http.StatusForbidden)
 		return
 	}
 
