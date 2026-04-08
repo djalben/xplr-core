@@ -202,15 +202,12 @@ func ensureDB() {
 			description TEXT,
 			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 		)`,
-		// Seed default commission values (idempotent)
+		// Seed default commission values (idempotent) — only STANDARD and GOLD tiers
 		`INSERT INTO commission_config (key, value, description) VALUES
-			('fee_standard', 6.70, 'Комиссия для грейда STANDARD (%)'),
-			('fee_silver', 5.50, 'Комиссия для грейда SILVER (%)'),
-			('fee_gold', 4.50, 'Комиссия для грейда GOLD (%)'),
-			('fee_platinum', 3.50, 'Комиссия для грейда PLATINUM (%)'),
-			('fee_black', 2.50, 'Комиссия для грейда BLACK (%)'),
+			('fee_standard', 6.70, 'Комиссия за выпуск карты — тир Стандарт ($)'),
+			('fee_gold', 4.50, 'Комиссия за выпуск карты — тир Gold ($)'),
 			('referral_percent', 5.00, 'Процент реферальной комиссии'),
-			('card_issue_fee', 2.00, 'Стоимость выпуска карты ($)')
+			('card_issue_fee', 2.00, 'Базовая стоимость выпуска карты ($)')
 		ON CONFLICT (key) DO NOTHING`,
 		// Seed card configs (idempotent)
 		`INSERT INTO card_configs (card_type, issue_fee, transaction_fee_percent, max_single_topup, daily_spend_limit, description) VALUES
@@ -222,8 +219,10 @@ func ensureDB() {
 		// Seed system settings (idempotent)
 		`INSERT INTO system_settings (setting_key, setting_value, description) VALUES
 			('sbp_enabled', 'true', 'Включить/выключить пополнение через СБП'),
-			('gold_tier_price', '50.00', 'Цена апгрейда до Gold tier (USD)'),
-			('gold_tier_duration_days', '30', 'Длительность Gold tier в днях')
+			('gold_tier_price', '50.00', 'Цена апгрейда до Gold (USD)'),
+			('gold_tier_duration_days', '30', 'Длительность Gold тира (дней)'),
+			('fee_standard', '6.70', 'Комиссия за выпуск карты — тир Стандарт ($)'),
+			('fee_gold', '4.50', 'Комиссия за выпуск карты — тир Gold ($)')
 		ON CONFLICT (setting_key) DO NOTHING`,
 	}
 	for _, m := range tableMigrations {
@@ -265,6 +264,17 @@ func ensureDB() {
 	} else {
 		log.Println("[WALLET-MIGRATION] ✅ auto_topup_enabled column ensured via direct ALTER TABLE")
 	}
+
+	// 9c4. Clean up obsolete tier commission keys from commission_config
+	if res, err := db.Exec(`DELETE FROM commission_config WHERE key IN ('fee_silver', 'fee_platinum', 'fee_black')`); err != nil {
+		log.Printf("[TIER-CLEANUP] ❌ Failed to delete obsolete commission keys: %v", err)
+	} else if n, _ := res.RowsAffected(); n > 0 {
+		log.Printf("[TIER-CLEANUP] ✅ Deleted %d obsolete commission keys (fee_silver, fee_platinum, fee_black)", n)
+	}
+	// Update descriptions for remaining commission keys to Russian
+	db.Exec(`UPDATE commission_config SET description = 'Комиссия за выпуск карты — тир Стандарт ($)' WHERE key = 'fee_standard'`)
+	db.Exec(`UPDATE commission_config SET description = 'Комиссия за выпуск карты — тир Gold ($)' WHERE key = 'fee_gold'`)
+	db.Exec(`UPDATE commission_config SET description = 'Базовая стоимость выпуска карты ($)' WHERE key = 'card_issue_fee'`)
 
 	// 9d. Force admin rights for known admins
 	adminEmails := []string{"aalabin5@gmail.com", "vardump@inbox.ru"}

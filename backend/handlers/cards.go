@@ -349,10 +349,16 @@ func MassIssueCardsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Calculate fee in USD (master_balance is now in USD)
+	// Calculate fee in USD — dynamic lookup from system_settings by user tier
 	cat := strings.ToLower(req.Category)
 	if cat == "" {
 		cat = "arbitrage"
+	}
+
+	// Determine effective tier for fee lookup
+	effectiveTier := "standard"
+	if tier == "gold" && tierExpiresAt.Valid && tierExpiresAt.Time.After(time.Now()) {
+		effectiveTier = "gold"
 	}
 
 	var feeUSD decimal.Decimal
@@ -360,14 +366,21 @@ func MassIssueCardsHandler(w http.ResponseWriter, r *http.Request) {
 		// Personal cards: fixed USD price sent by frontend
 		feeUSD = req.PriceUSD
 	} else {
-		// Arbitrage cards: default USD fees
-		feeUSD = decimal.NewFromFloat(5.00)
-		switch cat {
-		case "travel":
-			feeUSD = decimal.NewFromFloat(3.00)
-		case "services":
-			feeUSD = decimal.NewFromFloat(2.00)
+		// Dynamic fee from system_settings: fee_standard or fee_gold
+		feeKey := "fee_" + effectiveTier
+		var feeStr string
+		if err := GlobalDB.QueryRow(`SELECT setting_value FROM system_settings WHERE setting_key = $1`, feeKey).Scan(&feeStr); err != nil {
+			log.Printf("[CARD-FEE] ⚠️ Failed to read %s from system_settings: %v, using fallback", feeKey, err)
+			// Fallback to commission_config table
+			if dbFee, err2 := repository.GetCommissionValue(feeKey); err2 == nil {
+				feeUSD = dbFee
+			} else {
+				feeUSD = decimal.NewFromFloat(5.00) // ultimate fallback
+			}
+		} else {
+			feeUSD, _ = decimal.NewFromString(feeStr)
 		}
+		log.Printf("[CARD-FEE] User %d (tier=%s) → %s = $%s per card", userID, effectiveTier, feeKey, feeUSD.StringFixed(2))
 	}
 	totalFeeUSD := feeUSD.Mul(decimal.NewFromInt(int64(req.Count)))
 

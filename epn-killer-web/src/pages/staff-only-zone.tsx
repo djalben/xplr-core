@@ -177,14 +177,20 @@ const StatusBadge = ({ status }: { status: string }) => {
   );
 };
 
-// ── Grade Select ──
-const GRADES = ['STANDARD', 'SILVER', 'GOLD', 'PLATINUM', 'BLACK'] as const;
+// ── Grade Select (only STANDARD and GOLD tiers) ──
+const GRADES = ['STANDARD', 'GOLD'] as const;
 const gradeColors: Record<string, string> = {
   STANDARD: 'text-slate-400',
-  SILVER: 'text-slate-300',
   GOLD: 'text-yellow-400',
-  PLATINUM: 'text-blue-400',
-  BLACK: 'text-purple-400',
+};
+
+// ── Russian labels for system_settings keys ──
+const SETTING_LABELS: Record<string, string> = {
+  sbp_enabled: 'СБП (пополнение)',
+  gold_tier_price: 'Цена Gold-пакета (USD)',
+  gold_tier_duration_days: 'Длительность Gold (дней)',
+  fee_standard: 'Комиссия — тир Стандарт ($)',
+  fee_gold: 'Комиссия — тир Gold ($)',
 };
 
 // ══════════════════════════════════════
@@ -205,6 +211,8 @@ export const StaffOnlyZone = () => {
   const [selectedStatus, setSelectedStatus] = useState('');
   const [commissions, setCommissions] = useState<CommissionRow[]>([]);
   const [editingCommission, setEditingCommission] = useState<{ id: number; value: string } | null>(null);
+  const [sysSettings, setSysSettings] = useState<{ key: string; value: string; description: string }[]>([]);
+  const [editingSetting, setEditingSetting] = useState<{ key: string; value: string } | null>(null);
   const [logs, setLogs] = useState<AdminLog[]>([]);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [ticketFilter, setTicketFilter] = useState('');
@@ -266,6 +274,14 @@ export const StaffOnlyZone = () => {
     try {
       const res = await apiClient.get('/admin/commissions');
       setCommissions(res.data || []);
+    } catch { /* ignore */ }
+  }, []);
+
+  // ── System settings (tier fees, gold price, etc.) ──
+  const loadSysSettings = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/admin/system-settings');
+      setSysSettings(res.data || []);
     } catch { /* ignore */ }
   }, []);
 
@@ -374,11 +390,11 @@ export const StaffOnlyZone = () => {
 
   useEffect(() => {
     if (tab === 'users') loadAllUsers();
-    if (tab === 'commissions') loadCommissions();
+    if (tab === 'commissions') { loadCommissions(); loadSysSettings(); }
     if (tab === 'tickets') { loadTickets(); loadChats(); }
     if (tab === 'translations') loadTranslations();
     if (tab === 'logs') loadLogs();
-  }, [tab, loadAllUsers, loadCommissions, loadTickets, loadChats, loadTranslations, loadLogs]);
+  }, [tab, loadAllUsers, loadCommissions, loadSysSettings, loadTickets, loadChats, loadTranslations, loadLogs]);
 
   // ── Inspect User (Financial Passport) ──
   const inspectUserDetails = async (userId: number) => {
@@ -453,6 +469,22 @@ export const StaffOnlyZone = () => {
       showToast('Комиссия обновлена');
       setEditingCommission(null);
       loadCommissions();
+    } catch {
+      showToast('Ошибка сохранения', 'err');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ── Save system setting ──
+  const handleSaveSetting = async () => {
+    if (!editingSetting) return;
+    setSaving(true);
+    try {
+      await apiClient.patch(`/admin/system-settings/${editingSetting.key}`, { value: editingSetting.value });
+      showToast('Настройка обновлена');
+      setEditingSetting(null);
+      loadSysSettings();
     } catch {
       showToast('Ошибка сохранения', 'err');
     } finally {
@@ -947,61 +979,132 @@ export const StaffOnlyZone = () => {
 
         {/* ════════════ COMMISSIONS TAB ════════════ */}
         {tab === 'commissions' && (
-          <div className="space-y-4">
-            <div className="glass-card overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-white/10">
-                    <th className="text-left px-4 py-3 text-slate-400 font-medium">Параметр</th>
-                    <th className="text-left px-4 py-3 text-slate-400 font-medium">Описание</th>
-                    <th className="text-left px-4 py-3 text-slate-400 font-medium">Значение</th>
-                    <th className="text-left px-4 py-3 text-slate-400 font-medium"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {commissions.map(c => (
-                    <tr key={c.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                      <td className="px-4 py-3 text-white font-mono text-xs">{c.key}</td>
-                      <td className="px-4 py-3 text-slate-400 text-xs">{c.description}</td>
-                      <td className="px-4 py-3">
-                        {editingCommission?.id === c.id ? (
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={editingCommission.value}
-                            onChange={e => setEditingCommission({ ...editingCommission, value: e.target.value })}
-                            className="w-24 px-2 py-1 bg-white/10 border border-blue-500/50 rounded text-white text-sm outline-none"
-                          />
-                        ) : (
-                          <span className="text-emerald-400 font-medium">{c.value}</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {editingCommission?.id === c.id ? (
-                          <div className="flex gap-1">
-                            <button onClick={handleSaveCommission} disabled={saving} className="px-3 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-xs transition-colors disabled:opacity-50">
-                              {saving ? '...' : 'Save'}
-                            </button>
-                            <button onClick={() => setEditingCommission(null)} className="px-3 py-1 bg-white/10 hover:bg-white/20 text-slate-300 rounded text-xs transition-colors">
-                              ✕
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setEditingCommission({ id: c.id, value: c.value })}
-                            className="text-blue-400 hover:text-blue-300 text-xs transition-colors"
-                          >
-                            Изменить
-                          </button>
-                        )}
-                      </td>
+          <div className="space-y-6">
+            {/* ── Section 1: Настройки тиров (system_settings) ── */}
+            <div>
+              <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                <Shield className="w-4 h-4 text-yellow-400" />
+                Настройки тиров и комиссий
+              </h3>
+              <div className="glass-card overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-white/10">
+                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Параметр</th>
+                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Описание</th>
+                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Значение</th>
+                      <th className="text-left px-4 py-3 text-slate-400 font-medium"></th>
                     </tr>
-                  ))}
-                  {commissions.length === 0 && (
-                    <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-500">Нет данных</td></tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {sysSettings
+                      .filter(s => ['fee_standard', 'fee_gold', 'gold_tier_price', 'gold_tier_duration_days'].includes(s.key))
+                      .map(s => (
+                        <tr key={s.key} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                          <td className="px-4 py-3 text-white text-xs font-medium">{SETTING_LABELS[s.key] || s.key}</td>
+                          <td className="px-4 py-3 text-slate-400 text-xs">{s.description}</td>
+                          <td className="px-4 py-3">
+                            {editingSetting?.key === s.key ? (
+                              <input
+                                type="text"
+                                value={editingSetting.value}
+                                onChange={e => setEditingSetting({ ...editingSetting, value: e.target.value })}
+                                className="w-28 px-2 py-1 bg-white/10 border border-blue-500/50 rounded text-white text-sm outline-none"
+                              />
+                            ) : (
+                              <span className="text-emerald-400 font-medium">{s.value}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {editingSetting?.key === s.key ? (
+                              <div className="flex gap-1">
+                                <button onClick={handleSaveSetting} disabled={saving} className="px-3 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-xs transition-colors disabled:opacity-50">
+                                  {saving ? '...' : 'Сохранить'}
+                                </button>
+                                <button onClick={() => setEditingSetting(null)} className="px-3 py-1 bg-white/10 hover:bg-white/20 text-slate-300 rounded text-xs transition-colors">
+                                  ✕
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setEditingSetting({ key: s.key, value: s.value })}
+                                className="text-blue-400 hover:text-blue-300 text-xs transition-colors"
+                              >
+                                Изменить
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    {sysSettings.filter(s => ['fee_standard', 'fee_gold', 'gold_tier_price', 'gold_tier_duration_days'].includes(s.key)).length === 0 && (
+                      <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-500">Нет данных</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* ── Section 2: Прочие комиссии (commission_config) ── */}
+            <div>
+              <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                <Settings className="w-4 h-4 text-blue-400" />
+                Прочие комиссии
+              </h3>
+              <div className="glass-card overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-white/10">
+                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Параметр</th>
+                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Описание</th>
+                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Значение</th>
+                      <th className="text-left px-4 py-3 text-slate-400 font-medium"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {commissions.map(c => (
+                      <tr key={c.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                        <td className="px-4 py-3 text-white text-xs font-medium">{c.description || c.key}</td>
+                        <td className="px-4 py-3 text-slate-400 font-mono text-xs">{c.key}</td>
+                        <td className="px-4 py-3">
+                          {editingCommission?.id === c.id ? (
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={editingCommission.value}
+                              onChange={e => setEditingCommission({ ...editingCommission, value: e.target.value })}
+                              className="w-24 px-2 py-1 bg-white/10 border border-blue-500/50 rounded text-white text-sm outline-none"
+                            />
+                          ) : (
+                            <span className="text-emerald-400 font-medium">{c.value}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {editingCommission?.id === c.id ? (
+                            <div className="flex gap-1">
+                              <button onClick={handleSaveCommission} disabled={saving} className="px-3 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-xs transition-colors disabled:opacity-50">
+                                {saving ? '...' : 'Сохранить'}
+                              </button>
+                              <button onClick={() => setEditingCommission(null)} className="px-3 py-1 bg-white/10 hover:bg-white/20 text-slate-300 rounded text-xs transition-colors">
+                                ✕
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setEditingCommission({ id: c.id, value: c.value })}
+                              className="text-blue-400 hover:text-blue-300 text-xs transition-colors"
+                            >
+                              Изменить
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {commissions.length === 0 && (
+                      <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-500">Нет данных</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
