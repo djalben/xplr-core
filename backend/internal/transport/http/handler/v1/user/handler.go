@@ -134,9 +134,17 @@ func (h *Handler) GetWallet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	autoEnabled, err := h.walletUC.GetAutoTopUpEnabled(r.Context(), userID)
+	if err != nil {
+		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+
+		return
+	}
+
 	// BFF: фронт ожидает master_balance.
 	handler.WriteJSON(w, http.StatusOK, map[string]any{
-		"master_balance": balance.String(),
+		"master_balance":        balance.String(),
+		"auto_topup_enabled":    autoEnabled,
 	})
 }
 

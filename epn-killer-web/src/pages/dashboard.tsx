@@ -249,7 +249,12 @@ export const DashboardPage = () => {
     fetchData();
     // Auto-refresh wallet + dashboard stats every 30s (picks up webhook credits, new txns)
     const refreshInterval = setInterval(() => {
-      getWallet().then((v) => setWallet(v)).catch(() => {});
+      getWallet().then((v) => {
+        setWallet(v);
+        if (typeof v.auto_topup_enabled === 'boolean') {
+          setAutoTopup(v.auto_topup_enabled);
+        }
+      }).catch(() => {});
       fetchDashboardStats();
     }, 30000);
     return () => clearInterval(refreshInterval);
@@ -271,9 +276,22 @@ export const DashboardPage = () => {
       ]);
       setUserData(userRes.data);
 
+      // Restore toggle state per-user (if saved).
+      const userKey = userRes.data?.id ? `wallet_auto_topup_enabled:${userRes.data.id}` : null;
+      const saved = userKey ? localStorage.getItem(userKey) : null;
+      if (saved !== null) {
+        setAutoTopup(saved === 'true');
+      }
+
       // Non-critical parallel fetches
       try { const g = await getUserGrade(); setGradeInfo(g); } catch {}
-      try { const v = await getWallet(); setWallet(v); } catch {}
+      try {
+        const v = await getWallet();
+        setWallet(v);
+        if (typeof v.auto_topup_enabled === 'boolean') {
+          setAutoTopup(v.auto_topup_enabled);
+        }
+      } catch {}
       try { const c = await apiClient.get('/user/cards'); setCardCount(Array.isArray(c.data) ? c.data.filter((card: any) => card.card_status === 'ACTIVE').length : 0); } catch {}
 
       // Fetch dashboard analytics (today total, recent txns, weekly chart)
@@ -403,7 +421,22 @@ export const DashboardPage = () => {
                 onClick={() => {
                   const next = !autoTopup;
                   setAutoTopup(next);
-                  apiClient.patch('/user/wallet/auto-topup', { enabled: next }).catch(() => setAutoTopup(!next));
+                  apiClient
+                    .patch('/user/wallet/auto-topup', { enabled: next })
+                    .then(async () => {
+                      try {
+                        const v = await getWallet();
+                        setWallet(v);
+                        if (typeof v.auto_topup_enabled === 'boolean') {
+                          setAutoTopup(v.auto_topup_enabled);
+                        }
+                      } catch {
+                        // If sync failed, keep optimistic UI; periodic refresh will fix it.
+                      }
+                    })
+                    .catch(() => {
+                      setAutoTopup(!next);
+                    });
                 }}
                 className="flex items-center gap-2 text-sm"
               >

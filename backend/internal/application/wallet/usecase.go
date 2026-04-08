@@ -32,6 +32,16 @@ func (uc *UseCase) GetBalance(ctx context.Context, userID domain.UUID) (domain.N
 	return wallet.Balance, nil
 }
 
+// GetAutoTopUpEnabled — текущее состояние глобального автотопапа кошелька.
+func (uc *UseCase) GetAutoTopUpEnabled(ctx context.Context, userID domain.UUID) (bool, error) {
+	wallet, err := uc.walletRepo.GetByUserID(ctx, userID)
+	if err != nil {
+		return false, wrapper.Wrap(err)
+	}
+
+	return wallet.AutoTopUpEnabled, nil
+}
+
 // TopUpWallet — пополнение кошелька (канал СБП; при отключённом флаге — ошибка).
 func (uc *UseCase) TopUpWallet(ctx context.Context, userID domain.UUID, amount domain.Numeric) error {
 	if uc.commissionRepo != nil {

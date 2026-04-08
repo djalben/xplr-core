@@ -33,6 +33,7 @@ type TOTPSettings interface {
 // UserWallet — кошелёк в user-хендлере.
 type UserWallet interface {
 	GetBalance(ctx context.Context, userID domain.UUID) (domain.Numeric, error)
+	GetAutoTopUpEnabled(ctx context.Context, userID domain.UUID) (bool, error)
 	TopUpWallet(ctx context.Context, userID domain.UUID, amount domain.Numeric) error
 	ToggleAutoTopUp(ctx context.Context, userID domain.UUID, enabled bool) error
 }

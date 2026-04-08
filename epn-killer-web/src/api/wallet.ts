@@ -4,6 +4,7 @@ export interface InternalBalance {
   id: number;
   user_id: number;
   master_balance: number;
+  auto_topup_enabled?: boolean;
   updated_at: string;
 }
 

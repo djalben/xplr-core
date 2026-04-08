@@ -252,6 +252,21 @@ func (mr *MockUserWalletMockRecorder) GetBalance(ctx, userID interface{}) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBalance", reflect.TypeOf((*MockUserWallet)(nil).GetBalance), ctx, userID)
 }
 
+// GetAutoTopUpEnabled mocks base method.
+func (m *MockUserWallet) GetAutoTopUpEnabled(ctx context.Context, userID domain.UUID) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAutoTopUpEnabled", ctx, userID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetAutoTopUpEnabled indicates an expected call of GetAutoTopUpEnabled.
+func (mr *MockUserWalletMockRecorder) GetAutoTopUpEnabled(ctx, userID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAutoTopUpEnabled", reflect.TypeOf((*MockUserWallet)(nil).GetAutoTopUpEnabled), ctx, userID)
+}
+
 // ToggleAutoTopUp mocks base method.
 func (m *MockUserWallet) ToggleAutoTopUp(ctx context.Context, userID domain.UUID, enabled bool) error {
 	m.ctrl.T.Helper()
