@@ -21,9 +21,12 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dbURL := os.Getenv("DATABASE_URL")
+	dbURL := os.Getenv("POSTGRES_DSN")
 	if dbURL == "" {
-		http.Error(w, "DATABASE_URL not set", http.StatusInternalServerError)
+		dbURL = os.Getenv("DATABASE_URL")
+	}
+	if dbURL == "" {
+		http.Error(w, "POSTGRES_DSN/DATABASE_URL not set", http.StatusInternalServerError)
 		return
 	}
 

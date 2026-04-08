@@ -35,9 +35,12 @@ func ensureDB() {
 	}
 
 	// 1. Database connection
-	dbURL := os.Getenv("DATABASE_URL")
+	dbURL := os.Getenv("POSTGRES_DSN")
 	if dbURL == "" {
-		log.Println("ERROR: DATABASE_URL is not set")
+		dbURL = os.Getenv("DATABASE_URL")
+	}
+	if dbURL == "" {
+		log.Println("ERROR: POSTGRES_DSN/DATABASE_URL is not set")
 		return
 	}
 
