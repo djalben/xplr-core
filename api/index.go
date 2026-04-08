@@ -343,7 +343,16 @@ func buildRouter() *mux.Router {
 // Handler is the Vercel serverless entry point.
 func Handler(w http.ResponseWriter, r *http.Request) {
 	ensureRouter()
-	ensureDB()
+	// "Smart mode": allow selected public endpoints to work without DB.
+	// Everything else requires DB and will return 503 if not configured.
+	requiresDB := true
+	switch r.URL.Path {
+	case "/api/health", "/api/v1/rates", "/api/v1/cards/types":
+		requiresDB = false
+	}
+	if requiresDB {
+		ensureDB()
+	}
 
 	// CORS headers (same-origin on Vercel, but keep for local dev / preview URLs)
 	origin := r.Header.Get("Origin")
@@ -362,10 +371,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// If DB is not ready, return 503 with a clear message (except for health check)
-	if !dbReady && r.URL.Path != "/api/health" {
+	if !dbReady && requiresDB {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusServiceUnavailable)
-		w.Write([]byte(`{"error":"Database not initialized. Check DATABASE_URL environment variable."}`))
+		w.Write([]byte(`{"error":"Database not initialized. Check POSTGRES_DSN environment variable."}`))
 		return
 	}
 
