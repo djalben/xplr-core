@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"time"
@@ -34,6 +35,8 @@ type AdminUserRow struct {
 	IsTelegramLinked bool   `json:"is_telegram_linked"`
 	NotificationPref string `json:"notification_pref"`
 	CreatedAt        string `json:"created_at"`
+	Tier             string `json:"tier"`
+	TierExpiresAt    string `json:"tier_expires_at"`
 }
 
 // GetAdminStats returns aggregate platform stats.
@@ -88,7 +91,9 @@ func GetAllUsersForAdmin() ([]AdminUserRow, error) {
 		       COALESCE((SELECT ib.master_balance FROM internal_balances ib WHERE ib.user_id = u.id), 0) as wallet_balance,
 		       (COALESCE(u.telegram_chat_id, 0) != 0) as is_telegram_linked,
 		       COALESCE(u.notification_pref, 'email') as notification_pref,
-		       u.created_at
+		       u.created_at,
+		       COALESCE(u.tier, 'standard') as tier,
+		       u.tier_expires_at
 		FROM users u
 		ORDER BY u.id ASC
 	`
@@ -105,13 +110,17 @@ func GetAllUsersForAdmin() ([]AdminUserRow, error) {
 		var bal decimal.Decimal
 		var walletBal decimal.Decimal
 		var createdAt interface{}
-		if err := rows.Scan(&u.ID, &u.Email, &bal, &u.Status, &u.IsAdmin, &u.Role, &u.IsVerified, &u.CardCount, &walletBal, &u.IsTelegramLinked, &u.NotificationPref, &createdAt); err != nil {
+		var tierExpiresAt sql.NullTime
+		if err := rows.Scan(&u.ID, &u.Email, &bal, &u.Status, &u.IsAdmin, &u.Role, &u.IsVerified, &u.CardCount, &walletBal, &u.IsTelegramLinked, &u.NotificationPref, &createdAt, &u.Tier, &tierExpiresAt); err != nil {
 			log.Printf("AdminUsers: error scanning row: %v", err)
 			continue
 		}
 		u.BalanceRub = bal.String()
 		u.WalletBalance = walletBal.StringFixed(2)
 		u.CreatedAt = fmt.Sprintf("%v", createdAt)
+		if tierExpiresAt.Valid {
+			u.TierExpiresAt = tierExpiresAt.Time.Format("2006-01-02")
+		}
 		users = append(users, u)
 	}
 	if users == nil {

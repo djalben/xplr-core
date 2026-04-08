@@ -56,6 +56,8 @@ interface AdminUser {
   is_telegram_linked: boolean;
   notification_pref: string;
   created_at: string;
+  tier: string;
+  tier_expires_at: string;
 }
 
 interface UserFullDetails {
@@ -561,6 +563,7 @@ export const StaffOnlyZone = () => {
                       <th className="text-left px-4 py-3 text-slate-400 font-medium">Статус</th>
                       <th className="text-left px-4 py-3 text-slate-400 font-medium">Карты</th>
                       <th className="text-left px-4 py-3 text-slate-400 font-medium">Связь</th>
+                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Срок Gold</th>
                       <th className="text-left px-4 py-3 text-slate-400 font-medium">Дата</th>
                       <th className="text-left px-4 py-3 text-slate-400 font-medium"></th>
                     </tr>
@@ -586,6 +589,15 @@ export const StaffOnlyZone = () => {
                               Канал: {u.notification_pref === 'both' ? 'TG + Email' : u.notification_pref === 'telegram' ? 'Telegram' : 'Email'}
                             </div>
                           </div>
+                        </td>
+                        <td className="px-4 py-3 text-xs">
+                          {u.tier === 'gold' && u.tier_expires_at ? (() => {
+                            const exp = new Date(u.tier_expires_at);
+                            const days = Math.ceil((exp.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                            const expired = days <= 0;
+                            const color = expired ? 'text-red-400' : days <= 5 ? 'text-red-400' : days <= 30 ? 'text-orange-400' : 'text-emerald-400';
+                            return <span className={`font-medium ${color}`}>{expired ? 'Истёк' : exp.toLocaleDateString('ru-RU')}</span>;
+                          })() : <span className="text-slate-600">—</span>}
                         </td>
                         <td className="px-4 py-3 text-slate-500 text-xs">{u.created_at?.slice(0, 10)}</td>
                         <td className="px-4 py-3">
@@ -619,7 +631,7 @@ export const StaffOnlyZone = () => {
                       </tr>
                     ))}
                     {users.length === 0 && (
-                      <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">Нет данных</td></tr>
+                      <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-500">Нет данных</td></tr>
                     )}
                   </tbody>
                 </table>

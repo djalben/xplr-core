@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -41,17 +42,12 @@ func UpgradeTierHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	durationDays, _ := strconv.Atoi(durationDaysStr)
 
-	// Check current tier
+	// Check current tier and existing expiry
 	var currentTier string
 	var tierExpiresAt sql.NullTime
 	err = GlobalDB.QueryRow(`SELECT COALESCE(tier, 'standard'), tier_expires_at FROM users WHERE id = $1`, userID).Scan(&currentTier, &tierExpiresAt)
 	if err != nil {
 		http.Error(w, "User not found", http.StatusNotFound)
-		return
-	}
-
-	if currentTier == "gold" && tierExpiresAt.Valid && tierExpiresAt.Time.After(time.Now()) {
-		http.Error(w, "Already have active Gold tier", http.StatusBadRequest)
 		return
 	}
 
@@ -68,15 +64,21 @@ func UpgradeTierHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Deduct from wallet
-	err = repository.DeductWalletBalance(userID, goldPrice, "tier_upgrade")
+	details := "Gold tier upgrade — $" + goldPrice.StringFixed(2) + " за " + durationDaysStr + " дн."
+	err = repository.DeductWalletBalance(userID, goldPrice, details)
 	if err != nil {
 		log.Printf("[TIER-UPGRADE] Failed to deduct wallet: %v", err)
 		http.Error(w, "Failed to process payment", http.StatusInternalServerError)
 		return
 	}
 
-	// Update tier
-	expiresAt := time.Now().Add(time.Duration(durationDays) * 24 * time.Hour)
+	// Cumulative expiry: max(current_expires, now) + duration_days
+	baseTime := time.Now()
+	if tierExpiresAt.Valid && tierExpiresAt.Time.After(baseTime) {
+		baseTime = tierExpiresAt.Time
+	}
+	expiresAt := baseTime.Add(time.Duration(durationDays) * 24 * time.Hour)
+
 	_, err = GlobalDB.Exec(`UPDATE users SET tier = 'gold', tier_expires_at = $1 WHERE id = $2`, expiresAt, userID)
 	if err != nil {
 		log.Printf("[TIER-UPGRADE] Failed to update tier: %v", err)
@@ -90,16 +92,28 @@ func UpgradeTierHandler(w http.ResponseWriter, r *http.Request) {
 	goldPriceFloat, _ := goldPrice.Float64()
 	_, err = GlobalDB.Exec(`
 		INSERT INTO transactions (user_id, amount, fee, transaction_type, status, details, currency)
-		VALUES ($1, $2, 0, 'tier_upgrade', 'completed', 'Upgrade to Gold tier', 'USD')
-	`, userID, goldPriceFloat)
+		VALUES ($1, $2, 0, 'tier_upgrade', 'completed', $3, 'USD')
+	`, userID, goldPriceFloat, details)
 	if err != nil {
 		log.Printf("[TIER-UPGRADE] Failed to log transaction: %v", err)
 	}
 
-	// Notify user
-	go service.NotifyUser(userID, "Tier Upgraded", "Вы успешно обновились до Gold tier! Лимит карт увеличен до 15.")
+	isExtension := currentTier == "gold" && tierExpiresAt.Valid && tierExpiresAt.Time.After(time.Now())
+	actionLabel := "активирован"
+	if isExtension {
+		actionLabel = "продлён"
+	}
 
-	log.Printf("[TIER-UPGRADE] ✅ User %d upgraded to Gold tier (expires: %s)", userID, expiresAt.Format("2006-01-02"))
+	// Notify user
+	go service.NotifyUser(userID, "Gold "+actionLabel,
+		fmt.Sprintf("🏆 <b>Gold %s!</b>\n\n"+
+			"Срок: до <b>%s</b>\n"+
+			"Лимит карт: <b>15</b>\n"+
+			"Стоимость: <b>$%s</b>\n\n"+
+			"<a href=\"https://xplr.pro/dashboard\">Открыть дашборд</a>",
+			actionLabel, expiresAt.Format("02.01.2006"), goldPrice.StringFixed(2)))
+
+	log.Printf("[TIER-UPGRADE] ✅ User %d Gold %s (expires: %s, paid: $%s)", userID, actionLabel, expiresAt.Format("2006-01-02"), goldPrice.StringFixed(2))
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{

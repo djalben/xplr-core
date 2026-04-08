@@ -276,6 +276,13 @@ func ensureDB() {
 	db.Exec(`UPDATE commission_config SET description = 'Комиссия за выпуск карты — тир Gold ($)' WHERE key = 'fee_gold'`)
 	db.Exec(`UPDATE commission_config SET description = 'Базовая стоимость выпуска карты ($)' WHERE key = 'card_issue_fee'`)
 
+	// 9c5. Backfill tier_expires_at for existing Gold users who have NULL expiry
+	if res, err := db.Exec(`UPDATE users SET tier_expires_at = created_at + INTERVAL '365 days' WHERE tier = 'gold' AND tier_expires_at IS NULL`); err != nil {
+		log.Printf("[TIER-MIGRATION] ❌ Failed to backfill tier_expires_at: %v", err)
+	} else if n, _ := res.RowsAffected(); n > 0 {
+		log.Printf("[TIER-MIGRATION] ✅ Backfilled tier_expires_at for %d Gold users", n)
+	}
+
 	// 9d. Force admin rights for known admins
 	adminEmails := []string{"aalabin5@gmail.com", "vardump@inbox.ru"}
 	for _, email := range adminEmails {
@@ -319,6 +326,9 @@ func ensureDB() {
 	} else {
 		log.Printf("[SMTP] ℹ️  No SMTP_SUPPORT_USER — support emails will use main SMTP account")
 	}
+
+	// Start Gold expiry notification worker (daily check)
+	service.StartGoldExpiryTicker(db)
 
 	dbReady = true
 	log.Println("Serverless handler initialized successfully")

@@ -16,6 +16,8 @@ export const TierUpgradeModal = ({ tierInfo, walletBalance, onClose, onSuccess }
 
   const goldPrice = parseFloat(tierInfo.gold_price);
   const canAfford = walletBalance >= goldPrice;
+  const isAlreadyGold = tierInfo.tier === 'gold' && tierInfo.tier_expires_at && new Date(tierInfo.tier_expires_at) > new Date();
+  const actionLabel = isAlreadyGold ? 'Продлить' : 'Улучшить';
 
   const handleUpgrade = async () => {
     if (!canAfford || isUpgrading) return;
@@ -47,8 +49,8 @@ export const TierUpgradeModal = ({ tierInfo, walletBalance, onClose, onSuccess }
                   <Crown className="w-6 h-6 text-yellow-400" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-white">Улучшение до GOLD</h2>
-                  <p className="text-xs text-slate-400">Премиум уровень с расширенными лимитами</p>
+                  <h2 className="text-xl font-bold text-white">{isAlreadyGold ? 'Продление Gold' : 'Улучшение до GOLD'}</h2>
+                  <p className="text-xs text-slate-400">{isAlreadyGold ? 'Дни добавятся к текущему сроку' : 'Премиум уровень с расширенными лимитами'}</p>
                 </div>
               </div>
               <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors">
@@ -150,7 +152,7 @@ export const TierUpgradeModal = ({ tierInfo, walletBalance, onClose, onSuccess }
               ) : (
                 <>
                   <CreditCard className="w-5 h-5" />
-                  Улучшить за ${goldPrice.toFixed(2)}
+                  {actionLabel} за ${goldPrice.toFixed(2)}
                 </>
               )}
             </button>

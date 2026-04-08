@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Crown, ArrowUpRight } from 'lucide-react';
+import { Crown, ArrowUpRight, RefreshCw } from 'lucide-react';
 import { getTierInfo, type TierInfo } from '../api/tier';
 import { TierUpgradeModal } from './tier-upgrade-modal';
 import { getWallet, type InternalBalance } from '../api/wallet';
@@ -16,8 +16,6 @@ export const TierBadge = () => {
         getTierInfo(),
         getWallet()
       ]);
-      console.log('[TierBadge] Tier info from API:', tierData);
-      console.log('[TierBadge] Wallet data:', walletData);
       setTierInfo(tierData);
       setWallet(walletData);
     } catch (error) {
@@ -41,6 +39,17 @@ export const TierBadge = () => {
 
   const isGold = tierInfo.tier === 'gold';
   const isExpired = tierInfo.tier_expires_at && new Date(tierInfo.tier_expires_at) < new Date();
+  const isActiveGold = isGold && !isExpired;
+
+  // Calculate days remaining for Gold users
+  let daysLeft = 0;
+  if (isActiveGold && tierInfo.tier_expires_at) {
+    daysLeft = Math.ceil((new Date(tierInfo.tier_expires_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  }
+
+  // Color logic: <5 days = red, <30 days = orange, else normal
+  const expiryColor = daysLeft <= 5 ? 'text-red-400' : daysLeft <= 30 ? 'text-orange-400' : 'text-slate-400';
+  const showExtendButton = isActiveGold && daysLeft <= 30;
 
   return (
     <>
@@ -54,19 +63,19 @@ export const TierBadge = () => {
       )}
 
       <div className={`p-3 rounded-xl border ${
-        isGold && !isExpired
+        isActiveGold
           ? 'bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border-yellow-500/30'
           : 'bg-white/5 border-white/10'
       }`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {isGold && !isExpired && <Crown className="w-4 h-4 text-yellow-400" />}
+            {isActiveGold && <Crown className="w-4 h-4 text-yellow-400" />}
             <div>
               <p className="text-xs text-slate-400">Ваш уровень</p>
               <p className={`text-sm font-bold ${
-                isGold && !isExpired ? 'text-yellow-400' : 'text-white'
+                isActiveGold ? 'text-yellow-400' : 'text-white'
               }`}>
-                {isGold && !isExpired ? 'GOLD' : 'СТАНДАРТ'}
+                {isActiveGold ? 'GOLD' : 'СТАНДАРТ'}
               </p>
             </div>
           </div>
@@ -79,6 +88,30 @@ export const TierBadge = () => {
           </div>
         </div>
 
+        {/* Gold expiry date with color coding */}
+        {isActiveGold && tierInfo.tier_expires_at && (
+          <div className="mt-2 text-center">
+            <p className={`text-xs font-medium ${expiryColor}`}>
+              Активен до: {new Date(tierInfo.tier_expires_at).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+              {daysLeft <= 30 && (
+                <span className="ml-1">({daysLeft} {daysLeft === 1 ? 'день' : daysLeft >= 2 && daysLeft <= 4 ? 'дня' : 'дней'})</span>
+              )}
+            </p>
+          </div>
+        )}
+
+        {/* Extend button for active Gold users nearing expiry */}
+        {showExtendButton && (
+          <button
+            onClick={() => setShowUpgradeModal(true)}
+            className="w-full mt-2 py-2 bg-gradient-to-r from-orange-500/20 to-red-500/20 hover:from-orange-500/30 hover:to-red-500/30 text-orange-400 rounded-lg transition-all text-xs font-semibold border border-orange-500/30 flex items-center justify-center gap-1"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Продлить Gold
+          </button>
+        )}
+
+        {/* Upgrade button for Standard users */}
         {(!isGold || isExpired) && (
           <button
             onClick={() => setShowUpgradeModal(true)}
@@ -88,12 +121,6 @@ export const TierBadge = () => {
             Улучшить до GOLD
             <ArrowUpRight className="w-3.5 h-3.5" />
           </button>
-        )}
-
-        {isGold && !isExpired && tierInfo.tier_expires_at && (
-          <p className="text-xs text-slate-400 mt-2 text-center">
-            Истекает: {new Date(tierInfo.tier_expires_at).toLocaleDateString('ru-RU')}
-          </p>
         )}
       </div>
     </>
