@@ -154,7 +154,11 @@ func TransferWalletToCardHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // SetAutoTopupHandler — PATCH /api/v1/user/wallet/auto-topup
-// Включает/выключает автопополнение карт из Кошелька
+// Включает/выключает автопополнение карт из Кошелька.
+//
+// БИЗНЕС-ЛОГИКА: Флаг auto_topup_enabled должен учитываться в сервисе списаний
+// при обработке подписок и автоплатежей. Если флаг включён — система автоматически
+// переводит средства из Кошелька на карту при нехватке баланса на карте.
 func SetAutoTopupHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
 	if !ok || userID == 0 {
@@ -184,6 +188,24 @@ func SetAutoTopupHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to update auto-topup: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	log.Printf("[AUTO-TOPUP] User %d set auto_topup_enabled = %v", userID, req.Enabled)
+
+	// Уведомление пользователя (Telegram + Email) об изменении настройки
+	statusText := "выключено ❌"
+	if req.Enabled {
+		statusText = "включено ✅"
+	}
+	go service.NotifyUser(userID, "Автопополнение "+statusText,
+		fmt.Sprintf("⚙️ <b>Настройка изменена</b>\n\n"+
+			"Автопополнение карт: <b>%s</b>\n\n"+
+			"При нехватке средств на карте система %s переводить средства из Кошелька автоматически.",
+			statusText, func() string {
+				if req.Enabled {
+					return "будет"
+				}
+				return "не будет"
+			}()))
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{

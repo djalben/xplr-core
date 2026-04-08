@@ -259,6 +259,13 @@ func ensureDB() {
 		log.Println("[CARDS-MIGRATION] ✅ currency column ensured via direct ALTER TABLE")
 	}
 
+	// 9c3. Force auto_topup_enabled column in internal_balances (persistent toggle state)
+	if _, err := db.Exec(`ALTER TABLE internal_balances ADD COLUMN IF NOT EXISTS auto_topup_enabled BOOLEAN DEFAULT FALSE`); err != nil {
+		log.Printf("[WALLET-MIGRATION] auto_topup_enabled ALTER TABLE: %v (may already exist, OK)", err)
+	} else {
+		log.Println("[WALLET-MIGRATION] ✅ auto_topup_enabled column ensured via direct ALTER TABLE")
+	}
+
 	// 9d. Force admin rights for known admins
 	adminEmails := []string{"aalabin5@gmail.com", "vardump@inbox.ru"}
 	for _, email := range adminEmails {

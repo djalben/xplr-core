@@ -241,7 +241,7 @@ export const DashboardPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [wallet, setWallet] = useState<InternalBalance | null>(null);
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
-  const [autoTopup, setAutoTopup] = useState(false);
+  const [autoTopupSaving, setAutoTopupSaving] = useState(false);
   const [showAutoTopupTooltip, setShowAutoTopupTooltip] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
@@ -404,18 +404,31 @@ export const DashboardPage = () => {
             {/* Автопополнение toggle */}
             <div className="mt-3 flex items-center justify-between relative">
               <button
-                onClick={() => {
-                  const next = !autoTopup;
-                  setAutoTopup(next);
-                  apiClient.patch('/user/wallet/auto-topup', { enabled: next }).catch(() => setAutoTopup(!next));
+                onClick={async () => {
+                  if (autoTopupSaving) return;
+                  const prev = wallet?.auto_topup_enabled ?? false;
+                  const next = !prev;
+                  setAutoTopupSaving(true);
+                  // Optimistic update
+                  setWallet(w => w ? { ...w, auto_topup_enabled: next } : w);
+                  try {
+                    await apiClient.patch('/user/wallet/auto-topup', { enabled: next });
+                  } catch {
+                    setWallet(w => w ? { ...w, auto_topup_enabled: prev } : w);
+                  } finally {
+                    setAutoTopupSaving(false);
+                  }
                 }}
+                disabled={autoTopupSaving}
                 className="flex items-center gap-2 text-sm"
               >
-                {autoTopup
-                  ? <ToggleRight className="w-7 h-7 text-emerald-400" />
-                  : <ToggleLeft className="w-7 h-7 text-slate-500" />
+                {autoTopupSaving
+                  ? <Loader2 className="w-7 h-7 text-slate-400 animate-spin" />
+                  : (wallet?.auto_topup_enabled
+                    ? <ToggleRight className="w-7 h-7 text-emerald-400" />
+                    : <ToggleLeft className="w-7 h-7 text-slate-500" />)
                 }
-                <span className={autoTopup ? 'text-emerald-400 font-medium' : 'text-slate-400'}>Автопополнение</span>
+                <span className={wallet?.auto_topup_enabled ? 'text-emerald-400 font-medium' : 'text-slate-400'}>Автопополнение</span>
               </button>
               <button
                 onMouseEnter={() => setShowAutoTopupTooltip(true)}
