@@ -37,14 +37,30 @@ export const TierBadge = () => {
     );
   }
 
+  // Safe date parsing — handles ISO string, NullTime object {Time, Valid}, or null
+  const parseExpiry = (raw: any): Date | null => {
+    if (!raw) return null;
+    // Handle Go sql.NullTime leak: {Time: "...", Valid: true}
+    if (typeof raw === 'object' && raw.Valid === true && raw.Time) {
+      const d = new Date(raw.Time);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    if (typeof raw === 'string') {
+      const d = new Date(raw);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    return null;
+  };
+
   const isGold = tierInfo.tier === 'gold';
-  const isExpired = tierInfo.tier_expires_at && new Date(tierInfo.tier_expires_at) < new Date();
-  const isActiveGold = isGold && !isExpired;
+  const expiryDate = parseExpiry(tierInfo.tier_expires_at);
+  const isExpired = expiryDate ? expiryDate < new Date() : true;
+  const isActiveGold = isGold && !isExpired && !!expiryDate;
 
   // Calculate days remaining for Gold users
   let daysLeft = 0;
-  if (isActiveGold && tierInfo.tier_expires_at) {
-    daysLeft = Math.ceil((new Date(tierInfo.tier_expires_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  if (isActiveGold && expiryDate) {
+    daysLeft = Math.ceil((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
   }
 
   // Color logic: <5 days = red, <30 days = orange, else normal
@@ -89,10 +105,10 @@ export const TierBadge = () => {
         </div>
 
         {/* Gold expiry date with color coding */}
-        {isActiveGold && tierInfo.tier_expires_at && (
+        {isActiveGold && expiryDate && (
           <div className="mt-2 text-center">
             <p className={`text-xs font-medium ${expiryColor}`}>
-              Активен до: {new Date(tierInfo.tier_expires_at).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+              Активен до: {expiryDate.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })}
               {daysLeft <= 30 && (
                 <span className="ml-1">({daysLeft} {daysLeft === 1 ? 'день' : daysLeft >= 2 && daysLeft <= 4 ? 'дня' : 'дней'})</span>
               )}

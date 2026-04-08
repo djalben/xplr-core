@@ -147,6 +147,22 @@ func GetTierInfoHandler(w http.ResponseWriter, r *http.Request) {
 	GlobalDB.QueryRow(`SELECT setting_value FROM system_settings WHERE setting_key = 'gold_tier_price'`).Scan(&goldPrice)
 	GlobalDB.QueryRow(`SELECT setting_value FROM system_settings WHERE setting_key = 'gold_tier_duration_days'`).Scan(&durationDays)
 
+	// Auto-fix: Gold user with NULL tier_expires_at → set now + duration_days
+	if tier == "gold" && !tierExpiresAt.Valid {
+		days, _ := strconv.Atoi(durationDays)
+		if days <= 0 {
+			days = 365
+		}
+		fixedExpiry := time.Now().Add(time.Duration(days) * 24 * time.Hour)
+		_, err := GlobalDB.Exec(`UPDATE users SET tier_expires_at = $1 WHERE id = $2`, fixedExpiry, userID)
+		if err != nil {
+			log.Printf("[TIER-INFO] ❌ Failed to auto-fix tier_expires_at for user %d: %v", userID, err)
+		} else {
+			log.Printf("[TIER-INFO] 🔧 Auto-fixed tier_expires_at for Gold user %d → %s", userID, fixedExpiry.Format("2006-01-02"))
+		}
+		tierExpiresAt = sql.NullTime{Time: fixedExpiry, Valid: true}
+	}
+
 	// Count user's cards
 	var cardCount int
 	GlobalDB.QueryRow(`SELECT COUNT(*) FROM cards WHERE user_id = $1`, userID).Scan(&cardCount)
@@ -157,10 +173,16 @@ func GetTierInfoHandler(w http.ResponseWriter, r *http.Request) {
 		cardLimit = 15
 	}
 
+	// Convert sql.NullTime → ISO 8601 string (or null) for JSON
+	var expiresAtJSON interface{}
+	if tierExpiresAt.Valid {
+		expiresAtJSON = tierExpiresAt.Time.Format(time.RFC3339)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"tier":            tier,
-		"tier_expires_at": tierExpiresAt,
+		"tier_expires_at": expiresAtJSON,
 		"card_limit":      cardLimit,
 		"current_cards":   cardCount,
 		"gold_price":      goldPrice,

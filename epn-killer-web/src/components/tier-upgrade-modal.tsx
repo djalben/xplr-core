@@ -16,7 +16,20 @@ export const TierUpgradeModal = ({ tierInfo, walletBalance, onClose, onSuccess }
 
   const goldPrice = parseFloat(tierInfo.gold_price);
   const canAfford = walletBalance >= goldPrice;
-  const isAlreadyGold = tierInfo.tier === 'gold' && tierInfo.tier_expires_at && new Date(tierInfo.tier_expires_at) > new Date();
+  const parseExpiry = (raw: any): Date | null => {
+    if (!raw) return null;
+    if (typeof raw === 'object' && raw.Valid === true && raw.Time) {
+      const d = new Date(raw.Time);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    if (typeof raw === 'string') {
+      const d = new Date(raw);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    return null;
+  };
+  const expiryDate = parseExpiry(tierInfo.tier_expires_at);
+  const isAlreadyGold = tierInfo.tier === 'gold' && !!expiryDate && expiryDate > new Date();
   const actionLabel = isAlreadyGold ? 'Продлить' : 'Улучшить';
 
   const handleUpgrade = async () => {
