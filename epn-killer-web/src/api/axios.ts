@@ -5,10 +5,12 @@ export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 // Backend API URL — same Vercel domain in production, localhost for dev
+// You can override via Vite env: VITE_API_BASE_URL (e.g. http://localhost:8081/api/v1)
 export const API_BASE_URL =
-  typeof window !== 'undefined' && window.location?.hostname === 'localhost'
+  import.meta.env.VITE_API_BASE_URL ||
+  (typeof window !== 'undefined' && window.location?.hostname === 'localhost'
     ? 'http://localhost:8080/api/v1'
-    : '/api/v1';
+    : '/api/v1');
 
 // Создаем экземпляр axios с базовой конфигурацией
 const apiClient = axios.create({
