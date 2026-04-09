@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import apiClient from '../api/axios';
 import { useAuth } from '../store/auth-context';
 import { SBPToggle } from '../components/sbp-toggle';
+import { compressImage } from '../utils/compress-image';
 import {
   Users,
   DollarSign,
@@ -32,6 +33,8 @@ import {
   Newspaper,
   Trash2,
   Plus,
+  Upload,
+  ImageIcon,
 } from 'lucide-react';
 
 type Tab = 'dashboard' | 'users' | 'commissions' | 'tickets' | 'news' | 'logs';
@@ -233,8 +236,11 @@ export const StaffOnlyZone = () => {
   const [newsList, setNewsList] = useState<{ id: number; title: string; content: string; image_url: string; created_at: string }[]>([]);
   const [newNewsTitle, setNewNewsTitle] = useState('');
   const [newNewsContent, setNewNewsContent] = useState('');
-  const [newNewsImage, setNewNewsImage] = useState('');
+  const [newsImageFile, setNewsImageFile] = useState<File | null>(null);
+  const [newsImagePreview, setNewsImagePreview] = useState<string | null>(null);
   const [newsPublishing, setNewsPublishing] = useState(false);
+  const [newsUploadProgress, setNewsUploadProgress] = useState('');
+  const newsFileRef = useRef<HTMLInputElement>(null);
 
   const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
     setToast({ msg, type });
@@ -370,16 +376,42 @@ export const StaffOnlyZone = () => {
     } catch { /* ignore */ }
   }, []);
 
+  const handleNewsImageSelect = async (file: File | null) => {
+    if (!file) { setNewsImageFile(null); setNewsImagePreview(null); return; }
+    try {
+      const compressed = await compressImage(file);
+      setNewsImageFile(compressed);
+      setNewsImagePreview(URL.createObjectURL(compressed));
+    } catch {
+      showToast('Ошибка сжатия изображения', 'err');
+    }
+  };
+
   const publishNews = async () => {
     if (!newNewsTitle.trim() || !newNewsContent.trim()) return;
     setNewsPublishing(true);
     try {
-      await apiClient.post('/admin/news', { title: newNewsTitle, content: newNewsContent, image_url: newNewsImage });
+      let imageUrl = '';
+      // Step 1: Upload image if selected
+      if (newsImageFile) {
+        setNewsUploadProgress('Загрузка изображения...');
+        const formData = new FormData();
+        formData.append('image', newsImageFile);
+        const uploadRes = await apiClient.post('/admin/upload-image', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        imageUrl = uploadRes.data?.url || '';
+      }
+      // Step 2: Create news with image URL
+      setNewsUploadProgress('Публикация...');
+      await apiClient.post('/admin/news', { title: newNewsTitle, content: newNewsContent, image_url: imageUrl });
       showToast('Новость опубликована и уведомления отправлены');
-      setNewNewsTitle(''); setNewNewsContent(''); setNewNewsImage('');
+      setNewNewsTitle(''); setNewNewsContent('');
+      setNewsImageFile(null); setNewsImagePreview(null);
+      setNewsUploadProgress('');
       loadNews();
     } catch { showToast('Ошибка публикации', 'err'); }
-    finally { setNewsPublishing(false); }
+    finally { setNewsPublishing(false); setNewsUploadProgress(''); }
   };
 
   const deleteNews = async (id: number) => {
@@ -1344,16 +1376,49 @@ export const StaffOnlyZone = () => {
                   <textarea value={newNewsContent} onChange={e => setNewNewsContent(e.target.value)} placeholder="Текст новости..." rows={5} className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-blue-400 resize-y" />
                 </div>
                 <div>
-                  <label className="text-xs text-slate-500 mb-1 block">Ссылка на картинку (необязательно)</label>
-                  <input value={newNewsImage} onChange={e => setNewNewsImage(e.target.value)} placeholder="https://..." className="w-full h-9 px-3 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-blue-400" />
+                  <label className="text-xs text-slate-500 mb-1 block">Изображение (необязательно, авто-сжатие до 300КБ)</label>
+                  <input
+                    ref={newsFileRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={e => handleNewsImageSelect(e.target.files?.[0] || null)}
+                  />
+                  {newsImagePreview ? (
+                    <div className="relative group">
+                      <img src={newsImagePreview} alt="Preview" className="w-full max-h-48 object-cover rounded-lg border border-white/10" />
+                      <div className="absolute top-2 right-2 flex gap-1">
+                        <button onClick={() => newsFileRef.current?.click()} className="p-1.5 bg-black/60 text-white rounded-lg hover:bg-black/80 transition-colors" title="Заменить">
+                          <Upload className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => { setNewsImageFile(null); setNewsImagePreview(null); }} className="p-1.5 bg-black/60 text-red-400 rounded-lg hover:bg-black/80 transition-colors" title="Удалить">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      {newsImageFile && (
+                        <p className="text-[10px] text-slate-500 mt-1">{newsImageFile.name} — {(newsImageFile.size / 1024).toFixed(0)} КБ</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div
+                      onClick={() => newsFileRef.current?.click()}
+                      onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('border-blue-400'); }}
+                      onDragLeave={e => { e.preventDefault(); e.currentTarget.classList.remove('border-blue-400'); }}
+                      onDrop={e => { e.preventDefault(); e.currentTarget.classList.remove('border-blue-400'); handleNewsImageSelect(e.dataTransfer.files?.[0] || null); }}
+                      className="w-full py-8 border-2 border-dashed border-white/10 rounded-lg flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-blue-400/50 hover:bg-white/[0.02] transition-all"
+                    >
+                      <ImageIcon className="w-8 h-8 text-slate-600" />
+                      <p className="text-xs text-slate-500">Перетащите изображение или нажмите для выбора</p>
+                      <p className="text-[10px] text-slate-600">JPG, PNG, WebP · макс. 1200px · авто WebP</p>
+                    </div>
+                  )}
                 </div>
                 <button
                   onClick={publishNews}
                   disabled={!newNewsTitle.trim() || !newNewsContent.trim() || newsPublishing}
                   className="px-5 py-2.5 bg-blue-500 hover:bg-blue-600 disabled:opacity-40 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
                 >
-                  {newsPublishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                  Опубликовать и разослать уведомления
+                  {newsPublishing ? <><Loader2 className="w-4 h-4 animate-spin" /> {newsUploadProgress || 'Обработка...'}</> : <><Send className="w-4 h-4" /> Опубликовать и разослать уведомления</>}
                 </button>
               </div>
             </div>

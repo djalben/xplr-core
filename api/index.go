@@ -521,6 +521,7 @@ func buildRouter() *mux.Router {
 	admin.HandleFunc("/system-settings/{key}", handlers.UpdateSystemSettingHandler).Methods("PATCH")
 	admin.HandleFunc("/news", handlers.AdminCreateNewsHandler).Methods("POST")
 	admin.HandleFunc("/news/{id}", handlers.AdminDeleteNewsHandler).Methods("DELETE")
+	admin.HandleFunc("/upload-image", handlers.AdminUploadImageHandler).Methods("POST")
 
 	log.Println("✅ [ROUTER] All routes registered successfully")
 	return r
