@@ -223,29 +223,180 @@ func notifyUsersAboutNews(title, content, imageURL string) {
 	log.Printf("[NEWS-NOTIFY] 📩 Sent news notifications to %d users (image=%v)", count, imageURL != "")
 }
 
+// getSupabaseConfig reads and validates Supabase env vars.
+// Returns url, key, keySource. Empty url/key means not configured.
+func getSupabaseConfig() (string, string, string) {
+	supabaseURL := os.Getenv("SUPABASE_URL")
+	supabaseKey := os.Getenv("SUPABASE_SERVICE_KEY")
+	keySource := "SUPABASE_SERVICE_KEY"
+	if supabaseKey == "" {
+		supabaseKey = os.Getenv("SUPABASE_ANON_KEY")
+		keySource = "SUPABASE_ANON_KEY"
+	}
+	if supabaseKey == "" {
+		keySource = "NONE"
+	}
+	return supabaseURL, supabaseKey, keySource
+}
+
+// safePrefix returns the first n chars of a string for safe logging.
+func safePrefix(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "..."
+}
+
+// checkSupabaseBucket verifies the bucket exists by listing it.
+func checkSupabaseBucket(supabaseURL, supabaseKey, bucket string) (bool, string) {
+	checkURL := fmt.Sprintf("%s/storage/v1/bucket/%s", supabaseURL, bucket)
+	req, err := http.NewRequest("GET", checkURL, nil)
+	if err != nil {
+		return false, fmt.Sprintf("NewRequest error: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+supabaseKey)
+	req.Header.Set("apikey", supabaseKey)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, fmt.Sprintf("HTTP error: %v", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode == 200 {
+		return true, string(body)
+	}
+	return false, fmt.Sprintf("status=%d body=%s", resp.StatusCode, string(body))
+}
+
+// ── GET /api/v1/admin/test-upload — test Supabase Storage connectivity ──
+func AdminTestUploadHandler(w http.ResponseWriter, r *http.Request) {
+	supabaseURL, supabaseKey, keySource := getSupabaseConfig()
+
+	result := map[string]interface{}{
+		"supabase_url": supabaseURL,
+		"key_source":   keySource,
+		"key_prefix":   safePrefix(supabaseKey, 8),
+		"key_length":   len(supabaseKey),
+		"url_set":      supabaseURL != "",
+		"key_set":      supabaseKey != "",
+	}
+
+	if supabaseURL == "" || supabaseKey == "" {
+		result["error"] = "SUPABASE_URL or key not configured"
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(result)
+		return
+	}
+
+	// Check bucket existence
+	bucketOK, bucketInfo := checkSupabaseBucket(supabaseURL, supabaseKey, "news-images")
+	result["bucket_exists"] = bucketOK
+	result["bucket_info"] = bucketInfo
+
+	if !bucketOK {
+		log.Printf("[TEST-UPLOAD] ❌ BUCKET NOT FOUND: news-images — %s", bucketInfo)
+	}
+
+	// Try uploading a tiny test file
+	testFilename := fmt.Sprintf("_test_%d.txt", time.Now().UnixMilli())
+	uploadURL := fmt.Sprintf("%s/storage/v1/object/news-images/%s", supabaseURL, testFilename)
+	testBody := []byte("test-upload-connectivity-check")
+	req, _ := http.NewRequest("POST", uploadURL, bytes.NewReader(testBody))
+	req.Header.Set("Authorization", "Bearer "+supabaseKey)
+	req.Header.Set("apikey", supabaseKey)
+	req.Header.Set("Content-Type", "text/plain")
+	req.Header.Set("x-upsert", "true")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		result["upload_test"] = fmt.Sprintf("HTTP error: %v", err)
+	} else {
+		defer resp.Body.Close()
+		respBody, _ := io.ReadAll(resp.Body)
+		result["upload_test_status"] = resp.StatusCode
+		result["upload_test_body"] = string(respBody)
+
+		if resp.StatusCode < 400 {
+			result["upload_test"] = "SUCCESS"
+			// Clean up test file
+			delURL := fmt.Sprintf("%s/storage/v1/object/news-images/%s", supabaseURL, testFilename)
+			delReq, _ := http.NewRequest("DELETE", delURL, nil)
+			delReq.Header.Set("Authorization", "Bearer "+supabaseKey)
+			delReq.Header.Set("apikey", supabaseKey)
+			client.Do(delReq)
+		} else {
+			result["upload_test"] = "FAILED"
+		}
+	}
+
+	log.Printf("[TEST-UPLOAD] Result: %+v", result)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
 // ── POST /api/v1/admin/upload-image — upload image to Supabase Storage ──
 func AdminUploadImageHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[UPLOAD] 📥 Incoming upload request: method=%s content-type=%s content-length=%d",
+	log.Printf("[UPLOAD] ═══════════════════════════════════════════")
+	log.Printf("[UPLOAD] 📥 Request: method=%s content-type=%q content-length=%d",
 		r.Method, r.Header.Get("Content-Type"), r.ContentLength)
 
-	// Parse multipart form (max 5MB)
+	// ── Step 1: Validate env vars ──
+	supabaseURL, supabaseKey, keySource := getSupabaseConfig()
+	log.Printf("[UPLOAD] 🔑 ENV: SUPABASE_URL=%q, key_source=%s, key_prefix=%s, key_len=%d",
+		supabaseURL, keySource, safePrefix(supabaseKey, 8), len(supabaseKey))
+
+	if supabaseURL == "" || supabaseKey == "" {
+		errMsg := fmt.Sprintf("Storage not configured: SUPABASE_URL=%q, key_source=%s", supabaseURL, keySource)
+		log.Printf("[UPLOAD] ❌ %s", errMsg)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": errMsg})
+		return
+	}
+
+	// ── Step 2: Check bucket exists ──
+	bucketOK, bucketInfo := checkSupabaseBucket(supabaseURL, supabaseKey, "news-images")
+	log.Printf("[UPLOAD] 🪣 Bucket check: exists=%v info=%s", bucketOK, bucketInfo)
+	if !bucketOK {
+		log.Printf("[UPLOAD] ❌ BUCKET NOT FOUND: news-images")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error":       "BUCKET NOT FOUND: news-images",
+			"bucket_info": bucketInfo,
+			"hint":        "Create bucket 'news-images' in Supabase Dashboard → Storage → New Bucket (public=true)",
+		})
+		return
+	}
+
+	// ── Step 3: Parse multipart form ──
 	if err := r.ParseMultipartForm(5 << 20); err != nil {
 		log.Printf("[UPLOAD] ❌ ParseMultipartForm failed: %v", err)
-		http.Error(w, fmt.Sprintf("Failed to parse form: %v", err), http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("ParseMultipartForm: %v", err)})
 		return
 	}
 
 	file, header, err := r.FormFile("image")
 	if err != nil {
 		log.Printf("[UPLOAD] ❌ FormFile('image') failed: %v", err)
-		http.Error(w, fmt.Sprintf("Failed to read image file: %v", err), http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("FormFile: %v", err)})
 		return
 	}
 	defer file.Close()
 
-	log.Printf("[UPLOAD] 📄 File received: name=%s size=%d", header.Filename, header.Size)
+	log.Printf("[UPLOAD] 📄 File: name=%q size=%d", header.Filename, header.Size)
 
-	// Validate content type
+	// ── Step 4: Validate file type ──
 	ext := strings.ToLower(filepath.Ext(header.Filename))
 	contentType := ""
 	switch ext {
@@ -256,55 +407,57 @@ func AdminUploadImageHandler(w http.ResponseWriter, r *http.Request) {
 	case ".png":
 		contentType = "image/png"
 	default:
-		log.Printf("[UPLOAD] ❌ Invalid extension: %s", ext)
-		http.Error(w, "Only webp, jpg, png allowed", http.StatusBadRequest)
+		log.Printf("[UPLOAD] ❌ Invalid extension: %q", ext)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("Invalid extension: %s", ext)})
 		return
 	}
 
-	// Read file bytes
+	// ── Step 5: Read file bytes ──
 	fileBytes, err := io.ReadAll(file)
 	if err != nil {
-		log.Printf("[UPLOAD] ❌ io.ReadAll failed: %v", err)
-		http.Error(w, "Failed to read file", http.StatusInternalServerError)
+		log.Printf("[UPLOAD] ❌ ReadAll failed: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("ReadAll: %v", err)})
 		return
 	}
-	log.Printf("[UPLOAD] 📦 Read %d bytes, ext=%s, content-type=%s", len(fileBytes), ext, contentType)
+	log.Printf("[UPLOAD] 📦 Read %d bytes, content-type=%s", len(fileBytes), contentType)
 
-	// Generate unique filename
+	if len(fileBytes) == 0 {
+		log.Printf("[UPLOAD] ❌ Empty file")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "File is empty"})
+		return
+	}
+
+	// ── Step 6: Upload to Supabase Storage ──
 	filename := fmt.Sprintf("news_%d%s", time.Now().UnixMilli(), ext)
-
-	supabaseURL := os.Getenv("SUPABASE_URL")
-	supabaseKey := os.Getenv("SUPABASE_SERVICE_KEY")
-	if supabaseKey == "" {
-		supabaseKey = os.Getenv("SUPABASE_ANON_KEY")
-	}
-
-	if supabaseURL == "" || supabaseKey == "" {
-		log.Printf("[UPLOAD] ❌ Missing env: SUPABASE_URL=%q, SUPABASE_SERVICE_KEY set=%v, SUPABASE_ANON_KEY set=%v",
-			supabaseURL, os.Getenv("SUPABASE_SERVICE_KEY") != "", os.Getenv("SUPABASE_ANON_KEY") != "")
-		http.Error(w, "Storage not configured — check SUPABASE_URL and SUPABASE_SERVICE_KEY env vars", http.StatusInternalServerError)
-		return
-	}
-
-	bucket := "news-images"
-	uploadURL := fmt.Sprintf("%s/storage/v1/object/%s/%s", supabaseURL, bucket, filename)
-	log.Printf("[UPLOAD] 🚀 Uploading to Supabase: %s", uploadURL)
+	uploadURL := fmt.Sprintf("%s/storage/v1/object/news-images/%s", supabaseURL, filename)
+	log.Printf("[UPLOAD] 🚀 Uploading: %s (%d bytes, %s)", uploadURL, len(fileBytes), contentType)
 
 	req, err := http.NewRequest("POST", uploadURL, bytes.NewReader(fileBytes))
 	if err != nil {
 		log.Printf("[UPLOAD] ❌ NewRequest failed: %v", err)
-		http.Error(w, "Failed to create upload request", http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("NewRequest: %v", err)})
 		return
 	}
 	req.Header.Set("Authorization", "Bearer "+supabaseKey)
+	req.Header.Set("apikey", supabaseKey)
 	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("x-upsert", "true")
 
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Printf("[UPLOAD] ❌ Supabase HTTP request failed: %v", err)
-		http.Error(w, "Upload request failed", http.StatusInternalServerError)
+		log.Printf("[UPLOAD] ❌ Supabase HTTP error: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("Supabase HTTP: %v", err)})
 		return
 	}
 	defer resp.Body.Close()
@@ -313,13 +466,21 @@ func AdminUploadImageHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[UPLOAD] 📡 Supabase response: status=%d body=%s", resp.StatusCode, string(respBody))
 
 	if resp.StatusCode >= 400 {
-		http.Error(w, fmt.Sprintf("Supabase Storage error %d: %s", resp.StatusCode, string(respBody)), http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error":           fmt.Sprintf("Supabase Storage error %d", resp.StatusCode),
+			"supabase_body":   string(respBody),
+			"upload_url":      uploadURL,
+			"content_type":    contentType,
+			"file_size_bytes": fmt.Sprintf("%d", len(fileBytes)),
+		})
 		return
 	}
 
-	// Build public URL
-	publicURL := fmt.Sprintf("%s/storage/v1/object/public/%s/%s", supabaseURL, bucket, filename)
-	log.Printf("[UPLOAD] ✅ Image uploaded successfully: %s (%d bytes)", publicURL, len(fileBytes))
+	// ── Step 7: Return public URL ──
+	publicURL := fmt.Sprintf("%s/storage/v1/object/public/news-images/%s", supabaseURL, filename)
+	log.Printf("[UPLOAD] ✅ SUCCESS: %s (%d bytes)", publicURL, len(fileBytes))
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
