@@ -1,9 +1,66 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Newspaper, Bell, BellOff, ChevronLeft, ChevronRight, ImageIcon } from 'lucide-react';
+import { Newspaper, Bell, BellOff, ChevronLeft, ChevronRight, ImageIcon, X } from 'lucide-react';
 import { DashboardLayout } from '../components/dashboard-layout';
-import { getNews, getNewsNotifications, updateNewsNotifications, type NewsItem } from '../api/news';
+import { getNews, getNewsNotifications, updateNewsNotifications, markNewsAsRead, type NewsItem } from '../api/news';
 
 const PAGE_SIZE = 6;
+
+// ── News Detail Modal ──
+const NewsModal = ({ item, onClose }: { item: NewsItem; onClose: () => void }) => {
+  // Close on Escape key
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handleKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+      document.body.style.overflow = '';
+    };
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+      <div
+        className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[#111118] border border-white/10 shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 z-10 p-2 rounded-xl bg-black/50 backdrop-blur-sm border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        {/* Image — full width, no crop */}
+        {item.image_url ? (
+          <img
+            src={item.image_url}
+            alt={item.title}
+            className="w-full h-auto rounded-t-2xl"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          />
+        ) : (
+          <div className="h-32 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-t-2xl flex items-center justify-center">
+            <ImageIcon className="w-10 h-10 text-slate-600" />
+          </div>
+        )}
+
+        {/* Content */}
+        <div className="p-6 sm:p-8">
+          <p className="text-[11px] text-slate-500 mb-3">
+            {new Date(item.created_at).toLocaleDateString('ru-RU', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+          </p>
+          <h2 className="text-lg sm:text-xl font-bold text-white mb-4 leading-tight">{item.title}</h2>
+          <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-line break-words">
+            {item.content}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const NewsPage = () => {
   const [news, setNews] = useState<NewsItem[]>([]);
@@ -12,6 +69,7 @@ export const NewsPage = () => {
   const [loading, setLoading] = useState(true);
   const [notifyEnabled, setNotifyEnabled] = useState(true);
   const [notifyLoading, setNotifyLoading] = useState(false);
+  const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
@@ -44,6 +102,11 @@ export const NewsPage = () => {
   useEffect(() => {
     loadNotifyPref();
   }, [loadNotifyPref]);
+
+  // Mark news as read when page loads
+  useEffect(() => {
+    markNewsAsRead().catch(() => {});
+  }, []);
 
   const toggleNotify = async () => {
     setNotifyLoading(true);
@@ -92,6 +155,7 @@ export const NewsPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[...Array(4)].map((_, i) => (
               <div key={i} className="glass-card p-5 animate-pulse">
+                <div className="h-32 bg-white/5 rounded-lg mb-3" />
                 <div className="h-4 bg-white/10 rounded w-3/4 mb-3" />
                 <div className="h-3 bg-white/5 rounded w-full mb-2" />
                 <div className="h-3 bg-white/5 rounded w-2/3" />
@@ -108,9 +172,10 @@ export const NewsPage = () => {
             {news.map(item => (
               <article
                 key={item.id}
-                className="glass-card overflow-hidden hover:border-blue-500/20 transition-all group"
+                onClick={() => setSelectedNews(item)}
+                className="glass-card overflow-hidden hover:border-blue-500/20 transition-all group cursor-pointer"
               >
-                {item.image_url && (
+                {item.image_url ? (
                   <div className="relative h-40 bg-white/5 overflow-hidden">
                     <img
                       src={item.image_url}
@@ -119,18 +184,20 @@ export const NewsPage = () => {
                       onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                     />
                   </div>
-                )}
-                {!item.image_url && (
+                ) : (
                   <div className="h-24 bg-gradient-to-br from-blue-500/10 to-purple-500/10 flex items-center justify-center">
                     <ImageIcon className="w-8 h-8 text-slate-600" />
                   </div>
                 )}
                 <div className="p-5">
                   <h3 className="text-sm font-bold text-white mb-2 line-clamp-2">{item.title}</h3>
-                  <p className="text-xs text-slate-400 whitespace-pre-line line-clamp-4 mb-3">{item.content}</p>
-                  <p className="text-[10px] text-slate-600">
-                    {new Date(item.created_at).toLocaleDateString('ru-RU', { day: '2-digit', month: 'long', year: 'numeric' })}
-                  </p>
+                  <p className="text-xs text-slate-400 whitespace-pre-line line-clamp-3 mb-3">{item.content}</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] text-slate-600">
+                      {new Date(item.created_at).toLocaleDateString('ru-RU', { day: '2-digit', month: 'long', year: 'numeric' })}
+                    </p>
+                    <span className="text-[10px] text-blue-400/60 group-hover:text-blue-400 transition-colors">Читать →</span>
+                  </div>
                 </div>
               </article>
             ))}
@@ -170,6 +237,9 @@ export const NewsPage = () => {
           </div>
         )}
       </div>
+
+      {/* News Detail Modal */}
+      {selectedNews && <NewsModal item={selectedNews} onClose={() => setSelectedNews(null)} />}
     </DashboardLayout>
   );
 };

@@ -26,3 +26,12 @@ export const getNewsNotifications = async (): Promise<{ enabled: boolean }> => {
 export const updateNewsNotifications = async (enabled: boolean): Promise<void> => {
   await apiClient.patch('/user/news-notifications', { enabled });
 };
+
+export const getUnreadNewsCount = async (): Promise<{ count: number }> => {
+  const response = await apiClient.get('/user/news/unread-count');
+  return response.data;
+};
+
+export const markNewsAsRead = async (): Promise<void> => {
+  await apiClient.post('/user/news/mark-as-read');
+};

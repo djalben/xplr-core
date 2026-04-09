@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"log"
 	"net/http"
@@ -112,6 +113,43 @@ func UpdateNewsNotificationsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
+// ── GET /api/v1/user/news/unread-count — count news newer than user's last_read_news_id ──
+func GetUnreadNewsCountHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var count int
+	err := GlobalDB.QueryRow(`SELECT COUNT(*) FROM news WHERE id > COALESCE((SELECT last_read_news_id FROM users WHERE id = $1), 0)`, userID).Scan(&count)
+	if err != nil {
+		http.Error(w, "Failed to get unread count", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]int{"count": count})
+}
+
+// ── POST /api/v1/user/news/mark-as-read — set last_read_news_id to latest news id ──
+func MarkNewsAsReadHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	_, err := GlobalDB.Exec(`UPDATE users SET last_read_news_id = COALESCE((SELECT MAX(id) FROM news), 0) WHERE id = $1`, userID)
+	if err != nil {
+		http.Error(w, "Failed to mark as read", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
 // ── POST /api/v1/admin/news — create news + notify users ──
 func AdminCreateNewsHandler(w http.ResponseWriter, r *http.Request) {
 	adminID, _ := r.Context().Value(middleware.UserIDKey).(int)
@@ -143,7 +181,7 @@ func AdminCreateNewsHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[NEWS] ✅ Admin %d created news #%d: %s", adminID, newsID, req.Title)
 
 	// Notify users with news_notifications_enabled in background
-	go notifyUsersAboutNews(req.Title, req.Content, req.ImageURL)
+	go notifyUsersAboutNews(newsID, req.Title, req.Content, req.ImageURL)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -179,10 +217,17 @@ func AdminDeleteNewsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
 }
 
+// escapeTelegramHTML escapes special characters that break Telegram HTML parse mode.
+// Only <b>, <i>, <a>, <code>, <pre> tags are allowed in Telegram HTML.
+func escapeTelegramHTML(s string) string {
+	return html.EscapeString(s)
+}
+
 // notifyUsersAboutNews sends news notification to all opted-in users.
 // Uses NotifyUserNews for image-first layout (Telegram sendPhoto + Email image block).
-func notifyUsersAboutNews(title, content, imageURL string) {
+func notifyUsersAboutNews(newsID int, title, content, imageURL string) {
 	if GlobalDB == nil {
+		log.Printf("[NEWS-NOTIFY] ❌ GlobalDB is nil, cannot send notifications")
 		return
 	}
 
@@ -199,8 +244,12 @@ func notifyUsersAboutNews(title, content, imageURL string) {
 		preview = preview[:200] + "..."
 	}
 
+	// Escape title and preview for Telegram HTML safety
+	safeTitle := escapeTelegramHTML(title)
+	safePreview := escapeTelegramHTML(preview)
+
 	// Telegram caption (max 1024 chars for sendPhoto)
-	tgCaption := fmt.Sprintf("📰 <b>%s</b>\n\n%s\n\n<a href=\"https://xplr.pro/news\">Читать полностью →</a>", title, preview)
+	tgCaption := fmt.Sprintf("📰 <b>%s</b>\n\n%s\n\n<a href=\"https://xplr.pro/news\">Читать полностью →</a>", safeTitle, safePreview)
 
 	// Email body (text part, image is prepended by NotifyUserNews)
 	emailBody := fmt.Sprintf(`
@@ -210,17 +259,20 @@ func notifyUsersAboutNews(title, content, imageURL string) {
       <a href="https://xplr.pro/news" style="display:inline-block;padding:14px 40px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:#fff;text-decoration:none;border-radius:12px;font-size:14px;font-weight:600;">Читать полностью</a>
     </div>`, title, preview)
 
-	count := 0
+	var userIDs []int
 	for rows.Next() {
 		var userID int
 		if err := rows.Scan(&userID); err != nil {
 			continue
 		}
-		go service.NotifyUserNews(userID, "Новость XPLR", tgCaption, emailBody, imageURL)
-		count++
+		userIDs = append(userIDs, userID)
 	}
 
-	log.Printf("[NEWS-NOTIFY] 📩 Sent news notifications to %d users (image=%v)", count, imageURL != "")
+	log.Printf("[NEWS-NOTIFY] 📩 Attempting to notify %d users about news ID %d (image=%v)", len(userIDs), newsID, imageURL != "")
+
+	for _, uid := range userIDs {
+		go service.NotifyUserNews(uid, "Новость XPLR", tgCaption, emailBody, imageURL)
+	}
 }
 
 // getSupabaseConfig reads and validates Supabase env vars.

@@ -309,6 +309,13 @@ func ensureDB() {
 		log.Println("[NEWS-SEED] ✅ Seeded first news article")
 	}
 
+	// 9c8. Add last_read_news_id column for unread news badge
+	if _, err := db.Exec(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_read_news_id INTEGER DEFAULT 0`); err != nil {
+		log.Printf("[NEWS-MIGRATION] last_read_news_id ALTER: %v (may already exist, OK)", err)
+	} else {
+		log.Println("[NEWS-MIGRATION] ✅ last_read_news_id column ensured")
+	}
+
 	// 9d. Force admin rights for known admins
 	adminEmails := []string{"aalabin5@gmail.com", "vardump@inbox.ru"}
 	for _, email := range adminEmails {
@@ -441,6 +448,8 @@ func buildRouter() *mux.Router {
 	protected.HandleFunc("/news", handlers.GetNewsHandler).Methods("GET")
 	protected.HandleFunc("/news-notifications", handlers.GetNewsNotificationsHandler).Methods("GET")
 	protected.HandleFunc("/news-notifications", handlers.UpdateNewsNotificationsHandler).Methods("PATCH")
+	protected.HandleFunc("/news/unread-count", handlers.GetUnreadNewsCountHandler).Methods("GET")
+	protected.HandleFunc("/news/mark-as-read", handlers.MarkNewsAsReadHandler).Methods("POST")
 	log.Println("Registered route: GET /api/v1/user/dashboard-stats")
 
 	// Teams

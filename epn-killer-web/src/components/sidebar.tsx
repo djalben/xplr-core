@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import apiClient from '../api/axios';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -20,6 +20,7 @@ import {
   Lock,
   Newspaper
 } from 'lucide-react';
+import { getUnreadNewsCount } from '../api/news';
 
 const Logo = ({ onTripleClick }: { onTripleClick?: () => void }) => {
   const clickRef = useRef<{ count: number; timer: ReturnType<typeof setTimeout> | null }>({ count: 0, timer: null });
@@ -64,10 +65,11 @@ interface NavItemProps {
   icon: React.ReactNode;
   label: string;
   isActive: boolean;
+  badge?: number;
   onClick?: () => void;
 }
 
-const NavItem = ({ href, icon, label, isActive, onClick }: NavItemProps) => (
+const NavItem = ({ href, icon, label, isActive, badge, onClick }: NavItemProps) => (
   <Link to={href} onClick={onClick}>
     <div
       className={`group flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all duration-150 ${
@@ -80,7 +82,11 @@ const NavItem = ({ href, icon, label, isActive, onClick }: NavItemProps) => (
         {icon}
       </span>
       <span className="flex-1 text-sm font-medium">{label}</span>
-      {isActive && <ChevronRight className="w-4 h-4 text-blue-400" />}
+      {badge && badge > 0 ? (
+        <span className="min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+          {badge > 99 ? '99+' : badge}
+        </span>
+      ) : isActive ? <ChevronRight className="w-4 h-4 text-blue-400" /> : null}
     </div>
   </Link>
 );
@@ -128,12 +134,19 @@ const UserProfile = () => {
   );
 };
 
-const BottomNavItem = ({ href, icon, label, isActive }: { href: string; icon: React.ReactNode; label: string; isActive: boolean }) => (
+const BottomNavItem = ({ href, icon, label, isActive, badge }: { href: string; icon: React.ReactNode; label: string; isActive: boolean; badge?: number }) => (
   <Link to={href} className="flex-1 min-w-0">
-    <div className={`flex flex-col items-center justify-center h-full py-2 px-1 rounded-xl transition-colors ${
+    <div className={`relative flex flex-col items-center justify-center h-full py-2 px-1 rounded-xl transition-colors ${
       isActive ? 'text-blue-400' : 'text-slate-500'
     }`}>
-      <span className="shrink-0">{icon}</span>
+      <span className="relative shrink-0">
+        {icon}
+        {badge && badge > 0 ? (
+          <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold leading-none">
+            {badge > 99 ? '99+' : badge}
+          </span>
+        ) : null}
+      </span>
       <span className="text-[10px] mt-0.5 font-medium leading-tight text-center truncate w-full">{label}</span>
     </div>
   </Link>
@@ -214,21 +227,39 @@ export const Sidebar = () => {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [staffModalOpen, setStaffModalOpen] = useState(false);
+  const [unreadNews, setUnreadNews] = useState(0);
   const { isAdmin } = useAuth();
 
   const { t } = useTranslation();
+
+  // Fetch unread news count on mount + poll every 60s
+  useEffect(() => {
+    const fetchUnread = () => {
+      getUnreadNewsCount().then(r => setUnreadNews(r.count)).catch(() => {});
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Reset unread count when user navigates to /news
+  useEffect(() => {
+    if (location.pathname === '/news') {
+      setUnreadNews(0);
+    }
+  }, [location.pathname]);
 
   const handleLogoTripleClick = useCallback(() => {
     if (isAdmin) setStaffModalOpen(true);
   }, [isAdmin]);
 
   const navItems = [
-    { href: '/dashboard', icon: <LayoutDashboard className="w-5 h-5" />, label: t('nav.home') },
-    { href: '/cards', icon: <CreditCard className="w-5 h-5" />, label: t('nav.cards') },
-    { href: '/history', icon: <Receipt className="w-5 h-5" />, label: 'История' },
-    { href: '/referrals', icon: <Gift className="w-5 h-5" />, label: t('nav.referrals') },
-    { href: '/news', icon: <Newspaper className="w-5 h-5" />, label: 'Новости' },
-    { href: '/support', icon: <HelpCircle className="w-5 h-5" />, label: t('nav.support') },
+    { href: '/dashboard', icon: <LayoutDashboard className="w-5 h-5" />, label: t('nav.home'), badge: 0 },
+    { href: '/cards', icon: <CreditCard className="w-5 h-5" />, label: t('nav.cards'), badge: 0 },
+    { href: '/history', icon: <Receipt className="w-5 h-5" />, label: 'История', badge: 0 },
+    { href: '/referrals', icon: <Gift className="w-5 h-5" />, label: t('nav.referrals'), badge: 0 },
+    { href: '/news', icon: <Newspaper className="w-5 h-5" />, label: 'Новости', badge: unreadNews },
+    { href: '/support', icon: <HelpCircle className="w-5 h-5" />, label: t('nav.support'), badge: 0 },
   ];
 
   const bottomNavItems = navItems.slice(0, 5);
@@ -255,6 +286,7 @@ export const Sidebar = () => {
                 icon={item.icon}
                 label={item.label}
                 isActive={location.pathname === item.href}
+                badge={item.badge}
               />
             ))}
           </nav>
@@ -317,6 +349,7 @@ export const Sidebar = () => {
               icon={React.cloneElement(item.icon as React.ReactElement<any>, { className: 'w-5 h-5' })}
               label={item.label}
               isActive={location.pathname === item.href}
+              badge={item.badge}
             />
           ))}
         </div>
