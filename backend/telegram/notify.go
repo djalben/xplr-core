@@ -481,6 +481,40 @@ func SendMessageHTMLWithInlineReturnID(chatID int64, message string, keyboard *I
 	return result.Result.MessageID
 }
 
+// SendPhotoWithCaption sends a photo by URL with an HTML caption via Telegram sendPhoto API.
+// If photoURL is empty, falls back to SendMessageHTMLSafe (text-only).
+func SendPhotoWithCaption(chatID int64, photoURL string, caption string) error {
+	if botToken == "" {
+		return fmt.Errorf("TELEGRAM_BOT_TOKEN not set")
+	}
+	if chatID == 0 {
+		return fmt.Errorf("chatID is 0")
+	}
+	if photoURL == "" {
+		return SendMessageHTMLSafe(chatID, caption)
+	}
+
+	type sendPhotoPayload struct {
+		ChatID    int64  `json:"chat_id"`
+		Photo     string `json:"photo"`
+		Caption   string `json:"caption"`
+		ParseMode string `json:"parse_mode"`
+	}
+
+	payload := sendPhotoPayload{
+		ChatID:    chatID,
+		Photo:     photoURL,
+		Caption:   caption,
+		ParseMode: "HTML",
+	}
+
+	if err := postJSON("sendPhoto", payload); err != nil {
+		log.Printf("[TELEGRAM] ❌ SendPhotoWithCaption failed (Chat %d), falling back to text: %v", chatID, err)
+		return SendMessageHTMLSafe(chatID, caption)
+	}
+	return nil
+}
+
 // AnswerCallbackQuery отвечает на callback_query (убирает «часики» в Telegram).
 func AnswerCallbackQuery(callbackQueryID string, text string) {
 	payload := answerCallbackPayload{

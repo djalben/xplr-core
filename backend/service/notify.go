@@ -91,6 +91,74 @@ func NotifyUser(userID int, subject string, htmlMsg string) {
 	log.Printf("[NOTIFY-END] Dispatched notifications for user %d (email=%v, tg=%v)", userID, sendEmail, sendTG)
 }
 
+// NotifyUserNews sends a news notification with image-first layout.
+// tgCaption is used for Telegram (sendPhoto caption).
+// emailBody is the HTML content for the email (image is prepended automatically).
+// imageURL is the direct link to the news image.
+func NotifyUserNews(userID int, subject string, tgCaption string, emailBody string, imageURL string) {
+	pref := repository.GetNotificationPref(userID)
+	log.Printf("[NOTIFY-NEWS] UserID: %d, Subject: %q, Pref: %q, HasImage: %v", userID, subject, pref, imageURL != "")
+
+	sendEmail := pref == "email" || pref == "both"
+	sendTG := pref == "telegram" || pref == "both"
+
+	if pref == "" || (!sendEmail && !sendTG) {
+		sendEmail = true
+		sendTG = true
+	}
+
+	// ── Email channel — image first ──
+	if sendEmail {
+		go func(uid int, subj, body, imgURL string) {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("[NOTIFY-PANIC] Email goroutine panic for user %d: %v", uid, r)
+				}
+			}()
+
+			user, err := repository.GetUserByID(uid)
+			if err != nil || user.Email == "" {
+				return
+			}
+
+			// Build email body: clickable image first, then text
+			fullBody := ""
+			if imgURL != "" {
+				fullBody += `<div style="text-align:center;margin:0 0 24px;"><a href="https://xplr.pro/news"><img src="` + imgURL + `" alt="" style="max-width:100%;height:auto;border-radius:12px;border:1px solid rgba(255,255,255,0.06);" /></a></div>`
+			}
+			fullBody += body
+
+			if err := SendGenericEmail(user.Email, subj, fullBody); err != nil {
+				log.Printf("[NOTIFY-FAIL] Email to user %d failed: %v", uid, err)
+			}
+		}(userID, subject, emailBody, imageURL)
+	}
+
+	// ── Telegram channel — sendPhoto with caption ──
+	if sendTG {
+		go func(uid int, caption, imgURL string) {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("[NOTIFY-PANIC] Telegram goroutine panic for user %d: %v", uid, r)
+				}
+			}()
+
+			user, err := repository.GetUserByID(uid)
+			if err != nil {
+				return
+			}
+			if !user.TelegramChatID.Valid || user.TelegramChatID.Int64 == 0 {
+				return
+			}
+
+			tgID := user.TelegramChatID.Int64
+			if err := telegram.SendPhotoWithCaption(tgID, imgURL, caption); err != nil {
+				log.Printf("[NOTIFY-FAIL] Telegram photo to user %d (chat_id=%d) failed: %v", uid, tgID, err)
+			}
+		}(userID, tgCaption, imageURL)
+	}
+}
+
 // NotifyAdmins sends a notification to all users with is_admin=true in the database.
 // Uses existing telegram.NotifyAdmins for TG, and sends email to admin emails.
 func NotifyAdmins(subject string, htmlMsg string) {

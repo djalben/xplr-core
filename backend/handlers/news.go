@@ -143,7 +143,7 @@ func AdminCreateNewsHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[NEWS] ✅ Admin %d created news #%d: %s", adminID, newsID, req.Title)
 
 	// Notify users with news_notifications_enabled in background
-	go notifyUsersAboutNews(req.Title, req.Content)
+	go notifyUsersAboutNews(req.Title, req.Content, req.ImageURL)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -180,7 +180,8 @@ func AdminDeleteNewsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // notifyUsersAboutNews sends news notification to all opted-in users.
-func notifyUsersAboutNews(title, content string) {
+// Uses NotifyUserNews for image-first layout (Telegram sendPhoto + Email image block).
+func notifyUsersAboutNews(title, content, imageURL string) {
 	if GlobalDB == nil {
 		return
 	}
@@ -198,7 +199,16 @@ func notifyUsersAboutNews(title, content string) {
 		preview = preview[:200] + "..."
 	}
 
-	msg := fmt.Sprintf("📰 <b>%s</b>\n\n%s\n\n<a href=\"https://xplr.pro/news\">Читать полностью</a>", title, preview)
+	// Telegram caption (max 1024 chars for sendPhoto)
+	tgCaption := fmt.Sprintf("📰 <b>%s</b>\n\n%s\n\n<a href=\"https://xplr.pro/news\">Читать полностью →</a>", title, preview)
+
+	// Email body (text part, image is prepended by NotifyUserNews)
+	emailBody := fmt.Sprintf(`
+    <p style="color:#cbd5e1;font-size:16px;line-height:1.5;margin:0 0 16px;font-weight:700;">📰 %s</p>
+    <p style="color:#94a3b8;font-size:14px;line-height:1.7;margin:0 0 24px;white-space:pre-wrap;">%s</p>
+    <div style="text-align:center;">
+      <a href="https://xplr.pro/news" style="display:inline-block;padding:14px 40px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:#fff;text-decoration:none;border-radius:12px;font-size:14px;font-weight:600;">Читать полностью</a>
+    </div>`, title, preview)
 
 	count := 0
 	for rows.Next() {
@@ -206,28 +216,38 @@ func notifyUsersAboutNews(title, content string) {
 		if err := rows.Scan(&userID); err != nil {
 			continue
 		}
-		go service.NotifyUser(userID, "Новость XPLR", msg)
+		go service.NotifyUserNews(userID, "Новость XPLR", tgCaption, emailBody, imageURL)
 		count++
 	}
 
-	log.Printf("[NEWS-NOTIFY] 📩 Sent news notifications to %d users", count)
+	log.Printf("[NEWS-NOTIFY] 📩 Sent news notifications to %d users (image=%v)", count, imageURL != "")
 }
 
 // ── POST /api/v1/admin/upload-image — upload image to Supabase Storage ──
 func AdminUploadImageHandler(w http.ResponseWriter, r *http.Request) {
-	// Max 5MB upload
-	r.Body = http.MaxBytesReader(w, r.Body, 5<<20)
+	log.Printf("[UPLOAD] 📥 Incoming upload request: method=%s content-type=%s content-length=%d",
+		r.Method, r.Header.Get("Content-Type"), r.ContentLength)
+
+	// Parse multipart form (max 5MB)
+	if err := r.ParseMultipartForm(5 << 20); err != nil {
+		log.Printf("[UPLOAD] ❌ ParseMultipartForm failed: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to parse form: %v", err), http.StatusBadRequest)
+		return
+	}
 
 	file, header, err := r.FormFile("image")
 	if err != nil {
-		http.Error(w, "Failed to read image file", http.StatusBadRequest)
+		log.Printf("[UPLOAD] ❌ FormFile('image') failed: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to read image file: %v", err), http.StatusBadRequest)
 		return
 	}
 	defer file.Close()
 
+	log.Printf("[UPLOAD] 📄 File received: name=%s size=%d", header.Filename, header.Size)
+
 	// Validate content type
 	ext := strings.ToLower(filepath.Ext(header.Filename))
-	contentType := "image/webp"
+	contentType := ""
 	switch ext {
 	case ".webp":
 		contentType = "image/webp"
@@ -236,6 +256,7 @@ func AdminUploadImageHandler(w http.ResponseWriter, r *http.Request) {
 	case ".png":
 		contentType = "image/png"
 	default:
+		log.Printf("[UPLOAD] ❌ Invalid extension: %s", ext)
 		http.Error(w, "Only webp, jpg, png allowed", http.StatusBadRequest)
 		return
 	}
@@ -243,9 +264,11 @@ func AdminUploadImageHandler(w http.ResponseWriter, r *http.Request) {
 	// Read file bytes
 	fileBytes, err := io.ReadAll(file)
 	if err != nil {
+		log.Printf("[UPLOAD] ❌ io.ReadAll failed: %v", err)
 		http.Error(w, "Failed to read file", http.StatusInternalServerError)
 		return
 	}
+	log.Printf("[UPLOAD] 📦 Read %d bytes, ext=%s, content-type=%s", len(fileBytes), ext, contentType)
 
 	// Generate unique filename
 	filename := fmt.Sprintf("news_%d%s", time.Now().UnixMilli(), ext)
@@ -257,17 +280,19 @@ func AdminUploadImageHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if supabaseURL == "" || supabaseKey == "" {
-		log.Printf("[UPLOAD] ❌ SUPABASE_URL or SUPABASE_SERVICE_KEY not set")
-		http.Error(w, "Storage not configured", http.StatusInternalServerError)
+		log.Printf("[UPLOAD] ❌ Missing env: SUPABASE_URL=%q, SUPABASE_SERVICE_KEY set=%v, SUPABASE_ANON_KEY set=%v",
+			supabaseURL, os.Getenv("SUPABASE_SERVICE_KEY") != "", os.Getenv("SUPABASE_ANON_KEY") != "")
+		http.Error(w, "Storage not configured — check SUPABASE_URL and SUPABASE_SERVICE_KEY env vars", http.StatusInternalServerError)
 		return
 	}
 
 	bucket := "news-images"
-
-	// Upload to Supabase Storage
 	uploadURL := fmt.Sprintf("%s/storage/v1/object/%s/%s", supabaseURL, bucket, filename)
+	log.Printf("[UPLOAD] 🚀 Uploading to Supabase: %s", uploadURL)
+
 	req, err := http.NewRequest("POST", uploadURL, bytes.NewReader(fileBytes))
 	if err != nil {
+		log.Printf("[UPLOAD] ❌ NewRequest failed: %v", err)
 		http.Error(w, "Failed to create upload request", http.StatusInternalServerError)
 		return
 	}
@@ -278,22 +303,23 @@ func AdminUploadImageHandler(w http.ResponseWriter, r *http.Request) {
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Printf("[UPLOAD] ❌ Supabase Storage request failed: %v", err)
-		http.Error(w, "Upload failed", http.StatusInternalServerError)
+		log.Printf("[UPLOAD] ❌ Supabase HTTP request failed: %v", err)
+		http.Error(w, "Upload request failed", http.StatusInternalServerError)
 		return
 	}
 	defer resp.Body.Close()
 
+	respBody, _ := io.ReadAll(resp.Body)
+	log.Printf("[UPLOAD] 📡 Supabase response: status=%d body=%s", resp.StatusCode, string(respBody))
+
 	if resp.StatusCode >= 400 {
-		body, _ := io.ReadAll(resp.Body)
-		log.Printf("[UPLOAD] ❌ Supabase Storage error %d: %s", resp.StatusCode, string(body))
-		http.Error(w, "Storage upload failed", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Supabase Storage error %d: %s", resp.StatusCode, string(respBody)), http.StatusInternalServerError)
 		return
 	}
 
 	// Build public URL
 	publicURL := fmt.Sprintf("%s/storage/v1/object/public/%s/%s", supabaseURL, bucket, filename)
-	log.Printf("[UPLOAD] ✅ Image uploaded: %s (%d bytes)", publicURL, len(fileBytes))
+	log.Printf("[UPLOAD] ✅ Image uploaded successfully: %s (%d bytes)", publicURL, len(fileBytes))
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
