@@ -1,0 +1,76 @@
+import apiClient from './axios';
+
+export interface StoreCategory {
+  id: number;
+  slug: string;
+  name: string;
+  description: string;
+  icon: string;
+  sort_order: number;
+}
+
+export interface StoreProduct {
+  id: number;
+  category_id: number;
+  category_slug: string;
+  provider: string;
+  external_id: string;
+  name: string;
+  description: string;
+  country: string;
+  country_code: string;
+  price_usd: string;
+  data_gb: string;
+  validity_days: number;
+  image_url: string;
+  product_type: string;
+  in_stock: boolean;
+  meta: Record<string, unknown>;
+  sort_order: number;
+}
+
+export interface StoreOrder {
+  id: number;
+  user_id: number;
+  product_id: number;
+  product_name: string;
+  price_usd: string;
+  status: string;
+  activation_key: string;
+  qr_data: string;
+  provider_ref: string;
+  created_at: string;
+}
+
+export interface CatalogResponse {
+  categories: StoreCategory[];
+  products: StoreProduct[];
+}
+
+export interface PurchaseResult {
+  order_id: number;
+  product_name: string;
+  price_usd: string;
+  activation_key: string;
+  qr_data: string;
+  status: string;
+}
+
+export const getStoreCatalog = async (params?: {
+  category?: string;
+  country?: string;
+  search?: string;
+}): Promise<CatalogResponse> => {
+  const response = await apiClient.get('/user/store/catalog', { params });
+  return response.data;
+};
+
+export const purchaseProduct = async (productId: number): Promise<PurchaseResult> => {
+  const response = await apiClient.post('/user/store/purchase', { product_id: productId });
+  return response.data;
+};
+
+export const getStoreOrders = async (limit = 20): Promise<{ orders: StoreOrder[] }> => {
+  const response = await apiClient.get('/user/store/orders', { params: { limit } });
+  return response.data;
+};

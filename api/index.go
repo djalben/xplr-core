@@ -224,6 +224,46 @@ func ensureDB() {
 			image_url TEXT DEFAULT '',
 			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 		)`,
+		// Store tables
+		`CREATE TABLE IF NOT EXISTS store_categories (
+			id SERIAL PRIMARY KEY,
+			slug VARCHAR(50) UNIQUE NOT NULL,
+			name TEXT NOT NULL,
+			description TEXT DEFAULT '',
+			icon TEXT DEFAULT '',
+			sort_order INTEGER DEFAULT 0
+		)`,
+		`CREATE TABLE IF NOT EXISTS store_products (
+			id SERIAL PRIMARY KEY,
+			category_id INTEGER REFERENCES store_categories(id),
+			provider VARCHAR(50) DEFAULT 'demo',
+			external_id TEXT DEFAULT '',
+			name TEXT NOT NULL,
+			description TEXT DEFAULT '',
+			country TEXT DEFAULT '',
+			country_code VARCHAR(10) DEFAULT '',
+			price_usd NUMERIC(10,2) NOT NULL,
+			data_gb TEXT DEFAULT '',
+			validity_days INTEGER DEFAULT 0,
+			image_url TEXT DEFAULT '',
+			product_type VARCHAR(30) DEFAULT 'digital',
+			in_stock BOOLEAN DEFAULT TRUE,
+			meta JSONB DEFAULT '{}',
+			sort_order INTEGER DEFAULT 0,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		`CREATE TABLE IF NOT EXISTS store_orders (
+			id SERIAL PRIMARY KEY,
+			user_id INTEGER NOT NULL,
+			product_id INTEGER NOT NULL,
+			product_name TEXT NOT NULL,
+			price_usd NUMERIC(10,2) NOT NULL,
+			status VARCHAR(30) DEFAULT 'pending',
+			activation_key TEXT DEFAULT '',
+			qr_data TEXT DEFAULT '',
+			provider_ref TEXT DEFAULT '',
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
 		// Seed system settings (idempotent)
 		`INSERT INTO system_settings (setting_key, setting_value, description) VALUES
 			('sbp_enabled', 'true', 'Включить/выключить пополнение через СБП'),
@@ -315,6 +355,77 @@ func ensureDB() {
 	} else {
 		log.Println("[NEWS-MIGRATION] ✅ last_read_news_id column ensured")
 	}
+
+	// 9c9. Seed store categories (idempotent)
+	storeCatSeeds := []struct {
+		slug, name, desc, icon string
+		sort                   int
+	}{
+		{"esim", "eSIM — Весь мир", "Мобильный интернет в 190+ странах", "globe", 1},
+		{"digital", "Цифровые товары", "Игровые ключи, подписки, пополнения", "gamepad", 2},
+	}
+	for _, sc := range storeCatSeeds {
+		db.Exec(`INSERT INTO store_categories (slug, name, description, icon, sort_order) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (slug) DO NOTHING`,
+			sc.slug, sc.name, sc.desc, sc.icon, sc.sort)
+	}
+
+	// 9c10. Seed demo store products (idempotent via external_id uniqueness check)
+	var esimCatID, digitalCatID int
+	db.QueryRow(`SELECT id FROM store_categories WHERE slug='esim'`).Scan(&esimCatID)
+	db.QueryRow(`SELECT id FROM store_categories WHERE slug='digital'`).Scan(&digitalCatID)
+
+	if esimCatID > 0 {
+		esimProducts := []struct {
+			extID, name, country, cc, dataGB string
+			price                            float64
+			days                             int
+		}{
+			{"esim-tr-5", "Турция 5 ГБ", "Турция", "TR", "5", 4.50, 30},
+			{"esim-tr-10", "Турция 10 ГБ", "Турция", "TR", "10", 7.50, 30},
+			{"esim-th-5", "Таиланд 5 ГБ", "Таиланд", "TH", "5", 5.00, 15},
+			{"esim-th-10", "Таиланд 10 ГБ", "Таиланд", "TH", "10", 8.00, 30},
+			{"esim-eu-5", "Европа 5 ГБ", "Европа (30 стран)", "EU", "5", 6.00, 30},
+			{"esim-eu-10", "Европа 10 ГБ", "Европа (30 стран)", "EU", "10", 10.00, 30},
+			{"esim-us-5", "США 5 ГБ", "США", "US", "5", 5.50, 30},
+			{"esim-us-10", "США 10 ГБ", "США", "US", "10", 9.00, 30},
+			{"esim-ae-3", "ОАЭ 3 ГБ", "ОАЭ", "AE", "3", 5.00, 15},
+			{"esim-ae-10", "ОАЭ 10 ГБ", "ОАЭ", "AE", "10", 12.00, 30},
+			{"esim-jp-5", "Япония 5 ГБ", "Япония", "JP", "5", 6.50, 15},
+			{"esim-id-5", "Индонезия 5 ГБ", "Индонезия", "ID", "5", 4.00, 30},
+			{"esim-global-1", "Глобальный 1 ГБ", "190+ стран", "GLOBAL", "1", 3.50, 30},
+			{"esim-global-5", "Глобальный 5 ГБ", "190+ стран", "GLOBAL", "5", 12.50, 30},
+		}
+		for i, p := range esimProducts {
+			db.Exec(`INSERT INTO store_products (category_id, provider, external_id, name, description, country, country_code, price_usd, data_gb, validity_days, product_type, sort_order)
+				SELECT $1,'mobimatter',$2,$3,$4,$5,$6,$7,$8,$9,'esim',$10
+				WHERE NOT EXISTS (SELECT 1 FROM store_products WHERE external_id=$2)`,
+				esimCatID, p.extID, p.name, p.dataGB+" ГБ мобильного интернета", p.country, p.cc, p.price, p.dataGB, p.days, i)
+		}
+	}
+	if digitalCatID > 0 {
+		digProducts := []struct {
+			extID, name, desc string
+			price             float64
+		}{
+			{"steam-10", "Steam — $10", "Пополнение кошелька Steam на $10", 10.50},
+			{"steam-25", "Steam — $25", "Пополнение кошелька Steam на $25", 25.75},
+			{"steam-50", "Steam — $50", "Пополнение кошелька Steam на $50", 51.00},
+			{"psn-10", "PlayStation — $10", "PSN Card $10", 10.50},
+			{"psn-25", "PlayStation — $25", "PSN Card $25", 25.75},
+			{"xbox-10", "Xbox — $10", "Xbox Gift Card $10", 10.50},
+			{"xbox-25", "Xbox — $25", "Xbox Gift Card $25", 25.75},
+			{"nintendo-10", "Nintendo — $10", "Nintendo eShop $10", 10.50},
+			{"spotify-1m", "Spotify Premium — 1 мес", "Подписка Spotify Premium 1 месяц", 9.99},
+			{"netflix-1m", "Netflix Standard — 1 мес", "Подписка Netflix Standard 1 месяц", 15.49},
+		}
+		for i, p := range digProducts {
+			db.Exec(`INSERT INTO store_products (category_id, provider, external_id, name, description, price_usd, product_type, sort_order)
+				SELECT $1,'razer',$2,$3,$4,$5,'digital',$6
+				WHERE NOT EXISTS (SELECT 1 FROM store_products WHERE external_id=$2)`,
+				digitalCatID, p.extID, p.name, p.desc, p.price, i)
+		}
+	}
+	log.Println("[STORE-MIGRATION] ✅ Store tables + seed data ensured")
 
 	// 9d. Force admin rights for known admins
 	adminEmails := []string{"aalabin5@gmail.com", "vardump@inbox.ru"}
@@ -450,6 +561,12 @@ func buildRouter() *mux.Router {
 	protected.HandleFunc("/news-notifications", handlers.UpdateNewsNotificationsHandler).Methods("PATCH")
 	protected.HandleFunc("/news/unread-count", handlers.GetUnreadNewsCountHandler).Methods("GET")
 	protected.HandleFunc("/news/mark-as-read", handlers.MarkNewsAsReadHandler).Methods("POST")
+
+	// Store
+	protected.HandleFunc("/store/catalog", handlers.StoreCatalogHandler).Methods("GET")
+	protected.HandleFunc("/store/purchase", handlers.StorePurchaseHandler).Methods("POST")
+	protected.HandleFunc("/store/orders", handlers.StoreOrdersHandler).Methods("GET")
+
 	log.Println("Registered route: GET /api/v1/user/dashboard-stats")
 
 	// Teams

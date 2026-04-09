@@ -1,0 +1,435 @@
+package handlers
+
+import (
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/djalben/xplr-core/backend/middleware"
+	"github.com/djalben/xplr-core/backend/repository"
+	"github.com/djalben/xplr-core/backend/service"
+	"github.com/shopspring/decimal"
+)
+
+// ══════════════════════════════════════════════════════════════
+// Store types
+// ══════════════════════════════════════════════════════════════
+
+type StoreCategory struct {
+	ID          int    `json:"id"`
+	Slug        string `json:"slug"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Icon        string `json:"icon"`
+	SortOrder   int    `json:"sort_order"`
+}
+
+type StoreProduct struct {
+	ID           int             `json:"id"`
+	CategoryID   int             `json:"category_id"`
+	CategorySlug string          `json:"category_slug"`
+	Provider     string          `json:"provider"`
+	ExternalID   string          `json:"external_id"`
+	Name         string          `json:"name"`
+	Description  string          `json:"description"`
+	Country      string          `json:"country"`
+	CountryCode  string          `json:"country_code"`
+	PriceUSD     decimal.Decimal `json:"price_usd"`
+	DataGB       string          `json:"data_gb"`
+	ValidityDays int             `json:"validity_days"`
+	ImageURL     string          `json:"image_url"`
+	ProductType  string          `json:"product_type"`
+	InStock      bool            `json:"in_stock"`
+	Meta         json.RawMessage `json:"meta"`
+	SortOrder    int             `json:"sort_order"`
+}
+
+type StoreOrder struct {
+	ID            int             `json:"id"`
+	UserID        int             `json:"user_id"`
+	ProductID     int             `json:"product_id"`
+	ProductName   string          `json:"product_name"`
+	PriceUSD      decimal.Decimal `json:"price_usd"`
+	Status        string          `json:"status"`
+	ActivationKey string          `json:"activation_key"`
+	QRData        string          `json:"qr_data"`
+	ProviderRef   string          `json:"provider_ref"`
+	CreatedAt     time.Time       `json:"created_at"`
+}
+
+// ══════════════════════════════════════════════════════════════
+// GET /api/v1/store/catalog — returns categories + products
+// ══════════════════════════════════════════════════════════════
+
+func StoreCatalogHandler(w http.ResponseWriter, r *http.Request) {
+	if GlobalDB == nil {
+		http.Error(w, "DB not ready", http.StatusInternalServerError)
+		return
+	}
+
+	// Fetch categories
+	catRows, err := GlobalDB.Query(`SELECT id, slug, name, description, icon, sort_order FROM store_categories ORDER BY sort_order, id`)
+	if err != nil {
+		log.Printf("[STORE] ❌ Failed to fetch categories: %v", err)
+		http.Error(w, "Failed to fetch catalog", http.StatusInternalServerError)
+		return
+	}
+	defer catRows.Close()
+
+	var categories []StoreCategory
+	for catRows.Next() {
+		var c StoreCategory
+		if err := catRows.Scan(&c.ID, &c.Slug, &c.Name, &c.Description, &c.Icon, &c.SortOrder); err != nil {
+			continue
+		}
+		categories = append(categories, c)
+	}
+	if categories == nil {
+		categories = []StoreCategory{}
+	}
+
+	// Optional filters
+	categorySlug := r.URL.Query().Get("category")
+	country := r.URL.Query().Get("country")
+	search := r.URL.Query().Get("search")
+
+	// Build product query with optional filters
+	query := `SELECT p.id, p.category_id, c.slug, p.provider, p.external_id, p.name, p.description,
+		COALESCE(p.country, ''), COALESCE(p.country_code, ''), p.price_usd, COALESCE(p.data_gb, ''),
+		COALESCE(p.validity_days, 0), COALESCE(p.image_url, ''), p.product_type, p.in_stock,
+		COALESCE(p.meta, '{}'), p.sort_order
+		FROM store_products p
+		JOIN store_categories c ON c.id = p.category_id
+		WHERE p.in_stock = TRUE`
+	args := []interface{}{}
+	argIdx := 1
+
+	if categorySlug != "" {
+		query += fmt.Sprintf(" AND c.slug = $%d", argIdx)
+		args = append(args, categorySlug)
+		argIdx++
+	}
+	if country != "" {
+		query += fmt.Sprintf(" AND (LOWER(p.country) LIKE LOWER($%d) OR LOWER(p.country_code) = LOWER($%d))", argIdx, argIdx+1)
+		args = append(args, "%"+country+"%", country)
+		argIdx += 2
+	}
+	if search != "" {
+		query += fmt.Sprintf(" AND (LOWER(p.name) LIKE LOWER($%d) OR LOWER(p.country) LIKE LOWER($%d))", argIdx, argIdx+1)
+		args = append(args, "%"+search+"%", "%"+search+"%")
+		argIdx += 2
+	}
+	query += " ORDER BY p.sort_order, p.id"
+
+	prodRows, err := GlobalDB.Query(query, args...)
+	if err != nil {
+		log.Printf("[STORE] ❌ Failed to fetch products: %v", err)
+		http.Error(w, "Failed to fetch products", http.StatusInternalServerError)
+		return
+	}
+	defer prodRows.Close()
+
+	var products []StoreProduct
+	for prodRows.Next() {
+		var p StoreProduct
+		if err := prodRows.Scan(&p.ID, &p.CategoryID, &p.CategorySlug, &p.Provider, &p.ExternalID,
+			&p.Name, &p.Description, &p.Country, &p.CountryCode, &p.PriceUSD, &p.DataGB,
+			&p.ValidityDays, &p.ImageURL, &p.ProductType, &p.InStock, &p.Meta, &p.SortOrder); err != nil {
+			log.Printf("[STORE] product scan error: %v", err)
+			continue
+		}
+		products = append(products, p)
+	}
+	if products == nil {
+		products = []StoreProduct{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"categories": categories,
+		"products":   products,
+	})
+}
+
+// ══════════════════════════════════════════════════════════════
+// POST /api/v1/store/purchase — buy a digital product
+// ══════════════════════════════════════════════════════════════
+
+func StorePurchaseHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		ProductID int `json:"product_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ProductID <= 0 {
+		http.Error(w, "Invalid product_id", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("[STORE-PURCHASE] User %d → product %d", userID, req.ProductID)
+
+	// 1. Fetch product
+	var product StoreProduct
+	var metaBytes []byte
+	err := GlobalDB.QueryRow(`
+		SELECT p.id, p.category_id, c.slug, p.provider, p.external_id, p.name, p.description,
+			COALESCE(p.country, ''), COALESCE(p.country_code, ''), p.price_usd, COALESCE(p.data_gb, ''),
+			COALESCE(p.validity_days, 0), COALESCE(p.image_url, ''), p.product_type, p.in_stock,
+			COALESCE(p.meta, '{}'), p.sort_order
+		FROM store_products p
+		JOIN store_categories c ON c.id = p.category_id
+		WHERE p.id = $1
+	`, req.ProductID).Scan(&product.ID, &product.CategoryID, &product.CategorySlug, &product.Provider,
+		&product.ExternalID, &product.Name, &product.Description, &product.Country, &product.CountryCode,
+		&product.PriceUSD, &product.DataGB, &product.ValidityDays, &product.ImageURL, &product.ProductType,
+		&product.InStock, &metaBytes, &product.SortOrder)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			http.Error(w, "Product not found", http.StatusNotFound)
+		} else {
+			log.Printf("[STORE-PURCHASE] ❌ DB error fetching product %d: %v", req.ProductID, err)
+			http.Error(w, "Failed to fetch product", http.StatusInternalServerError)
+		}
+		return
+	}
+	product.Meta = metaBytes
+
+	// 2. Check stock
+	if !product.InStock {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Товар временно недоступен у поставщика",
+			"code":  "OUT_OF_STOCK",
+		})
+		return
+	}
+
+	// 3. Check wallet balance
+	wallet, err := repository.GetInternalBalance(userID)
+	if err != nil {
+		http.Error(w, "Failed to get wallet", http.StatusInternalServerError)
+		return
+	}
+	if wallet.MasterBalance.LessThan(product.PriceUSD) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusPaymentRequired)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error":    fmt.Sprintf("Недостаточно средств (баланс: $%s, цена: $%s)", wallet.MasterBalance.StringFixed(2), product.PriceUSD.StringFixed(2)),
+			"code":     "INSUFFICIENT_BALANCE",
+			"balance":  wallet.MasterBalance.StringFixed(2),
+			"required": product.PriceUSD.StringFixed(2),
+		})
+		return
+	}
+
+	// 4. Call provider API (stub — returns simulated activation data)
+	activationKey, qrData, providerRef, providerErr := callProvider(product)
+	if providerErr != nil {
+		log.Printf("[STORE-PURCHASE] ❌ Provider error for product %d: %v", product.ID, providerErr)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadGateway)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Ошибка поставщика: " + providerErr.Error(),
+			"code":  "PROVIDER_ERROR",
+		})
+		return
+	}
+
+	// 5. Deduct balance
+	details := fmt.Sprintf("Store purchase: %s — $%s", product.Name, product.PriceUSD.StringFixed(2))
+	if err := repository.DeductWalletBalance(userID, product.PriceUSD, details); err != nil {
+		log.Printf("[STORE-PURCHASE] ❌ Deduct failed for user %d: %v", userID, err)
+		http.Error(w, "Payment failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// 6. Record order
+	var orderID int
+	err = GlobalDB.QueryRow(`
+		INSERT INTO store_orders (user_id, product_id, product_name, price_usd, status, activation_key, qr_data, provider_ref)
+		VALUES ($1, $2, $3, $4, 'completed', $5, $6, $7) RETURNING id`,
+		userID, product.ID, product.Name, product.PriceUSD, activationKey, qrData, providerRef,
+	).Scan(&orderID)
+	if err != nil {
+		log.Printf("[STORE-PURCHASE] ❌ Failed to record order: %v", err)
+		// Balance already deducted — log critical error but still return data to user
+	}
+
+	log.Printf("[STORE-PURCHASE] ✅ User %d purchased '%s' for $%s (order #%d)",
+		userID, product.Name, product.PriceUSD.StringFixed(2), orderID)
+
+	// 7. Notify user
+	go notifyStorePurchase(userID, product, activationKey, qrData)
+
+	// 8. Return result
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"order_id":       orderID,
+		"product_name":   product.Name,
+		"price_usd":      product.PriceUSD.StringFixed(2),
+		"activation_key":  activationKey,
+		"qr_data":         qrData,
+		"status":          "completed",
+	})
+}
+
+// ══════════════════════════════════════════════════════════════
+// GET /api/v1/store/orders — user's purchase history
+// ══════════════════════════════════════════════════════════════
+
+func StoreOrdersHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	limitStr := r.URL.Query().Get("limit")
+	limit, _ := strconv.Atoi(limitStr)
+	if limit <= 0 || limit > 50 {
+		limit = 20
+	}
+
+	rows, err := GlobalDB.Query(`
+		SELECT id, user_id, product_id, product_name, price_usd, status, COALESCE(activation_key, ''), COALESCE(qr_data, ''), COALESCE(provider_ref, ''), created_at
+		FROM store_orders WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2`, userID, limit)
+	if err != nil {
+		http.Error(w, "Failed to fetch orders", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var orders []StoreOrder
+	for rows.Next() {
+		var o StoreOrder
+		if err := rows.Scan(&o.ID, &o.UserID, &o.ProductID, &o.ProductName, &o.PriceUSD,
+			&o.Status, &o.ActivationKey, &o.QRData, &o.ProviderRef, &o.CreatedAt); err != nil {
+			continue
+		}
+		orders = append(orders, o)
+	}
+	if orders == nil {
+		orders = []StoreOrder{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"orders": orders})
+}
+
+// ══════════════════════════════════════════════════════════════
+// Provider abstraction — stub for MobiMatter / Razer Gold
+// ══════════════════════════════════════════════════════════════
+
+func callProvider(product StoreProduct) (activationKey string, qrData string, providerRef string, err error) {
+	switch product.Provider {
+	case "mobimatter":
+		return callMobiMatter(product)
+	case "razer":
+		return callRazerGold(product)
+	case "demo":
+		return callDemoProvider(product)
+	default:
+		return callDemoProvider(product)
+	}
+}
+
+// Demo provider — returns test activation data
+func callDemoProvider(product StoreProduct) (string, string, string, error) {
+	ref := fmt.Sprintf("DEMO-%d-%d", product.ID, time.Now().UnixMilli())
+
+	if product.ProductType == "esim" {
+		// Return simulated eSIM QR data (LPA URI format)
+		qrData := fmt.Sprintf("LPA:1$smdp.example.com$%s", ref)
+		return "", qrData, ref, nil
+	}
+
+	// Digital product — return activation key
+	key := fmt.Sprintf("XPLR-%s-%d", product.ExternalID, time.Now().UnixMilli())
+	return key, "", ref, nil
+}
+
+// MobiMatter stub — will be replaced with real API integration
+func callMobiMatter(product StoreProduct) (string, string, string, error) {
+	// TODO: Implement real MobiMatter API call
+	// POST https://api.mobimatter.com/v1/orders
+	// Headers: Authorization: Bearer <MOBIMATTER_API_KEY>
+	// Body: { "productId": product.ExternalID, ... }
+	log.Printf("[MOBIMATTER] 🔧 Stub call for product %s (external_id=%s)", product.Name, product.ExternalID)
+	return callDemoProvider(product)
+}
+
+// Razer Gold stub — will be replaced with real API integration
+func callRazerGold(product StoreProduct) (string, string, string, error) {
+	// TODO: Implement real Razer Gold API call
+	log.Printf("[RAZER] 🔧 Stub call for product %s (external_id=%s)", product.Name, product.ExternalID)
+	return callDemoProvider(product)
+}
+
+// ══════════════════════════════════════════════════════════════
+// Notification after purchase
+// ══════════════════════════════════════════════════════════════
+
+func notifyStorePurchase(userID int, product StoreProduct, activationKey, qrData string) {
+	var resultInfo string
+	if qrData != "" {
+		resultInfo = "QR-код для активации eSIM отправлен ниже."
+	} else if activationKey != "" {
+		resultInfo = fmt.Sprintf("Ваш ключ активации: <code>%s</code>", activationKey)
+	}
+
+	tgMsg := fmt.Sprintf("🛒 <b>Покупка успешна!</b>\n\n"+
+		"Товар: <b>%s</b>\n"+
+		"Цена: <b>$%s</b>\n\n"+
+		"%s\n\n"+
+		"<a href=\"https://xplr.pro/store\">Открыть магазин</a>",
+		product.Name, product.PriceUSD.StringFixed(2), resultInfo)
+
+	emailBody := fmt.Sprintf(`
+		<p style="color:#cbd5e1;font-size:16px;line-height:1.5;margin:0 0 16px;font-weight:700;">🛒 Покупка успешна!</p>
+		<table style="width:100%%;border-collapse:collapse;margin:0 0 24px;">
+			<tr><td style="color:#94a3b8;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);">Товар</td><td style="color:#fff;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);text-align:right;font-weight:600;">%s</td></tr>
+			<tr><td style="color:#94a3b8;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);">Цена</td><td style="color:#fff;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);text-align:right;font-weight:600;">$%s</td></tr>
+		</table>`,
+		product.Name, product.PriceUSD.StringFixed(2))
+
+	if activationKey != "" {
+		emailBody += fmt.Sprintf(`
+		<div style="background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);border-radius:12px;padding:16px;margin:0 0 24px;text-align:center;">
+			<p style="color:#94a3b8;font-size:12px;margin:0 0 8px;">Ключ активации</p>
+			<p style="color:#fff;font-size:18px;font-weight:700;font-family:monospace;letter-spacing:2px;margin:0;">%s</p>
+		</div>`, activationKey)
+	}
+	if qrData != "" {
+		emailBody += `
+		<div style="background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);border-radius:12px;padding:16px;margin:0 0 24px;text-align:center;">
+			<p style="color:#94a3b8;font-size:12px;margin:0 0 8px;">QR-код для активации eSIM</p>
+			<p style="color:#fff;font-size:14px;margin:0;">QR-код доступен в приложении XPLR</p>
+		</div>`
+	}
+
+	emailBody += `
+		<div style="text-align:center;">
+			<a href="https://xplr.pro/store" style="display:inline-block;padding:14px 40px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:#fff;text-decoration:none;border-radius:12px;font-size:14px;font-weight:600;">Открыть магазин</a>
+		</div>`
+
+	service.NotifyUser(userID, "Покупка в XPLR Store", tgMsg)
+	// Also send email with receipt
+	go func() {
+		user, err := repository.GetUserByID(userID)
+		if err != nil || user.Email == "" {
+			return
+		}
+		if err := service.SendGenericEmail(user.Email, "Чек покупки — XPLR Store", emailBody); err != nil {
+			log.Printf("[STORE-NOTIFY] ❌ Email to user %d failed: %v", userID, err)
+		}
+	}()
+}
