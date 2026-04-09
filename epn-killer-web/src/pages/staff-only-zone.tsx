@@ -29,9 +29,12 @@ import {
   X,
   Wallet,
   Filter,
+  Newspaper,
+  Trash2,
+  Plus,
 } from 'lucide-react';
 
-type Tab = 'dashboard' | 'users' | 'commissions' | 'tickets' | 'logs';
+type Tab = 'dashboard' | 'users' | 'commissions' | 'tickets' | 'news' | 'logs';
 
 interface DashboardStats {
   total_users: number;
@@ -227,6 +230,11 @@ export const StaffOnlyZone = () => {
   const [txFilter, setTxFilter] = useState('');
   const [blockConfirmUser, setBlockConfirmUser] = useState<AdminUser | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
+  const [newsList, setNewsList] = useState<{ id: number; title: string; content: string; image_url: string; created_at: string }[]>([]);
+  const [newNewsTitle, setNewNewsTitle] = useState('');
+  const [newNewsContent, setNewNewsContent] = useState('');
+  const [newNewsImage, setNewNewsImage] = useState('');
+  const [newsPublishing, setNewsPublishing] = useState(false);
 
   const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
     setToast({ msg, type });
@@ -355,12 +363,40 @@ export const StaffOnlyZone = () => {
     fetchStats();
   }, [fetchStats]);
 
+  const loadNews = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/user/news', { params: { limit: 50, offset: 0 } });
+      setNewsList(res.data?.items || []);
+    } catch { /* ignore */ }
+  }, []);
+
+  const publishNews = async () => {
+    if (!newNewsTitle.trim() || !newNewsContent.trim()) return;
+    setNewsPublishing(true);
+    try {
+      await apiClient.post('/admin/news', { title: newNewsTitle, content: newNewsContent, image_url: newNewsImage });
+      showToast('Новость опубликована и уведомления отправлены');
+      setNewNewsTitle(''); setNewNewsContent(''); setNewNewsImage('');
+      loadNews();
+    } catch { showToast('Ошибка публикации', 'err'); }
+    finally { setNewsPublishing(false); }
+  };
+
+  const deleteNews = async (id: number) => {
+    try {
+      await apiClient.delete(`/admin/news/${id}`);
+      showToast('Новость удалена');
+      loadNews();
+    } catch { showToast('Ошибка удаления', 'err'); }
+  };
+
   useEffect(() => {
     if (tab === 'users') loadAllUsers();
     if (tab === 'commissions') { loadCommissions(); loadSysSettings(); }
     if (tab === 'tickets') { loadTickets(); loadChats(); }
+    if (tab === 'news') loadNews();
     if (tab === 'logs') loadLogs();
-  }, [tab, loadAllUsers, loadCommissions, loadSysSettings, loadTickets, loadChats, loadLogs]);
+  }, [tab, loadAllUsers, loadCommissions, loadSysSettings, loadTickets, loadChats, loadNews, loadLogs]);
 
   // ── Inspect User (Financial Passport) ──
   const inspectUserDetails = async (userId: number) => {
@@ -503,6 +539,7 @@ export const StaffOnlyZone = () => {
           <TabBtn id="users" icon={Users} label="Юзеры" />
           <TabBtn id="commissions" icon={Settings} label="Комиссии" />
           <TabBtn id="tickets" icon={MessageSquare} label="Тикеты" />
+          <TabBtn id="news" icon={Newspaper} label="Новости" />
           <TabBtn id="logs" icon={Clock} label="Логи" />
         </div>
 
@@ -1290,6 +1327,69 @@ export const StaffOnlyZone = () => {
           );
         })()}
 
+
+        {/* ════════════ NEWS TAB ════════════ */}
+        {tab === 'news' && (
+          <div className="space-y-4">
+            {/* Create news form */}
+            <div className="glass-card p-5">
+              <h4 className="text-white text-sm font-semibold mb-3 flex items-center gap-2"><Plus className="w-4 h-4 text-blue-400" /> Новая публикация</h4>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">Заголовок</label>
+                  <input value={newNewsTitle} onChange={e => setNewNewsTitle(e.target.value)} placeholder="Заголовок новости" className="w-full h-9 px-3 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-blue-400" />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">Текст (поддерживает переносы строк)</label>
+                  <textarea value={newNewsContent} onChange={e => setNewNewsContent(e.target.value)} placeholder="Текст новости..." rows={5} className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-blue-400 resize-y" />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">Ссылка на картинку (необязательно)</label>
+                  <input value={newNewsImage} onChange={e => setNewNewsImage(e.target.value)} placeholder="https://..." className="w-full h-9 px-3 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-blue-400" />
+                </div>
+                <button
+                  onClick={publishNews}
+                  disabled={!newNewsTitle.trim() || !newNewsContent.trim() || newsPublishing}
+                  className="px-5 py-2.5 bg-blue-500 hover:bg-blue-600 disabled:opacity-40 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                >
+                  {newsPublishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  Опубликовать и разослать уведомления
+                </button>
+              </div>
+            </div>
+
+            {/* News list */}
+            <div className="glass-card overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-white/10">
+                    <th className="text-left px-4 py-3 text-slate-400 font-medium">ID</th>
+                    <th className="text-left px-4 py-3 text-slate-400 font-medium">Заголовок</th>
+                    <th className="text-left px-4 py-3 text-slate-400 font-medium">Дата</th>
+                    <th className="text-right px-4 py-3 text-slate-400 font-medium w-16"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {newsList.map(n => (
+                    <tr key={n.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                      <td className="px-4 py-3 text-slate-500 font-mono text-xs">{n.id}</td>
+                      <td className="px-4 py-3 text-white text-xs">{n.title}</td>
+                      <td className="px-4 py-3 text-slate-500 text-xs">{n.created_at ? new Date(n.created_at).toLocaleString('ru-RU') : ''}</td>
+                      <td className="px-4 py-3 text-right">
+                        <button onClick={() => deleteNews(n.id)} className="p-1.5 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition-colors" title="Удалить">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {newsList.length === 0 && (
+                    <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-500 text-sm">Нет новостей</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* ════════════ LOGS TAB ════════════ */}
         {tab === 'logs' && (

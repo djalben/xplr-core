@@ -216,6 +216,14 @@ func ensureDB() {
 			('premium', 5.00, 1.00, 2000.00, 1000.00, 'Премиум карта с расширенными лимитами'),
 			('universal', 2.50, 0.60, 750.00, 400.00, 'Универсальная карта')
 		ON CONFLICT (card_type) DO NOTHING`,
+		// News table
+		`CREATE TABLE IF NOT EXISTS news (
+			id SERIAL PRIMARY KEY,
+			title TEXT NOT NULL,
+			content TEXT NOT NULL,
+			image_url TEXT DEFAULT '',
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
 		// Seed system settings (idempotent)
 		`INSERT INTO system_settings (setting_key, setting_value, description) VALUES
 			('sbp_enabled', 'true', 'Включить/выключить пополнение через СБП'),
@@ -281,6 +289,24 @@ func ensureDB() {
 		log.Printf("[TIER-MIGRATION] ❌ Failed to backfill tier_expires_at: %v", err)
 	} else if n, _ := res.RowsAffected(); n > 0 {
 		log.Printf("[TIER-MIGRATION] ✅ Backfilled tier_expires_at for %d Gold users", n)
+	}
+
+	// 9c6. Add news_notifications_enabled column to users
+	if _, err := db.Exec(`ALTER TABLE users ADD COLUMN IF NOT EXISTS news_notifications_enabled BOOLEAN DEFAULT TRUE`); err != nil {
+		log.Printf("[NEWS-MIGRATION] news_notifications_enabled ALTER: %v (may already exist, OK)", err)
+	} else {
+		log.Println("[NEWS-MIGRATION] ✅ news_notifications_enabled column ensured")
+	}
+
+	// 9c7. Seed first news article (idempotent)
+	if res, err := db.Exec(`INSERT INTO news (title, content, image_url) 
+		SELECT 'Гайд: Как оплачивать AppStore картами XPLR (Visa/Mastercard) через регион Сингапур',
+		       'Подробная инструкция по оплате AppStore с помощью карт XPLR через регион Сингапур.\n\n1. Откройте настройки Apple ID\n2. Смените регион на Сингапур\n3. Привяжите карту XPLR (Visa/Mastercard)\n4. Совершайте покупки в AppStore\n\nВажно: убедитесь, что на карте достаточно средств перед покупкой.',
+		       ''
+		WHERE NOT EXISTS (SELECT 1 FROM news LIMIT 1)`); err != nil {
+		log.Printf("[NEWS-SEED] ❌ Failed to seed first news: %v", err)
+	} else if n, _ := res.RowsAffected(); n > 0 {
+		log.Println("[NEWS-SEED] ✅ Seeded first news article")
 	}
 
 	// 9d. Force admin rights for known admins
@@ -412,6 +438,9 @@ func buildRouter() *mux.Router {
 	protected.HandleFunc("/api-key", handlers.CreateAPIKeyHandler).Methods("POST")
 	protected.HandleFunc("/upgrade-tier", handlers.UpgradeTierHandler).Methods("POST")
 	protected.HandleFunc("/tier-info", handlers.GetTierInfoHandler).Methods("GET")
+	protected.HandleFunc("/news", handlers.GetNewsHandler).Methods("GET")
+	protected.HandleFunc("/news-notifications", handlers.GetNewsNotificationsHandler).Methods("GET")
+	protected.HandleFunc("/news-notifications", handlers.UpdateNewsNotificationsHandler).Methods("PATCH")
 	log.Println("Registered route: GET /api/v1/user/dashboard-stats")
 
 	// Teams
@@ -490,6 +519,8 @@ func buildRouter() *mux.Router {
 	admin.HandleFunc("/test-notify", handlers.AdminTestNotifyHandler).Methods("GET")
 	admin.HandleFunc("/system-settings", handlers.GetSystemSettingsHandler).Methods("GET")
 	admin.HandleFunc("/system-settings/{key}", handlers.UpdateSystemSettingHandler).Methods("PATCH")
+	admin.HandleFunc("/news", handlers.AdminCreateNewsHandler).Methods("POST")
+	admin.HandleFunc("/news/{id}", handlers.AdminDeleteNewsHandler).Methods("DELETE")
 
 	log.Println("✅ [ROUTER] All routes registered successfully")
 	return r

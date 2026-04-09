@@ -17,7 +17,8 @@ import {
   Bell,
   DollarSign,
   HelpCircle,
-  Lock
+  Lock,
+  Newspaper
 } from 'lucide-react';
 
 const Logo = ({ onTripleClick }: { onTripleClick?: () => void }) => {
@@ -226,6 +227,7 @@ export const Sidebar = () => {
     { href: '/cards', icon: <CreditCard className="w-5 h-5" />, label: t('nav.cards') },
     { href: '/history', icon: <Receipt className="w-5 h-5" />, label: 'История' },
     { href: '/referrals', icon: <Gift className="w-5 h-5" />, label: t('nav.referrals') },
+    { href: '/news', icon: <Newspaper className="w-5 h-5" />, label: 'Новости' },
     { href: '/support', icon: <HelpCircle className="w-5 h-5" />, label: t('nav.support') },
   ];
 

@@ -16,6 +16,7 @@ import { AdminRatesPage } from './pages/admin-rates';
 import { ForgotPasswordPage } from './pages/forgot-password';
 import { ResetPasswordPage } from './pages/reset-password';
 import { StaffOnlyZone } from './pages/staff-only-zone';
+import { NewsPage } from './pages/news';
 import { PWAInstallPrompt } from './components/pwa-install-prompt';
 import { NeuralBackground } from './components/neural-background';
 import { useAuth } from './store/auth-context';
@@ -100,6 +101,7 @@ function App() {
         <Route path="/referrals" element={<ProtectedRoute><ReferralsPage /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="/support" element={<ProtectedRoute><SupportPage /></ProtectedRoute>} />
+        <Route path="/news" element={<ProtectedRoute><NewsPage /></ProtectedRoute>} />
         <Route path="/admin/rates" element={<ProtectedRoute><AdminRatesPage /></ProtectedRoute>} />
         <Route path="/staff-only-zone" element={<AdminRoute><StaffOnlyZone /></AdminRoute>} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
