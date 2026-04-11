@@ -248,8 +248,8 @@ export const StaffOnlyZone = () => {
   const editNewsFileRef = useRef<HTMLInputElement>(null);
 
   // ── Store pricing state ──
-  const [storeProducts, setStoreProducts] = useState<{ id: number; name: string; product_type: string; provider: string; cost_price: string; markup_percent: string; retail_price: string; old_price: string; in_stock: boolean; external_id: string }[]>([]);
-  const [editingProduct, setEditingProduct] = useState<{ id: number; cost_price: string; markup_percent: string } | null>(null);
+  const [storeProducts, setStoreProducts] = useState<{ id: number; name: string; product_type: string; provider: string; cost_price: string; markup_percent: string; retail_price: string; old_price: string; in_stock: boolean; external_id: string; image_url: string }[]>([]);
+  const [editingProduct, setEditingProduct] = useState<{ id: number; cost_price: string; markup_percent: string; image_url: string } | null>(null);
   const [bulkDelta, setBulkDelta] = useState('10');
   const [bulkType, setBulkType] = useState('');
   const [storeSubTab, setStoreSubTab] = useState<'esim' | 'digital'>('esim');
@@ -477,6 +477,7 @@ export const StaffOnlyZone = () => {
       await apiClient.patch(`/admin/store/products/${editingProduct.id}`, {
         cost_price: parseFloat(editingProduct.cost_price),
         markup_percent: parseFloat(editingProduct.markup_percent),
+        image_url: editingProduct.image_url,
       });
       showToast('Цена обновлена');
       setEditingProduct(null);
@@ -1628,7 +1629,16 @@ export const StaffOnlyZone = () => {
                     {filtered.map(p => (
                       <tr key={p.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                         <td className="px-4 py-3 text-slate-500 font-mono text-xs">{p.id}</td>
-                        <td className="px-4 py-3 text-white text-xs font-medium max-w-[200px] truncate" title={p.name}>{p.name}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            {p.image_url ? (
+                              <img src={p.image_url} alt="" className="w-6 h-6 rounded object-contain shrink-0 bg-white/5" />
+                            ) : (
+                              <div className="w-6 h-6 rounded bg-white/5 shrink-0" />
+                            )}
+                            <span className="text-white text-xs font-medium truncate max-w-[160px]" title={p.name}>{p.name}</span>
+                          </div>
+                        </td>
                         <td className="px-4 py-3">
                           {editingProduct?.id === p.id ? (
                             <input type="number" step="0.01" value={editingProduct.cost_price} onChange={e => setEditingProduct({ ...editingProduct, cost_price: e.target.value })} className="w-20 px-2 py-1 bg-white/10 border border-blue-500/50 rounded text-white text-xs outline-none" />
@@ -1661,7 +1671,7 @@ export const StaffOnlyZone = () => {
                               </button>
                             </div>
                           ) : (
-                            <button onClick={() => setEditingProduct({ id: p.id, cost_price: p.cost_price, markup_percent: p.markup_percent })} className="text-blue-400 hover:text-blue-300 text-xs transition-colors">
+                            <button onClick={() => setEditingProduct({ id: p.id, cost_price: p.cost_price, markup_percent: p.markup_percent, image_url: p.image_url })} className="text-blue-400 hover:text-blue-300 text-xs transition-colors">
                               Изменить
                             </button>
                           )}
@@ -1675,6 +1685,25 @@ export const StaffOnlyZone = () => {
                 </table>
               </div>
             </div>
+
+            {/* Image URL editor (shown when editing a product) */}
+            {editingProduct && (
+              <div className="glass-card p-4">
+                <label className="text-xs text-slate-500 mb-1.5 block">Изображение товара (URL логотипа / флага)</label>
+                <div className="flex items-center gap-3">
+                  {editingProduct.image_url && (
+                    <img src={editingProduct.image_url} alt="" className="w-8 h-8 rounded object-contain bg-white/5 border border-white/10 shrink-0" />
+                  )}
+                  <input
+                    type="text"
+                    value={editingProduct.image_url}
+                    onChange={e => setEditingProduct({ ...editingProduct, image_url: e.target.value })}
+                    placeholder="https://cdn.simpleicons.org/steam/white"
+                    className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-xs outline-none focus:border-blue-500/50 placeholder-slate-600"
+                  />
+                </div>
+              </div>
+            )}
           </div>
           );
         })()}

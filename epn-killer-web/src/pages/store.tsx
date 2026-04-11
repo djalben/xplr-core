@@ -595,16 +595,16 @@ export const StorePage = () => {
               )}
             </div>
 
-            {/* Destinations grid — SIM chip style */}
+            {/* Destinations grid — SIM card shape with clip-path notch */}
             {destsLoading ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {[...Array(8)].map((_, i) => (
-                  <div key={i} className="relative rounded-2xl overflow-hidden animate-pulse" style={{ aspectRatio: '1.6/1' }}>
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.06] to-white/[0.02]" />
-                    <div className="absolute top-4 left-4 w-10 h-7 rounded bg-yellow-500/10" />
+                  <div key={i} className="relative overflow-hidden animate-pulse" style={{ aspectRatio: '0.85/1', clipPath: 'polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 0 100%)' }}>
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.06] to-white/[0.02] rounded-2xl" />
+                    <div className="absolute top-[30%] left-1/2 -translate-x-1/2 w-16 h-16 rounded-full bg-white/5" />
                     <div className="absolute bottom-4 left-4 right-4">
-                      <div className="h-4 bg-white/10 rounded w-2/3 mb-1.5" />
-                      <div className="h-3 bg-white/5 rounded w-1/3" />
+                      <div className="h-4 bg-white/10 rounded w-2/3 mx-auto mb-1.5" />
+                      <div className="h-3 bg-white/5 rounded w-1/3 mx-auto" />
                     </div>
                   </div>
                 ))}
@@ -625,30 +625,45 @@ export const StorePage = () => {
                   <button
                     key={dest.country_code}
                     onClick={() => setSelectedCountry(dest)}
-                    className="relative rounded-2xl overflow-hidden border border-white/[0.08] hover:border-blue-500/30 hover:-translate-y-1 hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-200 group cursor-pointer text-left"
-                    style={{ aspectRatio: '1.6/1', background: 'linear-gradient(145deg, rgba(30,30,50,0.95), rgba(15,15,30,0.98))' }}
+                    className="relative overflow-hidden hover:-translate-y-1.5 hover:shadow-2xl hover:shadow-blue-500/20 transition-all duration-300 group cursor-pointer text-left"
+                    style={{
+                      aspectRatio: '0.85/1',
+                      clipPath: 'polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 0 100%)',
+                      background: 'linear-gradient(160deg, rgba(20,20,40,0.97), rgba(10,10,25,0.99))',
+                    }}
                   >
-                    {/* SIM chip accent */}
-                    <div className="absolute top-3.5 left-3.5 w-9 h-6 rounded-[4px] border border-yellow-500/30 bg-gradient-to-br from-yellow-400/20 to-yellow-600/10 flex items-center justify-center">
-                      <div className="w-5 h-3 rounded-[2px] border border-yellow-500/20 bg-gradient-to-br from-yellow-400/10 to-transparent" />
+                    {/* SIM card border line (inner glow) */}
+                    <div className="absolute inset-0 rounded-[2px] border border-white/[0.07] group-hover:border-blue-500/25 transition-colors" style={{ clipPath: 'inherit' }} />
+
+                    {/* Golden SIM chip — top-left */}
+                    <div className="absolute top-3 left-3 w-8 h-6 rounded-[3px] border border-yellow-500/40 bg-gradient-to-br from-yellow-400/25 via-yellow-500/15 to-yellow-600/10">
+                      <div className="absolute inset-[2px] rounded-[2px] border border-yellow-500/20">
+                        <div className="absolute top-1/2 left-0 right-0 h-px bg-yellow-500/15" />
+                        <div className="absolute left-1/2 top-0 bottom-0 w-px bg-yellow-500/15" />
+                      </div>
                     </div>
-                    {/* Large centered flag */}
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-300">
-                      <span className="text-6xl sm:text-7xl drop-shadow-lg select-none">{dest.flag_emoji || countryFlag(dest.country_code)}</span>
+
+                    {/* SIM notch diagonal line accent */}
+                    <div className="absolute top-0 right-0 w-[22px] h-[22px]">
+                      <div className="absolute inset-0 bg-gradient-to-bl from-blue-500/10 to-transparent" />
                     </div>
-                    {/* Gradient overlay at bottom */}
-                    <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none" />
+
+                    {/* Flag — large, 60-70% of card */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none pt-2">
+                      <span className="text-[5rem] sm:text-[5.5rem] select-none opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 drop-shadow-2xl filter">{dest.flag_emoji || countryFlag(dest.country_code)}</span>
+                    </div>
+
+                    {/* Bottom gradient for text readability */}
+                    <div className="absolute inset-x-0 bottom-0 h-[45%] bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none" />
+
                     {/* Country name + plan count */}
-                    <div className="absolute bottom-3 left-3.5 right-3.5">
-                      <h3 className="text-sm font-bold text-white truncate drop-shadow-md">{dest.country_name}</h3>
-                      <p className="text-[10px] text-slate-400 mt-0.5">{dest.plan_count} {dest.plan_count === 1 ? 'тариф' : 'тарифов'}</p>
+                    <div className="absolute bottom-3 inset-x-3 text-center">
+                      <h3 className="text-[13px] font-semibold text-white tracking-wide truncate drop-shadow-lg">{dest.country_name}</h3>
+                      <p className="text-[10px] text-slate-400/80 mt-0.5 font-medium">{dest.plan_count} {dest.plan_count === 1 ? 'тариф' : 'тарифов'}</p>
                     </div>
-                    {/* Hover arrow */}
-                    <div className="absolute top-3.5 right-3.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <ChevronRight className="w-4 h-4 text-blue-400 drop-shadow" />
-                    </div>
-                    {/* Subtle shine on hover */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 to-purple-500/0 group-hover:from-blue-500/5 group-hover:to-purple-500/5 transition-all duration-300 pointer-events-none" />
+
+                    {/* Hover glow overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 via-transparent to-purple-500/0 group-hover:from-blue-500/[0.07] group-hover:to-purple-500/[0.05] transition-all duration-500 pointer-events-none" />
                   </button>
                 ))}
               </div>
@@ -678,9 +693,9 @@ export const StorePage = () => {
             {plansLoading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {[...Array(3)].map((_, i) => (
-                  <div key={i} className="relative rounded-2xl overflow-hidden animate-pulse h-44 border border-white/[0.06]" style={{ background: 'linear-gradient(145deg, rgba(30,30,50,0.95), rgba(15,15,30,0.98))' }}>
-                    <div className="absolute top-4 left-4 w-10 h-7 rounded bg-yellow-500/10" />
-                    <div className="absolute top-4 right-4 w-12 h-12 rounded-xl bg-white/5" />
+                  <div key={i} className="relative overflow-hidden animate-pulse h-52" style={{ clipPath: 'polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%)', background: 'linear-gradient(160deg, rgba(20,20,40,0.97), rgba(10,10,25,0.99))' }}>
+                    <div className="absolute top-4 left-4 w-9 h-6 rounded-[3px] bg-yellow-500/10" />
+                    <div className="absolute top-4 right-6 w-10 h-10 rounded-full bg-white/5" />
                     <div className="absolute bottom-4 left-4 right-4 space-y-2">
                       <div className="h-4 bg-white/10 rounded w-1/2" />
                       <div className="h-6 bg-white/10 rounded w-1/3" />
@@ -699,31 +714,44 @@ export const StorePage = () => {
                   <article
                     key={plan.plan_id}
                     onClick={() => plan.in_stock && setConfirmPlan(plan)}
-                    className={`relative rounded-2xl overflow-hidden border transition-all duration-200 group ${
+                    className={`relative overflow-hidden transition-all duration-300 group ${
                       plan.in_stock
-                        ? 'cursor-pointer border-white/[0.08] hover:border-blue-500/30 hover:-translate-y-1 hover:shadow-xl hover:shadow-blue-500/10'
-                        : 'opacity-50 cursor-not-allowed border-white/[0.05]'
+                        ? 'cursor-pointer hover:-translate-y-1.5 hover:shadow-2xl hover:shadow-blue-500/20'
+                        : 'opacity-50 cursor-not-allowed'
                     }`}
-                    style={{ background: 'linear-gradient(145deg, rgba(30,30,50,0.95), rgba(15,15,30,0.98))' }}
+                    style={{
+                      clipPath: 'polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%)',
+                      background: 'linear-gradient(160deg, rgba(20,20,40,0.97), rgba(10,10,25,0.99))',
+                    }}
                   >
-                    <div className="p-5">
+                    {/* Border */}
+                    <div className="absolute inset-0 border border-white/[0.07] group-hover:border-blue-500/25 transition-colors" style={{ clipPath: 'inherit' }} />
+
+                    <div className="relative p-5">
                       {/* Top row: SIM chip + flag */}
-                      <div className="flex items-start justify-between mb-5">
-                        <div className="w-10 h-7 rounded-[4px] border border-yellow-500/30 bg-gradient-to-br from-yellow-400/20 to-yellow-600/10 flex items-center justify-center">
-                          <div className="w-6 h-3.5 rounded-[2px] border border-yellow-500/20 bg-gradient-to-br from-yellow-400/10 to-transparent" />
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="w-9 h-6 rounded-[3px] border border-yellow-500/40 bg-gradient-to-br from-yellow-400/25 via-yellow-500/15 to-yellow-600/10">
+                          <div className="absolute inset-[2px] w-[calc(100%-4px)] h-[calc(100%-4px)] rounded-[2px] border border-yellow-500/20" style={{ maxWidth: '32px', maxHeight: '20px' }}>
+                            <div className="absolute top-1/2 left-0 right-0 h-px bg-yellow-500/15" />
+                            <div className="absolute left-1/2 top-0 bottom-0 w-px bg-yellow-500/15" />
+                          </div>
                         </div>
-                        <span className="text-3xl select-none">{countryFlag(selectedCountry.country_code)}</span>
+                        <span className="text-4xl select-none drop-shadow-lg">{countryFlag(selectedCountry.country_code)}</span>
                       </div>
-                      {/* Plan name + badges */}
-                      <h3 className="text-sm font-bold text-white mb-2.5">{plan.name}</h3>
-                      <div className="flex items-center gap-2 mb-4">
-                        <span className="px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[11px] font-medium flex items-center gap-1">
+
+                      {/* Plan name */}
+                      <h3 className="text-sm font-bold text-white mb-3">{plan.name}</h3>
+
+                      {/* Badges */}
+                      <div className="flex items-center gap-2 mb-5">
+                        <span className="px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[11px] font-semibold flex items-center gap-1">
                           <Wifi className="w-3 h-3" /> {plan.data_gb} ГБ
                         </span>
-                        <span className="px-2.5 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[11px] font-medium">
+                        <span className="px-2.5 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[11px] font-semibold">
                           {plan.validity_days} дн.
                         </span>
                       </div>
+
                       {/* Price row */}
                       <div className="flex items-center justify-between pt-3 border-t border-white/[0.06]">
                         <div className="flex items-baseline gap-2">
@@ -743,8 +771,13 @@ export const StorePage = () => {
                         )}
                       </div>
                     </div>
-                    {/* Hover shine */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 to-purple-500/0 group-hover:from-blue-500/5 group-hover:to-purple-500/5 transition-all duration-300 pointer-events-none" />
+
+                    {/* SIM notch accent */}
+                    <div className="absolute top-0 right-0 w-[18px] h-[18px]">
+                      <div className="absolute inset-0 bg-gradient-to-bl from-blue-500/10 to-transparent" />
+                    </div>
+                    {/* Hover glow */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 via-transparent to-purple-500/0 group-hover:from-blue-500/[0.06] group-hover:to-purple-500/[0.04] transition-all duration-500 pointer-events-none" />
                   </article>
                 ))}
               </div>
@@ -758,11 +791,11 @@ export const StorePage = () => {
             {digitalLoading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {[...Array(6)].map((_, i) => (
-                  <div key={i} className="relative rounded-2xl overflow-hidden animate-pulse h-40 border border-white/[0.06]" style={{ background: 'linear-gradient(145deg, rgba(30,30,50,0.95), rgba(15,15,30,0.98))' }}>
-                    <div className="absolute top-4 left-4 w-10 h-10 rounded-xl bg-white/5" />
+                  <div key={i} className="relative rounded-2xl overflow-hidden animate-pulse h-48 border border-white/[0.06]" style={{ background: 'linear-gradient(160deg, rgba(20,20,40,0.97), rgba(10,10,25,0.99))' }}>
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-2xl bg-white/5" />
                     <div className="absolute bottom-4 left-4 right-4 space-y-2">
-                      <div className="h-4 bg-white/10 rounded w-2/3" />
-                      <div className="h-3 bg-white/5 rounded w-1/2" />
+                      <div className="h-4 bg-white/10 rounded w-2/3 mx-auto" />
+                      <div className="h-6 bg-white/10 rounded w-1/3 mx-auto" />
                     </div>
                   </div>
                 ))}
@@ -775,52 +808,55 @@ export const StorePage = () => {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {digitalProducts.map(product => {
-                  // Brand color accent based on product name
                   const brandKey = product.external_id?.split('-')[0] || product.name.split(' ')[0].toLowerCase();
-                  const brandColors: Record<string, { bg: string; border: string; text: string }> = {
-                    steam:     { bg: 'from-[#1b2838]/40 to-[#1b2838]/20', border: 'border-[#66c0f4]/20 hover:border-[#66c0f4]/40', text: 'text-[#66c0f4]' },
-                    psn:       { bg: 'from-[#003087]/30 to-[#003087]/10', border: 'border-blue-500/20 hover:border-blue-500/40', text: 'text-blue-400' },
-                    xbox:      { bg: 'from-[#107c10]/30 to-[#107c10]/10', border: 'border-green-500/20 hover:border-green-500/40', text: 'text-green-400' },
-                    nintendo:  { bg: 'from-[#e60012]/20 to-[#e60012]/10', border: 'border-red-500/20 hover:border-red-500/40', text: 'text-red-400' },
-                    spotify:   { bg: 'from-[#1DB954]/20 to-[#1DB954]/10', border: 'border-[#1DB954]/20 hover:border-[#1DB954]/40', text: 'text-[#1DB954]' },
-                    netflix:   { bg: 'from-[#E50914]/20 to-[#E50914]/10', border: 'border-[#E50914]/20 hover:border-[#E50914]/40', text: 'text-[#E50914]' },
+                  const brandThemes: Record<string, { accent: string; glow: string; border: string; text: string }> = {
+                    steam:     { accent: '#66c0f4', glow: 'rgba(102,192,244,0.12)', border: 'border-[#66c0f4]/15 hover:border-[#66c0f4]/40', text: 'text-[#66c0f4]' },
+                    psn:       { accent: '#003087', glow: 'rgba(0,48,135,0.15)', border: 'border-blue-500/15 hover:border-blue-500/40', text: 'text-blue-400' },
+                    xbox:      { accent: '#107c10', glow: 'rgba(16,124,16,0.15)', border: 'border-green-500/15 hover:border-green-500/40', text: 'text-green-400' },
+                    nintendo:  { accent: '#e60012', glow: 'rgba(230,0,18,0.12)', border: 'border-red-500/15 hover:border-red-500/40', text: 'text-red-400' },
+                    spotify:   { accent: '#1DB954', glow: 'rgba(29,185,84,0.12)', border: 'border-[#1DB954]/15 hover:border-[#1DB954]/40', text: 'text-[#1DB954]' },
+                    netflix:   { accent: '#E50914', glow: 'rgba(229,9,20,0.12)', border: 'border-[#E50914]/15 hover:border-[#E50914]/40', text: 'text-[#E50914]' },
                   };
-                  const brand = brandColors[brandKey] || { bg: 'from-purple-500/20 to-purple-500/10', border: 'border-purple-500/20 hover:border-purple-500/40', text: 'text-purple-400' };
+                  const theme = brandThemes[brandKey] || { accent: '#a855f7', glow: 'rgba(168,85,247,0.12)', border: 'border-purple-500/15 hover:border-purple-500/40', text: 'text-purple-400' };
 
                   return (
                     <article
                       key={product.id}
                       onClick={() => product.in_stock && setConfirmDigital(product)}
-                      className={`relative rounded-2xl overflow-hidden border transition-all duration-200 group ${
+                      className={`relative rounded-2xl overflow-hidden border transition-all duration-300 group ${
                         product.in_stock
-                          ? `cursor-pointer ${brand.border} hover:-translate-y-1 hover:shadow-xl`
+                          ? `cursor-pointer ${theme.border} hover:-translate-y-1.5 hover:shadow-2xl`
                           : 'opacity-50 cursor-not-allowed border-white/[0.05]'
                       }`}
-                      style={{ background: 'linear-gradient(145deg, rgba(30,30,50,0.95), rgba(15,15,30,0.98))' }}
+                      style={{
+                        background: 'linear-gradient(160deg, rgba(20,20,40,0.97), rgba(10,10,25,0.99))',
+                        '--brand-glow': theme.glow,
+                      } as React.CSSProperties}
                     >
-                      {/* Brand gradient overlay */}
-                      <div className={`absolute inset-0 bg-gradient-to-br ${brand.bg} pointer-events-none`} />
-                      <div className="relative p-5">
-                        {/* Logo + title row */}
-                        <div className="flex items-start gap-3 mb-3">
-                          {product.image_url ? (
-                            <div className="w-10 h-10 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center shrink-0 p-2">
-                              <img src={product.image_url} alt="" className="w-full h-full object-contain" />
-                            </div>
-                          ) : (
-                            <div className="w-10 h-10 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center shrink-0">
-                              <Gamepad2 className={`w-5 h-5 ${brand.text}`} />
-                            </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <h3 className="text-sm font-bold text-white mb-0.5 truncate">{product.name}</h3>
-                            {product.description && (
-                              <p className="text-[11px] text-slate-500 line-clamp-2">{product.description}</p>
-                            )}
+                      {/* Brand radial glow behind logo */}
+                      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-40 rounded-full opacity-60 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" style={{ background: `radial-gradient(circle, ${theme.glow} 0%, transparent 70%)` }} />
+
+                      <div className="relative p-5 flex flex-col items-center text-center">
+                        {/* Large centered brand logo */}
+                        {product.image_url ? (
+                          <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mb-4 p-3 group-hover:scale-110 transition-transform duration-300">
+                            <img src={product.image_url} alt="" className="w-full h-full object-contain drop-shadow-lg" />
                           </div>
-                        </div>
+                        ) : (
+                          <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                            <Gamepad2 className={`w-8 h-8 ${theme.text}`} />
+                          </div>
+                        )}
+
+                        {/* Product name */}
+                        <h3 className="text-sm font-bold text-white mb-1 truncate w-full">{product.name}</h3>
+                        {product.description && (
+                          <p className="text-[11px] text-slate-500 line-clamp-1 mb-4 w-full">{product.description}</p>
+                        )}
+                        {!product.description && <div className="mb-4" />}
+
                         {/* Price row */}
-                        <div className="flex items-center justify-between pt-3 border-t border-white/[0.06]">
+                        <div className="flex items-center justify-between w-full pt-3 border-t border-white/[0.06]">
                           <div className="flex items-baseline gap-2">
                             <span className="text-xl font-bold text-white">${product.price_usd}</span>
                             {product.old_price && parseFloat(product.old_price) > parseFloat(product.price_usd) && (
@@ -828,7 +864,7 @@ export const StorePage = () => {
                             )}
                           </div>
                           {product.in_stock ? (
-                            <span className={`flex items-center gap-1 text-xs ${brand.text} opacity-60 group-hover:opacity-100 transition-all font-medium`}>
+                            <span className={`flex items-center gap-1 text-xs ${theme.text} opacity-60 group-hover:opacity-100 transition-all font-medium`}>
                               Купить <ChevronRight className="w-3.5 h-3.5" />
                             </span>
                           ) : (

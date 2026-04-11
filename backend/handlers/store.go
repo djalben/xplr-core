@@ -747,6 +747,7 @@ type AdminStoreProduct struct {
 	OldPrice      decimal.Decimal `json:"old_price"`
 	InStock       bool            `json:"in_stock"`
 	ExternalID    string          `json:"external_id"`
+	ImageURL      string          `json:"image_url"`
 }
 
 // GET /api/v1/admin/store/products — list all products with pricing
@@ -754,7 +755,7 @@ func AdminStoreProductsHandler(w http.ResponseWriter, r *http.Request) {
 	rows, err := GlobalDB.Query(`
 		SELECT id, name, product_type, provider,
 			COALESCE(cost_price, 0), COALESCE(markup_percent, 20),
-			price_usd, in_stock, COALESCE(external_id, '')
+			price_usd, in_stock, COALESCE(external_id, ''), COALESCE(image_url, '')
 		FROM store_products ORDER BY product_type, sort_order, id`)
 	if err != nil {
 		http.Error(w, "Failed to fetch products", http.StatusInternalServerError)
@@ -766,7 +767,7 @@ func AdminStoreProductsHandler(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var p AdminStoreProduct
 		if err := rows.Scan(&p.ID, &p.Name, &p.ProductType, &p.Provider,
-			&p.CostPrice, &p.MarkupPercent, &p.RetailPrice, &p.InStock, &p.ExternalID); err != nil {
+			&p.CostPrice, &p.MarkupPercent, &p.RetailPrice, &p.InStock, &p.ExternalID, &p.ImageURL); err != nil {
 			continue
 		}
 		// Recalculate retail price from cost + markup
@@ -798,6 +799,7 @@ func AdminUpdateStoreProductHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		CostPrice     *float64 `json:"cost_price"`
 		MarkupPercent *float64 `json:"markup_percent"`
+		ImageURL      *string  `json:"image_url"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
@@ -813,6 +815,12 @@ func AdminUpdateStoreProductHandler(w http.ResponseWriter, r *http.Request) {
 	if req.MarkupPercent != nil {
 		if _, err := GlobalDB.Exec(`UPDATE store_products SET markup_percent = $1 WHERE id = $2`, *req.MarkupPercent, productID); err != nil {
 			http.Error(w, "Failed to update markup_percent", http.StatusInternalServerError)
+			return
+		}
+	}
+	if req.ImageURL != nil {
+		if _, err := GlobalDB.Exec(`UPDATE store_products SET image_url = $1 WHERE id = $2`, *req.ImageURL, productID); err != nil {
+			http.Error(w, "Failed to update image_url", http.StatusInternalServerError)
 			return
 		}
 	}
