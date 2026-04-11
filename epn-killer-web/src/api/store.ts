@@ -74,3 +74,61 @@ export const getStoreOrders = async (limit = 20): Promise<{ orders: StoreOrder[]
   const response = await apiClient.get('/user/store/orders', { params: { limit } });
   return response.data;
 };
+
+// ── eSIM API ──
+
+export interface ESIMDestination {
+  country_code: string;
+  country_name: string;
+  flag_emoji: string;
+  plan_count: number;
+}
+
+export interface ESIMPlan {
+  plan_id: string;
+  provider: string;
+  name: string;
+  country: string;
+  country_code: string;
+  data_gb: string;
+  validity_days: number;
+  price_usd: number;
+  description: string;
+  in_stock: boolean;
+}
+
+export interface ESIMOrderResult {
+  order_id: number;
+  product_name: string;
+  price_usd: string;
+  qr_data: string;
+  lpa: string;
+  smdp: string;
+  matching_id: string;
+  iccid: string;
+  provider_ref: string;
+  status: string;
+}
+
+export const getESIMDestinations = async (search?: string): Promise<{ destinations: ESIMDestination[] }> => {
+  const response = await apiClient.get('/user/store/esim/destinations', { params: search ? { search } : {} });
+  return response.data;
+};
+
+export const getESIMPlans = async (countryCode: string): Promise<{ plans: ESIMPlan[] }> => {
+  const response = await apiClient.get('/user/store/esim/plans', { params: { country: countryCode } });
+  return response.data;
+};
+
+export const orderESIM = async (plan: ESIMPlan): Promise<ESIMOrderResult> => {
+  const response = await apiClient.post('/user/store/esim/order', {
+    plan_id: plan.plan_id,
+    plan_name: plan.name,
+    country: plan.country,
+    country_code: plan.country_code,
+    data_gb: plan.data_gb,
+    validity_days: plan.validity_days,
+    price_usd: plan.price_usd,
+  });
+  return response.data;
+};

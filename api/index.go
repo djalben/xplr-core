@@ -566,6 +566,9 @@ func buildRouter() *mux.Router {
 	protected.HandleFunc("/store/catalog", handlers.StoreCatalogHandler).Methods("GET")
 	protected.HandleFunc("/store/purchase", handlers.StorePurchaseHandler).Methods("POST")
 	protected.HandleFunc("/store/orders", handlers.StoreOrdersHandler).Methods("GET")
+	protected.HandleFunc("/store/esim/destinations", handlers.ESIMDestinationsHandler).Methods("GET")
+	protected.HandleFunc("/store/esim/plans", handlers.ESIMPlansHandler).Methods("GET")
+	protected.HandleFunc("/store/esim/order", handlers.ESIMOrderHandler).Methods("POST")
 
 	log.Println("Registered route: GET /api/v1/user/dashboard-stats")
 

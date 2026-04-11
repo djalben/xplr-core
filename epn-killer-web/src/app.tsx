@@ -18,6 +18,7 @@ import { ResetPasswordPage } from './pages/reset-password';
 import { StaffOnlyZone } from './pages/staff-only-zone';
 import { NewsPage } from './pages/news';
 import { StorePage } from './pages/store';
+import { PurchasesPage } from './pages/purchases';
 import { PWAInstallPrompt } from './components/pwa-install-prompt';
 import { NeuralBackground } from './components/neural-background';
 import { useAuth } from './store/auth-context';
@@ -104,6 +105,7 @@ function App() {
         <Route path="/support" element={<ProtectedRoute><SupportPage /></ProtectedRoute>} />
         <Route path="/news" element={<ProtectedRoute><NewsPage /></ProtectedRoute>} />
         <Route path="/store" element={<ProtectedRoute><StorePage /></ProtectedRoute>} />
+        <Route path="/purchases" element={<ProtectedRoute><PurchasesPage /></ProtectedRoute>} />
         <Route path="/admin/rates" element={<ProtectedRoute><AdminRatesPage /></ProtectedRoute>} />
         <Route path="/staff-only-zone" element={<AdminRoute><StaffOnlyZone /></AdminRoute>} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/djalben/xplr-core/backend/middleware"
+	"github.com/djalben/xplr-core/backend/providers"
 	"github.com/djalben/xplr-core/backend/repository"
 	"github.com/djalben/xplr-core/backend/service"
 	"github.com/shopspring/decimal"
@@ -276,9 +277,9 @@ func StorePurchaseHandler(w http.ResponseWriter, r *http.Request) {
 		"order_id":       orderID,
 		"product_name":   product.Name,
 		"price_usd":      product.PriceUSD.StringFixed(2),
-		"activation_key":  activationKey,
-		"qr_data":         qrData,
-		"status":          "completed",
+		"activation_key": activationKey,
+		"qr_data":        qrData,
+		"status":         "completed",
 	})
 }
 
@@ -357,14 +358,26 @@ func callDemoProvider(product StoreProduct) (string, string, string, error) {
 	return key, "", ref, nil
 }
 
-// MobiMatter stub — will be replaced with real API integration
+// MobiMatter — uses the real eSIM provider wrapper
 func callMobiMatter(product StoreProduct) (string, string, string, error) {
-	// TODO: Implement real MobiMatter API call
-	// POST https://api.mobimatter.com/v1/orders
-	// Headers: Authorization: Bearer <MOBIMATTER_API_KEY>
-	// Body: { "productId": product.ExternalID, ... }
-	log.Printf("[MOBIMATTER] 🔧 Stub call for product %s (external_id=%s)", product.Name, product.ExternalID)
-	return callDemoProvider(product)
+	p := providers.GetESIMProvider()
+
+	// Check availability before ordering
+	available, err := p.CheckAvailability(product.ExternalID)
+	if err != nil {
+		log.Printf("[MOBIMATTER] ❌ Availability check error for %s: %v", product.ExternalID, err)
+	}
+	if !available {
+		return "", "", "", fmt.Errorf("план %s временно недоступен у поставщика", product.Name)
+	}
+
+	result, err := p.OrderESIM(product.ExternalID)
+	if err != nil {
+		return "", "", "", fmt.Errorf("eSIM order failed: %w", err)
+	}
+
+	log.Printf("[MOBIMATTER] ✅ Order placed: ref=%s, ICCID=%s", result.ProviderRef, result.ICCID)
+	return "", result.QRData, result.ProviderRef, nil
 }
 
 // Razer Gold stub — will be replaced with real API integration
@@ -432,4 +445,214 @@ func notifyStorePurchase(userID int, product StoreProduct, activationKey, qrData
 			log.Printf("[STORE-NOTIFY] ❌ Email to user %d failed: %v", userID, err)
 		}
 	}()
+}
+
+// ══════════════════════════════════════════════════════════════
+// eSIM API endpoints (provider wrapper)
+// ══════════════════════════════════════════════════════════════
+
+// GET /api/v1/store/esim/destinations
+func ESIMDestinationsHandler(w http.ResponseWriter, r *http.Request) {
+	p := providers.GetESIMProvider()
+	dests, err := p.GetDestinations()
+	if err != nil {
+		log.Printf("[ESIM] ❌ GetDestinations error: %v", err)
+		http.Error(w, "Failed to fetch destinations", http.StatusInternalServerError)
+		return
+	}
+
+	// Optional search filter
+	search := r.URL.Query().Get("search")
+	if search != "" {
+		searchLower := toLower(search)
+		var filtered []providers.ESIMDestination
+		for _, d := range dests {
+			if containsLower(d.CountryName, searchLower) || containsLower(d.CountryCode, searchLower) {
+				filtered = append(filtered, d)
+			}
+		}
+		dests = filtered
+	}
+	if dests == nil {
+		dests = []providers.ESIMDestination{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"destinations": dests})
+}
+
+// GET /api/v1/store/esim/plans?country=XX
+func ESIMPlansHandler(w http.ResponseWriter, r *http.Request) {
+	cc := r.URL.Query().Get("country")
+	if cc == "" {
+		http.Error(w, "country parameter required", http.StatusBadRequest)
+		return
+	}
+
+	p := providers.GetESIMProvider()
+	plans, err := p.GetPlans(cc)
+	if err != nil {
+		log.Printf("[ESIM] ❌ GetPlans error for %s: %v", cc, err)
+		http.Error(w, "Failed to fetch plans", http.StatusInternalServerError)
+		return
+	}
+	if plans == nil {
+		plans = []providers.ESIMPlan{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"plans": plans})
+}
+
+// POST /api/v1/store/esim/order — full eSIM purchase flow
+func ESIMOrderHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		PlanID      string  `json:"plan_id"`
+		PlanName    string  `json:"plan_name"`
+		Country     string  `json:"country"`
+		CountryCode string  `json:"country_code"`
+		DataGB      string  `json:"data_gb"`
+		Days        int     `json:"validity_days"`
+		PriceUSD    float64 `json:"price_usd"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.PlanID == "" || req.PriceUSD <= 0 {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	price := decimal.NewFromFloat(req.PriceUSD)
+	log.Printf("[ESIM-ORDER] User %d → plan %s (%s) $%s", userID, req.PlanID, req.PlanName, price.StringFixed(2))
+
+	// 1. Check availability at provider
+	p := providers.GetESIMProvider()
+	available, err := p.CheckAvailability(req.PlanID)
+	if err != nil {
+		log.Printf("[ESIM-ORDER] ⚠️ Availability check error: %v (proceeding anyway)", err)
+	}
+	if !available {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Этот план временно недоступен у поставщика. Попробуйте другой.",
+			"code":  "OUT_OF_STOCK",
+		})
+		return
+	}
+
+	// 2. Check wallet balance
+	wallet, err := repository.GetInternalBalance(userID)
+	if err != nil {
+		http.Error(w, "Failed to get wallet", http.StatusInternalServerError)
+		return
+	}
+	if wallet.MasterBalance.LessThan(price) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusPaymentRequired)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error":    fmt.Sprintf("Недостаточно средств (баланс: $%s, цена: $%s)", wallet.MasterBalance.StringFixed(2), price.StringFixed(2)),
+			"code":     "INSUFFICIENT_BALANCE",
+			"balance":  wallet.MasterBalance.StringFixed(2),
+			"required": price.StringFixed(2),
+		})
+		return
+	}
+
+	// 3. Order from provider
+	result, orderErr := p.OrderESIM(req.PlanID)
+	if orderErr != nil {
+		log.Printf("[ESIM-ORDER] ❌ Provider order error: %v", orderErr)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadGateway)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Ошибка поставщика: " + orderErr.Error(),
+			"code":  "PROVIDER_ERROR",
+		})
+		return
+	}
+
+	// 4. Deduct balance
+	productName := req.PlanName
+	if productName == "" {
+		productName = "eSIM " + req.CountryCode
+	}
+	details := fmt.Sprintf("eSIM: %s — $%s", productName, price.StringFixed(2))
+	if err := repository.DeductWalletBalance(userID, price, details); err != nil {
+		log.Printf("[ESIM-ORDER] ❌ Deduct failed for user %d: %v", userID, err)
+		http.Error(w, "Payment failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// 5. Record order in store_orders
+	var orderID int
+	err = GlobalDB.QueryRow(`
+		INSERT INTO store_orders (user_id, product_id, product_name, price_usd, status, activation_key, qr_data, provider_ref)
+		VALUES ($1, 0, $2, $3, 'completed', $4, $5, $6) RETURNING id`,
+		userID, productName, price, result.ICCID, result.QRData, result.ProviderRef,
+	).Scan(&orderID)
+	if err != nil {
+		log.Printf("[ESIM-ORDER] ❌ Failed to record order: %v", err)
+	}
+
+	log.Printf("[ESIM-ORDER] ✅ User %d ordered '%s' for $%s (order #%d, ref=%s)",
+		userID, productName, price.StringFixed(2), orderID, result.ProviderRef)
+
+	// 6. Notify
+	go func() {
+		product := StoreProduct{
+			Name:     productName,
+			PriceUSD: price,
+		}
+		notifyStorePurchase(userID, product, "", result.QRData)
+	}()
+
+	// 7. Return full result
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"order_id":     orderID,
+		"product_name": productName,
+		"price_usd":    price.StringFixed(2),
+		"qr_data":      result.QRData,
+		"lpa":          result.LPA,
+		"smdp":         result.SMDP,
+		"matching_id":  result.MatchingID,
+		"iccid":        result.ICCID,
+		"provider_ref": result.ProviderRef,
+		"status":       "completed",
+	})
+}
+
+// ══════════════════════════════════════════════════════════════
+// Utility helpers
+// ══════════════════════════════════════════════════════════════
+
+func toLower(s string) string {
+	b := make([]byte, len(s))
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c >= 'A' && c <= 'Z' {
+			c += 'a' - 'A'
+		}
+		b[i] = c
+	}
+	return string(b)
+}
+
+func containsLower(s, sub string) bool {
+	s = toLower(s)
+	return len(s) >= len(sub) && findSubstring(s, sub)
+}
+
+func findSubstring(s, sub string) bool {
+	for i := 0; i <= len(s)-len(sub); i++ {
+		if s[i:i+len(sub)] == sub {
+			return true
+		}
+	}
+	return false
 }
