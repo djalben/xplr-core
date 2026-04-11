@@ -35,9 +35,12 @@ import {
   Plus,
   Upload,
   ImageIcon,
+  Tag,
+  TrendingDown,
+  Percent,
 } from 'lucide-react';
 
-type Tab = 'dashboard' | 'users' | 'commissions' | 'tickets' | 'news' | 'logs';
+type Tab = 'dashboard' | 'users' | 'commissions' | 'tickets' | 'news' | 'logs' | 'pricing';
 
 interface DashboardStats {
   total_users: number;
@@ -242,6 +245,12 @@ export const StaffOnlyZone = () => {
   const [newsUploadProgress, setNewsUploadProgress] = useState('');
   const newsFileRef = useRef<HTMLInputElement>(null);
 
+  // ── Store pricing state ──
+  const [storeProducts, setStoreProducts] = useState<{ id: number; name: string; product_type: string; provider: string; cost_price: string; markup_percent: string; retail_price: string; old_price: string; in_stock: boolean; external_id: string }[]>([]);
+  const [editingProduct, setEditingProduct] = useState<{ id: number; cost_price: string; markup_percent: string } | null>(null);
+  const [bulkDelta, setBulkDelta] = useState('10');
+  const [bulkType, setBulkType] = useState('');
+
   const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
@@ -422,13 +431,49 @@ export const StaffOnlyZone = () => {
     } catch { showToast('Ошибка удаления', 'err'); }
   };
 
+  // ── Load store products ──
+  const loadStoreProducts = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/admin/store/products');
+      setStoreProducts(res.data || []);
+    } catch { /* ignore */ }
+  }, []);
+
+  const handleSaveProduct = async () => {
+    if (!editingProduct) return;
+    setSaving(true);
+    try {
+      await apiClient.patch(`/admin/store/products/${editingProduct.id}`, {
+        cost_price: parseFloat(editingProduct.cost_price),
+        markup_percent: parseFloat(editingProduct.markup_percent),
+      });
+      showToast('Цена обновлена');
+      setEditingProduct(null);
+      loadStoreProducts();
+    } catch { showToast('Ошибка сохранения', 'err'); }
+    finally { setSaving(false); }
+  };
+
+  const handleBulkMarkup = async () => {
+    const delta = parseFloat(bulkDelta);
+    if (!delta || delta === 0) return;
+    setSaving(true);
+    try {
+      const res = await apiClient.post('/admin/store/bulk-markup', { delta, product_type: bulkType || undefined });
+      showToast(`Наценка +${delta}% применена к ${res.data.affected} товарам`);
+      loadStoreProducts();
+    } catch { showToast('Ошибка массового обновления', 'err'); }
+    finally { setSaving(false); }
+  };
+
   useEffect(() => {
     if (tab === 'users') loadAllUsers();
     if (tab === 'commissions') { loadCommissions(); loadSysSettings(); }
     if (tab === 'tickets') { loadTickets(); loadChats(); }
     if (tab === 'news') loadNews();
     if (tab === 'logs') loadLogs();
-  }, [tab, loadAllUsers, loadCommissions, loadSysSettings, loadTickets, loadChats, loadNews, loadLogs]);
+    if (tab === 'pricing') loadStoreProducts();
+  }, [tab, loadAllUsers, loadCommissions, loadSysSettings, loadTickets, loadChats, loadNews, loadLogs, loadStoreProducts]);
 
   // ── Inspect User (Financial Passport) ──
   const inspectUserDetails = async (userId: number) => {
@@ -572,6 +617,7 @@ export const StaffOnlyZone = () => {
           <TabBtn id="commissions" icon={Settings} label="Комиссии" />
           <TabBtn id="tickets" icon={MessageSquare} label="Тикеты" />
           <TabBtn id="news" icon={Newspaper} label="Новости" />
+          <TabBtn id="pricing" icon={Tag} label="Цены" />
           <TabBtn id="logs" icon={Clock} label="Логи" />
         </div>
 
@@ -1452,6 +1498,107 @@ export const StaffOnlyZone = () => {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* ════════════ PRICING TAB ════════════ */}
+        {tab === 'pricing' && (
+          <div className="space-y-6">
+            {/* Bulk markup section */}
+            <div className="glass-card p-5">
+              <h4 className="text-white text-sm font-semibold mb-3 flex items-center gap-2"><Percent className="w-4 h-4 text-orange-400" /> Массовое изменение наценки</h4>
+              <div className="flex flex-wrap gap-3 items-end">
+                <div>
+                  <label className="text-[10px] text-slate-500 mb-1 block">Дельта (%)</label>
+                  <input type="number" step="1" value={bulkDelta} onChange={e => setBulkDelta(e.target.value)} className="w-24 px-2 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm outline-none focus:border-blue-500/50" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-500 mb-1 block">Тип товара</label>
+                  <select value={bulkType} onChange={e => setBulkType(e.target.value)} className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm outline-none">
+                    <option value="">Все</option>
+                    <option value="esim">eSIM</option>
+                    <option value="digital">Цифровые</option>
+                  </select>
+                </div>
+                <button onClick={handleBulkMarkup} disabled={saving} className="px-5 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5">
+                  <TrendingUp className="w-4 h-4" />{saving ? '...' : `Применить +${bulkDelta}%`}
+                </button>
+              </div>
+            </div>
+
+            {/* Products table */}
+            <div className="glass-card overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-white/10">
+                      <th className="text-left px-4 py-3 text-slate-400 font-medium">ID</th>
+                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Товар</th>
+                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Тип</th>
+                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Себестоимость</th>
+                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Наценка %</th>
+                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Розница</th>
+                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Старая цена</th>
+                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Статус</th>
+                      <th className="text-left px-4 py-3 text-slate-400 font-medium"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {storeProducts.map(p => (
+                      <tr key={p.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                        <td className="px-4 py-3 text-slate-500 font-mono text-xs">{p.id}</td>
+                        <td className="px-4 py-3 text-white text-xs font-medium max-w-[180px] truncate" title={p.name}>{p.name}</td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                            p.product_type === 'esim' ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'
+                          }`}>{p.product_type}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {editingProduct?.id === p.id ? (
+                            <input type="number" step="0.01" value={editingProduct.cost_price} onChange={e => setEditingProduct({ ...editingProduct, cost_price: e.target.value })} className="w-20 px-2 py-1 bg-white/10 border border-blue-500/50 rounded text-white text-xs outline-none" />
+                          ) : (
+                            <span className="text-emerald-400 font-medium text-xs">${parseFloat(p.cost_price).toFixed(2)}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {editingProduct?.id === p.id ? (
+                            <input type="number" step="1" value={editingProduct.markup_percent} onChange={e => setEditingProduct({ ...editingProduct, markup_percent: e.target.value })} className="w-16 px-2 py-1 bg-white/10 border border-blue-500/50 rounded text-white text-xs outline-none" />
+                          ) : (
+                            <span className="text-orange-400 font-medium text-xs">{parseFloat(p.markup_percent).toFixed(0)}%</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-white font-bold text-xs">${parseFloat(p.retail_price).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-slate-500 text-xs line-through">${parseFloat(p.old_price).toFixed(2)}</td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${p.in_stock ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                            {p.in_stock ? 'В наличии' : 'Нет'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {editingProduct?.id === p.id ? (
+                            <div className="flex gap-1">
+                              <button onClick={handleSaveProduct} disabled={saving} className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-xs transition-colors disabled:opacity-50">
+                                {saving ? '...' : 'OK'}
+                              </button>
+                              <button onClick={() => setEditingProduct(null)} className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-slate-300 rounded text-xs transition-colors">
+                                ✕
+                              </button>
+                            </div>
+                          ) : (
+                            <button onClick={() => setEditingProduct({ id: p.id, cost_price: p.cost_price, markup_percent: p.markup_percent })} className="text-blue-400 hover:text-blue-300 text-xs transition-colors">
+                              Изменить
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {storeProducts.length === 0 && (
+                      <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-500">Нет товаров</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}

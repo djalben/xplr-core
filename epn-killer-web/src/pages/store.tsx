@@ -685,7 +685,12 @@ export const StorePage = () => {
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-lg font-bold text-white">${plan.price_usd.toFixed(2)}</span>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-lg font-bold text-white">${plan.price_usd.toFixed(2)}</span>
+                        {plan.old_price > 0 && plan.old_price > plan.price_usd && (
+                          <span className="text-xs text-slate-500 line-through">${plan.old_price.toFixed(2)}</span>
+                        )}
+                      </div>
                       {plan.in_stock ? (
                         <span className="flex items-center gap-1 text-xs text-blue-400/60 group-hover:text-blue-400 transition-colors font-medium">
                           Купить <ChevronRight className="w-3.5 h-3.5" />
@@ -734,7 +739,12 @@ export const StorePage = () => {
                       )}
                     </div>
                     <div className="flex items-center justify-between mt-auto">
-                      <span className="text-lg font-bold text-white">${product.price_usd}</span>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-lg font-bold text-white">${product.price_usd}</span>
+                        {product.old_price && parseFloat(product.old_price) > parseFloat(product.price_usd) && (
+                          <span className="text-xs text-slate-500 line-through">${parseFloat(product.old_price).toFixed(2)}</span>
+                        )}
+                      </div>
                       {product.in_stock ? (
                         <span className="flex items-center gap-1 text-xs text-purple-400/60 group-hover:text-purple-400 transition-colors font-medium">
                           Купить <ChevronRight className="w-3.5 h-3.5" />

@@ -425,6 +425,22 @@ func ensureDB() {
 				digitalCatID, p.extID, p.name, p.desc, p.price, i)
 		}
 	}
+	// 9c10b. Add cost_price and markup_percent columns to store_products
+	for _, ddl := range []string{
+		`ALTER TABLE store_products ADD COLUMN IF NOT EXISTS cost_price NUMERIC(10,2) DEFAULT 0`,
+		`ALTER TABLE store_products ADD COLUMN IF NOT EXISTS markup_percent NUMERIC(6,2) DEFAULT 20`,
+	} {
+		if _, err := db.Exec(ddl); err != nil {
+			log.Printf("[STORE-MARKUP] column migration: %v (may already exist, OK)", err)
+		}
+	}
+	// Backfill: set cost_price = price_usd for rows where cost_price is still 0
+	db.Exec(`UPDATE store_products SET cost_price = price_usd WHERE cost_price = 0 OR cost_price IS NULL`)
+	// Set default markup: eSIM = 150%, digital = 20%
+	db.Exec(`UPDATE store_products SET markup_percent = 150 WHERE product_type = 'esim' AND markup_percent = 20`)
+	db.Exec(`UPDATE store_products SET markup_percent = 20 WHERE product_type = 'digital' AND (markup_percent IS NULL OR markup_percent = 0)`)
+	log.Println("[STORE-MARKUP] ✅ cost_price + markup_percent columns ensured")
+
 	log.Println("[STORE-MIGRATION] ✅ Store tables + seed data ensured")
 
 	// 9d. Force admin rights for known admins
@@ -652,6 +668,9 @@ func buildRouter() *mux.Router {
 	admin.HandleFunc("/news/{id}", handlers.AdminDeleteNewsHandler).Methods("DELETE")
 	admin.HandleFunc("/upload-image", handlers.AdminUploadImageHandler).Methods("POST")
 	admin.HandleFunc("/test-upload", handlers.AdminTestUploadHandler).Methods("GET")
+	admin.HandleFunc("/store/products", handlers.AdminStoreProductsHandler).Methods("GET")
+	admin.HandleFunc("/store/products/{id}", handlers.AdminUpdateStoreProductHandler).Methods("PATCH")
+	admin.HandleFunc("/store/bulk-markup", handlers.AdminBulkMarkupHandler).Methods("POST")
 
 	log.Println("✅ [ROUTER] All routes registered successfully")
 	return r

@@ -20,6 +20,7 @@ export interface StoreProduct {
   country: string;
   country_code: string;
   price_usd: string;
+  old_price: string;
   data_gb: string;
   validity_days: number;
   image_url: string;
@@ -93,6 +94,7 @@ export interface ESIMPlan {
   data_gb: string;
   validity_days: number;
   price_usd: number;
+  old_price: number;
   description: string;
   in_stock: boolean;
 }

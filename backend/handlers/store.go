@@ -30,23 +30,58 @@ type StoreCategory struct {
 }
 
 type StoreProduct struct {
-	ID           int             `json:"id"`
-	CategoryID   int             `json:"category_id"`
-	CategorySlug string          `json:"category_slug"`
-	Provider     string          `json:"provider"`
-	ExternalID   string          `json:"external_id"`
-	Name         string          `json:"name"`
-	Description  string          `json:"description"`
-	Country      string          `json:"country"`
-	CountryCode  string          `json:"country_code"`
-	PriceUSD     decimal.Decimal `json:"price_usd"`
-	DataGB       string          `json:"data_gb"`
-	ValidityDays int             `json:"validity_days"`
-	ImageURL     string          `json:"image_url"`
-	ProductType  string          `json:"product_type"`
-	InStock      bool            `json:"in_stock"`
-	Meta         json.RawMessage `json:"meta"`
-	SortOrder    int             `json:"sort_order"`
+	ID            int             `json:"id"`
+	CategoryID    int             `json:"category_id"`
+	CategorySlug  string          `json:"category_slug"`
+	Provider      string          `json:"provider"`
+	ExternalID    string          `json:"external_id"`
+	Name          string          `json:"name"`
+	Description   string          `json:"description"`
+	Country       string          `json:"country"`
+	CountryCode   string          `json:"country_code"`
+	PriceUSD      decimal.Decimal `json:"price_usd"`
+	CostPrice     decimal.Decimal `json:"cost_price"`
+	MarkupPercent decimal.Decimal `json:"markup_percent"`
+	OldPrice      decimal.Decimal `json:"old_price"`
+	DataGB        string          `json:"data_gb"`
+	ValidityDays  int             `json:"validity_days"`
+	ImageURL      string          `json:"image_url"`
+	ProductType   string          `json:"product_type"`
+	InStock       bool            `json:"in_stock"`
+	Meta          json.RawMessage `json:"meta"`
+	SortOrder     int             `json:"sort_order"`
+}
+
+// calculatePrice computes the retail price from cost and markup,
+// then rounds UP to the nearest .90 (e.g. $12.15 → $12.90).
+func calculatePrice(cost, markupPct decimal.Decimal) decimal.Decimal {
+	if cost.IsZero() {
+		return decimal.Zero
+	}
+	// retail = cost * (1 + markup/100)
+	multiplier := decimal.NewFromInt(1).Add(markupPct.Div(decimal.NewFromInt(100)))
+	raw := cost.Mul(multiplier)
+
+	// Round up to nearest .90
+	floor := raw.Floor()   // integer part
+	frac := raw.Sub(floor) // fractional part
+	threshold := decimal.NewFromFloat(0.90)
+	if frac.LessThanOrEqual(threshold) {
+		return floor.Add(threshold) // e.g. 12.15 → 12.90
+	}
+	// frac > 0.90 → next integer + .90
+	return floor.Add(decimal.NewFromInt(1)).Add(threshold) // e.g. 12.95 → 13.90
+}
+
+// applyMarkup recalculates PriceUSD and OldPrice from CostPrice + MarkupPercent.
+func applyMarkup(p *StoreProduct) {
+	if p.CostPrice.IsPositive() && p.MarkupPercent.IsPositive() {
+		p.PriceUSD = calculatePrice(p.CostPrice, p.MarkupPercent)
+	}
+	// Fake "old price" = current price * 1.20 (rounded to .90)
+	if p.PriceUSD.IsPositive() {
+		p.OldPrice = calculatePrice(p.PriceUSD, decimal.NewFromInt(20))
+	}
 }
 
 type StoreOrder struct {
@@ -100,7 +135,9 @@ func StoreCatalogHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Build product query with optional filters
 	query := `SELECT p.id, p.category_id, c.slug, p.provider, p.external_id, p.name, p.description,
-		COALESCE(p.country, ''), COALESCE(p.country_code, ''), p.price_usd, COALESCE(p.data_gb, ''),
+		COALESCE(p.country, ''), COALESCE(p.country_code, ''), p.price_usd,
+		COALESCE(p.cost_price, 0), COALESCE(p.markup_percent, 20),
+		COALESCE(p.data_gb, ''),
 		COALESCE(p.validity_days, 0), COALESCE(p.image_url, ''), p.product_type, p.in_stock,
 		COALESCE(p.meta, '{}'), p.sort_order
 		FROM store_products p
@@ -138,11 +175,14 @@ func StoreCatalogHandler(w http.ResponseWriter, r *http.Request) {
 	for prodRows.Next() {
 		var p StoreProduct
 		if err := prodRows.Scan(&p.ID, &p.CategoryID, &p.CategorySlug, &p.Provider, &p.ExternalID,
-			&p.Name, &p.Description, &p.Country, &p.CountryCode, &p.PriceUSD, &p.DataGB,
+			&p.Name, &p.Description, &p.Country, &p.CountryCode, &p.PriceUSD,
+			&p.CostPrice, &p.MarkupPercent,
+			&p.DataGB,
 			&p.ValidityDays, &p.ImageURL, &p.ProductType, &p.InStock, &p.Meta, &p.SortOrder); err != nil {
 			log.Printf("[STORE] product scan error: %v", err)
 			continue
 		}
+		applyMarkup(&p)
 		products = append(products, p)
 	}
 	if products == nil {
@@ -182,7 +222,9 @@ func StorePurchaseHandler(w http.ResponseWriter, r *http.Request) {
 	var metaBytes []byte
 	err := GlobalDB.QueryRow(`
 		SELECT p.id, p.category_id, c.slug, p.provider, p.external_id, p.name, p.description,
-			COALESCE(p.country, ''), COALESCE(p.country_code, ''), p.price_usd, COALESCE(p.data_gb, ''),
+			COALESCE(p.country, ''), COALESCE(p.country_code, ''), p.price_usd,
+			COALESCE(p.cost_price, 0), COALESCE(p.markup_percent, 20),
+			COALESCE(p.data_gb, ''),
 			COALESCE(p.validity_days, 0), COALESCE(p.image_url, ''), p.product_type, p.in_stock,
 			COALESCE(p.meta, '{}'), p.sort_order
 		FROM store_products p
@@ -190,7 +232,8 @@ func StorePurchaseHandler(w http.ResponseWriter, r *http.Request) {
 		WHERE p.id = $1
 	`, req.ProductID).Scan(&product.ID, &product.CategoryID, &product.CategorySlug, &product.Provider,
 		&product.ExternalID, &product.Name, &product.Description, &product.Country, &product.CountryCode,
-		&product.PriceUSD, &product.DataGB, &product.ValidityDays, &product.ImageURL, &product.ProductType,
+		&product.PriceUSD, &product.CostPrice, &product.MarkupPercent,
+		&product.DataGB, &product.ValidityDays, &product.ImageURL, &product.ProductType,
 		&product.InStock, &metaBytes, &product.SortOrder)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -202,6 +245,7 @@ func StorePurchaseHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	product.Meta = metaBytes
+	applyMarkup(&product)
 
 	// 2. Check stock
 	if !product.InStock {
@@ -489,8 +533,8 @@ func ESIMPlansHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p := providers.GetESIMProvider()
-	plans, err := p.GetPlans(cc)
+	prov := providers.GetESIMProvider()
+	plans, err := prov.GetPlans(cc)
 	if err != nil {
 		log.Printf("[ESIM] ❌ GetPlans error for %s: %v", cc, err)
 		http.Error(w, "Failed to fetch plans", http.StatusInternalServerError)
@@ -498,6 +542,24 @@ func ESIMPlansHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if plans == nil {
 		plans = []providers.ESIMPlan{}
+	}
+
+	// Read eSIM default markup from DB (or use 150%)
+	var esimMarkup float64 = 150
+	if GlobalDB != nil {
+		row := GlobalDB.QueryRow(`SELECT COALESCE(AVG(markup_percent), 150) FROM store_products WHERE product_type = 'esim' AND markup_percent > 0`)
+		row.Scan(&esimMarkup)
+	}
+	markupDec := decimal.NewFromFloat(esimMarkup)
+
+	// Apply markup to each plan
+	for i := range plans {
+		costDec := decimal.NewFromFloat(plans[i].PriceUSD)
+		plans[i].CostPrice = plans[i].PriceUSD
+		retailDec := calculatePrice(costDec, markupDec)
+		plans[i].PriceUSD, _ = retailDec.Float64()
+		oldDec := calculatePrice(retailDec, decimal.NewFromInt(20))
+		plans[i].OldPrice, _ = oldDec.Float64()
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -655,4 +717,138 @@ func findSubstring(s, sub string) bool {
 		}
 	}
 	return false
+}
+
+// ══════════════════════════════════════════════════════════════
+// Admin: Store Price Management
+// ══════════════════════════════════════════════════════════════
+
+// AdminStoreProduct — admin view includes cost_price and markup
+type AdminStoreProduct struct {
+	ID            int             `json:"id"`
+	Name          string          `json:"name"`
+	ProductType   string          `json:"product_type"`
+	Provider      string          `json:"provider"`
+	CostPrice     decimal.Decimal `json:"cost_price"`
+	MarkupPercent decimal.Decimal `json:"markup_percent"`
+	RetailPrice   decimal.Decimal `json:"retail_price"`
+	OldPrice      decimal.Decimal `json:"old_price"`
+	InStock       bool            `json:"in_stock"`
+	ExternalID    string          `json:"external_id"`
+}
+
+// GET /api/v1/admin/store/products — list all products with pricing
+func AdminStoreProductsHandler(w http.ResponseWriter, r *http.Request) {
+	rows, err := GlobalDB.Query(`
+		SELECT id, name, product_type, provider,
+			COALESCE(cost_price, 0), COALESCE(markup_percent, 20),
+			price_usd, in_stock, COALESCE(external_id, '')
+		FROM store_products ORDER BY product_type, sort_order, id`)
+	if err != nil {
+		http.Error(w, "Failed to fetch products", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var products []AdminStoreProduct
+	for rows.Next() {
+		var p AdminStoreProduct
+		if err := rows.Scan(&p.ID, &p.Name, &p.ProductType, &p.Provider,
+			&p.CostPrice, &p.MarkupPercent, &p.RetailPrice, &p.InStock, &p.ExternalID); err != nil {
+			continue
+		}
+		// Recalculate retail price from cost + markup
+		if p.CostPrice.IsPositive() && p.MarkupPercent.IsPositive() {
+			p.RetailPrice = calculatePrice(p.CostPrice, p.MarkupPercent)
+		}
+		if p.RetailPrice.IsPositive() {
+			p.OldPrice = calculatePrice(p.RetailPrice, decimal.NewFromInt(20))
+		}
+		products = append(products, p)
+	}
+	if products == nil {
+		products = []AdminStoreProduct{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(products)
+}
+
+// PATCH /api/v1/admin/store/products/{id} — update cost_price and/or markup_percent
+func AdminUpdateStoreProductHandler(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Path[len("/api/v1/admin/store/products/"):]
+	productID, _ := strconv.Atoi(idStr)
+	if productID <= 0 {
+		http.Error(w, "Invalid product ID", http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		CostPrice     *float64 `json:"cost_price"`
+		MarkupPercent *float64 `json:"markup_percent"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if req.CostPrice != nil {
+		if _, err := GlobalDB.Exec(`UPDATE store_products SET cost_price = $1 WHERE id = $2`, *req.CostPrice, productID); err != nil {
+			http.Error(w, "Failed to update cost_price", http.StatusInternalServerError)
+			return
+		}
+	}
+	if req.MarkupPercent != nil {
+		if _, err := GlobalDB.Exec(`UPDATE store_products SET markup_percent = $1 WHERE id = $2`, *req.MarkupPercent, productID); err != nil {
+			http.Error(w, "Failed to update markup_percent", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Also update the stored price_usd column for consistency
+	GlobalDB.Exec(`
+		UPDATE store_products SET price_usd = cost_price * (1 + markup_percent / 100) WHERE id = $1`, productID)
+
+	log.Printf("[ADMIN-STORE] Updated product %d: cost=%v markup=%v", productID, req.CostPrice, req.MarkupPercent)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+// POST /api/v1/admin/store/bulk-markup — increase markup_percent by delta for all or filtered products
+func AdminBulkMarkupHandler(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Delta       float64 `json:"delta"`
+		ProductType string  `json:"product_type"` // optional: "esim", "digital", or "" for all
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Delta == 0 {
+		http.Error(w, "Invalid request (delta required)", http.StatusBadRequest)
+		return
+	}
+
+	query := `UPDATE store_products SET markup_percent = markup_percent + $1`
+	args := []interface{}{req.Delta}
+	if req.ProductType != "" {
+		query += ` WHERE product_type = $2`
+		args = append(args, req.ProductType)
+	}
+
+	res, err := GlobalDB.Exec(query, args...)
+	if err != nil {
+		http.Error(w, "Failed to update markups", http.StatusInternalServerError)
+		return
+	}
+	affected, _ := res.RowsAffected()
+
+	// Also update stored price_usd for consistency
+	GlobalDB.Exec(`UPDATE store_products SET price_usd = cost_price * (1 + markup_percent / 100) WHERE cost_price > 0`)
+
+	log.Printf("[ADMIN-STORE] Bulk markup +%.1f%% applied to %d products (type=%s)", req.Delta, affected, req.ProductType)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":   "ok",
+		"affected": affected,
+		"delta":    req.Delta,
+	})
 }

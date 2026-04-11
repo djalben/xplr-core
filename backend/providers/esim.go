@@ -32,6 +32,8 @@ type ESIMPlan struct {
 	DataGB       string  `json:"data_gb"`
 	ValidityDays int     `json:"validity_days"`
 	PriceUSD     float64 `json:"price_usd"`
+	OldPrice     float64 `json:"old_price"`
+	CostPrice    float64 `json:"cost_price,omitempty"`
 	Description  string  `json:"description"`
 	InStock      bool    `json:"in_stock"`
 }
