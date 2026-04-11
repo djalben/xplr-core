@@ -2,28 +2,15 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ShoppingBag, Search, Globe, Gamepad2, X, Copy, Check, Loader2,
-  AlertTriangle, QrCode, Key, ChevronRight, ChevronLeft, ArrowLeft,
+  AlertTriangle, QrCode, Key, ChevronRight, ArrowLeft,
   Download, FileText, Smartphone, Wifi
 } from 'lucide-react';
 import { DashboardLayout } from '../components/dashboard-layout';
 import {
   getStoreCatalog, purchaseProduct,
   getESIMDestinations, getESIMPlans, orderESIM,
-  type StoreProduct, type StoreCategory, type ESIMDestination, type ESIMPlan, type ESIMOrderResult,
+  type StoreProduct, type ESIMDestination, type ESIMPlan, type ESIMOrderResult,
 } from '../api/store';
-
-// ── Skeleton Loader ──
-const CardSkeleton = () => (
-  <div className="glass-card p-5 animate-pulse">
-    <div className="h-5 bg-white/10 rounded w-2/3 mb-3" />
-    <div className="h-3 bg-white/5 rounded w-full mb-2" />
-    <div className="h-3 bg-white/5 rounded w-1/2 mb-4" />
-    <div className="flex items-center justify-between">
-      <div className="h-6 bg-white/10 rounded w-20" />
-      <div className="h-8 bg-white/5 rounded-lg w-24" />
-    </div>
-  </div>
-);
 
 // ── Country flag emoji ──
 const countryFlag = (code: string) => {
@@ -415,12 +402,12 @@ const DigitalConfirmModal = ({
 
 export const StorePage = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'esim' | 'digital'>('esim');
+  const [storeView, setStoreView] = useState<'hub' | 'esim' | 'digital'>('hub');
   const [error, setError] = useState('');
 
   // eSIM state
   const [destinations, setDestinations] = useState<ESIMDestination[]>([]);
-  const [destsLoading, setDestsLoading] = useState(true);
+  const [destsLoading, setDestsLoading] = useState(false);
   const [destsSearch, setDestsSearch] = useState('');
   const [selectedCountry, setSelectedCountry] = useState<ESIMDestination | null>(null);
   const [plans, setPlans] = useState<ESIMPlan[]>([]);
@@ -433,7 +420,7 @@ export const StorePage = () => {
 
   // Digital state
   const [digitalProducts, setDigitalProducts] = useState<StoreProduct[]>([]);
-  const [digitalLoading, setDigitalLoading] = useState(true);
+  const [digitalLoading, setDigitalLoading] = useState(false);
   const [confirmDigital, setConfirmDigital] = useState<StoreProduct | null>(null);
   const [digitalPurchasing, setDigitalPurchasing] = useState(false);
   const [digitalResult, setDigitalResult] = useState<{ productName: string; priceUsd: string; activationKey: string } | null>(null);
@@ -452,10 +439,10 @@ export const StorePage = () => {
   }, [destsSearch]);
 
   useEffect(() => {
-    if (activeTab !== 'esim') return;
+    if (storeView !== 'esim') return;
     const t = setTimeout(() => loadDestinations(), destsSearch ? 300 : 0);
     return () => clearTimeout(t);
-  }, [loadDestinations, destsSearch, activeTab]);
+  }, [loadDestinations, destsSearch, storeView]);
 
   // Load eSIM plans for selected country
   const loadPlans = useCallback(async (cc: string) => {
@@ -488,8 +475,8 @@ export const StorePage = () => {
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'digital') loadDigital();
-  }, [activeTab, loadDigital]);
+    if (storeView === 'digital') loadDigital();
+  }, [storeView, loadDigital]);
 
   // eSIM purchase handler
   const handleESIMPurchase = async () => {
@@ -528,23 +515,31 @@ export const StorePage = () => {
     }
   };
 
-  const tabs = [
-    { slug: 'esim' as const, label: 'eSIM — Весь мир', icon: <Globe className="w-4 h-4" /> },
-    { slug: 'digital' as const, label: 'Цифровые товары', icon: <Gamepad2 className="w-4 h-4" /> },
-  ];
-
   return (
     <DashboardLayout>
       <div className="max-w-5xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/30 flex items-center justify-center">
-              <ShoppingBag className="w-5 h-5 text-blue-400" />
-            </div>
+            {storeView !== 'hub' && (
+              <button
+                onClick={() => { setStoreView('hub'); setSelectedCountry(null); setDestsSearch(''); }}
+                className="p-2 -ml-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+            )}
             <div>
-              <h1 className="text-xl font-bold text-white">Магазин</h1>
-              <p className="text-xs text-slate-400">eSIM, игровые ключи, подписки</p>
+              <h1 className="text-xl font-bold text-white">
+                {storeView === 'hub' && 'Магазин'}
+                {storeView === 'esim' && 'eSIM / Сим-карты'}
+                {storeView === 'digital' && 'Цифровые товары'}
+              </h1>
+              <p className="text-xs text-slate-400">
+                {storeView === 'hub' && 'Выберите категорию'}
+                {storeView === 'esim' && 'Интернет для путешествий'}
+                {storeView === 'digital' && 'Ключи, игры и софт'}
+              </p>
             </div>
           </div>
           <button
@@ -556,34 +551,46 @@ export const StorePage = () => {
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-2">
-          {tabs.map(tab => (
+        {/* ═══════ Hub — Category Cards ═══════ */}
+        {storeView === 'hub' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 pt-4">
+            {/* eSIM Category */}
             <button
-              key={tab.slug}
-              onClick={() => { setActiveTab(tab.slug); setSelectedCountry(null); setDestsSearch(''); }}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border transition-all ${
-                activeTab === tab.slug
-                  ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
-                  : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-white'
-              }`}
+              onClick={() => setStoreView('esim')}
+              className="group relative rounded-2xl border border-white/[0.08] hover:border-cyan-500/30 bg-transparent backdrop-blur-sm p-8 md:p-10 flex flex-col items-center text-center transition-all duration-300 hover:shadow-2xl hover:shadow-cyan-500/10 hover:-translate-y-1"
             >
-              {tab.icon}
-              <span className="hidden sm:inline">{tab.label}</span>
-              <span className="sm:hidden">{tab.slug === 'esim' ? 'eSIM' : 'Товары'}</span>
+              <div className="w-52 h-32 md:w-64 md:h-40 rounded-[50%] overflow-hidden border-2 border-cyan-500/20 group-hover:border-cyan-400/50 transition-colors shadow-lg shadow-cyan-500/5 mb-6">
+                <img src="/store-esim.png" alt="eSIM" className="w-full h-full object-cover scale-110 group-hover:scale-125 transition-transform duration-500" />
+              </div>
+              <h2 className="text-lg font-bold text-white mb-1 group-hover:text-cyan-300 transition-colors">eSIM / Сим-карты</h2>
+              <p className="text-xs text-slate-500">Интернет для путешествий</p>
+              <ChevronRight className="absolute right-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-700 group-hover:text-cyan-400 transition-colors hidden md:block" />
             </button>
-          ))}
-        </div>
 
-        {/* ═══════ eSIM Tab ═══════ */}
-        {activeTab === 'esim' && !selectedCountry && (
+            {/* Digital Category */}
+            <button
+              onClick={() => setStoreView('digital')}
+              className="group relative rounded-2xl border border-white/[0.08] hover:border-purple-500/30 bg-transparent backdrop-blur-sm p-8 md:p-10 flex flex-col items-center text-center transition-all duration-300 hover:shadow-2xl hover:shadow-purple-500/10 hover:-translate-y-1"
+            >
+              <div className="w-52 h-32 md:w-64 md:h-40 rounded-[50%] overflow-hidden border-2 border-purple-500/20 group-hover:border-purple-400/50 transition-colors shadow-lg shadow-purple-500/5 mb-6">
+                <img src="/store-digital.png" alt="Digital" className="w-full h-full object-cover scale-110 group-hover:scale-125 transition-transform duration-500" />
+              </div>
+              <h2 className="text-lg font-bold text-white mb-1 group-hover:text-purple-300 transition-colors">Цифровые товары</h2>
+              <p className="text-xs text-slate-500">Ключи, игры и софт</p>
+              <ChevronRight className="absolute right-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-700 group-hover:text-purple-400 transition-colors hidden md:block" />
+            </button>
+          </div>
+        )}
+
+        {/* ═══════ eSIM — Country List ═══════ */}
+        {storeView === 'esim' && !selectedCountry && (
           <>
             {/* Country search */}
             <div className="relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input
                 type="text"
-                placeholder="Поиск по стране (Турция, USA, Japan...)"
+                placeholder="Поиск по стране..."
                 value={destsSearch}
                 onChange={e => setDestsSearch(e.target.value)}
                 className="w-full pl-11 pr-10 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 outline-none focus:border-blue-500/50 transition-colors"
@@ -595,75 +602,39 @@ export const StorePage = () => {
               )}
             </div>
 
-            {/* Destinations grid — SIM card shape with clip-path notch */}
+            {/* Country list */}
             {destsLoading ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div className="rounded-2xl border border-white/[0.06] overflow-hidden bg-white/[0.02]">
                 {[...Array(8)].map((_, i) => (
-                  <div key={i} className="relative overflow-hidden animate-pulse" style={{ aspectRatio: '0.85/1', clipPath: 'polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 0 100%)' }}>
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.06] to-white/[0.02] rounded-2xl" />
-                    <div className="absolute top-[30%] left-1/2 -translate-x-1/2 w-16 h-16 rounded-full bg-white/5" />
-                    <div className="absolute bottom-4 left-4 right-4">
-                      <div className="h-4 bg-white/10 rounded w-2/3 mx-auto mb-1.5" />
-                      <div className="h-3 bg-white/5 rounded w-1/3 mx-auto" />
-                    </div>
+                  <div key={i} className="flex items-center gap-4 px-5 py-4 border-b border-white/[0.04] last:border-0 animate-pulse">
+                    <div className="w-8 h-6 rounded bg-white/5" />
+                    <div className="flex-1"><div className="h-4 bg-white/[0.06] rounded w-32" /></div>
+                    <div className="h-3 bg-white/[0.04] rounded w-16" />
                   </div>
                 ))}
               </div>
             ) : destinations.length === 0 ? (
-              <div className="glass-card p-12 text-center">
-                <Globe className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-12 text-center">
+                <Globe className="w-10 h-10 text-slate-600 mx-auto mb-3" />
                 <p className="text-slate-400 text-sm">{destsSearch ? 'Страна не найдена' : 'Направления загружаются...'}</p>
                 {destsSearch && (
-                  <button onClick={() => setDestsSearch('')} className="mt-3 text-xs text-blue-400 hover:text-blue-300 transition-colors">
-                    Сбросить поиск
-                  </button>
+                  <button onClick={() => setDestsSearch('')} className="mt-3 text-xs text-blue-400 hover:text-blue-300">Сбросить поиск</button>
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {destinations.map(dest => (
+              <div className="rounded-2xl border border-white/[0.06] overflow-hidden bg-white/[0.02]">
+                {destinations.map((dest, idx) => (
                   <button
                     key={dest.country_code}
                     onClick={() => setSelectedCountry(dest)}
-                    className="relative overflow-hidden hover:-translate-y-1.5 hover:shadow-2xl hover:shadow-blue-500/20 transition-all duration-300 group cursor-pointer text-left"
-                    style={{
-                      aspectRatio: '0.85/1',
-                      clipPath: 'polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 0 100%)',
-                      background: 'linear-gradient(160deg, rgba(20,20,40,0.97), rgba(10,10,25,0.99))',
-                    }}
+                    className={`w-full flex items-center gap-4 px-5 py-3.5 hover:bg-white/[0.04] transition-colors group ${
+                      idx < destinations.length - 1 ? 'border-b border-white/[0.04]' : ''
+                    }`}
                   >
-                    {/* SIM card border line (inner glow) */}
-                    <div className="absolute inset-0 rounded-[2px] border border-white/[0.07] group-hover:border-blue-500/25 transition-colors" style={{ clipPath: 'inherit' }} />
-
-                    {/* Golden SIM chip — top-left */}
-                    <div className="absolute top-3 left-3 w-8 h-6 rounded-[3px] border border-yellow-500/40 bg-gradient-to-br from-yellow-400/25 via-yellow-500/15 to-yellow-600/10">
-                      <div className="absolute inset-[2px] rounded-[2px] border border-yellow-500/20">
-                        <div className="absolute top-1/2 left-0 right-0 h-px bg-yellow-500/15" />
-                        <div className="absolute left-1/2 top-0 bottom-0 w-px bg-yellow-500/15" />
-                      </div>
-                    </div>
-
-                    {/* SIM notch diagonal line accent */}
-                    <div className="absolute top-0 right-0 w-[22px] h-[22px]">
-                      <div className="absolute inset-0 bg-gradient-to-bl from-blue-500/10 to-transparent" />
-                    </div>
-
-                    {/* Flag — large, 60-70% of card */}
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none pt-2">
-                      <span className="text-[5rem] sm:text-[5.5rem] select-none opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 drop-shadow-2xl filter">{dest.flag_emoji || countryFlag(dest.country_code)}</span>
-                    </div>
-
-                    {/* Bottom gradient for text readability */}
-                    <div className="absolute inset-x-0 bottom-0 h-[45%] bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none" />
-
-                    {/* Country name + plan count */}
-                    <div className="absolute bottom-3 inset-x-3 text-center">
-                      <h3 className="text-[13px] font-semibold text-white tracking-wide truncate drop-shadow-lg">{dest.country_name}</h3>
-                      <p className="text-[10px] text-slate-400/80 mt-0.5 font-medium">{dest.plan_count} {dest.plan_count === 1 ? 'тариф' : 'тарифов'}</p>
-                    </div>
-
-                    {/* Hover glow overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 via-transparent to-purple-500/0 group-hover:from-blue-500/[0.07] group-hover:to-purple-500/[0.05] transition-all duration-500 pointer-events-none" />
+                    <span className="text-2xl leading-none select-none w-8 text-center">{dest.flag_emoji || countryFlag(dest.country_code)}</span>
+                    <span className="flex-1 text-left text-sm font-medium text-white">{dest.country_name}</span>
+                    <span className="text-[11px] text-slate-500 font-medium">{dest.plan_count} {dest.plan_count === 1 ? 'тариф' : 'тарифов'}</span>
+                    <ChevronRight className="w-4 h-4 text-slate-700 group-hover:text-blue-400 transition-colors" />
                   </button>
                 ))}
               </div>
@@ -672,7 +643,7 @@ export const StorePage = () => {
         )}
 
         {/* ═══════ eSIM Plans (selected country) ═══════ */}
-        {activeTab === 'esim' && selectedCountry && (
+        {storeView === 'esim' && selectedCountry && (
           <>
             <button
               onClick={() => { setSelectedCountry(null); setPlans([]); }}
@@ -691,192 +662,131 @@ export const StorePage = () => {
             </div>
 
             {plansLoading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="rounded-2xl border border-white/[0.06] overflow-hidden bg-white/[0.02]">
                 {[...Array(3)].map((_, i) => (
-                  <div key={i} className="relative overflow-hidden animate-pulse h-52" style={{ clipPath: 'polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%)', background: 'linear-gradient(160deg, rgba(20,20,40,0.97), rgba(10,10,25,0.99))' }}>
-                    <div className="absolute top-4 left-4 w-9 h-6 rounded-[3px] bg-yellow-500/10" />
-                    <div className="absolute top-4 right-6 w-10 h-10 rounded-full bg-white/5" />
-                    <div className="absolute bottom-4 left-4 right-4 space-y-2">
-                      <div className="h-4 bg-white/10 rounded w-1/2" />
-                      <div className="h-6 bg-white/10 rounded w-1/3" />
+                  <div key={i} className="flex items-center gap-4 px-5 py-4 border-b border-white/[0.04] last:border-0 animate-pulse">
+                    <div className="w-8 h-6 rounded bg-white/5" />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-4 bg-white/[0.06] rounded w-40" />
+                      <div className="h-3 bg-white/[0.04] rounded w-24" />
                     </div>
+                    <div className="h-5 bg-white/[0.06] rounded w-16" />
+                    <div className="h-8 bg-white/[0.04] rounded-lg w-20" />
                   </div>
                 ))}
               </div>
             ) : plans.length === 0 ? (
-              <div className="glass-card p-12 text-center">
-                <Wifi className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-12 text-center">
+                <Wifi className="w-10 h-10 text-slate-600 mx-auto mb-3" />
                 <p className="text-slate-400 text-sm">Нет доступных тарифов</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {plans.map(plan => (
-                  <article
+              <div className="rounded-2xl border border-white/[0.06] overflow-hidden bg-white/[0.02]">
+                {plans.map((plan, idx) => (
+                  <div
                     key={plan.plan_id}
-                    onClick={() => plan.in_stock && setConfirmPlan(plan)}
-                    className={`relative overflow-hidden transition-all duration-300 group ${
-                      plan.in_stock
-                        ? 'cursor-pointer hover:-translate-y-1.5 hover:shadow-2xl hover:shadow-blue-500/20'
-                        : 'opacity-50 cursor-not-allowed'
-                    }`}
-                    style={{
-                      clipPath: 'polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%)',
-                      background: 'linear-gradient(160deg, rgba(20,20,40,0.97), rgba(10,10,25,0.99))',
-                    }}
+                    className={`flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4 transition-colors ${
+                      plan.in_stock ? 'hover:bg-white/[0.04]' : 'opacity-50'
+                    } ${idx < plans.length - 1 ? 'border-b border-white/[0.04]' : ''}`}
                   >
-                    {/* Border */}
-                    <div className="absolute inset-0 border border-white/[0.07] group-hover:border-blue-500/25 transition-colors" style={{ clipPath: 'inherit' }} />
-
-                    <div className="relative p-5">
-                      {/* Top row: SIM chip + flag */}
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="w-9 h-6 rounded-[3px] border border-yellow-500/40 bg-gradient-to-br from-yellow-400/25 via-yellow-500/15 to-yellow-600/10">
-                          <div className="absolute inset-[2px] w-[calc(100%-4px)] h-[calc(100%-4px)] rounded-[2px] border border-yellow-500/20" style={{ maxWidth: '32px', maxHeight: '20px' }}>
-                            <div className="absolute top-1/2 left-0 right-0 h-px bg-yellow-500/15" />
-                            <div className="absolute left-1/2 top-0 bottom-0 w-px bg-yellow-500/15" />
-                          </div>
-                        </div>
-                        <span className="text-4xl select-none drop-shadow-lg">{countryFlag(selectedCountry.country_code)}</span>
-                      </div>
-
-                      {/* Plan name */}
-                      <h3 className="text-sm font-bold text-white mb-3">{plan.name}</h3>
-
-                      {/* Badges */}
-                      <div className="flex items-center gap-2 mb-5">
-                        <span className="px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[11px] font-semibold flex items-center gap-1">
-                          <Wifi className="w-3 h-3" /> {plan.data_gb} ГБ
-                        </span>
-                        <span className="px-2.5 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[11px] font-semibold">
-                          {plan.validity_days} дн.
-                        </span>
-                      </div>
-
-                      {/* Price row */}
-                      <div className="flex items-center justify-between pt-3 border-t border-white/[0.06]">
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-xl font-bold text-white">${plan.price_usd.toFixed(2)}</span>
-                          {plan.old_price > 0 && plan.old_price > plan.price_usd && (
-                            <span className="text-xs text-slate-500 line-through">${plan.old_price.toFixed(2)}</span>
-                          )}
-                        </div>
-                        {plan.in_stock ? (
-                          <span className="flex items-center gap-1 text-xs text-blue-400/60 group-hover:text-blue-400 transition-colors font-medium">
-                            Купить <ChevronRight className="w-3.5 h-3.5" />
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-1 text-xs text-red-400/60 font-medium">
-                            <AlertTriangle className="w-3 h-3" /> Нет в наличии
-                          </span>
-                        )}
+                    <span className="text-xl leading-none select-none w-7 text-center shrink-0">{countryFlag(selectedCountry.country_code)}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white truncate">{plan.name}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[11px] text-blue-400 font-medium">{plan.data_gb} ГБ</span>
+                        <span className="text-slate-600 text-[10px]">•</span>
+                        <span className="text-[11px] text-slate-500">{plan.validity_days} дн.</span>
                       </div>
                     </div>
-
-                    {/* SIM notch accent */}
-                    <div className="absolute top-0 right-0 w-[18px] h-[18px]">
-                      <div className="absolute inset-0 bg-gradient-to-bl from-blue-500/10 to-transparent" />
+                    <div className="text-right shrink-0">
+                      <span className="text-sm font-bold text-white">${plan.price_usd.toFixed(2)}</span>
+                      {plan.old_price > 0 && plan.old_price > plan.price_usd && (
+                        <span className="block text-[10px] text-slate-600 line-through">${plan.old_price.toFixed(2)}</span>
+                      )}
                     </div>
-                    {/* Hover glow */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 via-transparent to-purple-500/0 group-hover:from-blue-500/[0.06] group-hover:to-purple-500/[0.04] transition-all duration-500 pointer-events-none" />
-                  </article>
+                    {plan.in_stock ? (
+                      <button
+                        onClick={() => setConfirmPlan(plan)}
+                        className="shrink-0 px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-500/25 text-blue-400 text-xs font-semibold hover:bg-blue-500/20 hover:border-blue-500/40 transition-all"
+                      >
+                        Купить
+                      </button>
+                    ) : (
+                      <span className="shrink-0 px-3 py-2 rounded-xl bg-white/5 text-slate-600 text-[11px] font-medium">
+                        Нет в наличии
+                      </span>
+                    )}
+                  </div>
                 ))}
               </div>
             )}
           </>
         )}
 
-        {/* ═══════ Digital Goods Tab ═══════ */}
-        {activeTab === 'digital' && (
+        {/* ═══════ Digital — Products List ═══════ */}
+        {storeView === 'digital' && (
           <>
             {digitalLoading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="rounded-2xl border border-white/[0.06] overflow-hidden bg-white/[0.02]">
                 {[...Array(6)].map((_, i) => (
-                  <div key={i} className="relative rounded-2xl overflow-hidden animate-pulse h-48 border border-white/[0.06]" style={{ background: 'linear-gradient(160deg, rgba(20,20,40,0.97), rgba(10,10,25,0.99))' }}>
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-2xl bg-white/5" />
-                    <div className="absolute bottom-4 left-4 right-4 space-y-2">
-                      <div className="h-4 bg-white/10 rounded w-2/3 mx-auto" />
-                      <div className="h-6 bg-white/10 rounded w-1/3 mx-auto" />
+                  <div key={i} className="flex items-center gap-4 px-5 py-4 border-b border-white/[0.04] last:border-0 animate-pulse">
+                    <div className="w-8 h-8 rounded-lg bg-white/5" />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-4 bg-white/[0.06] rounded w-36" />
+                      <div className="h-3 bg-white/[0.04] rounded w-24" />
                     </div>
+                    <div className="h-5 bg-white/[0.06] rounded w-14" />
+                    <div className="h-8 bg-white/[0.04] rounded-lg w-20" />
                   </div>
                 ))}
               </div>
             ) : digitalProducts.length === 0 ? (
-              <div className="glass-card p-12 text-center">
-                <Gamepad2 className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-12 text-center">
+                <Gamepad2 className="w-10 h-10 text-slate-600 mx-auto mb-3" />
                 <p className="text-slate-400 text-sm">Товаров пока нет</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {digitalProducts.map(product => {
-                  const brandKey = product.external_id?.split('-')[0] || product.name.split(' ')[0].toLowerCase();
-                  const brandThemes: Record<string, { accent: string; glow: string; border: string; text: string }> = {
-                    steam:     { accent: '#66c0f4', glow: 'rgba(102,192,244,0.12)', border: 'border-[#66c0f4]/15 hover:border-[#66c0f4]/40', text: 'text-[#66c0f4]' },
-                    psn:       { accent: '#003087', glow: 'rgba(0,48,135,0.15)', border: 'border-blue-500/15 hover:border-blue-500/40', text: 'text-blue-400' },
-                    xbox:      { accent: '#107c10', glow: 'rgba(16,124,16,0.15)', border: 'border-green-500/15 hover:border-green-500/40', text: 'text-green-400' },
-                    nintendo:  { accent: '#e60012', glow: 'rgba(230,0,18,0.12)', border: 'border-red-500/15 hover:border-red-500/40', text: 'text-red-400' },
-                    spotify:   { accent: '#1DB954', glow: 'rgba(29,185,84,0.12)', border: 'border-[#1DB954]/15 hover:border-[#1DB954]/40', text: 'text-[#1DB954]' },
-                    netflix:   { accent: '#E50914', glow: 'rgba(229,9,20,0.12)', border: 'border-[#E50914]/15 hover:border-[#E50914]/40', text: 'text-[#E50914]' },
-                  };
-                  const theme = brandThemes[brandKey] || { accent: '#a855f7', glow: 'rgba(168,85,247,0.12)', border: 'border-purple-500/15 hover:border-purple-500/40', text: 'text-purple-400' };
-
-                  return (
-                    <article
-                      key={product.id}
-                      onClick={() => product.in_stock && setConfirmDigital(product)}
-                      className={`relative rounded-2xl overflow-hidden border transition-all duration-300 group ${
-                        product.in_stock
-                          ? `cursor-pointer ${theme.border} hover:-translate-y-1.5 hover:shadow-2xl`
-                          : 'opacity-50 cursor-not-allowed border-white/[0.05]'
-                      }`}
-                      style={{
-                        background: 'linear-gradient(160deg, rgba(20,20,40,0.97), rgba(10,10,25,0.99))',
-                        '--brand-glow': theme.glow,
-                      } as React.CSSProperties}
-                    >
-                      {/* Brand radial glow behind logo */}
-                      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-40 rounded-full opacity-60 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" style={{ background: `radial-gradient(circle, ${theme.glow} 0%, transparent 70%)` }} />
-
-                      <div className="relative p-5 flex flex-col items-center text-center">
-                        {/* Large centered brand logo */}
-                        {product.image_url ? (
-                          <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mb-4 p-3 group-hover:scale-110 transition-transform duration-300">
-                            <img src={product.image_url} alt="" className="w-full h-full object-contain drop-shadow-lg" />
-                          </div>
-                        ) : (
-                          <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
-                            <Gamepad2 className={`w-8 h-8 ${theme.text}`} />
-                          </div>
-                        )}
-
-                        {/* Product name */}
-                        <h3 className="text-sm font-bold text-white mb-1 truncate w-full">{product.name}</h3>
-                        {product.description && (
-                          <p className="text-[11px] text-slate-500 line-clamp-1 mb-4 w-full">{product.description}</p>
-                        )}
-                        {!product.description && <div className="mb-4" />}
-
-                        {/* Price row */}
-                        <div className="flex items-center justify-between w-full pt-3 border-t border-white/[0.06]">
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-xl font-bold text-white">${product.price_usd}</span>
-                            {product.old_price && parseFloat(product.old_price) > parseFloat(product.price_usd) && (
-                              <span className="text-xs text-slate-500 line-through">${parseFloat(product.old_price).toFixed(2)}</span>
-                            )}
-                          </div>
-                          {product.in_stock ? (
-                            <span className={`flex items-center gap-1 text-xs ${theme.text} opacity-60 group-hover:opacity-100 transition-all font-medium`}>
-                              Купить <ChevronRight className="w-3.5 h-3.5" />
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-1 text-xs text-red-400/60 font-medium">
-                              <AlertTriangle className="w-3 h-3" /> Нет в наличии
-                            </span>
-                          )}
-                        </div>
+              <div className="rounded-2xl border border-white/[0.06] overflow-hidden bg-white/[0.02]">
+                {digitalProducts.map((product, idx) => (
+                  <div
+                    key={product.id}
+                    className={`flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4 transition-colors ${
+                      product.in_stock ? 'hover:bg-white/[0.04]' : 'opacity-50'
+                    } ${idx < digitalProducts.length - 1 ? 'border-b border-white/[0.04]' : ''}`}
+                  >
+                    {product.image_url ? (
+                      <img src={product.image_url} alt="" className="w-8 h-8 rounded-lg object-contain shrink-0 bg-white/[0.03] p-0.5" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-lg bg-white/[0.03] flex items-center justify-center shrink-0">
+                        <Gamepad2 className="w-4 h-4 text-slate-600" />
                       </div>
-                    </article>
-                  );
-                })}
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white truncate">{product.name}</p>
+                      {product.description && (
+                        <p className="text-[11px] text-slate-500 truncate mt-0.5">{product.description}</p>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="text-sm font-bold text-white">${product.price_usd}</span>
+                      {product.old_price && parseFloat(product.old_price) > parseFloat(product.price_usd) && (
+                        <span className="block text-[10px] text-slate-600 line-through">${parseFloat(product.old_price).toFixed(2)}</span>
+                      )}
+                    </div>
+                    {product.in_stock ? (
+                      <button
+                        onClick={() => setConfirmDigital(product)}
+                        className="shrink-0 px-4 py-2 rounded-xl bg-purple-500/10 border border-purple-500/25 text-purple-400 text-xs font-semibold hover:bg-purple-500/20 hover:border-purple-500/40 transition-all"
+                      >
+                        Купить
+                      </button>
+                    ) : (
+                      <span className="shrink-0 px-3 py-2 rounded-xl bg-white/5 text-slate-600 text-[11px] font-medium">
+                        Нет в наличии
+                      </span>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </>
