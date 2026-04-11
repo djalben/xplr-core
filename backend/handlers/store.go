@@ -26,6 +26,7 @@ type StoreCategory struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Icon        string `json:"icon"`
+	ImageURL    string `json:"image_url"`
 	SortOrder   int    `json:"sort_order"`
 }
 
@@ -108,7 +109,7 @@ func StoreCatalogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch categories
-	catRows, err := GlobalDB.Query(`SELECT id, slug, name, description, icon, sort_order FROM store_categories ORDER BY sort_order, id`)
+	catRows, err := GlobalDB.Query(`SELECT id, slug, name, description, icon, COALESCE(image_url, ''), sort_order FROM store_categories ORDER BY sort_order, id`)
 	if err != nil {
 		log.Printf("[STORE] ❌ Failed to fetch categories: %v", err)
 		http.Error(w, "Failed to fetch catalog", http.StatusInternalServerError)
@@ -119,7 +120,7 @@ func StoreCatalogHandler(w http.ResponseWriter, r *http.Request) {
 	var categories []StoreCategory
 	for catRows.Next() {
 		var c StoreCategory
-		if err := catRows.Scan(&c.ID, &c.Slug, &c.Name, &c.Description, &c.Icon, &c.SortOrder); err != nil {
+		if err := catRows.Scan(&c.ID, &c.Slug, &c.Name, &c.Description, &c.Icon, &c.ImageURL, &c.SortOrder); err != nil {
 			continue
 		}
 		categories = append(categories, c)
@@ -443,12 +444,19 @@ func notifyStorePurchase(userID int, product StoreProduct, activationKey, qrData
 		resultInfo = fmt.Sprintf("Ваш ключ активации: <code>%s</code>", activationKey)
 	}
 
+	// Build flag emoji for eSIM products
+	flagEmoji := ""
+	if product.ProductType == "esim" && len(product.CountryCode) == 2 {
+		cc := []rune(product.CountryCode)
+		flagEmoji = string(rune(0x1F1E6+int(cc[0])-'A')) + string(rune(0x1F1E6+int(cc[1])-'A')) + " "
+	}
+
 	tgMsg := fmt.Sprintf("🛒 <b>Покупка успешна!</b>\n\n"+
-		"Товар: <b>%s</b>\n"+
+		"%sТовар: <b>%s</b>\n"+
 		"Цена: <b>$%s</b>\n\n"+
 		"%s\n\n"+
 		"<a href=\"https://xplr.pro/store\">Открыть магазин</a>",
-		product.Name, product.PriceUSD.StringFixed(2), resultInfo)
+		flagEmoji, product.Name, product.PriceUSD.StringFixed(2), resultInfo)
 
 	emailBody := fmt.Sprintf(`
 		<p style="color:#cbd5e1;font-size:16px;line-height:1.5;margin:0 0 16px;font-weight:700;">🛒 Покупка успешна!</p>
@@ -478,17 +486,21 @@ func notifyStorePurchase(userID int, product StoreProduct, activationKey, qrData
 			<a href="https://xplr.pro/store" style="display:inline-block;padding:14px 40px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:#fff;text-decoration:none;border-radius:12px;font-size:14px;font-weight:600;">Открыть магазин</a>
 		</div>`
 
-	service.NotifyUser(userID, "Покупка в XPLR Store", tgMsg)
-	// Also send email with receipt
-	go func() {
-		user, err := repository.GetUserByID(userID)
-		if err != nil || user.Email == "" {
-			return
-		}
-		if err := service.SendGenericEmail(user.Email, "Чек покупки — XPLR Store", emailBody); err != nil {
-			log.Printf("[STORE-NOTIFY] ❌ Email to user %d failed: %v", userID, err)
-		}
-	}()
+	// If product has an image, use NotifyUserNews (sends photo in TG + image in email)
+	if product.ImageURL != "" {
+		service.NotifyUserNews(userID, "Покупка в XPLR Store", tgMsg, emailBody, product.ImageURL)
+	} else {
+		service.NotifyUser(userID, "Покупка в XPLR Store", tgMsg)
+		go func() {
+			user, err := repository.GetUserByID(userID)
+			if err != nil || user.Email == "" {
+				return
+			}
+			if err := service.SendGenericEmail(user.Email, "Чек покупки — XPLR Store", emailBody); err != nil {
+				log.Printf("[STORE-NOTIFY] ❌ Email to user %d failed: %v", userID, err)
+			}
+		}()
+	}
 }
 
 // ══════════════════════════════════════════════════════════════

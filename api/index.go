@@ -231,6 +231,7 @@ func ensureDB() {
 			name TEXT NOT NULL,
 			description TEXT DEFAULT '',
 			icon TEXT DEFAULT '',
+			image_url TEXT DEFAULT '',
 			sort_order INTEGER DEFAULT 0
 		)`,
 		`CREATE TABLE IF NOT EXISTS store_products (
@@ -425,8 +426,9 @@ func ensureDB() {
 				digitalCatID, p.extID, p.name, p.desc, p.price, i)
 		}
 	}
-	// 9c10b. Add cost_price and markup_percent columns to store_products
+	// 9c10b. Add image_url to store_categories + cost_price/markup_percent to store_products
 	for _, ddl := range []string{
+		`ALTER TABLE store_categories ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT ''`,
 		`ALTER TABLE store_products ADD COLUMN IF NOT EXISTS cost_price NUMERIC(10,2) DEFAULT 0`,
 		`ALTER TABLE store_products ADD COLUMN IF NOT EXISTS markup_percent NUMERIC(6,2) DEFAULT 20`,
 	} {
@@ -440,6 +442,27 @@ func ensureDB() {
 	db.Exec(`UPDATE store_products SET markup_percent = 150 WHERE product_type = 'esim' AND markup_percent = 20`)
 	db.Exec(`UPDATE store_products SET markup_percent = 20 WHERE product_type = 'digital' AND (markup_percent IS NULL OR markup_percent = 0)`)
 	log.Println("[STORE-MARKUP] ✅ cost_price + markup_percent columns ensured")
+
+	// 9c10c. Backfill image_url for store products and categories
+	productImages := map[string]string{
+		"steam-10":    "https://cdn.simpleicons.org/steam/white",
+		"steam-25":    "https://cdn.simpleicons.org/steam/white",
+		"steam-50":    "https://cdn.simpleicons.org/steam/white",
+		"psn-10":      "https://cdn.simpleicons.org/playstation/white",
+		"psn-25":      "https://cdn.simpleicons.org/playstation/white",
+		"xbox-10":     "https://cdn.simpleicons.org/xbox/white",
+		"xbox-25":     "https://cdn.simpleicons.org/xbox/white",
+		"nintendo-10": "https://cdn.simpleicons.org/nintendo/white",
+		"spotify-1m":  "https://cdn.simpleicons.org/spotify/1DB954",
+		"netflix-1m":  "https://cdn.simpleicons.org/netflix/E50914",
+	}
+	for extID, imgURL := range productImages {
+		db.Exec(`UPDATE store_products SET image_url = $1 WHERE external_id = $2 AND (image_url = '' OR image_url IS NULL)`, imgURL, extID)
+	}
+	// Category images
+	db.Exec(`UPDATE store_categories SET image_url = 'https://cdn.simpleicons.org/esim/3b82f6' WHERE slug = 'esim' AND (image_url = '' OR image_url IS NULL)`)
+	db.Exec(`UPDATE store_categories SET image_url = 'https://cdn.simpleicons.org/gamepad/a855f7' WHERE slug = 'digital' AND (image_url = '' OR image_url IS NULL)`)
+	log.Println("[STORE-IMAGES] ✅ Product and category image_url backfilled")
 
 	log.Println("[STORE-MIGRATION] ✅ Store tables + seed data ensured")
 

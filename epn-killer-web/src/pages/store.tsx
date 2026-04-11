@@ -595,14 +595,17 @@ export const StorePage = () => {
               )}
             </div>
 
-            {/* Destinations grid */}
+            {/* Destinations grid — SIM chip style */}
             {destsLoading ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {[...Array(8)].map((_, i) => (
-                  <div key={i} className="glass-card p-4 animate-pulse">
-                    <div className="h-8 w-8 bg-white/10 rounded-lg mb-2" />
-                    <div className="h-4 bg-white/10 rounded w-3/4 mb-1" />
-                    <div className="h-3 bg-white/5 rounded w-1/2" />
+                  <div key={i} className="relative rounded-2xl overflow-hidden animate-pulse" style={{ aspectRatio: '1.6/1' }}>
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.06] to-white/[0.02]" />
+                    <div className="absolute top-4 left-4 w-10 h-7 rounded bg-yellow-500/10" />
+                    <div className="absolute bottom-4 left-4 right-4">
+                      <div className="h-4 bg-white/10 rounded w-2/3 mb-1.5" />
+                      <div className="h-3 bg-white/5 rounded w-1/3" />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -617,17 +620,35 @@ export const StorePage = () => {
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {destinations.map(dest => (
                   <button
                     key={dest.country_code}
                     onClick={() => setSelectedCountry(dest)}
-                    className="glass-card p-4 text-left hover:border-blue-500/20 hover:shadow-lg hover:shadow-blue-500/5 transition-all group cursor-pointer"
+                    className="relative rounded-2xl overflow-hidden border border-white/[0.08] hover:border-blue-500/30 transition-all group cursor-pointer text-left"
+                    style={{ aspectRatio: '1.6/1', background: 'linear-gradient(145deg, rgba(30,30,50,0.95), rgba(15,15,30,0.98))' }}
                   >
-                    <span className="text-3xl mb-2 block">{dest.flag_emoji || countryFlag(dest.country_code)}</span>
-                    <h3 className="text-sm font-bold text-white mb-0.5 truncate">{dest.country_name}</h3>
-                    <p className="text-[11px] text-slate-500">от {dest.plan_count} {dest.plan_count === 1 ? 'тариф' : 'тарифов'}</p>
-                    <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-blue-400 transition-colors absolute top-4 right-4" />
+                    {/* SIM chip accent */}
+                    <div className="absolute top-3.5 left-3.5 w-9 h-6 rounded-[4px] border border-yellow-500/30 bg-gradient-to-br from-yellow-400/20 to-yellow-600/10 flex items-center justify-center">
+                      <div className="w-5 h-3 rounded-[2px] border border-yellow-500/20 bg-gradient-to-br from-yellow-400/10 to-transparent" />
+                    </div>
+                    {/* Large centered flag */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-300">
+                      <span className="text-6xl sm:text-7xl drop-shadow-lg select-none">{dest.flag_emoji || countryFlag(dest.country_code)}</span>
+                    </div>
+                    {/* Gradient overlay at bottom */}
+                    <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none" />
+                    {/* Country name + plan count */}
+                    <div className="absolute bottom-3 left-3.5 right-3.5">
+                      <h3 className="text-sm font-bold text-white truncate drop-shadow-md">{dest.country_name}</h3>
+                      <p className="text-[10px] text-slate-400 mt-0.5">{dest.plan_count} {dest.plan_count === 1 ? 'тариф' : 'тарифов'}</p>
+                    </div>
+                    {/* Hover arrow */}
+                    <div className="absolute top-3.5 right-3.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <ChevronRight className="w-4 h-4 text-blue-400 drop-shadow" />
+                    </div>
+                    {/* Subtle shine on hover */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 to-purple-500/0 group-hover:from-blue-500/5 group-hover:to-purple-500/5 transition-all duration-300 pointer-events-none" />
                   </button>
                 ))}
               </div>
@@ -656,7 +677,16 @@ export const StorePage = () => {
 
             {plansLoading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {[...Array(3)].map((_, i) => <CardSkeleton key={i} />)}
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="relative rounded-2xl overflow-hidden animate-pulse h-44 border border-white/[0.06]" style={{ background: 'linear-gradient(145deg, rgba(30,30,50,0.95), rgba(15,15,30,0.98))' }}>
+                    <div className="absolute top-4 left-4 w-10 h-7 rounded bg-yellow-500/10" />
+                    <div className="absolute top-4 right-4 w-12 h-12 rounded-xl bg-white/5" />
+                    <div className="absolute bottom-4 left-4 right-4 space-y-2">
+                      <div className="h-4 bg-white/10 rounded w-1/2" />
+                      <div className="h-6 bg-white/10 rounded w-1/3" />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : plans.length === 0 ? (
               <div className="glass-card p-12 text-center">
@@ -669,38 +699,52 @@ export const StorePage = () => {
                   <article
                     key={plan.plan_id}
                     onClick={() => plan.in_stock && setConfirmPlan(plan)}
-                    className={`glass-card p-5 transition-all group ${
+                    className={`relative rounded-2xl overflow-hidden border transition-all group ${
                       plan.in_stock
-                        ? 'cursor-pointer hover:border-blue-500/20 hover:shadow-lg hover:shadow-blue-500/5'
-                        : 'opacity-50 cursor-not-allowed'
+                        ? 'cursor-pointer border-white/[0.08] hover:border-blue-500/30 hover:shadow-lg hover:shadow-blue-500/5'
+                        : 'opacity-50 cursor-not-allowed border-white/[0.05]'
                     }`}
+                    style={{ background: 'linear-gradient(145deg, rgba(30,30,50,0.95), rgba(15,15,30,0.98))' }}
                   >
-                    <h3 className="text-sm font-bold text-white mb-3">{plan.name}</h3>
-                    <div className="flex items-center gap-2 mb-4">
-                      <span className="px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[11px] font-medium">
-                        {plan.data_gb} ГБ
-                      </span>
-                      <span className="px-2.5 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[11px] font-medium">
-                        {plan.validity_days} дн.
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-lg font-bold text-white">${plan.price_usd.toFixed(2)}</span>
-                        {plan.old_price > 0 && plan.old_price > plan.price_usd && (
-                          <span className="text-xs text-slate-500 line-through">${plan.old_price.toFixed(2)}</span>
+                    <div className="p-5">
+                      {/* Top row: SIM chip + flag */}
+                      <div className="flex items-start justify-between mb-5">
+                        <div className="w-10 h-7 rounded-[4px] border border-yellow-500/30 bg-gradient-to-br from-yellow-400/20 to-yellow-600/10 flex items-center justify-center">
+                          <div className="w-6 h-3.5 rounded-[2px] border border-yellow-500/20 bg-gradient-to-br from-yellow-400/10 to-transparent" />
+                        </div>
+                        <span className="text-3xl select-none">{countryFlag(selectedCountry.country_code)}</span>
+                      </div>
+                      {/* Plan name + badges */}
+                      <h3 className="text-sm font-bold text-white mb-2.5">{plan.name}</h3>
+                      <div className="flex items-center gap-2 mb-4">
+                        <span className="px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[11px] font-medium flex items-center gap-1">
+                          <Wifi className="w-3 h-3" /> {plan.data_gb} ГБ
+                        </span>
+                        <span className="px-2.5 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[11px] font-medium">
+                          {plan.validity_days} дн.
+                        </span>
+                      </div>
+                      {/* Price row */}
+                      <div className="flex items-center justify-between pt-3 border-t border-white/[0.06]">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-xl font-bold text-white">${plan.price_usd.toFixed(2)}</span>
+                          {plan.old_price > 0 && plan.old_price > plan.price_usd && (
+                            <span className="text-xs text-slate-500 line-through">${plan.old_price.toFixed(2)}</span>
+                          )}
+                        </div>
+                        {plan.in_stock ? (
+                          <span className="flex items-center gap-1 text-xs text-blue-400/60 group-hover:text-blue-400 transition-colors font-medium">
+                            Купить <ChevronRight className="w-3.5 h-3.5" />
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-xs text-red-400/60 font-medium">
+                            <AlertTriangle className="w-3 h-3" /> Нет в наличии
+                          </span>
                         )}
                       </div>
-                      {plan.in_stock ? (
-                        <span className="flex items-center gap-1 text-xs text-blue-400/60 group-hover:text-blue-400 transition-colors font-medium">
-                          Купить <ChevronRight className="w-3.5 h-3.5" />
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1 text-xs text-red-400/60 font-medium">
-                          <AlertTriangle className="w-3 h-3" /> Нет в наличии
-                        </span>
-                      )}
                     </div>
+                    {/* Hover shine */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 to-purple-500/0 group-hover:from-blue-500/5 group-hover:to-purple-500/5 transition-all duration-300 pointer-events-none" />
                   </article>
                 ))}
               </div>
@@ -713,7 +757,15 @@ export const StorePage = () => {
           <>
             {digitalLoading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {[...Array(6)].map((_, i) => <CardSkeleton key={i} />)}
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="relative rounded-2xl overflow-hidden animate-pulse h-40 border border-white/[0.06]" style={{ background: 'linear-gradient(145deg, rgba(30,30,50,0.95), rgba(15,15,30,0.98))' }}>
+                    <div className="absolute top-4 left-4 w-10 h-10 rounded-xl bg-white/5" />
+                    <div className="absolute bottom-4 left-4 right-4 space-y-2">
+                      <div className="h-4 bg-white/10 rounded w-2/3" />
+                      <div className="h-3 bg-white/5 rounded w-1/2" />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : digitalProducts.length === 0 ? (
               <div className="glass-card p-12 text-center">
@@ -722,41 +774,73 @@ export const StorePage = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {digitalProducts.map(product => (
-                  <article
-                    key={product.id}
-                    onClick={() => product.in_stock && setConfirmDigital(product)}
-                    className={`glass-card p-5 transition-all group ${
-                      product.in_stock
-                        ? 'cursor-pointer hover:border-purple-500/20 hover:shadow-lg hover:shadow-purple-500/5'
-                        : 'opacity-50 cursor-not-allowed'
-                    }`}
-                  >
-                    <div className="flex-1 min-w-0 mb-3">
-                      <h3 className="text-sm font-bold text-white mb-1 truncate">{product.name}</h3>
-                      {product.description && (
-                        <p className="text-xs text-slate-500 line-clamp-2">{product.description}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between mt-auto">
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-lg font-bold text-white">${product.price_usd}</span>
-                        {product.old_price && parseFloat(product.old_price) > parseFloat(product.price_usd) && (
-                          <span className="text-xs text-slate-500 line-through">${parseFloat(product.old_price).toFixed(2)}</span>
-                        )}
+                {digitalProducts.map(product => {
+                  // Brand color accent based on product name
+                  const brandKey = product.external_id?.split('-')[0] || product.name.split(' ')[0].toLowerCase();
+                  const brandColors: Record<string, { bg: string; border: string; text: string }> = {
+                    steam:     { bg: 'from-[#1b2838]/40 to-[#1b2838]/20', border: 'border-[#66c0f4]/20 hover:border-[#66c0f4]/40', text: 'text-[#66c0f4]' },
+                    psn:       { bg: 'from-[#003087]/30 to-[#003087]/10', border: 'border-blue-500/20 hover:border-blue-500/40', text: 'text-blue-400' },
+                    xbox:      { bg: 'from-[#107c10]/30 to-[#107c10]/10', border: 'border-green-500/20 hover:border-green-500/40', text: 'text-green-400' },
+                    nintendo:  { bg: 'from-[#e60012]/20 to-[#e60012]/10', border: 'border-red-500/20 hover:border-red-500/40', text: 'text-red-400' },
+                    spotify:   { bg: 'from-[#1DB954]/20 to-[#1DB954]/10', border: 'border-[#1DB954]/20 hover:border-[#1DB954]/40', text: 'text-[#1DB954]' },
+                    netflix:   { bg: 'from-[#E50914]/20 to-[#E50914]/10', border: 'border-[#E50914]/20 hover:border-[#E50914]/40', text: 'text-[#E50914]' },
+                  };
+                  const brand = brandColors[brandKey] || { bg: 'from-purple-500/20 to-purple-500/10', border: 'border-purple-500/20 hover:border-purple-500/40', text: 'text-purple-400' };
+
+                  return (
+                    <article
+                      key={product.id}
+                      onClick={() => product.in_stock && setConfirmDigital(product)}
+                      className={`relative rounded-2xl overflow-hidden border transition-all group ${
+                        product.in_stock
+                          ? `cursor-pointer ${brand.border} hover:shadow-lg`
+                          : 'opacity-50 cursor-not-allowed border-white/[0.05]'
+                      }`}
+                      style={{ background: 'linear-gradient(145deg, rgba(30,30,50,0.95), rgba(15,15,30,0.98))' }}
+                    >
+                      {/* Brand gradient overlay */}
+                      <div className={`absolute inset-0 bg-gradient-to-br ${brand.bg} pointer-events-none`} />
+                      <div className="relative p-5">
+                        {/* Logo + title row */}
+                        <div className="flex items-start gap-3 mb-3">
+                          {product.image_url ? (
+                            <div className="w-10 h-10 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center shrink-0 p-2">
+                              <img src={product.image_url} alt="" className="w-full h-full object-contain" />
+                            </div>
+                          ) : (
+                            <div className="w-10 h-10 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center shrink-0">
+                              <Gamepad2 className={`w-5 h-5 ${brand.text}`} />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-sm font-bold text-white mb-0.5 truncate">{product.name}</h3>
+                            {product.description && (
+                              <p className="text-[11px] text-slate-500 line-clamp-2">{product.description}</p>
+                            )}
+                          </div>
+                        </div>
+                        {/* Price row */}
+                        <div className="flex items-center justify-between pt-3 border-t border-white/[0.06]">
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-xl font-bold text-white">${product.price_usd}</span>
+                            {product.old_price && parseFloat(product.old_price) > parseFloat(product.price_usd) && (
+                              <span className="text-xs text-slate-500 line-through">${parseFloat(product.old_price).toFixed(2)}</span>
+                            )}
+                          </div>
+                          {product.in_stock ? (
+                            <span className={`flex items-center gap-1 text-xs ${brand.text} opacity-60 group-hover:opacity-100 transition-all font-medium`}>
+                              Купить <ChevronRight className="w-3.5 h-3.5" />
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-xs text-red-400/60 font-medium">
+                              <AlertTriangle className="w-3 h-3" /> Нет в наличии
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      {product.in_stock ? (
-                        <span className="flex items-center gap-1 text-xs text-purple-400/60 group-hover:text-purple-400 transition-colors font-medium">
-                          Купить <ChevronRight className="w-3.5 h-3.5" />
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1 text-xs text-red-400/60 font-medium">
-                          <AlertTriangle className="w-3 h-3" /> Нет в наличии
-                        </span>
-                      )}
-                    </div>
-                  </article>
-                ))}
+                    </article>
+                  );
+                })}
               </div>
             )}
           </>

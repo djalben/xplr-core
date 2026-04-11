@@ -36,11 +36,11 @@ import {
   Upload,
   ImageIcon,
   Tag,
-  TrendingDown,
   Percent,
+  ShoppingBag,
 } from 'lucide-react';
 
-type Tab = 'dashboard' | 'users' | 'commissions' | 'tickets' | 'news' | 'logs' | 'pricing';
+type Tab = 'dashboard' | 'users' | 'commissions' | 'tickets' | 'news' | 'logs' | 'store';
 
 interface DashboardStats {
   total_users: number;
@@ -250,6 +250,7 @@ export const StaffOnlyZone = () => {
   const [editingProduct, setEditingProduct] = useState<{ id: number; cost_price: string; markup_percent: string } | null>(null);
   const [bulkDelta, setBulkDelta] = useState('10');
   const [bulkType, setBulkType] = useState('');
+  const [storeSubTab, setStoreSubTab] = useState<'esim' | 'digital'>('esim');
 
   const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
     setToast({ msg, type });
@@ -459,7 +460,7 @@ export const StaffOnlyZone = () => {
     if (!delta || delta === 0) return;
     setSaving(true);
     try {
-      const res = await apiClient.post('/admin/store/bulk-markup', { delta, product_type: bulkType || undefined });
+      const res = await apiClient.post('/admin/store/bulk-markup', { delta, product_type: storeSubTab });
       showToast(`Наценка +${delta}% применена к ${res.data.affected} товарам`);
       loadStoreProducts();
     } catch { showToast('Ошибка массового обновления', 'err'); }
@@ -472,7 +473,7 @@ export const StaffOnlyZone = () => {
     if (tab === 'tickets') { loadTickets(); loadChats(); }
     if (tab === 'news') loadNews();
     if (tab === 'logs') loadLogs();
-    if (tab === 'pricing') loadStoreProducts();
+    if (tab === 'store') loadStoreProducts();
   }, [tab, loadAllUsers, loadCommissions, loadSysSettings, loadTickets, loadChats, loadNews, loadLogs, loadStoreProducts]);
 
   // ── Inspect User (Financial Passport) ──
@@ -617,7 +618,7 @@ export const StaffOnlyZone = () => {
           <TabBtn id="commissions" icon={Settings} label="Комиссии" />
           <TabBtn id="tickets" icon={MessageSquare} label="Тикеты" />
           <TabBtn id="news" icon={Newspaper} label="Новости" />
-          <TabBtn id="pricing" icon={Tag} label="Цены" />
+          <TabBtn id="store" icon={ShoppingBag} label="Магазин" />
           <TabBtn id="logs" icon={Clock} label="Логи" />
         </div>
 
@@ -1502,27 +1503,29 @@ export const StaffOnlyZone = () => {
           </div>
         )}
 
-        {/* ════════════ PRICING TAB ════════════ */}
-        {tab === 'pricing' && (
-          <div className="space-y-6">
-            {/* Bulk markup section */}
-            <div className="glass-card p-5">
-              <h4 className="text-white text-sm font-semibold mb-3 flex items-center gap-2"><Percent className="w-4 h-4 text-orange-400" /> Массовое изменение наценки</h4>
-              <div className="flex flex-wrap gap-3 items-end">
-                <div>
-                  <label className="text-[10px] text-slate-500 mb-1 block">Дельта (%)</label>
-                  <input type="number" step="1" value={bulkDelta} onChange={e => setBulkDelta(e.target.value)} className="w-24 px-2 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm outline-none focus:border-blue-500/50" />
-                </div>
-                <div>
-                  <label className="text-[10px] text-slate-500 mb-1 block">Тип товара</label>
-                  <select value={bulkType} onChange={e => setBulkType(e.target.value)} className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm outline-none">
-                    <option value="">Все</option>
-                    <option value="esim">eSIM</option>
-                    <option value="digital">Цифровые</option>
-                  </select>
-                </div>
-                <button onClick={handleBulkMarkup} disabled={saving} className="px-5 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5">
-                  <TrendingUp className="w-4 h-4" />{saving ? '...' : `Применить +${bulkDelta}%`}
+        {/* ════════════ STORE TAB ════════════ */}
+        {tab === 'store' && (() => {
+          const filtered = storeProducts.filter(p => p.product_type === storeSubTab);
+          return (
+          <div className="space-y-5">
+            {/* Header: sub-tabs + bulk markup */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex gap-2">
+                {([['esim', 'eSIM'], ['digital', 'Цифровые']] as const).map(([key, label]) => (
+                  <button key={key} onClick={() => { setStoreSubTab(key); setEditingProduct(null); }}
+                    className={`px-4 py-2 rounded-xl text-xs font-medium border transition-all ${
+                      storeSubTab === key
+                        ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+                        : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
+                    }`}>
+                    {label} ({storeProducts.filter(p => p.product_type === key).length})
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="number" step="1" value={bulkDelta} onChange={e => setBulkDelta(e.target.value)} className="w-20 px-2 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-xs outline-none focus:border-blue-500/50" placeholder="+%" />
+                <button onClick={handleBulkMarkup} disabled={saving} className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap">
+                  <TrendingUp className="w-3.5 h-3.5" />{saving ? '...' : `+${bulkDelta}% ${storeSubTab}`}
                 </button>
               </div>
             </div>
@@ -1535,7 +1538,6 @@ export const StaffOnlyZone = () => {
                     <tr className="border-b border-white/10">
                       <th className="text-left px-4 py-3 text-slate-400 font-medium">ID</th>
                       <th className="text-left px-4 py-3 text-slate-400 font-medium">Товар</th>
-                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Тип</th>
                       <th className="text-left px-4 py-3 text-slate-400 font-medium">Себестоимость</th>
                       <th className="text-left px-4 py-3 text-slate-400 font-medium">Наценка %</th>
                       <th className="text-left px-4 py-3 text-slate-400 font-medium">Розница</th>
@@ -1545,15 +1547,10 @@ export const StaffOnlyZone = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {storeProducts.map(p => (
+                    {filtered.map(p => (
                       <tr key={p.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                         <td className="px-4 py-3 text-slate-500 font-mono text-xs">{p.id}</td>
-                        <td className="px-4 py-3 text-white text-xs font-medium max-w-[180px] truncate" title={p.name}>{p.name}</td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                            p.product_type === 'esim' ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'
-                          }`}>{p.product_type}</span>
-                        </td>
+                        <td className="px-4 py-3 text-white text-xs font-medium max-w-[200px] truncate" title={p.name}>{p.name}</td>
                         <td className="px-4 py-3">
                           {editingProduct?.id === p.id ? (
                             <input type="number" step="0.01" value={editingProduct.cost_price} onChange={e => setEditingProduct({ ...editingProduct, cost_price: e.target.value })} className="w-20 px-2 py-1 bg-white/10 border border-blue-500/50 rounded text-white text-xs outline-none" />
@@ -1593,15 +1590,16 @@ export const StaffOnlyZone = () => {
                         </td>
                       </tr>
                     ))}
-                    {storeProducts.length === 0 && (
-                      <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-500">Нет товаров</td></tr>
+                    {filtered.length === 0 && (
+                      <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">Нет товаров</td></tr>
                     )}
                   </tbody>
                 </table>
               </div>
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {/* ════════════ LOGS TAB ════════════ */}
         {tab === 'logs' && (
