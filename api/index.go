@@ -688,6 +688,7 @@ func buildRouter() *mux.Router {
 	admin.HandleFunc("/system-settings", handlers.GetSystemSettingsHandler).Methods("GET")
 	admin.HandleFunc("/system-settings/{key}", handlers.UpdateSystemSettingHandler).Methods("PATCH")
 	admin.HandleFunc("/news", handlers.AdminCreateNewsHandler).Methods("POST")
+	admin.HandleFunc("/news/{id}", handlers.AdminUpdateNewsHandler).Methods("PUT")
 	admin.HandleFunc("/news/{id}", handlers.AdminDeleteNewsHandler).Methods("DELETE")
 	admin.HandleFunc("/upload-image", handlers.AdminUploadImageHandler).Methods("POST")
 	admin.HandleFunc("/test-upload", handlers.AdminTestUploadHandler).Methods("GET")

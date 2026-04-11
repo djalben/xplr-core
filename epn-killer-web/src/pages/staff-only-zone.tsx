@@ -243,7 +243,9 @@ export const StaffOnlyZone = () => {
   const [newsImagePreview, setNewsImagePreview] = useState<string | null>(null);
   const [newsPublishing, setNewsPublishing] = useState(false);
   const [newsUploadProgress, setNewsUploadProgress] = useState('');
+  const [editingNews, setEditingNews] = useState<{ id: number; title: string; content: string; image_url: string } | null>(null);
   const newsFileRef = useRef<HTMLInputElement>(null);
+  const editNewsFileRef = useRef<HTMLInputElement>(null);
 
   // ── Store pricing state ──
   const [storeProducts, setStoreProducts] = useState<{ id: number; name: string; product_type: string; provider: string; cost_price: string; markup_percent: string; retail_price: string; old_price: string; in_stock: boolean; external_id: string }[]>([]);
@@ -430,6 +432,34 @@ export const StaffOnlyZone = () => {
       showToast('Новость удалена');
       loadNews();
     } catch { showToast('Ошибка удаления', 'err'); }
+  };
+
+  const saveEditedNews = async () => {
+    if (!editingNews) return;
+    setSaving(true);
+    try {
+      await apiClient.put(`/admin/news/${editingNews.id}`, {
+        title: editingNews.title,
+        content: editingNews.content,
+        image_url: editingNews.image_url,
+      });
+      showToast('Новость обновлена');
+      setEditingNews(null);
+      loadNews();
+    } catch { showToast('Ошибка обновления', 'err'); }
+    finally { setSaving(false); }
+  };
+
+  const handleEditNewsImageUpload = async (file: File | null) => {
+    if (!file || !editingNews) return;
+    try {
+      const compressed = await compressImage(file);
+      const formData = new FormData();
+      formData.append('image', compressed);
+      const res = await apiClient.post('/admin/upload-image', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setEditingNews({ ...editingNews, image_url: res.data.url });
+      showToast('Изображение загружено');
+    } catch { showToast('Ошибка загрузки', 'err'); }
   };
 
   // ── Load store products ──
@@ -1470,6 +1500,49 @@ export const StaffOnlyZone = () => {
               </div>
             </div>
 
+            {/* Edit news form (shown when editing) */}
+            {editingNews && (
+              <div className="glass-card p-5 border-l-2 border-blue-500">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-white text-sm font-semibold flex items-center gap-2"><Tag className="w-4 h-4 text-blue-400" /> Редактирование #{editingNews.id}</h4>
+                  <button onClick={() => setEditingNews(null)} className="text-slate-500 hover:text-white transition-colors"><X className="w-4 h-4" /></button>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">Заголовок</label>
+                    <input value={editingNews.title} onChange={e => setEditingNews({ ...editingNews, title: e.target.value })} className="w-full h-9 px-3 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-blue-400" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">Текст</label>
+                    <textarea value={editingNews.content} onChange={e => setEditingNews({ ...editingNews, content: e.target.value })} rows={4} className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-blue-400 resize-y" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">Изображение</label>
+                    <input ref={editNewsFileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={e => handleEditNewsImageUpload(e.target.files?.[0] || null)} />
+                    {editingNews.image_url ? (
+                      <div className="relative group">
+                        <img src={editingNews.image_url} alt="" className="w-full max-h-36 object-cover rounded-lg border border-white/10" />
+                        <div className="absolute top-2 right-2 flex gap-1">
+                          <button onClick={() => editNewsFileRef.current?.click()} className="p-1.5 bg-black/60 text-white rounded-lg hover:bg-black/80 transition-colors" title="Заменить"><Upload className="w-3.5 h-3.5" /></button>
+                          <button onClick={() => setEditingNews({ ...editingNews, image_url: '' })} className="p-1.5 bg-black/60 text-red-400 rounded-lg hover:bg-black/80 transition-colors" title="Удалить"><X className="w-3.5 h-3.5" /></button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button onClick={() => editNewsFileRef.current?.click()} className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-xs text-slate-400 hover:bg-white/10 transition-colors flex items-center gap-1.5">
+                        <Upload className="w-3.5 h-3.5" /> Загрузить изображение
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={saveEditedNews} disabled={saving || !editingNews.title.trim() || !editingNews.content.trim()} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5">
+                      {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Сохранить
+                    </button>
+                    <button onClick={() => setEditingNews(null)} className="px-4 py-2 bg-white/5 border border-white/10 text-slate-400 rounded-lg text-xs font-medium hover:bg-white/10 transition-colors">Отмена</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* News list */}
             <div className="glass-card overflow-hidden">
               <table className="w-full text-sm">
@@ -1478,19 +1551,24 @@ export const StaffOnlyZone = () => {
                     <th className="text-left px-4 py-3 text-slate-400 font-medium">ID</th>
                     <th className="text-left px-4 py-3 text-slate-400 font-medium">Заголовок</th>
                     <th className="text-left px-4 py-3 text-slate-400 font-medium">Дата</th>
-                    <th className="text-right px-4 py-3 text-slate-400 font-medium w-16"></th>
+                    <th className="text-right px-4 py-3 text-slate-400 font-medium w-24"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {newsList.map(n => (
-                    <tr key={n.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                    <tr key={n.id} className={`border-b border-white/5 hover:bg-white/5 transition-colors ${editingNews?.id === n.id ? 'bg-blue-500/5' : ''}`}>
                       <td className="px-4 py-3 text-slate-500 font-mono text-xs">{n.id}</td>
                       <td className="px-4 py-3 text-white text-xs">{n.title}</td>
                       <td className="px-4 py-3 text-slate-500 text-xs">{n.created_at ? new Date(n.created_at).toLocaleString('ru-RU') : ''}</td>
                       <td className="px-4 py-3 text-right">
-                        <button onClick={() => deleteNews(n.id)} className="p-1.5 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition-colors" title="Удалить">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex gap-1 justify-end">
+                          <button onClick={() => setEditingNews({ id: n.id, title: n.title, content: n.content, image_url: n.image_url })} className="p-1.5 bg-blue-500/10 text-blue-400 rounded-lg hover:bg-blue-500/20 transition-colors" title="Редактировать">
+                            <Tag className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={() => deleteNews(n.id)} className="p-1.5 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition-colors" title="Удалить">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

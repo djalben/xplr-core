@@ -625,7 +625,7 @@ export const StorePage = () => {
                   <button
                     key={dest.country_code}
                     onClick={() => setSelectedCountry(dest)}
-                    className="relative rounded-2xl overflow-hidden border border-white/[0.08] hover:border-blue-500/30 transition-all group cursor-pointer text-left"
+                    className="relative rounded-2xl overflow-hidden border border-white/[0.08] hover:border-blue-500/30 hover:-translate-y-1 hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-200 group cursor-pointer text-left"
                     style={{ aspectRatio: '1.6/1', background: 'linear-gradient(145deg, rgba(30,30,50,0.95), rgba(15,15,30,0.98))' }}
                   >
                     {/* SIM chip accent */}
@@ -699,9 +699,9 @@ export const StorePage = () => {
                   <article
                     key={plan.plan_id}
                     onClick={() => plan.in_stock && setConfirmPlan(plan)}
-                    className={`relative rounded-2xl overflow-hidden border transition-all group ${
+                    className={`relative rounded-2xl overflow-hidden border transition-all duration-200 group ${
                       plan.in_stock
-                        ? 'cursor-pointer border-white/[0.08] hover:border-blue-500/30 hover:shadow-lg hover:shadow-blue-500/5'
+                        ? 'cursor-pointer border-white/[0.08] hover:border-blue-500/30 hover:-translate-y-1 hover:shadow-xl hover:shadow-blue-500/10'
                         : 'opacity-50 cursor-not-allowed border-white/[0.05]'
                     }`}
                     style={{ background: 'linear-gradient(145deg, rgba(30,30,50,0.95), rgba(15,15,30,0.98))' }}
@@ -791,9 +791,9 @@ export const StorePage = () => {
                     <article
                       key={product.id}
                       onClick={() => product.in_stock && setConfirmDigital(product)}
-                      className={`relative rounded-2xl overflow-hidden border transition-all group ${
+                      className={`relative rounded-2xl overflow-hidden border transition-all duration-200 group ${
                         product.in_stock
-                          ? `cursor-pointer ${brand.border} hover:shadow-lg`
+                          ? `cursor-pointer ${brand.border} hover:-translate-y-1 hover:shadow-xl`
                           : 'opacity-50 cursor-not-allowed border-white/[0.05]'
                       }`}
                       style={{ background: 'linear-gradient(145deg, rgba(30,30,50,0.95), rgba(15,15,30,0.98))' }}

@@ -126,7 +126,7 @@ func SendMessageHTML(chatID int64, message string) {
 }
 
 // SendMessageHTMLSafe — error-returning version of SendMessageHTML for use in NotifyUser.
-// Returns an error instead of silently swallowing failures, enabling proper logging upstream.
+// Uses POST with JSON body for reliability (no URL length limits, proper encoding).
 func SendMessageHTMLSafe(chatID int64, message string) error {
 	if botToken == "" {
 		return fmt.Errorf("TELEGRAM_BOT_TOKEN not set — Telegram notifications disabled")
@@ -134,18 +134,26 @@ func SendMessageHTMLSafe(chatID int64, message string) error {
 	if chatID == 0 {
 		return fmt.Errorf("chatID is 0 — cannot send Telegram message")
 	}
-	chatIDStr := fmt.Sprintf("%d", chatID)
-	encodedMessage := url.QueryEscape(message)
-	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?chat_id=%s&parse_mode=HTML&text=%s",
-		botToken, chatIDStr, encodedMessage)
-	resp, err := http.Get(apiURL)
-	if err != nil {
-		return fmt.Errorf("HTTP request failed: %w", err)
+
+	type sendMsgPayload struct {
+		ChatID    int64  `json:"chat_id"`
+		Text      string `json:"text"`
+		ParseMode string `json:"parse_mode"`
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("Telegram API returned %d: %s", resp.StatusCode, string(body))
+
+	// Telegram sendMessage text limit is 4096 chars
+	text := message
+	if len(text) > 4000 {
+		text = text[:4000] + "..."
+	}
+
+	if err := postJSON("sendMessage", sendMsgPayload{
+		ChatID:    chatID,
+		Text:      text,
+		ParseMode: "HTML",
+	}); err != nil {
+		log.Printf("[TELEGRAM] ❌ SendMessageHTMLSafe POST failed for chat %d: %v", chatID, err)
+		return err
 	}
 	return nil
 }
@@ -483,6 +491,7 @@ func SendMessageHTMLWithInlineReturnID(chatID int64, message string, keyboard *I
 
 // SendPhotoWithCaption sends a photo by URL with an HTML caption via Telegram sendPhoto API.
 // If photoURL is empty, falls back to SendMessageHTMLSafe (text-only).
+// Caption is truncated to 1024 chars (Telegram sendPhoto limit).
 func SendPhotoWithCaption(chatID int64, photoURL string, caption string) error {
 	if botToken == "" {
 		return fmt.Errorf("TELEGRAM_BOT_TOKEN not set")
@@ -491,7 +500,14 @@ func SendPhotoWithCaption(chatID int64, photoURL string, caption string) error {
 		return fmt.Errorf("chatID is 0")
 	}
 	if photoURL == "" {
+		log.Printf("[TELEGRAM] SendPhotoWithCaption: no photo URL, falling back to text for chat %d", chatID)
 		return SendMessageHTMLSafe(chatID, caption)
+	}
+
+	// Telegram sendPhoto caption limit is 1024 chars
+	safeCaption := caption
+	if len(safeCaption) > 1000 {
+		safeCaption = safeCaption[:1000] + "..."
 	}
 
 	type sendPhotoPayload struct {
@@ -504,15 +520,22 @@ func SendPhotoWithCaption(chatID int64, photoURL string, caption string) error {
 	payload := sendPhotoPayload{
 		ChatID:    chatID,
 		Photo:     photoURL,
-		Caption:   caption,
+		Caption:   safeCaption,
 		ParseMode: "HTML",
 	}
 
 	if err := postJSON("sendPhoto", payload); err != nil {
-		log.Printf("[TELEGRAM] ❌ SendPhotoWithCaption failed (Chat %d), falling back to text: %v", chatID, err)
+		log.Printf("[TELEGRAM] ❌ SendPhotoWithCaption failed (Chat %d, photo=%s): %v — falling back to text", chatID, photoURL[:min(len(photoURL), 60)], err)
 		return SendMessageHTMLSafe(chatID, caption)
 	}
 	return nil
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // AnswerCallbackQuery отвечает на callback_query (убирает «часики» в Telegram).

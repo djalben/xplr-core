@@ -190,6 +190,52 @@ func AdminCreateNewsHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// ── PUT /api/v1/admin/news/{id} — update existing news article ──
+func AdminUpdateNewsHandler(w http.ResponseWriter, r *http.Request) {
+	adminID, _ := r.Context().Value(middleware.UserIDKey).(int)
+	vars := mux.Vars(r)
+	newsID, err := strconv.Atoi(vars["id"])
+	if err != nil || newsID <= 0 {
+		http.Error(w, "Invalid news id", http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		Title    string `json:"title"`
+		Content  string `json:"content"`
+		ImageURL string `json:"image_url"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid body", http.StatusBadRequest)
+		return
+	}
+	if req.Title == "" || req.Content == "" {
+		http.Error(w, "Title and content are required", http.StatusBadRequest)
+		return
+	}
+
+	res, err := GlobalDB.Exec(`UPDATE news SET title = $1, content = $2, image_url = $3 WHERE id = $4`,
+		req.Title, req.Content, req.ImageURL, newsID)
+	if err != nil {
+		log.Printf("[NEWS] ❌ Failed to update news #%d: %v", newsID, err)
+		http.Error(w, "Failed to update news", http.StatusInternalServerError)
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		http.Error(w, "News not found", http.StatusNotFound)
+		return
+	}
+
+	repository.WriteAdminLog(adminID, fmt.Sprintf("Обновлена новость #%d: %s", newsID, req.Title))
+	log.Printf("[NEWS] ✏️ Admin %d updated news #%d: %s", adminID, newsID, req.Title)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"id":    newsID,
+		"title": req.Title,
+	})
+}
+
 // ── DELETE /api/v1/admin/news/{id} — delete news article ──
 func AdminDeleteNewsHandler(w http.ResponseWriter, r *http.Request) {
 	adminID, _ := r.Context().Value(middleware.UserIDKey).(int)
