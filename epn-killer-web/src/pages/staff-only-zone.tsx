@@ -617,7 +617,7 @@ export const StaffOnlyZone = () => {
   const TabBtn = ({ id, icon: Icon, label }: { id: Tab; icon: any; label: string }) => (
     <button
       onClick={() => setTab(id)}
-      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
+      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap shrink-0 ${
         tab === id
           ? 'bg-gradient-to-r from-blue-500/20 to-purple-500/10 text-blue-400 border border-blue-500/30'
           : 'text-slate-400 hover:text-white hover:bg-white/5'
@@ -1119,7 +1119,8 @@ export const StaffOnlyZone = () => {
                 Настройки тиров и комиссий
               </h3>
               <div className="glass-card overflow-hidden">
-                <table className="w-full text-sm">
+                <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[500px]">
                   <thead>
                     <tr className="border-b border-white/10">
                       <th className="text-left px-4 py-3 text-slate-400 font-medium">Параметр</th>
@@ -1133,8 +1134,8 @@ export const StaffOnlyZone = () => {
                       .filter(s => ['fee_standard', 'fee_gold', 'gold_tier_price', 'gold_tier_duration_days'].includes(s.key))
                       .map(s => (
                         <tr key={s.key} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                          <td className="px-4 py-3 text-white text-xs font-medium">{SETTING_LABELS[s.key] || s.key}</td>
-                          <td className="px-4 py-3 text-slate-400 text-xs">{s.description}</td>
+                          <td className="px-4 py-3 text-white text-xs font-medium break-words">{SETTING_LABELS[s.key] || s.key}</td>
+                          <td className="px-4 py-3 text-slate-400 text-xs break-words max-w-[200px]">{s.description}</td>
                           <td className="px-4 py-3">
                             {editingSetting?.key === s.key ? (
                               <input
@@ -1173,6 +1174,7 @@ export const StaffOnlyZone = () => {
                     )}
                   </tbody>
                 </table>
+                </div>
               </div>
             </div>
 
@@ -1183,7 +1185,8 @@ export const StaffOnlyZone = () => {
                 Прочие комиссии
               </h3>
               <div className="glass-card overflow-hidden">
-                <table className="w-full text-sm">
+                <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[500px]">
                   <thead>
                     <tr className="border-b border-white/10">
                       <th className="text-left px-4 py-3 text-slate-400 font-medium">Параметр</th>
@@ -1198,8 +1201,8 @@ export const StaffOnlyZone = () => {
                       .filter((c, i, arr) => arr.findIndex(x => x.key === c.key) === i)
                       .map(c => (
                       <tr key={c.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                        <td className="px-4 py-3 text-white text-xs font-medium">{c.description || c.key}</td>
-                        <td className="px-4 py-3 text-slate-400 font-mono text-xs">{c.key}</td>
+                        <td className="px-4 py-3 text-white text-xs font-medium break-words max-w-[200px]">{c.description || c.key}</td>
+                        <td className="px-4 py-3 text-slate-400 font-mono text-xs break-words">{c.key}</td>
                         <td className="px-4 py-3">
                           {editingCommission?.id === c.id ? (
                             <input
@@ -1239,6 +1242,7 @@ export const StaffOnlyZone = () => {
                     )}
                   </tbody>
                 </table>
+                </div>
               </div>
             </div>
           </div>
@@ -1571,7 +1575,8 @@ export const StaffOnlyZone = () => {
 
             {/* News list */}
             <div className="glass-card overflow-hidden">
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[500px]">
                 <thead>
                   <tr className="border-b border-white/10">
                     <th className="text-left px-4 py-3 text-slate-400 font-medium">ID</th>
@@ -1585,7 +1590,7 @@ export const StaffOnlyZone = () => {
                   {newsList.map(n => (
                     <tr key={n.id} className={`border-b border-white/5 hover:bg-white/5 transition-colors ${editingNews?.id === n.id ? 'bg-blue-500/5' : ''}`}>
                       <td className="px-4 py-3 text-slate-500 font-mono text-xs">{n.id}</td>
-                      <td className="px-4 py-3 text-white text-xs">{n.title}</td>
+                      <td className="px-4 py-3 text-white text-xs break-words max-w-[200px]">{n.title}</td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
                           n.status === 'published' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-500/20 text-slate-400'
@@ -1623,6 +1628,7 @@ export const StaffOnlyZone = () => {
                   )}
                 </tbody>
               </table>
+              </div>
             </div>
           </div>
         )}
@@ -1757,7 +1763,8 @@ export const StaffOnlyZone = () => {
         {tab === 'logs' && (
           <div className="space-y-4">
             <div className="glass-card overflow-hidden">
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[500px]">
                 <thead>
                   <tr className="border-b border-white/10">
                     <th className="text-left px-4 py-3 text-slate-400 font-medium">ID</th>
@@ -1770,8 +1777,8 @@ export const StaffOnlyZone = () => {
                   {logs.map(l => (
                     <tr key={l.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                       <td className="px-4 py-3 text-slate-500 font-mono text-xs">{l.id}</td>
-                      <td className="px-4 py-3 text-slate-300 text-xs">{l.admin_email}</td>
-                      <td className="px-4 py-3 text-white text-xs">{l.action}</td>
+                      <td className="px-4 py-3 text-slate-300 text-xs break-all">{l.admin_email}</td>
+                      <td className="px-4 py-3 text-white text-xs break-words max-w-[250px]">{l.action}</td>
                       <td className="px-4 py-3 text-slate-500 text-xs">{l.created_at ? new Date(l.created_at).toLocaleString('ru-RU') : ''}</td>
                     </tr>
                   ))}
@@ -1780,6 +1787,7 @@ export const StaffOnlyZone = () => {
                   )}
                 </tbody>
               </table>
+              </div>
             </div>
           </div>
         )}
