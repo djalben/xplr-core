@@ -143,7 +143,7 @@ const BottomNavItem = ({ href, icon, label, isActive, badge }: { href: string; i
       <span className="relative shrink-0">
         {icon}
         {badge && badge > 0 ? (
-          <span className="absolute -top-1.5 -right-2.5 min-w-[14px] h-3.5 px-0.5 flex items-center justify-center rounded-full bg-red-500 text-white text-[8px] font-bold leading-none">
+          <span className="absolute -top-1.5 -right-2.5 min-w-[14px] h-3.5 px-0.5 flex items-center justify-center rounded-full bg-violet-500 text-white text-[8px] font-bold leading-none">
             {badge > 99 ? '99+' : badge}
           </span>
         ) : null}

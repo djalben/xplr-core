@@ -419,10 +419,16 @@ export const StorePage = () => {
                 </div>
                 <span className="text-base sm:text-lg font-bold text-white tracking-tight">Магазин</span>
               </div>
-              <button onClick={() => navigate('/purchases')} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.04] text-white/40 text-xs font-medium hover:bg-white/[0.08] hover:text-white transition-colors border border-white/[0.06]">
-                <FileText className="w-3.5 h-3.5" /> Мои покупки
-              </button>
             </div>
+
+            {/* Мои покупки — premium wide button */}
+            <button
+              onClick={() => navigate('/purchases')}
+              className="w-full flex items-center justify-center gap-3 px-6 py-3.5 mb-5 rounded-2xl bg-gradient-to-r from-[#4F46E5] to-[#7C3AED] border border-white/10 text-white font-semibold text-sm tracking-wide hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-purple-500/15"
+            >
+              <ShoppingBag className="w-5 h-5" />
+              Мои покупки
+            </button>
 
             {/* Cards */}
             <div className="flex flex-col lg:flex-row gap-4 sm:gap-5">
