@@ -159,6 +159,124 @@ func DeductWalletBalance(userID int, amount decimal.Decimal, details string) err
 	return nil
 }
 
+// PurchaseViaCard — атомарная покупка товара через карту.
+// Цепочка: Карта → (авто-пополнение из Кошелька при нехватке) → Списание с карты.
+// Прямое списание с Кошелька ЗАПРЕЩЕНО.
+// Возвращает cardID, cardLast4 для логирования.
+func PurchaseViaCard(userID int, amount decimal.Decimal, description string) (int, string, error) {
+	if GlobalDB == nil {
+		return 0, "", fmt.Errorf("database connection not initialized")
+	}
+	if amount.LessThanOrEqual(decimal.Zero) {
+		return 0, "", fmt.Errorf("сумма должна быть положительной")
+	}
+
+	// 1. Найти активную карту пользователя
+	card, err := GetFirstActiveCard(userID)
+	if err != nil {
+		return 0, "", fmt.Errorf("ошибка поиска карты: %w", err)
+	}
+	if card == nil {
+		return 0, "", fmt.Errorf("NO_ACTIVE_CARD")
+	}
+
+	tx, err := GlobalDB.Begin()
+	if err != nil {
+		return 0, "", fmt.Errorf("не удалось начать транзакцию: %v", err)
+	}
+	defer tx.Rollback()
+
+	// 2. Проверяем баланс карты (FOR UPDATE)
+	var cardBalance decimal.Decimal
+	err = tx.QueryRow(
+		`SELECT COALESCE(card_balance, 0) FROM cards WHERE id = $1 AND user_id = $2 FOR UPDATE`,
+		card.ID, userID,
+	).Scan(&cardBalance)
+	if err != nil {
+		return 0, "", fmt.Errorf("не удалось получить баланс карты: %v", err)
+	}
+
+	// 3. Авто-пополнение при нехватке средств на карте
+	if cardBalance.LessThan(amount) {
+		deficit := amount.Sub(cardBalance)
+
+		// Проверяем баланс кошелька
+		var walletBalance decimal.Decimal
+		err = tx.QueryRow(
+			`SELECT COALESCE(master_balance, 0) FROM internal_balances WHERE user_id = $1 FOR UPDATE`,
+			userID,
+		).Scan(&walletBalance)
+		if err != nil {
+			return 0, "", fmt.Errorf("кошелёк не найден — пополните баланс")
+		}
+
+		if walletBalance.LessThan(deficit) {
+			total := cardBalance.Add(walletBalance)
+			return 0, "", fmt.Errorf("INSUFFICIENT_FUNDS:card=$%s,wallet=$%s,total=$%s,required=$%s",
+				cardBalance.StringFixed(2), walletBalance.StringFixed(2),
+				total.StringFixed(2), amount.StringFixed(2))
+		}
+
+		// Списываем дефицит из кошелька
+		_, err = tx.Exec(
+			`UPDATE internal_balances SET master_balance = master_balance - $1, updated_at = NOW() WHERE user_id = $2`,
+			deficit, userID,
+		)
+		if err != nil {
+			return 0, "", fmt.Errorf("не удалось списать из кошелька: %v", err)
+		}
+
+		// Зачисляем дефицит на карту
+		_, err = tx.Exec(
+			`UPDATE cards SET card_balance = COALESCE(card_balance, 0) + $1 WHERE id = $2`,
+			deficit, card.ID,
+		)
+		if err != nil {
+			return 0, "", fmt.Errorf("не удалось зачислить на карту: %v", err)
+		}
+
+		// Записываем транзакцию авто-пополнения
+		_, _ = tx.Exec(
+			`INSERT INTO transactions (user_id, card_id, amount, fee, transaction_type, status, details, executed_at)
+			 VALUES ($1, $2, $3, 0, 'CARD_TOPUP', 'APPROVED', $4, $5)`,
+			userID, card.ID, deficit,
+			fmt.Sprintf("Auto top-up for purchase: $%s → card *%s", deficit.StringFixed(2), card.Last4Digits),
+			time.Now(),
+		)
+
+		log.Printf("[PURCHASE-VIA-CARD] Auto top-up: user=%d, $%s wallet → card %d (*%s)",
+			userID, deficit.StringFixed(2), card.ID, card.Last4Digits)
+	}
+
+	// 4. Списание с баланса карты
+	_, err = tx.Exec(
+		`UPDATE cards SET card_balance = card_balance - $1 WHERE id = $2`,
+		amount, card.ID,
+	)
+	if err != nil {
+		return 0, "", fmt.Errorf("не удалось списать с карты: %v", err)
+	}
+
+	// 5. Записываем транзакцию покупки
+	_, err = tx.Exec(
+		`INSERT INTO transactions (user_id, card_id, amount, fee, transaction_type, status, details, executed_at)
+		 VALUES ($1, $2, $3, 0, 'STORE_PURCHASE', 'APPROVED', $4, $5)`,
+		userID, card.ID, amount, description, time.Now(),
+	)
+	if err != nil {
+		log.Printf("DB Error Insert STORE_PURCHASE transaction: %v", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, "", fmt.Errorf("ошибка фиксации: %v", err)
+	}
+
+	log.Printf("[PURCHASE-VIA-CARD] ✅ User %d: purchased via Card %d (*%s) — $%s — %s",
+		userID, card.ID, card.Last4Digits, amount.StringFixed(2), description)
+
+	return card.ID, card.Last4Digits, nil
+}
+
 // TransferWalletToCard — перевести средства из Кошелька (USD) на карту.
 // Если карта в EUR, конвертирует USD→EUR по внутреннему курсу.
 // Атомарно: проверяет баланс, списывает из wallet, зачисляет на card_balance, записывает транзакцию.

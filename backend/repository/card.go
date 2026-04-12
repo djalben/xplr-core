@@ -121,6 +121,48 @@ func GetUserCards(userID int) ([]models.Card, error) {
 	return cards, nil
 }
 
+// GetFirstActiveCard — returns the first ACTIVE card for a user (for store purchases).
+func GetFirstActiveCard(userID int) (*models.Card, error) {
+	if GlobalDB == nil {
+		return nil, fmt.Errorf("database connection not initialized")
+	}
+	var card models.Card
+	var teamID sql.NullInt64
+	err := GlobalDB.QueryRow(`
+		SELECT id, user_id, provider_card_id, bin, last_4_digits, card_status,
+		       COALESCE(nickname, '') as nickname, COALESCE(service_slug, 'arbitrage'),
+		       daily_spend_limit, COALESCE(spend_limit, 0) as spend_limit, failed_auth_count,
+		       COALESCE(card_type, 'VISA') as card_type,
+		       COALESCE(category, 'arbitrage') as category,
+		       COALESCE(currency, 'USD') as currency,
+		       COALESCE(auto_replenish_enabled, FALSE) as auto_replenish_enabled,
+		       COALESCE(auto_replenish_threshold, 0) as auto_replenish_threshold,
+		       COALESCE(auto_replenish_amount, 0) as auto_replenish_amount,
+		       COALESCE(card_balance, 0) as card_balance,
+		       team_id, created_at
+		FROM cards
+		WHERE user_id = $1 AND card_status = 'ACTIVE'
+		ORDER BY created_at ASC
+		LIMIT 1
+	`, userID).Scan(
+		&card.ID, &card.UserID, &card.ProviderCardID, &card.BIN, &card.Last4Digits,
+		&card.CardStatus, &card.Nickname, &card.ServiceSlug, &card.DailySpendLimit, &card.SpendLimit, &card.FailedAuthCount,
+		&card.CardType, &card.Category, &card.Currency, &card.AutoReplenishEnabled, &card.AutoReplenishThreshold,
+		&card.AutoReplenishAmount, &card.CardBalance, &teamID, &card.CreatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // no active card — not an error
+		}
+		return nil, fmt.Errorf("failed to query active card: %w", err)
+	}
+	if teamID.Valid {
+		v := int(teamID.Int64)
+		card.TeamID = &v
+	}
+	return &card, nil
+}
+
 // ProcessCardPayment — Атомарное списание средств с баланса пользователя
 // Использует транзакцию БД и SELECT ... FOR UPDATE для предотвращения race conditions
 func ProcessCardPayment(userID int, cardID int, amount decimal.Decimal, fee decimal.Decimal, merchantName string, cardLast4 string) error {

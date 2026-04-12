@@ -259,25 +259,7 @@ func StorePurchaseHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 3. Check wallet balance
-	wallet, err := repository.GetInternalBalance(userID)
-	if err != nil {
-		http.Error(w, "Failed to get wallet", http.StatusInternalServerError)
-		return
-	}
-	if wallet.MasterBalance.LessThan(product.PriceUSD) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusPaymentRequired)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error":    fmt.Sprintf("Недостаточно средств (баланс: $%s, цена: $%s)", wallet.MasterBalance.StringFixed(2), product.PriceUSD.StringFixed(2)),
-			"code":     "INSUFFICIENT_BALANCE",
-			"balance":  wallet.MasterBalance.StringFixed(2),
-			"required": product.PriceUSD.StringFixed(2),
-		})
-		return
-	}
-
-	// 4. Call provider API (stub — returns simulated activation data)
+	// 3. Call provider API (stub — returns simulated activation data)
 	activationKey, qrData, providerRef, providerErr := callProvider(product)
 	if providerErr != nil {
 		log.Printf("[STORE-PURCHASE] ❌ Provider error for product %d: %v", product.ID, providerErr)
@@ -290,15 +272,37 @@ func StorePurchaseHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 5. Deduct balance
-	details := fmt.Sprintf("Store purchase: %s — $%s", product.Name, product.PriceUSD.StringFixed(2))
-	if err := repository.DeductWalletBalance(userID, product.PriceUSD, details); err != nil {
-		log.Printf("[STORE-PURCHASE] ❌ Deduct failed for user %d: %v", userID, err)
-		http.Error(w, "Payment failed: "+err.Error(), http.StatusInternalServerError)
+	// 4. Payment via Card (direct wallet deduction FORBIDDEN)
+	details := fmt.Sprintf("Покупка товара ID_%d (%s) — $%s", product.ID, product.Name, product.PriceUSD.StringFixed(2))
+	cardID, cardLast4, payErr := repository.PurchaseViaCard(userID, product.PriceUSD, details)
+	if payErr != nil {
+		errMsg := payErr.Error()
+		if errMsg == "NO_ACTIVE_CARD" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusPaymentRequired)
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "Для покупки товаров необходимо иметь активную карту. Пожалуйста, приобретите карту в разделе «Карты» и пополните её с кошелька XPLR.",
+				"code":  "NO_ACTIVE_CARD",
+			})
+			return
+		}
+		if len(errMsg) > 18 && errMsg[:18] == "INSUFFICIENT_FUNDS" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusPaymentRequired)
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "Недостаточно средств в системе XPLR для проведения операции",
+				"code":  "INSUFFICIENT_FUNDS",
+			})
+			return
+		}
+		log.Printf("[STORE-PURCHASE] ❌ Payment failed for user %d: %v", userID, payErr)
+		http.Error(w, "Payment failed: "+errMsg, http.StatusInternalServerError)
 		return
 	}
 
-	// 6. Record order
+	log.Printf("[STORE-PURCHASE] Покупка товара ID_%d через Карту ID_%d (*%s)", product.ID, cardID, cardLast4)
+
+	// 5. Record order
 	var orderID int
 	err = GlobalDB.QueryRow(`
 		INSERT INTO store_orders (user_id, product_id, product_name, price_usd, status, activation_key, qr_data, provider_ref)
@@ -307,16 +311,15 @@ func StorePurchaseHandler(w http.ResponseWriter, r *http.Request) {
 	).Scan(&orderID)
 	if err != nil {
 		log.Printf("[STORE-PURCHASE] ❌ Failed to record order: %v", err)
-		// Balance already deducted — log critical error but still return data to user
 	}
 
-	log.Printf("[STORE-PURCHASE] ✅ User %d purchased '%s' for $%s (order #%d)",
-		userID, product.Name, product.PriceUSD.StringFixed(2), orderID)
+	log.Printf("[STORE-PURCHASE] ✅ User %d purchased '%s' for $%s via Card %d (order #%d)",
+		userID, product.Name, product.PriceUSD.StringFixed(2), cardID, orderID)
 
-	// 7. Notify user
+	// 6. Notify user
 	go notifyStorePurchase(userID, product, activationKey, qrData)
 
-	// 8. Return result
+	// 7. Return result
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"order_id":       orderID,
@@ -619,25 +622,7 @@ func ESIMOrderHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 2. Check wallet balance
-	wallet, err := repository.GetInternalBalance(userID)
-	if err != nil {
-		http.Error(w, "Failed to get wallet", http.StatusInternalServerError)
-		return
-	}
-	if wallet.MasterBalance.LessThan(price) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusPaymentRequired)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error":    fmt.Sprintf("Недостаточно средств (баланс: $%s, цена: $%s)", wallet.MasterBalance.StringFixed(2), price.StringFixed(2)),
-			"code":     "INSUFFICIENT_BALANCE",
-			"balance":  wallet.MasterBalance.StringFixed(2),
-			"required": price.StringFixed(2),
-		})
-		return
-	}
-
-	// 3. Order from provider
+	// 2. Order from provider
 	result, orderErr := p.OrderESIM(req.PlanID)
 	if orderErr != nil {
 		log.Printf("[ESIM-ORDER] ❌ Provider order error: %v", orderErr)
@@ -650,19 +635,41 @@ func ESIMOrderHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 4. Deduct balance
+	// 3. Payment via Card (direct wallet deduction FORBIDDEN)
 	productName := req.PlanName
 	if productName == "" {
 		productName = "eSIM " + req.CountryCode
 	}
-	details := fmt.Sprintf("eSIM: %s — $%s", productName, price.StringFixed(2))
-	if err := repository.DeductWalletBalance(userID, price, details); err != nil {
-		log.Printf("[ESIM-ORDER] ❌ Deduct failed for user %d: %v", userID, err)
-		http.Error(w, "Payment failed: "+err.Error(), http.StatusInternalServerError)
+	details := fmt.Sprintf("Покупка eSIM ID_%s (%s) — $%s", req.PlanID, productName, price.StringFixed(2))
+	cardID, cardLast4, payErr := repository.PurchaseViaCard(userID, price, details)
+	if payErr != nil {
+		errMsg := payErr.Error()
+		if errMsg == "NO_ACTIVE_CARD" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusPaymentRequired)
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "Для покупки товаров необходимо иметь активную карту. Пожалуйста, приобретите карту в разделе «Карты» и пополните её с кошелька XPLR.",
+				"code":  "NO_ACTIVE_CARD",
+			})
+			return
+		}
+		if len(errMsg) > 18 && errMsg[:18] == "INSUFFICIENT_FUNDS" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusPaymentRequired)
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "Недостаточно средств в системе XPLR для проведения операции",
+				"code":  "INSUFFICIENT_FUNDS",
+			})
+			return
+		}
+		log.Printf("[ESIM-ORDER] ❌ Payment failed for user %d: %v", userID, payErr)
+		http.Error(w, "Payment failed: "+errMsg, http.StatusInternalServerError)
 		return
 	}
 
-	// 5. Record order in store_orders
+	log.Printf("[ESIM-ORDER] Покупка eSIM ID_%s через Карту ID_%d (*%s)", req.PlanID, cardID, cardLast4)
+
+	// 4. Record order in store_orders
 	var orderID int
 	err = GlobalDB.QueryRow(`
 		INSERT INTO store_orders (user_id, product_id, product_name, price_usd, status, activation_key, qr_data, provider_ref)
@@ -673,10 +680,10 @@ func ESIMOrderHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[ESIM-ORDER] ❌ Failed to record order: %v", err)
 	}
 
-	log.Printf("[ESIM-ORDER] ✅ User %d ordered '%s' for $%s (order #%d, ref=%s)",
-		userID, productName, price.StringFixed(2), orderID, result.ProviderRef)
+	log.Printf("[ESIM-ORDER] ✅ User %d ordered '%s' for $%s via Card %d (order #%d, ref=%s)",
+		userID, productName, price.StringFixed(2), cardID, orderID, result.ProviderRef)
 
-	// 6. Notify
+	// 5. Notify
 	go func() {
 		product := StoreProduct{
 			Name:     productName,
@@ -685,7 +692,7 @@ func ESIMOrderHandler(w http.ResponseWriter, r *http.Request) {
 		notifyStorePurchase(userID, product, "", result.QRData)
 	}()
 
-	// 7. Return full result
+	// 6. Return full result
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"order_id":     orderID,

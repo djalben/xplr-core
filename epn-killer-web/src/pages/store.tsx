@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   ShoppingBag, Search, Globe, Gamepad2, X, Copy, Check, Loader2,
   AlertTriangle, QrCode, Key, ChevronRight, ArrowLeft,
-  Download, FileText, Smartphone, Wifi
+  Download, FileText, Smartphone, Wifi, CreditCard
 } from 'lucide-react';
 import { DashboardLayout } from '../components/dashboard-layout';
 import {
@@ -11,6 +11,7 @@ import {
   getESIMDestinations, getESIMPlans, orderESIM,
   type StoreProduct, type ESIMDestination, type ESIMPlan, type ESIMOrderResult,
 } from '../api/store';
+import { getUserCards, type Card } from '../api/cards';
 
 // ── Country flag emoji ──
 const countryFlag = (code: string) => {
@@ -296,9 +297,9 @@ const DigitalResultModal = ({
 // eSIM Confirm Purchase Modal
 // ══════════════════════════════════════════════════════════════
 const ESIMConfirmModal = ({
-  plan, loading, onConfirm, onClose,
+  plan, loading, onConfirm, onClose, card,
 }: {
-  plan: ESIMPlan; loading: boolean; onConfirm: () => void; onClose: () => void;
+  plan: ESIMPlan; loading: boolean; onConfirm: () => void; onClose: () => void; card: Card | null;
 }) => {
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && !loading) onClose(); };
@@ -321,10 +322,10 @@ const ESIMConfirmModal = ({
             </div>
             <div>
               <h2 className="text-lg font-bold text-white">Подтвердите покупку eSIM</h2>
-              <p className="text-xs text-slate-500">Средства будут списаны с кошелька XPLR</p>
+              <p className="text-xs text-slate-500">Списание с карты XPLR</p>
             </div>
           </div>
-          <div className="space-y-3 mb-6">
+          <div className="space-y-3 mb-4">
             <div className="flex justify-between items-center py-2.5 border-b border-white/5">
               <span className="text-sm text-slate-400">План</span>
               <span className="text-sm text-white font-medium">{plan.name}</span>
@@ -341,11 +342,23 @@ const ESIMConfirmModal = ({
               <span className="text-sm text-slate-400">Срок</span>
               <span className="text-sm text-white font-medium">{plan.validity_days} дней</span>
             </div>
+            {card && (
+              <div className="flex justify-between items-center py-2.5 border-b border-white/5">
+                <span className="text-sm text-slate-400">Оплата</span>
+                <span className="text-sm text-white font-medium flex items-center gap-1.5">
+                  <CreditCard className="w-3.5 h-3.5 text-blue-400" />
+                  •••• {card.last_4_digits}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between items-center py-3 bg-blue-500/5 rounded-xl px-3 border border-blue-500/10">
               <span className="text-sm text-slate-300 font-medium">Итого</span>
               <span className="text-xl text-blue-400 font-bold">${plan.price_usd.toFixed(2)}</span>
             </div>
           </div>
+          <p className="text-[11px] text-slate-500 mb-5 leading-relaxed">
+            При нехватке средств на карте — автоматическое пополнение из Кошелька XPLR
+          </p>
           <div className="flex gap-3">
             <button onClick={onClose} disabled={loading} className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-sm font-medium hover:bg-white/10 transition-all disabled:opacity-30">
               Отмена
@@ -364,9 +377,9 @@ const ESIMConfirmModal = ({
 // Digital Product Confirm Modal
 // ══════════════════════════════════════════════════════════════
 const DigitalConfirmModal = ({
-  product, loading, onConfirm, onClose,
+  product, loading, onConfirm, onClose, card,
 }: {
-  product: StoreProduct; loading: boolean; onConfirm: () => void; onClose: () => void;
+  product: StoreProduct; loading: boolean; onConfirm: () => void; onClose: () => void; card: Card | null;
 }) => {
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && !loading) onClose(); };
@@ -389,10 +402,10 @@ const DigitalConfirmModal = ({
             </div>
             <div>
               <h2 className="text-lg font-bold text-white">Подтвердите покупку</h2>
-              <p className="text-xs text-slate-500">Средства будут списаны с кошелька XPLR</p>
+              <p className="text-xs text-slate-500">Списание с карты XPLR</p>
             </div>
           </div>
-          <div className="space-y-3 mb-6">
+          <div className="space-y-3 mb-4">
             <div className="flex justify-between items-center py-2.5 border-b border-white/5">
               <span className="text-sm text-slate-400">Товар</span>
               <span className="text-sm text-white font-medium text-right max-w-[200px] truncate">{product.name}</span>
@@ -403,17 +416,67 @@ const DigitalConfirmModal = ({
                 <span className="text-xs text-slate-300 text-right max-w-[200px]">{product.description}</span>
               </div>
             )}
+            {card && (
+              <div className="flex justify-between items-center py-2.5 border-b border-white/5">
+                <span className="text-sm text-slate-400">Оплата</span>
+                <span className="text-sm text-white font-medium flex items-center gap-1.5">
+                  <CreditCard className="w-3.5 h-3.5 text-blue-400" />
+                  •••• {card.last_4_digits}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between items-center py-3 bg-blue-500/5 rounded-xl px-3 border border-blue-500/10">
               <span className="text-sm text-slate-300 font-medium">Итого</span>
               <span className="text-xl text-blue-400 font-bold">${product.price_usd}</span>
             </div>
           </div>
+          <p className="text-[11px] text-slate-500 mb-5 leading-relaxed">
+            При нехватке средств на карте — автоматическое пополнение из Кошелька XPLR
+          </p>
           <div className="flex gap-3">
             <button onClick={onClose} disabled={loading} className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-sm font-medium hover:bg-white/10 transition-all disabled:opacity-30">
               Отмена
             </button>
             <button onClick={onConfirm} disabled={loading} className="flex-1 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 text-white text-sm font-medium hover:opacity-90 transition-all disabled:opacity-60 flex items-center justify-center gap-2">
               {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Покупка...</> : 'Купить'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════
+// No Active Card Warning Modal
+// ══════════════════════════════════════════════════════════════
+const NoCardWarningModal = ({ onClose, onGoToCards }: { onClose: () => void; onGoToCards: () => void }) => {
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', h);
+    document.body.style.overflow = 'hidden';
+    return () => { document.removeEventListener('keydown', h); document.body.style.overflow = ''; };
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+      <div className="relative w-full max-w-sm rounded-2xl bg-[#111118] border border-white/10 shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="p-6 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle className="w-7 h-7 text-amber-400" />
+          </div>
+          <h2 className="text-lg font-bold text-white mb-2">Нет активной карты</h2>
+          <p className="text-sm text-slate-400 mb-6 leading-relaxed">
+            Для покупки товаров необходима активная карта XPLR. Пожалуйста, выпустите карту и пополните её с кошелька.
+          </p>
+          <div className="flex gap-3">
+            <button onClick={onClose} className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-sm font-medium hover:bg-white/10 transition-all">
+              Закрыть
+            </button>
+            <button onClick={onGoToCards} className="flex-1 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 text-white text-sm font-medium hover:opacity-90 transition-all flex items-center justify-center gap-2">
+              <CreditCard className="w-4 h-4" />
+              Мои карты
             </button>
           </div>
         </div>
@@ -450,6 +513,28 @@ export const StorePage = () => {
   const [confirmDigital, setConfirmDigital] = useState<StoreProduct | null>(null);
   const [digitalPurchasing, setDigitalPurchasing] = useState(false);
   const [digitalResult, setDigitalResult] = useState<{ productName: string; priceUsd: string; activationKey: string } | null>(null);
+
+  // Card state — purchases only via active cards
+  const [activeCards, setActiveCards] = useState<Card[]>([]);
+  const [showNoCardWarning, setShowNoCardWarning] = useState(false);
+
+  // Fetch user's active cards on mount
+  useEffect(() => {
+    getUserCards()
+      .then(cards => setActiveCards((cards || []).filter(c => c.card_status === 'ACTIVE')))
+      .catch(() => setActiveCards([]));
+  }, []);
+
+  // Card check — intercept Buy click
+  const firstCard = activeCards.length > 0 ? activeCards[0] : null;
+  const tryBuyESIM = (plan: ESIMPlan) => {
+    if (!firstCard) { setShowNoCardWarning(true); return; }
+    setConfirmPlan(plan);
+  };
+  const tryBuyDigital = (product: StoreProduct) => {
+    if (!firstCard) { setShowNoCardWarning(true); return; }
+    setConfirmDigital(product);
+  };
 
   // Load eSIM destinations
   const loadDestinations = useCallback(async () => {
@@ -516,8 +601,12 @@ export const StorePage = () => {
       setEsimResult({ result: res, planName });
     } catch (err: any) {
       setConfirmPlan(null);
-      const msg = err?.response?.data?.error || 'Ошибка при покупке eSIM';
-      setError(typeof msg === 'string' ? msg : 'Ошибка при покупке');
+      const code = err?.response?.data?.code;
+      if (code === 'NO_ACTIVE_CARD') { setShowNoCardWarning(true); }
+      else {
+        const msg = err?.response?.data?.error || 'Ошибка при покупке eSIM';
+        setError(typeof msg === 'string' ? msg : 'Ошибка при покупке');
+      }
     } finally {
       setEsimPurchasing(false);
     }
@@ -534,8 +623,12 @@ export const StorePage = () => {
       setDigitalResult({ productName: res.product_name, priceUsd: res.price_usd, activationKey: res.activation_key });
     } catch (err: any) {
       setConfirmDigital(null);
-      const msg = err?.response?.data?.error || 'Ошибка при покупке';
-      setError(typeof msg === 'string' ? msg : 'Ошибка при покупке');
+      const code = err?.response?.data?.code;
+      if (code === 'NO_ACTIVE_CARD') { setShowNoCardWarning(true); }
+      else {
+        const msg = err?.response?.data?.error || 'Ошибка при покупке';
+        setError(typeof msg === 'string' ? msg : 'Ошибка при покупке');
+      }
     } finally {
       setDigitalPurchasing(false);
     }
@@ -724,7 +817,7 @@ export const StorePage = () => {
                     </div>
                     {plan.in_stock ? (
                       <button
-                        onClick={() => setConfirmPlan(plan)}
+                        onClick={() => tryBuyESIM(plan)}
                         className="shrink-0 px-4 py-2 rounded-lg bg-white/[0.06] text-white text-xs font-medium hover:bg-white/[0.1] transition-colors"
                       >
                         Купить
@@ -793,7 +886,7 @@ export const StorePage = () => {
                       </div>
                       {product.in_stock ? (
                         <button
-                          onClick={() => setConfirmDigital(product)}
+                          onClick={() => tryBuyDigital(product)}
                           className="shrink-0 px-4 py-2 rounded-lg bg-white/[0.06] text-white text-xs font-medium hover:bg-white/[0.1] transition-colors"
                         >
                           Купить
@@ -811,14 +904,17 @@ export const StorePage = () => {
       </div>
 
       {/* ═══════ Modals ═══════ */}
+      {showNoCardWarning && (
+        <NoCardWarningModal onClose={() => setShowNoCardWarning(false)} onGoToCards={() => navigate('/cards')} />
+      )}
       {confirmPlan && (
-        <ESIMConfirmModal plan={confirmPlan} loading={esimPurchasing} onConfirm={handleESIMPurchase} onClose={() => !esimPurchasing && setConfirmPlan(null)} />
+        <ESIMConfirmModal plan={confirmPlan} loading={esimPurchasing} onConfirm={handleESIMPurchase} onClose={() => !esimPurchasing && setConfirmPlan(null)} card={firstCard} />
       )}
       {esimResult && (
         <ESIMActivationModal result={esimResult.result} planName={esimResult.planName} onClose={() => setEsimResult(null)} />
       )}
       {confirmDigital && (
-        <DigitalConfirmModal product={confirmDigital} loading={digitalPurchasing} onConfirm={handleDigitalPurchase} onClose={() => !digitalPurchasing && setConfirmDigital(null)} />
+        <DigitalConfirmModal product={confirmDigital} loading={digitalPurchasing} onConfirm={handleDigitalPurchase} onClose={() => !digitalPurchasing && setConfirmDigital(null)} card={firstCard} />
       )}
       {digitalResult && (
         <DigitalResultModal productName={digitalResult.productName} priceUsd={digitalResult.priceUsd} activationKey={digitalResult.activationKey} onClose={() => setDigitalResult(null)} />
