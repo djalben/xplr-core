@@ -122,6 +122,8 @@ func GetUserCards(userID int) ([]models.Card, error) {
 }
 
 // GetFirstActiveCard — returns the first ACTIVE card for a user (for store purchases).
+// IMPORTANT: Travel cards (service_slug='travel') are EXCLUDED from store purchases.
+// Only subscription/premium/arbitrage cards are allowed.
 func GetFirstActiveCard(userID int) (*models.Card, error) {
 	if GlobalDB == nil {
 		return nil, fmt.Errorf("database connection not initialized")
@@ -142,6 +144,7 @@ func GetFirstActiveCard(userID int) (*models.Card, error) {
 		       team_id, created_at
 		FROM cards
 		WHERE user_id = $1 AND card_status = 'ACTIVE'
+		  AND COALESCE(service_slug, 'arbitrage') NOT IN ('travel')
 		ORDER BY created_at ASC
 		LIMIT 1
 	`, userID).Scan(

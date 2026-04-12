@@ -137,18 +137,18 @@ const UserProfile = () => {
 
 const BottomNavItem = ({ href, icon, label, isActive, badge }: { href: string; icon: React.ReactNode; label: string; isActive: boolean; badge?: number }) => (
   <Link to={href} className="flex-1 min-w-0">
-    <div className={`relative flex flex-col items-center justify-center h-full py-2 px-1 rounded-xl transition-colors ${
+    <div className={`relative flex flex-col items-center justify-center h-full py-1.5 px-0.5 rounded-xl transition-colors ${
       isActive ? 'text-blue-400' : 'text-slate-500'
     }`}>
       <span className="relative shrink-0">
         {icon}
         {badge && badge > 0 ? (
-          <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold leading-none">
+          <span className="absolute -top-1.5 -right-2.5 min-w-[14px] h-3.5 px-0.5 flex items-center justify-center rounded-full bg-red-500 text-white text-[8px] font-bold leading-none">
             {badge > 99 ? '99+' : badge}
           </span>
         ) : null}
       </span>
-      <span className="text-[10px] mt-0.5 font-medium leading-tight text-center truncate w-full">{label}</span>
+      <span className="text-[9px] xs:text-[10px] mt-0.5 font-medium leading-tight text-center truncate w-full">{label}</span>
     </div>
   </Link>
 );
@@ -264,7 +264,7 @@ export const Sidebar = () => {
     { href: '/support', icon: <HelpCircle className="w-5 h-5" />, label: t('nav.support'), badge: 0 },
   ];
 
-  const bottomNavItems = navItems.slice(0, 5);
+  const bottomNavItems = navItems.slice(0, 6);
 
   return (
     <>
@@ -348,7 +348,7 @@ export const Sidebar = () => {
             <BottomNavItem
               key={item.href}
               href={item.href}
-              icon={React.cloneElement(item.icon as React.ReactElement<any>, { className: 'w-5 h-5' })}
+              icon={React.cloneElement(item.icon as React.ReactElement<any>, { className: 'w-4 h-4' })}
               label={item.label}
               isActive={location.pathname === item.href}
               badge={item.badge}

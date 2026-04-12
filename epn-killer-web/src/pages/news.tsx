@@ -22,17 +22,19 @@ const NewsModal = ({ item, onClose }: { item: NewsItem; onClose: () => void }) =
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6" onClick={onClose}>
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
       <div
-        className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[#111118] border border-white/10 shadow-2xl"
+        className="relative w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl bg-[#111118] border border-white/10 shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
-        {/* Close button */}
+        {/* Close button — always visible */}
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 z-10 p-2 rounded-xl bg-black/50 backdrop-blur-sm border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+          className="absolute top-3 right-3 z-50 p-2 rounded-xl bg-black/70 backdrop-blur-sm border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all"
         >
           <X className="w-5 h-5" />
         </button>
 
+        {/* Scrollable content */}
+        <div className="overflow-y-auto flex-1 rounded-2xl">
         {/* Image — full width, no crop */}
         {item.image_url ? (
           <img
@@ -57,6 +59,7 @@ const NewsModal = ({ item, onClose }: { item: NewsItem; onClose: () => void }) =
             {item.content}
           </div>
         </div>
+        </div>{/* /overflow-y-auto */}
       </div>
     </div>
   );

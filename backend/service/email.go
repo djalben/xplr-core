@@ -8,6 +8,7 @@ import (
 	"net/smtp"
 	"os"
 	"strings"
+	"time"
 )
 
 // ═══════════════════════════════════════════════════
@@ -133,21 +134,21 @@ func wrapHTML(title, content string) string {
 	return fmt.Sprintf(`<!DOCTYPE html>
 <html lang="ru">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#0a0a0f;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-<table width="100%%" cellpadding="0" cellspacing="0" style="background:#0a0a0f;padding:40px 0;">
+<body style="margin:0;padding:0;background:#121212;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<table width="100%%" cellpadding="0" cellspacing="0" style="background:#121212;padding:40px 0;">
 <tr><td align="center">
-<table width="600" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg,#111118 0%%,#0d0d15 100%%);border-radius:16px;border:1px solid rgba(255,255,255,0.06);overflow:hidden;">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#1A1A1A;border-radius:16px;border:1px solid rgba(255,255,255,0.08);overflow:hidden;">
   <!-- Header -->
-  <tr><td style="padding:32px 40px 20px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.06);">
+  <tr><td style="padding:32px 40px 20px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.08);">
     <div style="display:inline-block;background:linear-gradient(135deg,#3b82f6,#8b5cf6);border-radius:12px;width:48px;height:48px;line-height:48px;text-align:center;color:#fff;font-size:22px;font-weight:bold;">X</div>
-    <h1 style="margin:12px 0 0;color:#fff;font-size:20px;font-weight:700;letter-spacing:-0.3px;">%s</h1>
+    <h1 style="margin:12px 0 0;color:#FFFFFF;font-size:20px;font-weight:700;letter-spacing:-0.3px;">%s</h1>
   </td></tr>
   <!-- Body -->
   <tr><td style="padding:32px 40px;">%s</td></tr>
   <!-- Footer -->
-  <tr><td style="padding:20px 40px 32px;text-align:center;border-top:1px solid rgba(255,255,255,0.06);">
-    <p style="margin:0;color:#475569;font-size:11px;">© XPLR — Premium Financial Services</p>
-    <p style="margin:4px 0 0;color:#334155;font-size:10px;">Это автоматическое письмо, не отвечайте на него.</p>
+  <tr><td style="padding:20px 40px 32px;text-align:center;border-top:1px solid rgba(255,255,255,0.08);">
+    <p style="margin:0;color:#9ca3af;font-size:11px;">© XPLR — Premium Financial Services</p>
+    <p style="margin:4px 0 0;color:#6b7280;font-size:10px;">Это автоматическое письмо, не отвечайте на него.</p>
   </td></tr>
 </table>
 </td></tr></table>
@@ -380,6 +381,90 @@ func SendEmergencyFreezeNotification(toEmail string, frozenCards int) error {
 		return err
 	}
 	log.Printf("[EMAIL] Emergency freeze notification sent to %s", toEmail)
+	return nil
+}
+
+// SendPurchaseReceipt — premium purchase receipt email with order details.
+// For eSIM purchases, includes activation instructions block.
+func SendPurchaseReceipt(toEmail string, orderID int, productName string, priceUSD string, cardLast4 string, isESIM bool, activationData map[string]string) error {
+	cfg := loadSMTPConfig()
+	dateStr := fmt.Sprintf("%s", time.Now().Format("02.01.2006 15:04"))
+
+	// Order details block
+	orderBlock := fmt.Sprintf(`
+    <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:20px 24px;margin:0 0 24px;">
+      <table width="100%%" cellpadding="0" cellspacing="0">
+        <tr><td style="padding:6px 0;color:#9ca3af;font-size:13px;">Номер заказа</td><td style="padding:6px 0;color:#FFFFFF;font-size:13px;text-align:right;font-weight:600;">#%d</td></tr>
+        <tr><td style="padding:6px 0;color:#9ca3af;font-size:13px;">Дата</td><td style="padding:6px 0;color:#FFFFFF;font-size:13px;text-align:right;">%s</td></tr>
+        <tr><td style="padding:6px 0;color:#9ca3af;font-size:13px;">Товар</td><td style="padding:6px 0;color:#FFFFFF;font-size:13px;text-align:right;font-weight:600;">%s</td></tr>
+        <tr><td style="padding:6px 0;color:#9ca3af;font-size:13px;">Сумма</td><td style="padding:6px 0;color:#60a5fa;font-size:15px;text-align:right;font-weight:700;">$%s</td></tr>
+        <tr><td style="padding:6px 0;color:#9ca3af;font-size:13px;">Оплата</td><td style="padding:6px 0;color:#FFFFFF;font-size:13px;text-align:right;">Карта •••• %s</td></tr>
+        <tr><td colspan="2" style="padding:12px 0 0;"><div style="height:1px;background:rgba(255,255,255,0.06);"></div></td></tr>
+        <tr><td style="padding:8px 0 0;color:#9ca3af;font-size:13px;">Статус</td><td style="padding:8px 0 0;text-align:right;"><span style="display:inline-block;padding:4px 12px;background:rgba(34,197,94,0.15);color:#4ade80;border-radius:8px;font-size:12px;font-weight:600;">Оплачено</span></td></tr>
+      </table>
+    </div>`, orderID, dateStr, productName, priceUSD, cardLast4)
+
+	// eSIM activation instructions (optional)
+	esimBlock := ""
+	if isESIM && activationData != nil {
+		qrData := activationData["qr_data"]
+		smdp := activationData["smdp"]
+		matchingID := activationData["matching_id"]
+		iccid := activationData["iccid"]
+
+		esimBlock = fmt.Sprintf(`
+    <div style="background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.15);border-radius:12px;padding:20px 24px;margin:0 0 24px;">
+      <p style="margin:0 0 12px;color:#60a5fa;font-size:14px;font-weight:700;">📱 Инструкция по активации eSIM</p>
+      <p style="margin:0 0 8px;color:#e2e8f0;font-size:13px;line-height:1.6;"><strong>Способ 1:</strong> Настройки → Сотовая связь → Добавить eSIM → Сканировать QR-код</p>
+      <p style="margin:0 0 16px;color:#e2e8f0;font-size:13px;line-height:1.6;"><strong>Способ 2:</strong> Ввести данные вручную:</p>`)
+
+		if smdp != "" {
+			esimBlock += fmt.Sprintf(`
+      <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:10px 14px;margin:0 0 8px;">
+        <p style="margin:0 0 2px;color:#9ca3af;font-size:10px;text-transform:uppercase;letter-spacing:1px;">SM-DP+ адрес</p>
+        <p style="margin:0;color:#FFFFFF;font-size:12px;font-family:monospace;word-break:break-all;">%s</p>
+      </div>`, smdp)
+		}
+		if matchingID != "" {
+			esimBlock += fmt.Sprintf(`
+      <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:10px 14px;margin:0 0 8px;">
+        <p style="margin:0 0 2px;color:#9ca3af;font-size:10px;text-transform:uppercase;letter-spacing:1px;">Код активации</p>
+        <p style="margin:0;color:#FFFFFF;font-size:12px;font-family:monospace;word-break:break-all;">%s</p>
+      </div>`, matchingID)
+		}
+		if qrData != "" {
+			esimBlock += fmt.Sprintf(`
+      <div style="text-align:center;margin:16px 0 8px;">
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=%s" alt="QR" style="width:180px;height:180px;border-radius:12px;" />
+      </div>`, qrData)
+		}
+		if iccid != "" {
+			esimBlock += fmt.Sprintf(`
+      <p style="margin:8px 0 0;color:#9ca3af;font-size:11px;">ICCID: %s</p>`, iccid)
+		}
+		esimBlock += `
+    </div>`
+	}
+
+	content := fmt.Sprintf(`
+    <p style="color:#FFFFFF;font-size:16px;line-height:1.6;margin:0 0 8px;">Спасибо за покупку! 🎉</p>
+    <p style="color:#d1d5db;font-size:14px;line-height:1.6;margin:0 0 24px;">Ваш заказ успешно оплачен. Ниже — детали:</p>
+    %s
+    %s
+    <div style="text-align:center;margin:0 0 24px;">
+      <a href="%s/purchases" style="display:inline-block;padding:14px 40px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:#fff;text-decoration:none;border-radius:12px;font-size:14px;font-weight:600;">Мои покупки</a>
+    </div>
+    <p style="color:#6b7280;font-size:12px;line-height:1.5;margin:0;">Если у вас есть вопросы — обратитесь в поддержку через личный кабинет.</p>`,
+		orderBlock, esimBlock, cfg.Domain)
+
+	html := wrapHTML("Чек покупки", content)
+	subject := fmt.Sprintf("XPLR — Чек #%d: %s", orderID, productName)
+
+	if err := sendMail(toEmail, subject, html); err != nil {
+		log.Printf("[EMAIL] Failed to send purchase receipt to %s: %v", toEmail, err)
+		return err
+	}
+	log.Printf("[EMAIL] Purchase receipt #%d sent to %s", orderID, toEmail)
 	return nil
 }
 

@@ -13,11 +13,21 @@ import {
 } from '../api/store';
 import { getUserCards, type Card } from '../api/cards';
 
-// ── Country flag emoji ──
-const countryFlag = (code: string) => {
-  if (!code || code.length < 2 || code === 'GLOBAL') return '\u{1F30D}';
-  const codePoints = code.toUpperCase().split('').map(c => 0x1f1e6 + c.charCodeAt(0) - 65);
-  return String.fromCodePoint(...codePoints);
+// ── Country flag (SVG via flagcdn — cross-platform: Win/iOS/Android) ──
+const CountryFlag = ({ code, size = 24 }: { code: string; size?: number }) => {
+  if (!code || code.length < 2 || code === 'GLOBAL') {
+    return <Globe className="inline-block text-slate-400" style={{ width: size, height: size }} />;
+  }
+  return (
+    <img
+      src={`https://flagcdn.com/w80/${code.toLowerCase()}.png`}
+      srcSet={`https://flagcdn.com/w160/${code.toLowerCase()}.png 2x`}
+      alt={code}
+      style={{ width: size, height: Math.round(size * 0.75) }}
+      className="inline-block rounded-sm object-cover"
+      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+    />
+  );
 };
 
 // ── Brand icon fallback (simple-icons CDN) ──
@@ -332,7 +342,7 @@ const ESIMConfirmModal = ({
             </div>
             <div className="flex justify-between items-center py-2.5 border-b border-white/5">
               <span className="text-sm text-slate-400">Страна</span>
-              <span className="text-sm text-white font-medium">{countryFlag(plan.country_code)} {plan.country}</span>
+              <span className="text-sm text-white font-medium flex items-center gap-1.5"><CountryFlag code={plan.country_code} size={18} /> {plan.country}</span>
             </div>
             <div className="flex justify-between items-center py-2.5 border-b border-white/5">
               <span className="text-sm text-slate-400">Объём</span>
@@ -347,7 +357,7 @@ const ESIMConfirmModal = ({
                 <span className="text-sm text-slate-400">Оплата</span>
                 <span className="text-sm text-white font-medium flex items-center gap-1.5">
                   <CreditCard className="w-3.5 h-3.5 text-blue-400" />
-                  •••• {card.last_4_digits}
+                  {card.nickname ? `${card.nickname} ` : ''}•••• {card.last_4_digits}
                 </span>
               </div>
             )}
@@ -364,7 +374,7 @@ const ESIMConfirmModal = ({
               Отмена
             </button>
             <button onClick={onConfirm} disabled={loading} className="flex-1 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 text-white text-sm font-medium hover:opacity-90 transition-all disabled:opacity-60 flex items-center justify-center gap-2">
-              {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Покупка...</> : 'Купить eSIM'}
+              {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Оплата...</> : 'Подтвердить оплату'}
             </button>
           </div>
         </div>
@@ -421,7 +431,7 @@ const DigitalConfirmModal = ({
                 <span className="text-sm text-slate-400">Оплата</span>
                 <span className="text-sm text-white font-medium flex items-center gap-1.5">
                   <CreditCard className="w-3.5 h-3.5 text-blue-400" />
-                  •••• {card.last_4_digits}
+                  {card.nickname ? `${card.nickname} ` : ''}•••• {card.last_4_digits}
                 </span>
               </div>
             )}
@@ -438,7 +448,7 @@ const DigitalConfirmModal = ({
               Отмена
             </button>
             <button onClick={onConfirm} disabled={loading} className="flex-1 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 text-white text-sm font-medium hover:opacity-90 transition-all disabled:opacity-60 flex items-center justify-center gap-2">
-              {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Покупка...</> : 'Купить'}
+              {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Оплата...</> : 'Подтвердить оплату'}
             </button>
           </div>
         </div>
@@ -466,9 +476,9 @@ const NoCardWarningModal = ({ onClose, onGoToCards }: { onClose: () => void; onG
           <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto mb-4">
             <AlertTriangle className="w-7 h-7 text-amber-400" />
           </div>
-          <h2 className="text-lg font-bold text-white mb-2">Нет активной карты</h2>
+          <h2 className="text-lg font-bold text-white mb-2">Нет подходящей карты</h2>
           <p className="text-sm text-slate-400 mb-6 leading-relaxed">
-            Для покупки товаров необходима активная карта XPLR. Пожалуйста, выпустите карту и пополните её с кошелька.
+            Для покупки нужна активная карта для подписок или премиальная карта. Карта для путешествий не подходит для оплаты товаров. Откройте подходящую карту в разделе «Карты».
           </p>
           <div className="flex gap-3">
             <button onClick={onClose} className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-sm font-medium hover:bg-white/10 transition-all">
@@ -518,10 +528,12 @@ export const StorePage = () => {
   const [activeCards, setActiveCards] = useState<Card[]>([]);
   const [showNoCardWarning, setShowNoCardWarning] = useState(false);
 
-  // Fetch user's active cards on mount
+  // Fetch user's active cards on mount (exclude travel cards — not allowed for store purchases)
   useEffect(() => {
     getUserCards()
-      .then(cards => setActiveCards((cards || []).filter(c => c.card_status === 'ACTIVE')))
+      .then(cards => setActiveCards(
+        (cards || []).filter(c => c.card_status === 'ACTIVE' && c.service_slug !== 'travel')
+      ))
       .catch(() => setActiveCards([]));
   }, []);
 
@@ -748,7 +760,7 @@ export const StorePage = () => {
                       idx < destinations.length - 1 ? 'border-b border-white/[0.05]' : ''
                     }`}
                   >
-                    <span className="text-2xl leading-none select-none w-8 text-center">{dest.flag_emoji || countryFlag(dest.country_code)}</span>
+                    <span className="leading-none select-none w-8 text-center flex items-center justify-center">{dest.flag_emoji ? <span className="text-2xl">{dest.flag_emoji}</span> : <CountryFlag code={dest.country_code} size={28} />}</span>
                     <span className="flex-1 text-left text-sm font-semibold text-white">{dest.country_name}</span>
                     <span className="text-xs text-slate-500">{dest.plan_count} {dest.plan_count === 1 ? 'тариф' : 'тарифов'}</span>
                     <ChevronRight className="w-4 h-4 text-slate-600" />
@@ -771,7 +783,7 @@ export const StorePage = () => {
             </button>
 
             <div className="flex items-center gap-3 mb-2">
-              <span className="text-3xl">{selectedCountry.flag_emoji || countryFlag(selectedCountry.country_code)}</span>
+              <span className="flex items-center justify-center">{selectedCountry.flag_emoji ? <span className="text-3xl">{selectedCountry.flag_emoji}</span> : <CountryFlag code={selectedCountry.country_code} size={36} />}</span>
               <div>
                 <h2 className="text-lg font-bold text-white">{selectedCountry.country_name}</h2>
                 <p className="text-xs text-slate-400">Выберите тариф eSIM</p>
