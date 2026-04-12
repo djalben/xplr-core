@@ -544,7 +544,7 @@ export const StorePage = () => {
           </div>
           <button
             onClick={() => navigate('/purchases')}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-xs font-medium hover:bg-white/10 hover:text-white transition-all"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-white/[0.04] text-slate-400 text-xs font-medium hover:bg-white/[0.08] hover:text-white transition-colors"
           >
             <FileText className="w-4 h-4" />
             Мои покупки
@@ -553,31 +553,39 @@ export const StorePage = () => {
 
         {/* ═══════ Hub — Category Cards ═══════ */}
         {storeView === 'hub' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 pt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
             {/* eSIM Category */}
             <button
               onClick={() => setStoreView('esim')}
-              className="group relative rounded-2xl border border-white/[0.08] hover:border-cyan-500/30 bg-transparent backdrop-blur-sm p-8 md:p-10 flex flex-col items-center text-center transition-all duration-300 hover:shadow-2xl hover:shadow-cyan-500/10 hover:-translate-y-1"
+              className="group relative rounded-2xl overflow-hidden bg-white/[0.03] hover:bg-white/[0.05] transition-colors"
             >
-              <div className="w-52 h-32 md:w-64 md:h-40 rounded-[50%] overflow-hidden border-2 border-cyan-500/20 group-hover:border-cyan-400/50 transition-colors shadow-lg shadow-cyan-500/5 mb-6">
-                <img src="/store-esim.png" alt="eSIM" className="w-full h-full object-cover scale-110 group-hover:scale-125 transition-transform duration-500" />
+              <div className="aspect-[16/10] w-full">
+                <img src="/store-esim.png" alt="eSIM" className="w-full h-full object-cover" />
               </div>
-              <h2 className="text-lg font-bold text-white mb-1 group-hover:text-cyan-300 transition-colors">eSIM / Сим-карты</h2>
-              <p className="text-xs text-slate-500">Интернет для путешествий</p>
-              <ChevronRight className="absolute right-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-700 group-hover:text-cyan-400 transition-colors hidden md:block" />
+              <div className="px-5 py-4 flex items-center justify-between">
+                <div className="text-left">
+                  <h2 className="text-base font-semibold text-white">eSIM / Сим-карты</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">Интернет для путешествий</p>
+                </div>
+                <ChevronRight className="w-5 h-5 text-slate-600 group-hover:text-white transition-colors" />
+              </div>
             </button>
 
             {/* Digital Category */}
             <button
               onClick={() => setStoreView('digital')}
-              className="group relative rounded-2xl border border-white/[0.08] hover:border-purple-500/30 bg-transparent backdrop-blur-sm p-8 md:p-10 flex flex-col items-center text-center transition-all duration-300 hover:shadow-2xl hover:shadow-purple-500/10 hover:-translate-y-1"
+              className="group relative rounded-2xl overflow-hidden bg-white/[0.03] hover:bg-white/[0.05] transition-colors"
             >
-              <div className="w-52 h-32 md:w-64 md:h-40 rounded-[50%] overflow-hidden border-2 border-purple-500/20 group-hover:border-purple-400/50 transition-colors shadow-lg shadow-purple-500/5 mb-6">
-                <img src="/store-digital.png" alt="Digital" className="w-full h-full object-cover scale-110 group-hover:scale-125 transition-transform duration-500" />
+              <div className="aspect-[16/10] w-full">
+                <img src="/store-digital.png" alt="Digital" className="w-full h-full object-cover" />
               </div>
-              <h2 className="text-lg font-bold text-white mb-1 group-hover:text-purple-300 transition-colors">Цифровые товары</h2>
-              <p className="text-xs text-slate-500">Ключи, игры и софт</p>
-              <ChevronRight className="absolute right-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-700 group-hover:text-purple-400 transition-colors hidden md:block" />
+              <div className="px-5 py-4 flex items-center justify-between">
+                <div className="text-left">
+                  <h2 className="text-base font-semibold text-white">Цифровые товары</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">Ключи, игры и софт</p>
+                </div>
+                <ChevronRight className="w-5 h-5 text-slate-600 group-hover:text-white transition-colors" />
+              </div>
             </button>
           </div>
         )}
@@ -593,7 +601,7 @@ export const StorePage = () => {
                 placeholder="Поиск по стране..."
                 value={destsSearch}
                 onChange={e => setDestsSearch(e.target.value)}
-                className="w-full pl-11 pr-10 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 outline-none focus:border-blue-500/50 transition-colors"
+                className="w-full pl-11 pr-10 py-3 bg-white/[0.04] rounded-lg text-sm text-white placeholder-slate-500 outline-none focus:bg-white/[0.06] transition-colors"
               />
               {destsSearch && (
                 <button onClick={() => setDestsSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg hover:bg-white/10 text-slate-500 hover:text-white transition-all">
@@ -604,37 +612,37 @@ export const StorePage = () => {
 
             {/* Country list */}
             {destsLoading ? (
-              <div className="rounded-2xl border border-white/[0.06] overflow-hidden bg-white/[0.02]">
+              <div>
                 {[...Array(8)].map((_, i) => (
-                  <div key={i} className="flex items-center gap-4 px-5 py-4 border-b border-white/[0.04] last:border-0 animate-pulse">
-                    <div className="w-8 h-6 rounded bg-white/5" />
-                    <div className="flex-1"><div className="h-4 bg-white/[0.06] rounded w-32" /></div>
-                    <div className="h-3 bg-white/[0.04] rounded w-16" />
+                  <div key={i} className="flex items-center gap-4 px-1 py-3.5 border-b border-white/[0.04] animate-pulse">
+                    <div className="w-7 h-5 rounded bg-white/[0.06]" />
+                    <div className="flex-1"><div className="h-4 bg-white/[0.05] rounded w-32" /></div>
+                    <div className="h-3 bg-white/[0.04] rounded w-14" />
                   </div>
                 ))}
               </div>
             ) : destinations.length === 0 ? (
-              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-12 text-center">
-                <Globe className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-                <p className="text-slate-400 text-sm">{destsSearch ? 'Страна не найдена' : 'Направления загружаются...'}</p>
+              <div className="py-16 text-center">
+                <Globe className="w-10 h-10 text-slate-700 mx-auto mb-3" />
+                <p className="text-slate-500 text-sm">{destsSearch ? 'Страна не найдена' : 'Направления загружаются...'}</p>
                 {destsSearch && (
                   <button onClick={() => setDestsSearch('')} className="mt-3 text-xs text-blue-400 hover:text-blue-300">Сбросить поиск</button>
                 )}
               </div>
             ) : (
-              <div className="rounded-2xl border border-white/[0.06] overflow-hidden bg-white/[0.02]">
+              <div>
                 {destinations.map((dest, idx) => (
                   <button
                     key={dest.country_code}
                     onClick={() => setSelectedCountry(dest)}
-                    className={`w-full flex items-center gap-4 px-5 py-3.5 hover:bg-white/[0.04] transition-colors group ${
+                    className={`w-full flex items-center gap-4 px-1 py-3.5 hover:bg-white/[0.02] transition-colors ${
                       idx < destinations.length - 1 ? 'border-b border-white/[0.04]' : ''
                     }`}
                   >
-                    <span className="text-2xl leading-none select-none w-8 text-center">{dest.flag_emoji || countryFlag(dest.country_code)}</span>
-                    <span className="flex-1 text-left text-sm font-medium text-white">{dest.country_name}</span>
-                    <span className="text-[11px] text-slate-500 font-medium">{dest.plan_count} {dest.plan_count === 1 ? 'тариф' : 'тарифов'}</span>
-                    <ChevronRight className="w-4 h-4 text-slate-700 group-hover:text-blue-400 transition-colors" />
+                    <span className="text-2xl leading-none select-none w-7 text-center">{dest.flag_emoji || countryFlag(dest.country_code)}</span>
+                    <span className="flex-1 text-left text-sm font-semibold text-white">{dest.country_name}</span>
+                    <span className="text-xs text-slate-500">{dest.plan_count} {dest.plan_count === 1 ? 'тариф' : 'тарифов'}</span>
+                    <ChevronRight className="w-4 h-4 text-slate-600" />
                   </button>
                 ))}
               </div>
@@ -662,44 +670,38 @@ export const StorePage = () => {
             </div>
 
             {plansLoading ? (
-              <div className="rounded-2xl border border-white/[0.06] overflow-hidden bg-white/[0.02]">
+              <div>
                 {[...Array(3)].map((_, i) => (
-                  <div key={i} className="flex items-center gap-4 px-5 py-4 border-b border-white/[0.04] last:border-0 animate-pulse">
-                    <div className="w-8 h-6 rounded bg-white/5" />
+                  <div key={i} className="flex items-center gap-4 px-1 py-4 border-b border-white/[0.04] animate-pulse">
                     <div className="flex-1 space-y-1.5">
-                      <div className="h-4 bg-white/[0.06] rounded w-40" />
+                      <div className="h-4 bg-white/[0.05] rounded w-40" />
                       <div className="h-3 bg-white/[0.04] rounded w-24" />
                     </div>
-                    <div className="h-5 bg-white/[0.06] rounded w-16" />
-                    <div className="h-8 bg-white/[0.04] rounded-lg w-20" />
+                    <div className="h-5 bg-white/[0.05] rounded w-16" />
+                    <div className="h-8 bg-white/[0.04] rounded w-20" />
                   </div>
                 ))}
               </div>
             ) : plans.length === 0 ? (
-              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-12 text-center">
-                <Wifi className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-                <p className="text-slate-400 text-sm">Нет доступных тарифов</p>
+              <div className="py-16 text-center">
+                <Wifi className="w-10 h-10 text-slate-700 mx-auto mb-3" />
+                <p className="text-slate-500 text-sm">Нет доступных тарифов</p>
               </div>
             ) : (
-              <div className="rounded-2xl border border-white/[0.06] overflow-hidden bg-white/[0.02]">
+              <div>
                 {plans.map((plan, idx) => (
                   <div
                     key={plan.plan_id}
-                    className={`flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4 transition-colors ${
-                      plan.in_stock ? 'hover:bg-white/[0.04]' : 'opacity-50'
+                    className={`flex items-center gap-3 sm:gap-4 px-1 py-4 ${
+                      plan.in_stock ? '' : 'opacity-40'
                     } ${idx < plans.length - 1 ? 'border-b border-white/[0.04]' : ''}`}
                   >
-                    <span className="text-xl leading-none select-none w-7 text-center shrink-0">{countryFlag(selectedCountry.country_code)}</span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">{plan.name}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[11px] text-blue-400 font-medium">{plan.data_gb} ГБ</span>
-                        <span className="text-slate-600 text-[10px]">•</span>
-                        <span className="text-[11px] text-slate-500">{plan.validity_days} дн.</span>
-                      </div>
+                      <p className="text-sm font-semibold text-white truncate">{plan.name}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{plan.data_gb} GB / {plan.validity_days} Days</p>
                     </div>
-                    <div className="text-right shrink-0">
-                      <span className="text-sm font-bold text-white">${plan.price_usd.toFixed(2)}</span>
+                    <div className="text-right shrink-0 mr-1">
+                      <span className="text-sm font-bold text-blue-400">${plan.price_usd.toFixed(2)}</span>
                       {plan.old_price > 0 && plan.old_price > plan.price_usd && (
                         <span className="block text-[10px] text-slate-600 line-through">${plan.old_price.toFixed(2)}</span>
                       )}
@@ -707,14 +709,12 @@ export const StorePage = () => {
                     {plan.in_stock ? (
                       <button
                         onClick={() => setConfirmPlan(plan)}
-                        className="shrink-0 px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-500/25 text-blue-400 text-xs font-semibold hover:bg-blue-500/20 hover:border-blue-500/40 transition-all"
+                        className="shrink-0 px-4 py-2 rounded-lg bg-white/[0.06] text-white text-xs font-medium hover:bg-white/[0.1] transition-colors"
                       >
                         Купить
                       </button>
                     ) : (
-                      <span className="shrink-0 px-3 py-2 rounded-xl bg-white/5 text-slate-600 text-[11px] font-medium">
-                        Нет в наличии
-                      </span>
+                      <span className="shrink-0 text-xs text-slate-600">Нет в наличии</span>
                     )}
                   </div>
                 ))}
@@ -727,48 +727,48 @@ export const StorePage = () => {
         {storeView === 'digital' && (
           <>
             {digitalLoading ? (
-              <div className="rounded-2xl border border-white/[0.06] overflow-hidden bg-white/[0.02]">
+              <div>
                 {[...Array(6)].map((_, i) => (
-                  <div key={i} className="flex items-center gap-4 px-5 py-4 border-b border-white/[0.04] last:border-0 animate-pulse">
-                    <div className="w-8 h-8 rounded-lg bg-white/5" />
+                  <div key={i} className="flex items-center gap-4 px-1 py-4 border-b border-white/[0.04] animate-pulse">
+                    <div className="w-8 h-8 rounded bg-white/[0.06]" />
                     <div className="flex-1 space-y-1.5">
-                      <div className="h-4 bg-white/[0.06] rounded w-36" />
+                      <div className="h-4 bg-white/[0.05] rounded w-36" />
                       <div className="h-3 bg-white/[0.04] rounded w-24" />
                     </div>
-                    <div className="h-5 bg-white/[0.06] rounded w-14" />
-                    <div className="h-8 bg-white/[0.04] rounded-lg w-20" />
+                    <div className="h-5 bg-white/[0.05] rounded w-14" />
+                    <div className="h-8 bg-white/[0.04] rounded w-20" />
                   </div>
                 ))}
               </div>
             ) : digitalProducts.length === 0 ? (
-              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-12 text-center">
-                <Gamepad2 className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-                <p className="text-slate-400 text-sm">Товаров пока нет</p>
+              <div className="py-16 text-center">
+                <Gamepad2 className="w-10 h-10 text-slate-700 mx-auto mb-3" />
+                <p className="text-slate-500 text-sm">Товаров пока нет</p>
               </div>
             ) : (
-              <div className="rounded-2xl border border-white/[0.06] overflow-hidden bg-white/[0.02]">
+              <div>
                 {digitalProducts.map((product, idx) => (
                   <div
                     key={product.id}
-                    className={`flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4 transition-colors ${
-                      product.in_stock ? 'hover:bg-white/[0.04]' : 'opacity-50'
+                    className={`flex items-center gap-3 sm:gap-4 px-1 py-4 ${
+                      product.in_stock ? '' : 'opacity-40'
                     } ${idx < digitalProducts.length - 1 ? 'border-b border-white/[0.04]' : ''}`}
                   >
                     {product.image_url ? (
-                      <img src={product.image_url} alt="" className="w-8 h-8 rounded-lg object-contain shrink-0 bg-white/[0.03] p-0.5" />
+                      <img src={product.image_url} alt="" className="w-8 h-8 rounded object-contain shrink-0" />
                     ) : (
-                      <div className="w-8 h-8 rounded-lg bg-white/[0.03] flex items-center justify-center shrink-0">
+                      <div className="w-8 h-8 rounded bg-white/[0.04] flex items-center justify-center shrink-0">
                         <Gamepad2 className="w-4 h-4 text-slate-600" />
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">{product.name}</p>
+                      <p className="text-sm font-semibold text-white truncate">{product.name}</p>
                       {product.description && (
-                        <p className="text-[11px] text-slate-500 truncate mt-0.5">{product.description}</p>
+                        <p className="text-xs text-slate-500 truncate mt-0.5">{product.description}</p>
                       )}
                     </div>
-                    <div className="text-right shrink-0">
-                      <span className="text-sm font-bold text-white">${product.price_usd}</span>
+                    <div className="text-right shrink-0 mr-1">
+                      <span className="text-sm font-bold text-blue-400">${product.price_usd}</span>
                       {product.old_price && parseFloat(product.old_price) > parseFloat(product.price_usd) && (
                         <span className="block text-[10px] text-slate-600 line-through">${parseFloat(product.old_price).toFixed(2)}</span>
                       )}
@@ -776,14 +776,12 @@ export const StorePage = () => {
                     {product.in_stock ? (
                       <button
                         onClick={() => setConfirmDigital(product)}
-                        className="shrink-0 px-4 py-2 rounded-xl bg-purple-500/10 border border-purple-500/25 text-purple-400 text-xs font-semibold hover:bg-purple-500/20 hover:border-purple-500/40 transition-all"
+                        className="shrink-0 px-4 py-2 rounded-lg bg-white/[0.06] text-white text-xs font-medium hover:bg-white/[0.1] transition-colors"
                       >
                         Купить
                       </button>
                     ) : (
-                      <span className="shrink-0 px-3 py-2 rounded-xl bg-white/5 text-slate-600 text-[11px] font-medium">
-                        Нет в наличии
-                      </span>
+                      <span className="shrink-0 text-xs text-slate-600">Нет в наличии</span>
                     )}
                   </div>
                 ))}
