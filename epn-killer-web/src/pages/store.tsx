@@ -19,6 +19,32 @@ const countryFlag = (code: string) => {
   return String.fromCodePoint(...codePoints);
 };
 
+// ── Brand icon fallback (simple-icons CDN) ──
+const brandIconUrl = (name: string, externalId?: string): string | null => {
+  const key = (externalId?.split('-')[0] || name.split(' ')[0]).toLowerCase();
+  const map: Record<string, string> = {
+    steam: 'steam',
+    psn: 'playstation',
+    playstation: 'playstation',
+    xbox: 'xbox',
+    nintendo: 'nintendo',
+    spotify: 'spotify',
+    netflix: 'netflix',
+    apple: 'apple',
+    google: 'google',
+    discord: 'discord',
+    twitch: 'twitch',
+    youtube: 'youtube',
+    ea: 'ea',
+    epic: 'epicgames',
+    roblox: 'roblox',
+    minecraft: 'minecraft',
+    pubg: 'pubg',
+  };
+  const slug = map[key];
+  return slug ? `https://cdn.simpleicons.org/${slug}/white` : null;
+};
+
 // ── Error toast ──
 const ErrorToast = ({ message, onClose }: { message: string; onClose: () => void }) => (
   <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[110] max-w-sm w-full mx-4">
@@ -553,39 +579,29 @@ export const StorePage = () => {
 
         {/* ═══════ Hub — Category Cards ═══════ */}
         {storeView === 'hub' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-14 pt-4">
             {/* eSIM Category */}
             <button
               onClick={() => setStoreView('esim')}
-              className="group relative rounded-2xl overflow-hidden bg-white/[0.03] hover:bg-white/[0.05] transition-colors"
+              className="group flex flex-col items-center bg-transparent"
             >
-              <div className="aspect-[16/10] w-full">
+              <div className="w-56 h-36 md:w-72 md:h-44 rounded-full overflow-hidden group-hover:scale-105 transition-transform duration-300">
                 <img src="/store-esim.png" alt="eSIM" className="w-full h-full object-cover" />
               </div>
-              <div className="px-5 py-4 flex items-center justify-between">
-                <div className="text-left">
-                  <h2 className="text-base font-semibold text-white">eSIM / Сим-карты</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">Интернет для путешествий</p>
-                </div>
-                <ChevronRight className="w-5 h-5 text-slate-600 group-hover:text-white transition-colors" />
-              </div>
+              <h2 className="text-lg font-semibold text-white mt-5 group-hover:text-slate-300 transition-colors">eSIM / Сим-карты</h2>
+              <p className="text-xs text-slate-500 mt-1">Интернет для путешествий</p>
             </button>
 
             {/* Digital Category */}
             <button
               onClick={() => setStoreView('digital')}
-              className="group relative rounded-2xl overflow-hidden bg-white/[0.03] hover:bg-white/[0.05] transition-colors"
+              className="group flex flex-col items-center bg-transparent"
             >
-              <div className="aspect-[16/10] w-full">
+              <div className="w-56 h-36 md:w-72 md:h-44 rounded-full overflow-hidden group-hover:scale-105 transition-transform duration-300">
                 <img src="/store-digital.png" alt="Digital" className="w-full h-full object-cover" />
               </div>
-              <div className="px-5 py-4 flex items-center justify-between">
-                <div className="text-left">
-                  <h2 className="text-base font-semibold text-white">Цифровые товары</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">Ключи, игры и софт</p>
-                </div>
-                <ChevronRight className="w-5 h-5 text-slate-600 group-hover:text-white transition-colors" />
-              </div>
+              <h2 className="text-lg font-semibold text-white mt-5 group-hover:text-slate-300 transition-colors">Цифровые товары</h2>
+              <p className="text-xs text-slate-500 mt-1">Ключи, игры и софт</p>
             </button>
           </div>
         )}
@@ -614,8 +630,8 @@ export const StorePage = () => {
             {destsLoading ? (
               <div>
                 {[...Array(8)].map((_, i) => (
-                  <div key={i} className="flex items-center gap-4 px-1 py-3.5 border-b border-white/[0.04] animate-pulse">
-                    <div className="w-7 h-5 rounded bg-white/[0.06]" />
+                  <div key={i} className="flex items-center gap-4 px-2 py-4 border-b border-white/[0.05] animate-pulse">
+                    <div className="w-8 h-6 rounded bg-white/[0.06]" />
                     <div className="flex-1"><div className="h-4 bg-white/[0.05] rounded w-32" /></div>
                     <div className="h-3 bg-white/[0.04] rounded w-14" />
                   </div>
@@ -635,11 +651,11 @@ export const StorePage = () => {
                   <button
                     key={dest.country_code}
                     onClick={() => setSelectedCountry(dest)}
-                    className={`w-full flex items-center gap-4 px-1 py-3.5 hover:bg-white/[0.02] transition-colors ${
-                      idx < destinations.length - 1 ? 'border-b border-white/[0.04]' : ''
+                    className={`w-full flex items-center gap-4 px-2 py-4 hover:bg-white/[0.02] transition-colors ${
+                      idx < destinations.length - 1 ? 'border-b border-white/[0.05]' : ''
                     }`}
                   >
-                    <span className="text-2xl leading-none select-none w-7 text-center">{dest.flag_emoji || countryFlag(dest.country_code)}</span>
+                    <span className="text-2xl leading-none select-none w-8 text-center">{dest.flag_emoji || countryFlag(dest.country_code)}</span>
                     <span className="flex-1 text-left text-sm font-semibold text-white">{dest.country_name}</span>
                     <span className="text-xs text-slate-500">{dest.plan_count} {dest.plan_count === 1 ? 'тариф' : 'тарифов'}</span>
                     <ChevronRight className="w-4 h-4 text-slate-600" />
@@ -672,7 +688,7 @@ export const StorePage = () => {
             {plansLoading ? (
               <div>
                 {[...Array(3)].map((_, i) => (
-                  <div key={i} className="flex items-center gap-4 px-1 py-4 border-b border-white/[0.04] animate-pulse">
+                  <div key={i} className="flex items-center gap-4 px-2 py-5 border-b border-white/[0.05] animate-pulse">
                     <div className="flex-1 space-y-1.5">
                       <div className="h-4 bg-white/[0.05] rounded w-40" />
                       <div className="h-3 bg-white/[0.04] rounded w-24" />
@@ -692,9 +708,9 @@ export const StorePage = () => {
                 {plans.map((plan, idx) => (
                   <div
                     key={plan.plan_id}
-                    className={`flex items-center gap-3 sm:gap-4 px-1 py-4 ${
+                    className={`flex items-center gap-4 px-2 py-5 ${
                       plan.in_stock ? '' : 'opacity-40'
-                    } ${idx < plans.length - 1 ? 'border-b border-white/[0.04]' : ''}`}
+                    } ${idx < plans.length - 1 ? 'border-b border-white/[0.05]' : ''}`}
                   >
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-white truncate">{plan.name}</p>
@@ -729,7 +745,7 @@ export const StorePage = () => {
             {digitalLoading ? (
               <div>
                 {[...Array(6)].map((_, i) => (
-                  <div key={i} className="flex items-center gap-4 px-1 py-4 border-b border-white/[0.04] animate-pulse">
+                  <div key={i} className="flex items-center gap-4 px-2 py-5 border-b border-white/[0.05] animate-pulse">
                     <div className="w-8 h-8 rounded bg-white/[0.06]" />
                     <div className="flex-1 space-y-1.5">
                       <div className="h-4 bg-white/[0.05] rounded w-36" />
@@ -747,44 +763,47 @@ export const StorePage = () => {
               </div>
             ) : (
               <div>
-                {digitalProducts.map((product, idx) => (
-                  <div
-                    key={product.id}
-                    className={`flex items-center gap-3 sm:gap-4 px-1 py-4 ${
-                      product.in_stock ? '' : 'opacity-40'
-                    } ${idx < digitalProducts.length - 1 ? 'border-b border-white/[0.04]' : ''}`}
-                  >
-                    {product.image_url ? (
-                      <img src={product.image_url} alt="" className="w-8 h-8 rounded object-contain shrink-0" />
-                    ) : (
-                      <div className="w-8 h-8 rounded bg-white/[0.04] flex items-center justify-center shrink-0">
-                        <Gamepad2 className="w-4 h-4 text-slate-600" />
+                {digitalProducts.map((product, idx) => {
+                  const logoSrc = product.image_url || brandIconUrl(product.name, product.external_id);
+                  return (
+                    <div
+                      key={product.id}
+                      className={`flex items-center gap-4 px-2 py-5 ${
+                        product.in_stock ? '' : 'opacity-40'
+                      } ${idx < digitalProducts.length - 1 ? 'border-b border-white/[0.05]' : ''}`}
+                    >
+                      {logoSrc ? (
+                        <img src={logoSrc} alt="" className="w-8 h-8 rounded object-contain shrink-0" />
+                      ) : (
+                        <div className="w-8 h-8 rounded bg-white/[0.04] flex items-center justify-center shrink-0">
+                          <Gamepad2 className="w-4 h-4 text-slate-600" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-white truncate">{product.name}</p>
+                        {product.description && (
+                          <p className="text-xs text-slate-500 truncate mt-0.5">{product.description}</p>
+                        )}
                       </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-white truncate">{product.name}</p>
-                      {product.description && (
-                        <p className="text-xs text-slate-500 truncate mt-0.5">{product.description}</p>
+                      <div className="text-right shrink-0 mr-1">
+                        <span className="text-sm font-bold text-blue-400">${product.price_usd}</span>
+                        {product.old_price && parseFloat(product.old_price) > parseFloat(product.price_usd) && (
+                          <span className="block text-[10px] text-slate-600 line-through">${parseFloat(product.old_price).toFixed(2)}</span>
+                        )}
+                      </div>
+                      {product.in_stock ? (
+                        <button
+                          onClick={() => setConfirmDigital(product)}
+                          className="shrink-0 px-4 py-2 rounded-lg bg-white/[0.06] text-white text-xs font-medium hover:bg-white/[0.1] transition-colors"
+                        >
+                          Купить
+                        </button>
+                      ) : (
+                        <span className="shrink-0 text-xs text-slate-600">Нет в наличии</span>
                       )}
                     </div>
-                    <div className="text-right shrink-0 mr-1">
-                      <span className="text-sm font-bold text-blue-400">${product.price_usd}</span>
-                      {product.old_price && parseFloat(product.old_price) > parseFloat(product.price_usd) && (
-                        <span className="block text-[10px] text-slate-600 line-through">${parseFloat(product.old_price).toFixed(2)}</span>
-                      )}
-                    </div>
-                    {product.in_stock ? (
-                      <button
-                        onClick={() => setConfirmDigital(product)}
-                        className="shrink-0 px-4 py-2 rounded-lg bg-white/[0.06] text-white text-xs font-medium hover:bg-white/[0.1] transition-colors"
-                      >
-                        Купить
-                      </button>
-                    ) : (
-                      <span className="shrink-0 text-xs text-slate-600">Нет в наличии</span>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </>
