@@ -222,15 +222,25 @@ const DigitalResultModal = ({ productName, priceUsd, activationKey, onClose }: {
 // Confirm Purchase Modal (unified for eSIM + Digital)
 // ══════════════════════════════════════════════════════════════
 const ConfirmPurchaseModal = ({
-  title, itemLabel, priceLabel, loading, onConfirm, onClose, card,
+  title, itemLabel, priceLabel, loading, onConfirm, onClose, allCards, onCardChange,
 }: {
-  title: string; itemLabel: string; priceLabel: string; loading: boolean; onConfirm: () => void; onClose: () => void; card: Card | null;
+  title: string; itemLabel: string; priceLabel: string; loading: boolean;
+  onConfirm: () => void; onClose: () => void;
+  allCards: Card[]; onCardChange: (card: Card) => void;
 }) => {
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const card = allCards[selectedIdx] || null;
+
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && !loading) onClose(); };
     document.addEventListener('keydown', h); document.body.style.overflow = 'hidden';
     return () => { document.removeEventListener('keydown', h); document.body.style.overflow = ''; };
   }, [onClose, loading]);
+
+  const handleCardSwitch = (idx: number) => {
+    setSelectedIdx(idx);
+    if (allCards[idx]) onCardChange(allCards[idx]);
+  };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => !loading && onClose()}>
@@ -245,12 +255,29 @@ const ConfirmPurchaseModal = ({
             <span className="text-sm text-white/40">Товар</span>
             <span className="text-sm text-white font-medium text-right max-w-[180px] truncate">{itemLabel}</span>
           </div>
-          {card && (
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-white/40">Карта</span>
-              <span className="text-sm text-white font-medium">{card.nickname ? `${card.nickname} ` : ''}•••• {card.last_4_digits}</span>
-            </div>
-          )}
+          {/* Card selector */}
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-white/40">Карта</span>
+            {allCards.length <= 1 && card ? (
+              <span className="text-sm text-white font-medium flex items-center gap-1.5">
+                <CreditCard className="w-3.5 h-3.5 text-[#38BDF8]" />
+                {card.nickname ? `${card.nickname} ` : ''}•••• {card.last_4_digits}
+              </span>
+            ) : (
+              <select
+                value={selectedIdx}
+                onChange={e => handleCardSwitch(Number(e.target.value))}
+                disabled={loading}
+                className="bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-1 text-sm text-white font-medium outline-none focus:border-[#38BDF8]/50 transition-colors cursor-pointer max-w-[200px] truncate"
+              >
+                {allCards.map((c, i) => (
+                  <option key={c.id} value={i} className="bg-[#0F1629] text-white">
+                    {c.nickname ? `${c.nickname} ` : ''}•••• {c.last_4_digits}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
           <div className="border-t border-white/[0.05] pt-2.5 flex justify-between items-center">
             <span className="text-sm text-white/60 font-medium">Итого</span>
             <span className="text-lg font-bold gradient-text">{priceLabel}</span>
@@ -324,17 +351,25 @@ export const StorePage = () => {
 
   // Card state — purchases only via active non-travel cards
   const [activeCards, setActiveCards] = useState<Card[]>([]);
+  const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [showNoCardWarning, setShowNoCardWarning] = useState(false);
 
   useEffect(() => {
     getUserCards()
-      .then(cards => setActiveCards((cards || []).filter(c => c.card_status === 'ACTIVE' && c.service_slug !== 'travel')))
+      .then(cards => {
+        // Filter: only ACTIVE, non-travel cards; sort subscription first
+        const slugOrder: Record<string, number> = { subscriptions: 0, services: 0, premium: 1 };
+        const eligible = (cards || [])
+          .filter(c => c.card_status === 'ACTIVE' && c.service_slug !== 'travel')
+          .sort((a, b) => (slugOrder[a.service_slug || ''] ?? 9) - (slugOrder[b.service_slug || ''] ?? 9));
+        setActiveCards(eligible);
+        if (eligible.length > 0) setSelectedCard(eligible[0]);
+      })
       .catch(() => setActiveCards([]));
   }, []);
 
-  const firstCard = activeCards.length > 0 ? activeCards[0] : null;
-  const tryBuyESIM = (plan: ESIMPlan) => { if (!firstCard) { setShowNoCardWarning(true); return; } setConfirmPlan(plan); };
-  const tryBuyDigital = (product: StoreProduct) => { if (!firstCard) { setShowNoCardWarning(true); return; } setConfirmDigital(product); };
+  const tryBuyESIM = (plan: ESIMPlan) => { if (activeCards.length === 0) { setShowNoCardWarning(true); return; } setConfirmPlan(plan); };
+  const tryBuyDigital = (product: StoreProduct) => { if (activeCards.length === 0) { setShowNoCardWarning(true); return; } setConfirmDigital(product); };
 
   // Load eSIM destinations
   const loadDestinations = useCallback(async () => {
@@ -620,7 +655,7 @@ export const StorePage = () => {
           title="Подтвердите покупку eSIM"
           itemLabel={`${confirmPlan.name} — ${confirmPlan.country}`}
           priceLabel={`$${confirmPlan.price_usd.toFixed(2)}`}
-          loading={esimPurchasing} onConfirm={handleESIMPurchase} onClose={() => !esimPurchasing && setConfirmPlan(null)} card={firstCard}
+          loading={esimPurchasing} onConfirm={handleESIMPurchase} onClose={() => !esimPurchasing && setConfirmPlan(null)} allCards={activeCards} onCardChange={setSelectedCard}
         />
       )}
       {esimResult && <ESIMActivationModal result={esimResult.result} planName={esimResult.planName} onClose={() => setEsimResult(null)} />}
@@ -629,7 +664,7 @@ export const StorePage = () => {
           title="Подтвердите покупку"
           itemLabel={confirmDigital.name}
           priceLabel={`$${confirmDigital.price_usd}`}
-          loading={digitalPurchasing} onConfirm={handleDigitalPurchase} onClose={() => !digitalPurchasing && setConfirmDigital(null)} card={firstCard}
+          loading={digitalPurchasing} onConfirm={handleDigitalPurchase} onClose={() => !digitalPurchasing && setConfirmDigital(null)} allCards={activeCards} onCardChange={setSelectedCard}
         />
       )}
       {digitalResult && <DigitalResultModal productName={digitalResult.productName} priceUsd={digitalResult.priceUsd} activationKey={digitalResult.activationKey} onClose={() => setDigitalResult(null)} />}
