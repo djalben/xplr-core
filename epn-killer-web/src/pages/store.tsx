@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   ShoppingBag, Search, Globe, Gamepad2, X, Copy, Check, Loader2,
   AlertTriangle, QrCode, Key, ChevronRight, ArrowLeft,
-  Download, FileText, Smartphone, Wifi, CreditCard
+  Download, Smartphone, Wifi, CreditCard
 } from 'lucide-react';
 import { DashboardLayout } from '../components/dashboard-layout';
 import {

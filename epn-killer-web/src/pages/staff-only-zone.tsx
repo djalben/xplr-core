@@ -28,7 +28,6 @@ import {
   Mail,
   FileSearch,
   X,
-  Wallet,
   Filter,
   Newspaper,
   Trash2,
@@ -36,7 +35,6 @@ import {
   Upload,
   ImageIcon,
   Tag,
-  Percent,
   ShoppingBag,
 } from 'lucide-react';
 

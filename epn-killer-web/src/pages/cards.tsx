@@ -4,7 +4,7 @@ import { useRates } from '../store/rates-context';
 import { DashboardLayout } from '../components/dashboard-layout';
 import { ModalPortal } from '../components/modal-portal';
 import { BackButton } from '../components/back-button';
-import { getWallet, transferWalletToCard, type InternalBalance } from '../api/wallet';
+import { getWallet, transferWalletToCard } from '../api/wallet';
 import { getUserCards, issuePersonalCard, getCardDetails, updateCardStatus, type Card as BackendCard } from '../api/cards';
 import { getTierInfo, type TierInfo } from '../api/tier';
 import { 
@@ -12,7 +12,6 @@ import {
   CreditCard as CardIcon,
   Wifi,
   Eye,
-  EyeOff,
   Copy,
   Trash2,
   Check,
@@ -22,12 +21,7 @@ import {
   ChevronRight,
   Banknote,
   ArrowUpDown,
-  DollarSign,
-  Plane,
   ShoppingBag,
-  Monitor,
-  Bot,
-  Briefcase,
   CreditCard,
   ChevronDown
 } from 'lucide-react';
