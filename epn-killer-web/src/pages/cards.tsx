@@ -45,6 +45,8 @@ interface PersonalCard {
   cardNetwork: 'visa' | 'mastercard';
   color: 'blue' | 'purple' | 'gold';
   price: string;
+  bin: string;
+  last4: string;
 }
 
 // Professional Visa Logo
@@ -269,7 +271,7 @@ const CardIssueModal = ({
 };
 
 // Subscriptions Card Visual - colorful with service icons (realistic bank card style)
-export const SubscriptionsCardVisual = ({ mini = true, currencySymbol }: { mini?: boolean; currencySymbol?: string }) => (
+export const SubscriptionsCardVisual = ({ mini = true, currencySymbol, bin, last4 }: { mini?: boolean; currencySymbol?: string; bin?: string; last4?: string }) => (
   <div className={`relative ${mini ? 'w-full aspect-[1.586/1]' : 'w-72 h-44'} rounded-2xl overflow-hidden shadow-2xl`}>
     {/* Gradient background */}
     <div className="absolute inset-0">
@@ -320,7 +322,7 @@ export const SubscriptionsCardVisual = ({ mini = true, currencySymbol }: { mini?
       <div className="mt-auto">
         <p className="text-white/40 text-[7px] font-light tracking-[0.15em] uppercase leading-none mb-1.5">БЕЗ ГРАНИЦ</p>
         <p className="text-white/50 text-[10px] mb-0.5">Card number</p>
-        <p className="text-white font-mono text-sm tracking-widest">**** **** **** 1234</p>
+        <p className="text-white font-mono text-sm tracking-widest">{bin ? `${bin.slice(0, 4)} ${bin.slice(4, 6)}** **** ${last4 || '****'}` : '**** **** **** ****'}</p>
       </div>
       
       {/* Mastercard logo at bottom right */}
@@ -332,7 +334,7 @@ export const SubscriptionsCardVisual = ({ mini = true, currencySymbol }: { mini?
 );
 
 // Travel Card Visual - blue gradient (realistic bank card style)
-export const TravelCardVisual = ({ mini = true, currencySymbol }: { mini?: boolean; currencySymbol?: string }) => (
+export const TravelCardVisual = ({ mini = true, currencySymbol, bin, last4 }: { mini?: boolean; currencySymbol?: string; bin?: string; last4?: string }) => (
   <div className={`relative ${mini ? 'w-full aspect-[1.586/1]' : 'w-72 h-44'} rounded-2xl overflow-hidden shadow-2xl`}>
     {/* Blue gradient background */}
     <div className="absolute inset-0">
@@ -385,7 +387,7 @@ export const TravelCardVisual = ({ mini = true, currencySymbol }: { mini?: boole
       <div className="mt-auto">
         <p className="text-white/40 text-[7px] font-light tracking-[0.15em] uppercase leading-none mb-1.5">БЕЗ ГРАНИЦ</p>
         <p className="text-white/50 text-[10px] mb-0.5">Card number</p>
-        <p className="text-white font-mono text-sm tracking-widest">**** **** **** 1234</p>
+        <p className="text-white font-mono text-sm tracking-widest">{bin ? `${bin.slice(0, 4)} ${bin.slice(4, 6)}** **** ${last4 || '****'}` : '**** **** **** ****'}</p>
       </div>
       
       {/* Mastercard logo at bottom right */}
@@ -397,7 +399,7 @@ export const TravelCardVisual = ({ mini = true, currencySymbol }: { mini?: boole
 );
 
 // Premium Card Visual - XPLR PRIME: deep black matte, neural texture, platinum chip, Power Beam
-export const PremiumCardVisual = ({ mini = true, currencySymbol }: { mini?: boolean; currencySymbol?: string }) => (
+export const PremiumCardVisual = ({ mini = true, currencySymbol, bin, last4 }: { mini?: boolean; currencySymbol?: string; bin?: string; last4?: string }) => (
   <div className={`relative ${mini ? 'w-full aspect-[1.586/1]' : 'w-72 h-44'} rounded-2xl overflow-hidden shadow-2xl`}>
     {/* Deep matte black background */}
     <div className="absolute inset-0 bg-gradient-to-br from-[#0a0a0a] via-[#111111] to-[#080808]">
@@ -459,7 +461,7 @@ export const PremiumCardVisual = ({ mini = true, currencySymbol }: { mini?: bool
       <div className="mt-auto">
         <p className="text-white/25 text-[7px] font-light tracking-[0.15em] uppercase leading-none mb-1.5">БЕЗ ГРАНИЦ</p>
         <p className="text-white/25 text-[10px] mb-0.5">Card number</p>
-        <p className="text-white/90 font-mono text-sm tracking-widest">**** **** **** 1234</p>
+        <p className="text-white/90 font-mono text-sm tracking-widest">{bin ? `${bin.slice(0, 4)} ${bin.slice(4, 6)}** **** ${last4 || '****'}` : '**** **** **** ****'}</p>
       </div>
 
       {/* Mastercard logo at bottom right */}
@@ -769,9 +771,9 @@ const CardDetailsModal = ({
             
             {/* Card preview */}
             <div className="flex justify-center mb-3">
-              {card.type === 'subscriptions' && <SubscriptionsCardVisual mini={false} currencySymbol={card.currency} />}
-              {card.type === 'travel' && <TravelCardVisual mini={false} currencySymbol={card.currency} />}
-              {card.type === 'premium' && <PremiumCardVisual mini={false} currencySymbol={card.currency} />}
+              {card.type === 'subscriptions' && <SubscriptionsCardVisual mini={false} currencySymbol={card.currency} bin={card.bin} last4={card.last4} />}
+              {card.type === 'travel' && <TravelCardVisual mini={false} currencySymbol={card.currency} bin={card.bin} last4={card.last4} />}
+              {card.type === 'premium' && <PremiumCardVisual mini={false} currencySymbol={card.currency} bin={card.bin} last4={card.last4} />}
             </div>
           </div>
 
@@ -918,9 +920,9 @@ const RealisticCreditCard = ({
       <div className="group">
         {/* Card visual based on type */}
         <div className="relative">
-          {card.type === 'subscriptions' && <SubscriptionsCardVisual mini={true} />}
-          {card.type === 'travel' && <TravelCardVisual mini={true} />}
-          {card.type === 'premium' && <PremiumCardVisual mini={true} />}
+          {card.type === 'subscriptions' && <SubscriptionsCardVisual mini={true} bin={card.bin} last4={card.last4} />}
+          {card.type === 'travel' && <TravelCardVisual mini={true} bin={card.bin} last4={card.last4} />}
+          {card.type === 'premium' && <PremiumCardVisual mini={true} bin={card.bin} last4={card.last4} />}
           
           {/* Overlay for card details */}
           <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center gap-2">
@@ -1090,6 +1092,8 @@ export const CardsPage = () => {
       cardNetwork: (bc.card_type || '').toLowerCase().includes('visa') ? 'visa' : 'mastercard',
       color: typeColorMap[slug] || 'blue',
       price: '',
+      bin: bc.bin || '',
+      last4: bc.last_4_digits || '',
     };
   };
 
@@ -1110,6 +1114,9 @@ export const CardsPage = () => {
           }
         })
       );
+      // Sort: subscriptions first, travel second, premium last
+      const typeOrder: Record<string, number> = { subscriptions: 0, travel: 1, premium: 2 };
+      mapped.sort((a, b) => (typeOrder[a.type] ?? 9) - (typeOrder[b.type] ?? 9));
       setPersonalCards(mapped);
     } catch (err) {
       console.error('Failed to fetch cards:', err);
