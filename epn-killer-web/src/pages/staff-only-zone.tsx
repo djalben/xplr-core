@@ -236,14 +236,14 @@ export const StaffOnlyZone = () => {
   const [txFilter, setTxFilter] = useState('');
   const [blockConfirmUser, setBlockConfirmUser] = useState<AdminUser | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
-  const [newsList, setNewsList] = useState<{ id: number; title: string; content: string; image_url: string; created_at: string }[]>([]);
+  const [newsList, setNewsList] = useState<{ id: number; title: string; content: string; image_url: string; status: string; created_at: string }[]>([]);
   const [newNewsTitle, setNewNewsTitle] = useState('');
   const [newNewsContent, setNewNewsContent] = useState('');
   const [newsImageFile, setNewsImageFile] = useState<File | null>(null);
   const [newsImagePreview, setNewsImagePreview] = useState<string | null>(null);
   const [newsPublishing, setNewsPublishing] = useState(false);
   const [newsUploadProgress, setNewsUploadProgress] = useState('');
-  const [editingNews, setEditingNews] = useState<{ id: number; title: string; content: string; image_url: string } | null>(null);
+  const [editingNews, setEditingNews] = useState<{ id: number; title: string; content: string; image_url: string; status: string } | null>(null);
   const newsFileRef = useRef<HTMLInputElement>(null);
   const editNewsFileRef = useRef<HTMLInputElement>(null);
 
@@ -414,16 +414,27 @@ export const StaffOnlyZone = () => {
         });
         imageUrl = uploadRes.data?.url || '';
       }
-      // Step 2: Create news with image URL
-      setNewsUploadProgress('Публикация...');
-      await apiClient.post('/admin/news', { title: newNewsTitle, content: newNewsContent, image_url: imageUrl });
-      showToast('Новость опубликована и уведомления отправлены');
+      // Step 2: Create news as draft
+      setNewsUploadProgress('Сохранение...');
+      await apiClient.post('/admin/news', { title: newNewsTitle, content: newNewsContent, image_url: imageUrl, status: 'draft' });
+      showToast('Новость сохранена как черновик');
       setNewNewsTitle(''); setNewNewsContent('');
       setNewsImageFile(null); setNewsImagePreview(null);
       setNewsUploadProgress('');
       loadNews();
     } catch { showToast('Ошибка публикации', 'err'); }
     finally { setNewsPublishing(false); setNewsUploadProgress(''); }
+  };
+
+  const toggleNewsStatus = async (id: number, currentStatus: string) => {
+    const newStatus = currentStatus === 'published' ? 'draft' : 'published';
+    setSaving(true);
+    try {
+      await apiClient.patch(`/admin/news/${id}`, { status: newStatus });
+      showToast(newStatus === 'published' ? 'Новость опубликована' : 'Новость снята с публикации');
+      loadNews();
+    } catch { showToast('Ошибка обновления статуса', 'err'); }
+    finally { setSaving(false); }
   };
 
   const deleteNews = async (id: number) => {
@@ -442,6 +453,7 @@ export const StaffOnlyZone = () => {
         title: editingNews.title,
         content: editingNews.content,
         image_url: editingNews.image_url,
+        status: editingNews.status,
       });
       showToast('Новость обновлена');
       setEditingNews(null);
@@ -1183,7 +1195,10 @@ export const StaffOnlyZone = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {commissions.map(c => (
+                    {commissions
+                      .filter(c => !['fee_standard', 'fee_gold', 'gold_tier_price', 'gold_tier_duration_days'].includes(c.key))
+                      .filter((c, i, arr) => arr.findIndex(x => x.key === c.key) === i)
+                      .map(c => (
                       <tr key={c.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                         <td className="px-4 py-3 text-white text-xs font-medium">{c.description || c.key}</td>
                         <td className="px-4 py-3 text-slate-400 font-mono text-xs">{c.key}</td>
@@ -1496,7 +1511,7 @@ export const StaffOnlyZone = () => {
                   disabled={!newNewsTitle.trim() || !newNewsContent.trim() || newsPublishing}
                   className="px-5 py-2.5 bg-blue-500 hover:bg-blue-600 disabled:opacity-40 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
                 >
-                  {newsPublishing ? <><Loader2 className="w-4 h-4 animate-spin" /> {newsUploadProgress || 'Обработка...'}</> : <><Send className="w-4 h-4" /> Опубликовать и разослать уведомления</>}
+                  {newsPublishing ? <><Loader2 className="w-4 h-4 animate-spin" /> {newsUploadProgress || 'Обработка...'}</> : <><Save className="w-4 h-4" /> Сохранить черновик</>}
                 </button>
               </div>
             </div>
@@ -1538,6 +1553,18 @@ export const StaffOnlyZone = () => {
                     <button onClick={saveEditedNews} disabled={saving || !editingNews.title.trim() || !editingNews.content.trim()} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5">
                       {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Сохранить
                     </button>
+                    <button
+                      onClick={() => toggleNewsStatus(editingNews.id, editingNews.status)}
+                      disabled={saving}
+                      className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 disabled:opacity-40 ${
+                        editingNews.status === 'published'
+                          ? 'bg-orange-500/10 border border-orange-500/30 text-orange-400 hover:bg-orange-500/20'
+                          : 'bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20'
+                      }`}
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      {editingNews.status === 'published' ? 'Убрать из публикации' : 'Опубликовать'}
+                    </button>
                     <button onClick={() => setEditingNews(null)} className="px-4 py-2 bg-white/5 border border-white/10 text-slate-400 rounded-lg text-xs font-medium hover:bg-white/10 transition-colors">Отмена</button>
                   </div>
                 </div>
@@ -1551,8 +1578,9 @@ export const StaffOnlyZone = () => {
                   <tr className="border-b border-white/10">
                     <th className="text-left px-4 py-3 text-slate-400 font-medium">ID</th>
                     <th className="text-left px-4 py-3 text-slate-400 font-medium">Заголовок</th>
+                    <th className="text-left px-4 py-3 text-slate-400 font-medium">Статус</th>
                     <th className="text-left px-4 py-3 text-slate-400 font-medium">Дата</th>
-                    <th className="text-right px-4 py-3 text-slate-400 font-medium w-24"></th>
+                    <th className="text-right px-4 py-3 text-slate-400 font-medium w-32"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1560,10 +1588,29 @@ export const StaffOnlyZone = () => {
                     <tr key={n.id} className={`border-b border-white/5 hover:bg-white/5 transition-colors ${editingNews?.id === n.id ? 'bg-blue-500/5' : ''}`}>
                       <td className="px-4 py-3 text-slate-500 font-mono text-xs">{n.id}</td>
                       <td className="px-4 py-3 text-white text-xs">{n.title}</td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                          n.status === 'published' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-500/20 text-slate-400'
+                        }`}>
+                          {n.status === 'published' ? 'Опубликовано' : 'Черновик'}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 text-slate-500 text-xs">{n.created_at ? new Date(n.created_at).toLocaleString('ru-RU') : ''}</td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex gap-1 justify-end">
-                          <button onClick={() => setEditingNews({ id: n.id, title: n.title, content: n.content, image_url: n.image_url })} className="p-1.5 bg-blue-500/10 text-blue-400 rounded-lg hover:bg-blue-500/20 transition-colors" title="Редактировать">
+                          <button
+                            onClick={() => toggleNewsStatus(n.id, n.status)}
+                            disabled={saving}
+                            className={`p-1.5 rounded-lg transition-colors ${
+                              n.status === 'published'
+                                ? 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20'
+                                : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
+                            }`}
+                            title={n.status === 'published' ? 'Убрать из публикации' : 'Опубликовать'}
+                          >
+                            <Send className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={() => setEditingNews({ id: n.id, title: n.title, content: n.content, image_url: n.image_url, status: n.status || 'draft' })} className="p-1.5 bg-blue-500/10 text-blue-400 rounded-lg hover:bg-blue-500/20 transition-colors" title="Редактировать">
                             <Tag className="w-3.5 h-3.5" />
                           </button>
                           <button onClick={() => deleteNews(n.id)} className="p-1.5 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition-colors" title="Удалить">
@@ -1574,7 +1621,7 @@ export const StaffOnlyZone = () => {
                     </tr>
                   ))}
                   {newsList.length === 0 && (
-                    <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-500 text-sm">Нет новостей</td></tr>
+                    <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-500 text-sm">Нет новостей</td></tr>
                   )}
                 </tbody>
               </table>
