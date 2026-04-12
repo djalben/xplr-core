@@ -797,7 +797,7 @@ export const StaffOnlyZone = () => {
 
             {/* Block confirmation modal */}
             {blockConfirmUser && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setBlockConfirmUser(null)}>
+              <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setBlockConfirmUser(null)}>
                 <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-sm p-6 shadow-2xl space-y-4" onClick={e => e.stopPropagation()}>
                   <div className="flex items-center gap-3">
                     <div className={`p-2.5 rounded-xl ${blockConfirmUser.is_blocked ? 'bg-emerald-500/20' : 'bg-red-500/20'}`}>
@@ -836,7 +836,7 @@ export const StaffOnlyZone = () => {
 
             {/* User edit modal */}
             {selectedUser && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setSelectedUser(null)}>
+              <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setSelectedUser(null)}>
                 <div className="glass-card p-6 w-full max-w-md mx-4 space-y-5" onClick={e => e.stopPropagation()}>
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-bold text-white">Юзер #{selectedUser.id}</h3>
@@ -952,7 +952,7 @@ export const StaffOnlyZone = () => {
 
             {/* ══ Financial Passport Modal ══ */}
             {(inspectUser || inspectLoading) && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => { setInspectUser(null); setInspectLoading(false); }}>
+              <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => { setInspectUser(null); setInspectLoading(false); }}>
                 <div className="bg-[#0c0c18]/95 border border-white/10 rounded-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
                   {/* Header */}
                   <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
@@ -1421,7 +1421,7 @@ export const StaffOnlyZone = () => {
 
             {/* ── Chat Messages Modal ── */}
             {viewingChatId && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setViewingChatId(null)}>
+              <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setViewingChatId(null)}>
                 <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
                   <div className="flex items-center justify-between p-4 border-b border-white/10">
                     <h4 className="text-white font-semibold text-sm">Чат #{viewingChatId}</h4>

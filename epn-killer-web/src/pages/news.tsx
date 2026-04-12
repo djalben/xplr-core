@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Newspaper, Bell, BellOff, ChevronLeft, ChevronRight, ImageIcon, X } from 'lucide-react';
 import { DashboardLayout } from '../components/dashboard-layout';
+import { BackButton } from '../components/back-button';
 import { getNews, getNewsNotifications, updateNewsNotifications, markNewsAsRead, type NewsItem } from '../api/news';
 
 const PAGE_SIZE = 6;
@@ -19,34 +20,35 @@ const NewsModal = ({ item, onClose }: { item: NewsItem; onClose: () => void }) =
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6" onClick={onClose}>
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-6" onClick={onClose}>
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
       <div
-        className="relative w-full max-w-2xl max-h-[85vh] rounded-2xl bg-[#111118] border border-white/10 shadow-2xl overflow-hidden"
+        className="relative w-full sm:max-w-2xl max-h-[90vh] sm:max-h-[85vh] rounded-t-2xl sm:rounded-2xl bg-[#111118] border border-white/10 shadow-2xl overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
-        {/* Scrollable content */}
-        <div className="overflow-y-auto max-h-[85vh]">
-          {/* Sticky close button — always visible on scroll */}
-          <div className="sticky top-0 z-50 flex justify-end p-3 pointer-events-none">
-            <button
-              onClick={onClose}
-              className="pointer-events-auto p-2 rounded-xl bg-black/70 backdrop-blur-sm border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+        {/* Close button — absolute, always on top, outside scroll */}
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 z-[60] p-2 rounded-xl bg-black/80 backdrop-blur-sm border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+        >
+          <X className="w-5 h-5" />
+        </button>
 
+        {/* Scrollable content — touch-friendly */}
+        <div
+          className="overflow-y-auto max-h-[90vh] sm:max-h-[85vh] overscroll-contain"
+          style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+        >
           {/* Image — full width, constrained */}
           {item.image_url ? (
             <img
               src={item.image_url}
               alt={item.title}
-              className="w-full max-w-full h-auto object-contain -mt-12"
+              className="w-full max-w-full h-auto object-contain"
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
             />
           ) : (
-            <div className="h-32 bg-gradient-to-br from-blue-500/10 to-purple-500/10 flex items-center justify-center -mt-12">
+            <div className="h-32 bg-gradient-to-br from-blue-500/10 to-purple-500/10 flex items-center justify-center">
               <ImageIcon className="w-10 h-10 text-slate-600" />
             </div>
           )}
@@ -56,8 +58,8 @@ const NewsModal = ({ item, onClose }: { item: NewsItem; onClose: () => void }) =
             <p className="text-[11px] text-slate-500 mb-3">
               {new Date(item.created_at).toLocaleDateString('ru-RU', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
             </p>
-            <h2 className="text-lg sm:text-xl font-bold text-white mb-4 leading-tight break-words">{item.title}</h2>
-            <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-line break-words overflow-hidden">
+            <h2 className="text-lg sm:text-xl font-bold text-white mb-4 leading-tight break-words pr-10">{item.title}</h2>
+            <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-line break-words">
               {item.content}
             </div>
           </div>
@@ -128,6 +130,7 @@ export const NewsPage = () => {
   return (
     <DashboardLayout>
       <div className="max-w-4xl mx-auto space-y-6">
+        <BackButton />
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">

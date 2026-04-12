@@ -93,23 +93,23 @@ const TransactionRow = ({ tx }: { tx: DashboardTx }) => {
   const cardLabel = tx.card_last4 ? `•••• ${tx.card_last4}` : 'Кошелёк';
 
   return (
-    <div className="flex items-center justify-between py-4 border-b border-white/5 last:border-0 hover:bg-white/[0.02] px-4 -mx-4 transition-colors rounded-lg">
-      <div className="flex items-center gap-4">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+    <div className="flex items-center justify-between py-4 border-b border-white/5 last:border-0 hover:bg-white/[0.02] px-4 -mx-4 transition-colors rounded-lg overflow-hidden">
+      <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+        <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 ${
           isIncome ? 'bg-emerald-500/20' : 'bg-white/5'
         }`}>
           {isIncome ? (
-            <ArrowDownRight className="w-5 h-5 text-emerald-400" />
+            <ArrowDownRight className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
           ) : (
-            <ArrowUpRight className="w-5 h-5 text-slate-400" />
+            <ArrowUpRight className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400" />
           )}
         </div>
         <div className="min-w-0">
-          <p className="text-white font-medium truncate">{tx.type_label}</p>
-          <p className="text-sm text-slate-500 truncate">{cardLabel} • {dateStr}</p>
+          <p className="text-sm sm:text-base text-white font-medium truncate">{tx.type_label}</p>
+          <p className="text-xs sm:text-sm text-slate-500 truncate">{cardLabel} • {dateStr}</p>
         </div>
       </div>
-      <p className={`font-semibold balance-display whitespace-nowrap ml-3 ${
+      <p className={`text-sm sm:text-base font-semibold balance-display whitespace-nowrap ml-2 sm:ml-3 shrink-0 ${
         isIncome ? 'text-emerald-400' : 'text-white'
       }`}>
         {isIncome ? '+' : '-'}${Math.abs(amt).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -489,7 +489,7 @@ export const DashboardPage = () => {
                   {exportingExcel ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <TableProperties className="w-3.5 h-3.5" />}
                   <span className="hidden sm:inline">Excel</span>
                 </button>
-                <button onClick={() => navigate('/history')} className="text-sm text-blue-400 hover:text-blue-300 transition-colors font-medium whitespace-nowrap ml-1">
+                <button onClick={() => navigate('/history')} className="text-[10px] sm:text-sm text-blue-400 hover:text-blue-300 transition-colors font-medium whitespace-nowrap ml-1">
                   {t('dashboard.viewAll')}
                 </button>
               </div>

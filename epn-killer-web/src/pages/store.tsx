@@ -6,6 +6,7 @@ import {
   Download, Smartphone, Wifi, CreditCard
 } from 'lucide-react';
 import { DashboardLayout } from '../components/dashboard-layout';
+import { BackButton } from '../components/back-button';
 import {
   getStoreCatalog, purchaseProduct,
   getESIMDestinations, getESIMPlans, orderESIM,
@@ -442,6 +443,7 @@ export const StorePage = () => {
   return (
     <DashboardLayout>
       <div className="max-w-5xl mx-auto">
+        <BackButton />
 
         {/* ═══════ Hub — Full-Bleed Category Cards ═══════ */}
         {storeView === 'hub' && (

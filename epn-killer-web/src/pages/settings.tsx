@@ -109,7 +109,7 @@ const TelegramLinkModal = ({ onClose, onSuccess }: { onClose: () => void; onSucc
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div className="relative w-full max-w-md bg-slate-900/95 border border-white/10 rounded-2xl shadow-2xl p-6 space-y-5" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
@@ -359,7 +359,7 @@ const ProfileTab = ({ profile, reload, showToast, setActiveTab }: { profile: Pro
 
       {/* Email Verification Modal */}
       {emailVerifyOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="glass-card p-8 max-w-sm w-full mx-4 relative">
             <button onClick={() => { setEmailVerifyOpen(false); setEmailCode(''); }} className="absolute top-4 right-4 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
             <div className="text-center mb-6">

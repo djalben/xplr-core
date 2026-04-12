@@ -126,7 +126,7 @@ export const WalletTopUpModal = ({ onClose, onSuccess }: WalletTopUpModalProps) 
 
   return (
     <ModalPortal>
-      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
         <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose} />
 
         <div className="relative bg-[#0b0b14]/95 border border-white/[0.10] rounded-t-2xl sm:rounded-2xl w-full max-w-[400px] max-h-[90vh] overflow-hidden flex flex-col animate-scale-in shadow-[0_24px_80px_-12px_rgba(0,0,0,0.8)]">
