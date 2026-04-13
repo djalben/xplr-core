@@ -21,7 +21,8 @@ import {
   FileText,
   TableProperties,
   Loader2,
-  Clock
+  Clock,
+  Eye
 } from 'lucide-react';
 import apiClient, { API_BASE_URL } from '../api/axios';
 import { getUserGrade, type GradeInfo } from '../api/grade';
@@ -489,8 +490,9 @@ export const DashboardPage = () => {
                   {exportingExcel ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <TableProperties className="w-3.5 h-3.5" />}
                   <span className="hidden sm:inline">Excel</span>
                 </button>
-                <button onClick={() => navigate('/history')} className="text-[10px] sm:text-sm text-blue-400 hover:text-blue-300 transition-colors font-medium whitespace-nowrap ml-1">
-                  {t('dashboard.viewAll')}
+                <button onClick={() => navigate('/history')} className="flex items-center gap-1 text-blue-400 hover:text-blue-300 transition-colors font-medium whitespace-nowrap ml-1" title={t('dashboard.viewAll')}>
+                  <Eye className="w-4 h-4 sm:hidden" />
+                  <span className="hidden sm:inline text-sm">{t('dashboard.viewAll')}</span>
                 </button>
               </div>
             </div>

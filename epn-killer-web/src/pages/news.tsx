@@ -8,7 +8,7 @@ const PAGE_SIZE = 6;
 
 // ── News Detail Modal ──
 const NewsModal = ({ item, onClose }: { item: NewsItem; onClose: () => void }) => {
-  // Close on Escape key
+  // Close on Escape key + lock body scroll
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', handleKey);
@@ -20,47 +20,58 @@ const NewsModal = ({ item, onClose }: { item: NewsItem; onClose: () => void }) =
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-6" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
-      <div
-        className="relative w-full sm:max-w-2xl max-h-[90vh] sm:max-h-[85vh] rounded-t-2xl sm:rounded-2xl bg-[#111118] border border-white/10 shadow-2xl overflow-hidden"
-        onClick={e => e.stopPropagation()}
+    <div className="fixed inset-0 z-[100] flex flex-col" onClick={onClose}>
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+
+      {/* Close button — fixed in safe zone, always visible above content */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onClose(); }}
+        className="fixed top-3 right-3 z-[110] p-2.5 rounded-xl bg-[#1a1a24]/90 backdrop-blur-md border border-white/15 text-slate-300 hover:text-white hover:bg-white/10 transition-all shadow-lg"
+        style={{ marginTop: 'env(safe-area-inset-top, 0px)' }}
       >
-        {/* Close button — absolute, always on top, outside scroll */}
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 z-[60] p-2 rounded-xl bg-black/80 backdrop-blur-sm border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all"
-        >
-          <X className="w-5 h-5" />
-        </button>
+        <X className="w-5 h-5" />
+      </button>
 
-        {/* Scrollable content — touch-friendly */}
+      {/* Modal container — centered on desktop, bottom-sheet on mobile */}
+      <div className="relative flex-1 flex items-end sm:items-center justify-center sm:p-6">
         <div
-          className="overflow-y-auto max-h-[90vh] sm:max-h-[85vh] overscroll-contain"
-          style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+          className="relative w-full sm:max-w-2xl max-h-[92vh] sm:max-h-[85vh] rounded-t-2xl sm:rounded-2xl bg-[#111118] border border-white/10 shadow-2xl flex flex-col overflow-hidden"
+          onClick={e => e.stopPropagation()}
         >
-          {/* Image — full width, constrained */}
-          {item.image_url ? (
-            <img
-              src={item.image_url}
-              alt={item.title}
-              className="w-full max-w-full h-auto object-contain"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            />
-          ) : (
-            <div className="h-32 bg-gradient-to-br from-blue-500/10 to-purple-500/10 flex items-center justify-center">
-              <ImageIcon className="w-10 h-10 text-slate-600" />
-            </div>
-          )}
+          {/* Scrollable content — full touch support */}
+          <div
+            className="flex-1 overflow-y-auto overscroll-contain"
+            style={{
+              WebkitOverflowScrolling: 'touch',
+              touchAction: 'pan-y',
+              overscrollBehavior: 'contain',
+            }}
+          >
+            {/* Image */}
+            {item.image_url ? (
+              <img
+                src={item.image_url}
+                alt={item.title}
+                className="w-full max-w-full h-auto object-contain select-none"
+                draggable={false}
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            ) : (
+              <div className="h-32 bg-gradient-to-br from-blue-500/10 to-purple-500/10 flex items-center justify-center">
+                <ImageIcon className="w-10 h-10 text-slate-600" />
+              </div>
+            )}
 
-          {/* Content */}
-          <div className="p-4 sm:p-8">
-            <p className="text-[11px] text-slate-500 mb-3">
-              {new Date(item.created_at).toLocaleDateString('ru-RU', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-            </p>
-            <h2 className="text-lg sm:text-xl font-bold text-white mb-4 leading-tight break-words pr-10">{item.title}</h2>
-            <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-line break-words">
-              {item.content}
+            {/* Text content */}
+            <div className="p-4 sm:p-8 pb-8">
+              <p className="text-[11px] text-slate-500 mb-3">
+                {new Date(item.created_at).toLocaleDateString('ru-RU', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </p>
+              <h2 className="text-lg sm:text-xl font-bold text-white mb-4 leading-tight break-words pr-8">{item.title}</h2>
+              <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-line break-words select-text">
+                {item.content}
+              </div>
             </div>
           </div>
         </div>

@@ -985,3 +985,13 @@ select option:focus,
 .animate-fade-in {
   animation: fade-in 0.15s ease-out forwards;
 }
+
+/* Mobile content padding — accounts for fixed header + safe-area on notched devices */
+.mobile-content-pad {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 80px);
+}
+@media (min-width: 1024px) {
+  .mobile-content-pad {
+    padding-top: 2rem; /* lg:pt-8 equivalent — sidebar layout, no fixed header */
+  }
+}

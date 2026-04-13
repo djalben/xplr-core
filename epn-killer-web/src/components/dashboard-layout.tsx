@@ -11,7 +11,8 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       <Sidebar />
       {/* Desktop: sidebar offset. Mobile: header + bottom nav offset */}
       <main className="lg:ml-64 min-h-[100dvh] relative z-10 overflow-x-hidden">
-        <div className="p-4 pt-32 pb-28 lg:p-8 lg:pt-8 lg:pb-8">
+        {/* Mobile: safe-area + header top offset. Desktop: standard padding */}
+        <div className="mobile-content-pad p-4 pb-28 lg:p-8 lg:pb-8">
           {children}
         </div>
       </main>
