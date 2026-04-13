@@ -119,6 +119,24 @@ func RunSchemaGuard() {
 		}
 	}
 
+	// Ensure required system_settings rows exist
+	requiredSettings := []struct {
+		Key, Value, Description string
+	}{
+		{"global_markup_percent", "20", "Глобальная наценка на все товары магазина (%)"},
+	}
+	for _, s := range requiredSettings {
+		_, err := GlobalDB.Exec(
+			`INSERT INTO system_settings (setting_key, setting_value, description)
+			 VALUES ($1, $2, $3)
+			 ON CONFLICT (setting_key) DO NOTHING`,
+			s.Key, s.Value, s.Description,
+		)
+		if err != nil {
+			log.Printf("[SCHEMA-GUARD] ⚠️ Failed to seed setting %s: %v", s.Key, err)
+		}
+	}
+
 	log.Printf("[SCHEMA-GUARD] ✅ Done: %d created, %d already OK, %d errors", created, skipped, errors)
 }
 

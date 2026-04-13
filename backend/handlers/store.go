@@ -9,12 +9,58 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/djalben/xplr-core/backend/internal/shop"
 	"github.com/djalben/xplr-core/backend/middleware"
 	"github.com/djalben/xplr-core/backend/providers"
 	"github.com/djalben/xplr-core/backend/repository"
 	"github.com/djalben/xplr-core/backend/service"
 	"github.com/shopspring/decimal"
 )
+
+// ══════════════════════════════════════════════════════════════
+// Shop infrastructure — fulfillment engine + deposit monitor
+// ══════════════════════════════════════════════════════════════
+
+var (
+	shopFulfillment *shop.FulfillmentEngine
+	shopMonitor     *shop.DepositMonitor
+)
+
+// InitShopInfrastructure wires up the internal/shop package with DB, notifications, and email.
+// Must be called once after GlobalDB is set (e.g. in main.go).
+func InitShopInfrastructure() {
+	if GlobalDB == nil {
+		log.Println("[SHOP] ⚠️ Cannot init shop infrastructure — DB not ready")
+		return
+	}
+
+	// Init markup cache with DB reference
+	shop.InitMarkup(GlobalDB)
+
+	// Get provider registry and register demo (auto-registered)
+	registry := shop.GetRegistry()
+
+	// Create fulfillment engine
+	shopFulfillment = shop.NewFulfillmentEngine(
+		GlobalDB,
+		registry,
+		// UserNotifier — wraps service.NotifyUser
+		func(userID int, subject, tgMsg, _ string) {
+			service.NotifyUser(userID, subject, tgMsg)
+		},
+		// AdminNotifier — wraps service.NotifyAdmins
+		service.NotifyAdmins,
+		// PremiumEmailSender — wraps service.SendPurchaseReceipt
+		service.SendPurchaseReceipt,
+	)
+	shopFulfillment.StartRetryLoop()
+
+	// Create deposit monitor
+	shopMonitor = shop.NewDepositMonitor(registry, service.NotifyAdmins)
+	shopMonitor.Start()
+
+	log.Println("[SHOP] ✅ Shop infrastructure initialized (fulfillment + deposit monitor)")
+}
 
 // ══════════════════════════════════════════════════════════════
 // Store types
@@ -75,9 +121,14 @@ func calculatePrice(cost, markupPct decimal.Decimal) decimal.Decimal {
 }
 
 // applyMarkup recalculates PriceUSD and OldPrice from CostPrice + MarkupPercent.
+// If the product has no per-product markup (0 or missing), uses global_markup_percent from settings.
 func applyMarkup(p *StoreProduct) {
-	if p.CostPrice.IsPositive() && p.MarkupPercent.IsPositive() {
-		p.PriceUSD = calculatePrice(p.CostPrice, p.MarkupPercent)
+	if p.CostPrice.IsPositive() {
+		markup := p.MarkupPercent
+		if !markup.IsPositive() {
+			markup = shop.GetGlobalMarkup()
+		}
+		p.PriceUSD = calculatePrice(p.CostPrice, markup)
 	}
 	// Fake "old price" = current price * 1.20 (rounded to .90)
 	if p.PriceUSD.IsPositive() {

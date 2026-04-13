@@ -62,6 +62,9 @@ func main() {
 	// 1.1. Schema Integrity Guard — проверяет и создаёт отсутствующие колонки
 	repository.RunSchemaGuard()
 
+	// 1.2. Shop infrastructure — fulfillment engine + deposit monitor
+	handlers.InitShopInfrastructure()
+
 	// Тест "Дыхания" — проверка таблицы services в Supabase
 	log.Println("Testing Supabase connection: SELECT slug FROM services...")
 	rows, err := DB.Query("SELECT slug FROM services")
