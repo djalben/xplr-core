@@ -69,6 +69,12 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return nil
 }
 
+// Handler returns the configured router.
+// Useful for serverless adapters (e.g. Vercel) where ListenAndServe is not used.
+func (s *Server) Handler() http.Handler {
+	return s.router
+}
+
 func (s *Server) setupMiddleware(corsAllowedOrigins string) {
 	s.router.Use(middleware.RequestID)
 	s.router.Use(middleware.RealIP)
