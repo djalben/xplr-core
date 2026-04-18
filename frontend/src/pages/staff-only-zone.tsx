@@ -253,7 +253,7 @@ export const StaffOnlyZone = () => {
   const [storeSubTab, setStoreSubTab] = useState<'esim' | 'digital' | 'vpn'>('esim');
 
   // ── Aeza infra balance ──
-  const [aezaBalance, setAezaBalance] = useState<{ balance: number; currency: string; updated_at: string } | null>(null);
+  const [aezaBalance, setAezaBalance] = useState<{ balance: number; currency: string; updated_at: string; status?: string } | null>(null);
   const [aezaLoading, setAezaLoading] = useState(false);
   const [aezaError, setAezaError] = useState('');
   const [activeKeys, setActiveKeys] = useState<number | null>(null);
@@ -718,20 +718,30 @@ export const StaffOnlyZone = () => {
                 </div>
               ) : aezaBalance ? (
                 <div className="space-y-4">
-                  <div className="flex items-center gap-6">
-                    <div>
-                      <p className="text-xs text-white/40 mb-1">Aeza Hosting</p>
-                      <p className={`text-2xl font-bold tabular-nums ${aezaBalance.balance < 2 ? 'text-red-400' : aezaBalance.balance < 5 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                        {aezaBalance.balance.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} €
-                      </p>
-                    </div>
-                    {aezaBalance.balance < 2 && (
-                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20">
-                        <AlertCircle className="w-3.5 h-3.5 text-red-400" />
-                        <span className="text-xs text-red-400 font-medium">Низкий баланс!</span>
+                  {aezaBalance.status === 'maintenance' ? (
+                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                      <Loader2 className="w-4 h-4 text-amber-400 animate-spin flex-shrink-0" />
+                      <div>
+                        <p className="text-sm text-amber-400 font-medium">Aeza API временно недоступен (500)</p>
+                        <p className="text-xs text-amber-400/60 mt-0.5">Повторная попытка при следующем обновлении...</p>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-6">
+                      <div>
+                        <p className="text-xs text-white/40 mb-1">Aeza Hosting</p>
+                        <p className={`text-2xl font-bold tabular-nums ${aezaBalance.balance < 2 ? 'text-red-400' : aezaBalance.balance < 5 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                          {aezaBalance.balance.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} €
+                        </p>
+                      </div>
+                      {aezaBalance.balance < 2 && (
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20">
+                          <AlertCircle className="w-3.5 h-3.5 text-red-400" />
+                          <span className="text-xs text-red-400 font-medium">Низкий баланс!</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="flex items-center gap-3 pt-3 border-t border-white/5">
                     <div className="w-8 h-8 rounded-lg bg-[#818CF8]/10 flex items-center justify-center">
                       <Activity className="w-4 h-4 text-[#818CF8]" />

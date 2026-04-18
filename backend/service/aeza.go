@@ -25,10 +25,17 @@ type AezaBalance struct {
 	Balance   float64 `json:"balance"`
 	Currency  string  `json:"currency"`
 	UpdatedAt string  `json:"updated_at"`
+	Status    string  `json:"status"` // "ok", "maintenance", "error"
 }
 
 // cleanBalanceString removes currency symbols and whitespace, replaces comma decimal separators.
 var balanceCleanRe = regexp.MustCompile(`[^\d.,\-]`)
+
+const (
+	aezaMaxRetries = 3
+	aezaBaseDelay  = 1 * time.Second
+	aezaPrimaryURL = "https://my.aeza.net/api/account"
+)
 
 var (
 	aezaLastAlert     time.Time
@@ -36,38 +43,117 @@ var (
 	aezaAlertCooldown = 6 * time.Hour
 )
 
+// doAezaRequest performs a single HTTP request to the Aeza API.
+// Returns body, status code, and error.
+func doAezaRequest(apiKey string) ([]byte, int, error) {
+	req, err := http.NewRequest("GET", aezaPrimaryURL, nil)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("X-API-Key", strings.TrimSpace(apiKey))
+	req.Header.Set("Accept", "application/json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("aeza API request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	return body, resp.StatusCode, nil
+}
+
+// extractTraceID tries to pull a traceId from an Aeza error JSON response.
+func extractTraceID(body []byte) string {
+	var errResp struct {
+		TraceID string `json:"traceId"`
+	}
+	if json.Unmarshal(body, &errResp) == nil && errResp.TraceID != "" {
+		return errResp.TraceID
+	}
+	// fallback: look for traceId in raw body
+	var raw map[string]any
+	if json.Unmarshal(body, &raw) == nil {
+		if tid, ok := raw["traceId"]; ok {
+			return fmt.Sprintf("%v", tid)
+		}
+		if tid, ok := raw["trace_id"]; ok {
+			return fmt.Sprintf("%v", tid)
+		}
+	}
+	return ""
+}
+
 // GetAezaBalance fetches the current account balance from the Aeza API.
-// Returns nil if AEZA_API_KEY is not configured.
+// Implements retry logic (up to 3 attempts) with exponential backoff.
+// On persistent 5xx errors, returns a MAINTENANCE status instead of an error.
 func GetAezaBalance() (*AezaBalance, error) {
 	apiKey := os.Getenv("AEZA_API_KEY")
 	if apiKey == "" {
 		return nil, fmt.Errorf("AEZA_API_KEY not configured")
 	}
 
-	req, err := http.NewRequest("GET", "https://my.aeza.net/api/account", nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+	var lastBody []byte
+	var lastStatus int
+	var lastErr error
+
+	for attempt := 1; attempt <= aezaMaxRetries; attempt++ {
+		body, status, err := doAezaRequest(apiKey)
+		lastBody = body
+		lastStatus = status
+		lastErr = err
+
+		if err != nil {
+			log.Printf("[AEZA] ⚠️ Attempt %d/%d network error: %v", attempt, aezaMaxRetries, err)
+			if attempt < aezaMaxRetries {
+				time.Sleep(aezaBaseDelay * time.Duration(attempt))
+			}
+			continue
+		}
+
+		// Success — parse the response
+		if status == http.StatusOK {
+			log.Printf("[AEZA] Raw API response (attempt %d, status %d): %s", attempt, status, string(body))
+			return parseAezaBalanceBody(body)
+		}
+
+		// 5xx — log traceId and retry
+		if status >= 500 {
+			traceID := extractTraceID(body)
+			traceLog := ""
+			if traceID != "" {
+				traceLog = fmt.Sprintf(" traceId=%s", traceID)
+			}
+			log.Printf("[AEZA] ⚠️ Attempt %d/%d server error %d%s: %s", attempt, aezaMaxRetries, status, traceLog, string(body))
+			if attempt < aezaMaxRetries {
+				time.Sleep(aezaBaseDelay * time.Duration(attempt))
+			}
+			continue
+		}
+
+		// 4xx — no point retrying
+		return nil, fmt.Errorf("aeza API returned %d: %s", status, string(body))
 	}
-	req.Header.Set("X-API-Key", apiKey)
-	req.Header.Set("Accept", "application/json")
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("aeza API request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("aeza API returned %d: %s", resp.StatusCode, string(body))
+	// All retries exhausted — return graceful MAINTENANCE status for 5xx
+	if lastStatus >= 500 {
+		traceID := extractTraceID(lastBody)
+		log.Printf("[AEZA] 🔧 All %d retries failed (last status %d, traceId=%s). Returning MAINTENANCE status.", aezaMaxRetries, lastStatus, traceID)
+		return &AezaBalance{
+			Balance:   -1,
+			Currency:  "EUR",
+			UpdatedAt: time.Now().Format(time.RFC3339),
+			Status:    "maintenance",
+		}, nil
 	}
 
-	log.Printf("[AEZA] Raw API response (status %d): %s", resp.StatusCode, string(body))
+	// Network error after all retries
+	return nil, fmt.Errorf("aeza API unreachable after %d attempts: %w", aezaMaxRetries, lastErr)
+}
 
-	// Aeza API response: {"data": {"balance": 1234.56, ...}} or {"data": {"balance": "12.34 \u20ac", ...}}
-	// Try float first, then fall back to string parsing
+// parseAezaBalanceBody parses a successful Aeza API response body into AezaBalance.
+func parseAezaBalanceBody(body []byte) (*AezaBalance, error) {
 	var result struct {
 		Data struct {
 			Balance json.RawMessage `json:"balance"`
@@ -78,16 +164,14 @@ func GetAezaBalance() (*AezaBalance, error) {
 	}
 
 	var balanceVal float64
-	// Try parsing as float64 directly
 	if err := json.Unmarshal(result.Data.Balance, &balanceVal); err != nil {
-		// Fall back: parse as string, strip currency symbols
 		var balanceStr string
 		if err2 := json.Unmarshal(result.Data.Balance, &balanceStr); err2 != nil {
 			return nil, fmt.Errorf("failed to parse balance value: float err=%v, string err=%v, raw=%s", err, err2, string(result.Data.Balance))
 		}
 		cleaned := balanceCleanRe.ReplaceAllString(balanceStr, "")
 		cleaned = strings.TrimSpace(cleaned)
-		cleaned = strings.Replace(cleaned, ",", ".", 1) // handle comma decimal separator
+		cleaned = strings.Replace(cleaned, ",", ".", 1)
 		balanceVal, err = strconv.ParseFloat(cleaned, 64)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse cleaned balance %q (from %q): %w", cleaned, balanceStr, err)
@@ -101,6 +185,7 @@ func GetAezaBalance() (*AezaBalance, error) {
 		Balance:   balanceVal,
 		Currency:  "EUR",
 		UpdatedAt: time.Now().Format(time.RFC3339),
+		Status:    "ok",
 	}, nil
 }
 
@@ -119,6 +204,11 @@ func CheckAezaBalanceAndNotify() {
 	balance, err := GetAezaBalance()
 	if err != nil {
 		log.Printf("[AEZA] ⚠️ Balance check failed: %v", err)
+		return
+	}
+
+	if balance.Status == "maintenance" {
+		log.Printf("[AEZA] 🔧 API in maintenance — skipping threshold check")
 		return
 	}
 

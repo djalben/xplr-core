@@ -12,6 +12,7 @@ import (
 
 // GetAezaBalanceHandler - GET /api/v1/admin/infra/balance
 // Returns the current Aeza hosting balance (admin only).
+// On persistent 5xx from Aeza, returns status:"maintenance" (200 OK) instead of an error.
 func GetAezaBalanceHandler(w http.ResponseWriter, r *http.Request) {
 	balance, err := service.GetAezaBalance()
 	if err != nil {
@@ -25,6 +26,7 @@ func GetAezaBalanceHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Maintenance status is returned as 200 so frontend can handle it gracefully
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(balance)
 }
