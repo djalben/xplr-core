@@ -389,6 +389,26 @@ const VpnSuccessModal = ({ productName, priceUsd, vlessKey, onClose }: { product
           </div>
         </div>
 
+        {/* App download links */}
+        <div className="mt-4 flex flex-col sm:flex-row gap-2">
+          <a href="https://apps.apple.com/app/v2box-v2ray-client/id1640137564" target="_blank" rel="noopener noreferrer"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white/70 font-medium text-xs hover:bg-white/[0.08] transition-all">
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+            V2Box (iOS)
+          </a>
+          <a href="https://play.google.com/store/apps/details?id=com.v2box.android" target="_blank" rel="noopener noreferrer"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white/70 font-medium text-xs hover:bg-white/[0.08] transition-all">
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M3.18 23.73c.44.26.96.27 1.41.01l16.34-9.47-3.69-3.69L3.18 23.73zm-.55-1.7V1.97c0-.46.2-.85.55-1.1L14.53 12.2 3.18 23.73l-.55-1.7zM20.95 11.45L17.47 9.5l-3.8 3.8 3.8 3.8 3.48-2.11c.73-.42.73-1.12 0-1.54zM4.81.32l12.44 7.31L13.56 11.3 4.81.32z"/></svg>
+            v2rayNG (Android)
+          </a>
+        </div>
+        <p className="text-center mt-2">
+          <a href="https://github.com/2dust/v2rayNG/releases" target="_blank" rel="noopener noreferrer"
+            className="text-[10px] text-white/25 hover:text-white/40 transition-colors underline underline-offset-2">
+            Скачать APK напрямую
+          </a>
+        </p>
+
         <button onClick={onClose} className="w-full py-2.5 mt-3 text-sm text-white/40 hover:text-white/60 transition-colors">Готово</button>
       </div>
     </div>
@@ -605,7 +625,7 @@ export const StorePage = () => {
                 <div className="relative z-10 flex flex-col justify-end h-full p-5 sm:p-7">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="w-2 h-2 rounded-full bg-[#818CF8] animate-pulse" />
-                    <span className="text-xs font-bold tracking-widest uppercase text-[#818CF8] px-2 py-0.5 rounded-md bg-black/40" style={{ textShadow: '0px 2px 4px rgba(0,0,0,0.8)' }}>100% ПРИВАТНОСТЬ</span>
+                    <span className="text-xs font-bold tracking-widest uppercase text-white px-2.5 py-1 rounded-md bg-[#4338CA]/80 border border-[#818CF8]/40" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}>100% ПРИВАТНОСТЬ</span>
                   </div>
                   <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white text-left leading-tight">Безопасный доступ</h2>
                   <p className="text-xs sm:text-sm text-white/50 mt-1.5 text-left max-w-md">Зашифрованный канал для защиты данных и стабильного интернета</p>
@@ -799,90 +819,8 @@ export const StorePage = () => {
               </div>
             </div>
 
-            {vpnLoading ? (
-              <div className="space-y-4">
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="rounded-2xl bg-white/[0.02] border border-white/[0.05] p-5 animate-pulse space-y-3">
-                    <div className="h-5 bg-white/[0.05] rounded w-40" /><div className="h-4 bg-white/[0.04] rounded w-64" />
-                    <div className="h-10 bg-white/[0.04] rounded w-full mt-3" />
-                  </div>
-                ))}
-              </div>
-            ) : vpnProducts.length === 0 ? (
-              <div className="py-16 text-center"><Shield className="w-10 h-10 text-white/10 mx-auto mb-3" /><p className="text-white/30 text-sm">Тарифы загружаются...</p></div>
-            ) : (
-              <div className="space-y-4">
-                {vpnProducts.map((product) => {
-                  const ext = product.external_id || '';
-                  const is7 = ext.includes('7d');
-                  const is30 = ext.includes('30d');
-                  const is180 = ext.includes('180d');
-                  const is365 = ext.includes('365d');
-                  const isFeatured = is30;
-
-                  const planLabel = is7 ? '7 дней' : is30 ? '30 дней' : is180 ? '180 дней' : is365 ? '365 дней' : product.name;
-                  const planTitle = is7 ? 'Недельный' : is30 ? 'Оптимальный' : is180 ? 'Полугодовой' : is365 ? 'Годовой' : product.name;
-                  const planDesc = is7 ? 'Быстрый старт на неделю' : is30 ? 'Оптимальный выбор' : is180 ? 'Скидка для лояльных' : is365 ? 'Самый выгодный тариф' : '';
-                  const badge = is30 ? 'Популярный' : is365 ? 'Выгодный' : null;
-
-                  const features = ['Выделенный IP-адрес', 'Безлимитный трафик', 'Протокол VLESS + Reality', 'Поддержка всех устройств',
-                    ...(is180 || is365 ? ['Приоритетная маршрутизация'] : []),
-                    ...(is365 ? ['Максимальная экономия'] : []),
-                  ];
-
-                  return (
-                    <div key={product.id} className={`rounded-2xl overflow-hidden ${isFeatured ? 'bg-white/[0.04] border-2 border-[#818CF8]/30' : 'bg-white/[0.02] border border-white/[0.05]'}`}>
-                      <div className="p-5 sm:p-6">
-                        <div className="flex items-start justify-between gap-4 mb-4">
-                          <div>
-                            <div className="flex items-center gap-2.5 mb-1">
-                              <h3 className="text-base sm:text-lg font-bold text-white">{planTitle}</h3>
-                              {badge && (
-                                <span className="px-2 py-0.5 rounded-md bg-[#7C3AED]/15 text-[#A78BFA] text-[10px] font-bold uppercase tracking-wider">
-                                  {badge}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-sm text-white/40">{planDesc}</p>
-                          </div>
-                          <div className="text-right flex-shrink-0">
-                            <div className={`text-2xl sm:text-3xl font-extrabold tabular-nums ${isFeatured ? 'gradient-text' : 'text-white'}`}>
-                              €{product.price_usd}
-                            </div>
-                            <div className="text-xs text-white/30 mt-0.5">{planLabel}</div>
-                          </div>
-                        </div>
-
-                        {!is7 && (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-5">
-                            {features.map(f => (
-                              <div key={f} className="flex items-center gap-2">
-                                <Check className="w-3.5 h-3.5 text-[#818CF8] flex-shrink-0" />
-                                <span className="text-xs sm:text-sm text-white/50">{f}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        <button
-                          onClick={() => tryBuyVpn(product)}
-                          className={`w-full py-3 rounded-xl font-semibold text-sm transition-all duration-200 active:scale-[0.98] ${
-                            isFeatured
-                              ? 'bg-gradient-to-r from-[#4338CA] to-[#7C3AED] text-white hover:opacity-90'
-                              : 'bg-white/[0.06] hover:bg-white/[0.1] text-white'
-                          }`}
-                        >
-                          Подключить за €{product.price_usd}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* ── Quick Start Block ── */}
-            <div className="mt-8 rounded-2xl border border-white/[0.08] bg-white/[0.02] overflow-hidden">
+            {/* ── Download Apps Block (above tariffs) ── */}
+            <div className="mb-6 rounded-2xl border border-white/[0.08] bg-white/[0.02] overflow-hidden">
               <div className="p-5 sm:p-6">
                 <div className="flex items-center gap-3 mb-5">
                   <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/10 flex items-center justify-center">
@@ -913,24 +851,24 @@ export const StorePage = () => {
                   ))}
                 </div>
 
-                {/* Download Buttons */}
+                {/* Download Buttons — large with official logos */}
                 <div className="flex flex-col sm:flex-row gap-3">
                   <a
                     href="https://apps.apple.com/app/v2box-v2ray-client/id1640137564"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 flex items-center justify-center gap-2.5 px-5 py-3 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white font-medium text-sm hover:bg-white/[0.1] hover:border-white/[0.15] transition-all duration-200 active:scale-[0.98]"
+                    className="flex-1 flex items-center justify-center gap-3 px-5 py-4 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white font-semibold text-[15px] hover:bg-white/[0.1] hover:border-white/[0.15] transition-all duration-200 active:scale-[0.98]"
                   >
-                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+                    <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
                     V2Box для iOS
                   </a>
                   <a
-                    href="https://play.google.com/store/apps/details?id=com.v2ray.ang"
+                    href="https://play.google.com/store/apps/details?id=com.v2box.android"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 flex items-center justify-center gap-2.5 px-5 py-3 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white font-medium text-sm hover:bg-white/[0.1] hover:border-white/[0.15] transition-all duration-200 active:scale-[0.98]"
+                    className="flex-1 flex items-center justify-center gap-3 px-5 py-4 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white font-semibold text-[15px] hover:bg-white/[0.1] hover:border-white/[0.15] transition-all duration-200 active:scale-[0.98]"
                   >
-                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M3.18 23.73c.44.26.96.27 1.41.01l16.34-9.47-3.69-3.69L3.18 23.73zm-.55-1.7V1.97c0-.46.2-.85.55-1.1L14.53 12.2 3.18 23.73l-.55-1.7zM20.95 11.45L17.47 9.5l-3.8 3.8 3.8 3.8 3.48-2.11c.73-.42.73-1.12 0-1.54zM4.81.32l12.44 7.31L13.56 11.3 4.81.32z"/></svg>
+                    <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M3.18 23.73c.44.26.96.27 1.41.01l16.34-9.47-3.69-3.69L3.18 23.73zm-.55-1.7V1.97c0-.46.2-.85.55-1.1L14.53 12.2 3.18 23.73l-.55-1.7zM20.95 11.45L17.47 9.5l-3.8 3.8 3.8 3.8 3.48-2.11c.73-.42.73-1.12 0-1.54zM4.81.32l12.44 7.31L13.56 11.3 4.81.32z"/></svg>
                     v2rayNG для Android
                   </a>
                 </div>
@@ -938,16 +876,106 @@ export const StorePage = () => {
                 {/* APK fallback */}
                 <p className="text-center mt-4">
                   <a
-                    href="https://github.com/2dust/v2rayNG/releases/latest"
+                    href="https://github.com/2dust/v2rayNG/releases"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs text-white/30 hover:text-white/50 transition-colors underline underline-offset-2 decoration-white/10 hover:decoration-white/30"
                   >
-                    Не работает Google Play? Скачать APK (v2rayNG)
+                    Не работает Google Play? Скачать APK напрямую
                   </a>
                 </p>
               </div>
             </div>
+
+            {vpnLoading ? (
+              <div className="space-y-4">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="rounded-2xl bg-white/[0.02] border border-white/[0.05] p-5 animate-pulse space-y-3">
+                    <div className="h-5 bg-white/[0.05] rounded w-40" /><div className="h-4 bg-white/[0.04] rounded w-64" />
+                    <div className="h-10 bg-white/[0.04] rounded w-full mt-3" />
+                  </div>
+                ))}
+              </div>
+            ) : vpnProducts.length === 0 ? (
+              <div className="py-16 text-center"><Shield className="w-10 h-10 text-white/10 mx-auto mb-3" /><p className="text-white/30 text-sm">Тарифы загружаются...</p></div>
+            ) : (
+              <div className="space-y-4">
+                {vpnProducts.map((product) => {
+                  const ext = product.external_id || '';
+                  const is7 = ext.includes('7d');
+                  const is30 = ext.includes('30d');
+                  const is180 = ext.includes('180d');
+                  const is365 = ext.includes('365d');
+                  const isFeatured = is30;
+
+                  const planLabel = is7 ? '7 дней' : is30 ? '30 дней' : is180 ? '180 дней' : is365 ? '365 дней' : product.name;
+                  const planTitle = is7 ? 'Недельный' : is30 ? 'Оптимальный' : is180 ? 'Полугодовой' : is365 ? 'Годовой' : product.name;
+                  const planDesc = is7 ? 'Быстрый старт на неделю' : is30 ? 'Оптимальный выбор' : is180 ? 'Скидка для лояльных' : is365 ? 'Самый выгодный тариф' : '';
+                  const trafficGB = is7 ? 15 : is30 ? 60 : is180 ? 300 : is365 ? 600 : 0;
+                  const badge = is30 ? 'Популярный' : is365 ? 'Выгодный' : null;
+
+                  const features = ['1 устройство (выделенный IP)', `Лимит ${trafficGB} ГБ трафика`, 'Протокол VLESS + Reality', 'Поддержка всех устройств',
+                    ...(is180 || is365 ? ['Приоритетная маршрутизация'] : []),
+                    ...(is365 ? ['Максимальная экономия'] : []),
+                  ];
+
+                  return (
+                    <div key={product.id} className={`rounded-2xl overflow-hidden ${isFeatured ? 'bg-white/[0.04] border-2 border-[#818CF8]/30' : 'bg-white/[0.02] border border-white/[0.05]'}`}>
+                      <div className="p-5 sm:p-6">
+                        <div className="flex items-start justify-between gap-4 mb-3">
+                          <div>
+                            <div className="flex items-center gap-2.5 mb-1">
+                              <h3 className="text-base sm:text-lg font-bold text-white">{planTitle}</h3>
+                              {badge && (
+                                <span className="px-2 py-0.5 rounded-md bg-[#7C3AED]/15 text-[#A78BFA] text-[10px] font-bold uppercase tracking-wider">
+                                  {badge}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-white/40">{planDesc}</p>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <div className={`text-2xl sm:text-3xl font-extrabold tabular-nums ${isFeatured ? 'gradient-text' : 'text-white'}`}>
+                              €{product.price_usd}
+                            </div>
+                            <div className="text-xs text-white/30 mt-0.5">{planLabel}</div>
+                          </div>
+                        </div>
+
+                        {/* Traffic limit — prominent */}
+                        <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg bg-[#818CF8]/[0.07] border border-[#818CF8]/10">
+                          <Wifi className="w-4 h-4 text-[#818CF8] flex-shrink-0" />
+                          <span className="text-sm font-semibold text-[#A78BFA]">{trafficGB} ГБ</span>
+                          <span className="text-xs text-white/35">трафика · 1 устройство</span>
+                        </div>
+
+                        {!is7 && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-5">
+                            {features.map(f => (
+                              <div key={f} className="flex items-center gap-2">
+                                <Check className="w-3.5 h-3.5 text-[#818CF8] flex-shrink-0" />
+                                <span className="text-xs sm:text-sm text-white/50">{f}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        <button
+                          onClick={() => tryBuyVpn(product)}
+                          className={`w-full py-3 rounded-xl font-semibold text-sm transition-all duration-200 active:scale-[0.98] ${
+                            isFeatured
+                              ? 'bg-gradient-to-r from-[#4338CA] to-[#7C3AED] text-white hover:opacity-90'
+                              : 'bg-white/[0.06] hover:bg-white/[0.1] text-white'
+                          }`}
+                        >
+                          Подключить за €{product.price_usd}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>

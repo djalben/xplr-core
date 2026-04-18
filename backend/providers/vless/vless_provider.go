@@ -160,8 +160,6 @@ func (v *VlessProvider) CreateOrder(externalProductID string) (*shop.OrderResult
 	durationDays := 30
 	if strings.Contains(externalProductID, "7d") {
 		durationDays = 7
-	} else if strings.Contains(externalProductID, "90d") {
-		durationDays = 90
 	} else if strings.Contains(externalProductID, "180d") {
 		durationDays = 180
 	} else if strings.Contains(externalProductID, "365d") {
