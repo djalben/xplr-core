@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   ShoppingBag, Search, Globe, Gamepad2, X, Copy, Check, Loader2,
   AlertTriangle, QrCode, Key, ChevronRight, ArrowLeft,
-  Download, Smartphone, Wifi, CreditCard
+  Download, Smartphone, Wifi, CreditCard, Shield
 } from 'lucide-react';
 import { DashboardLayout } from '../components/dashboard-layout';
 import { BackButton } from '../components/back-button';
@@ -323,11 +323,84 @@ const NoCardWarningModal = ({ onClose, onGoToCards }: { onClose: () => void; onG
 };
 
 // ══════════════════════════════════════════════════════════════
+// VPN Success Modal (vless:// key + copy + instructions)
+// ══════════════════════════════════════════════════════════════
+const VpnSuccessModal = ({ productName, priceUsd, vlessKey, onClose }: { productName: string; priceUsd: string; vlessKey: string; onClose: () => void }) => {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', h); document.body.style.overflow = 'hidden';
+    return () => { document.removeEventListener('keydown', h); document.body.style.overflow = ''; };
+  }, [onClose]);
+
+  const handleCopy = async () => {
+    try { await navigator.clipboard.writeText(vlessKey); }
+    catch { const ta = document.createElement('textarea'); ta.value = vlessKey; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }
+    setCopied(true); setTimeout(() => setCopied(false), 2500);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="relative z-10 w-full max-w-md rounded-2xl bg-[#0F1629] border border-white/[0.08] p-6 sm:p-8 animate-scale-in" onClick={e => e.stopPropagation()}>
+        {/* Success icon */}
+        <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-emerald-500/10 mb-5 mx-auto">
+          <Check className="w-7 h-7 text-emerald-400" />
+        </div>
+        <h3 className="text-lg font-bold text-white text-center mb-1">{productName} активирован!</h3>
+        <p className="text-sm text-white/40 text-center mb-5">Ваш зашифрованный канал готов к использованию</p>
+
+        {/* VLESS key field */}
+        <div className="rounded-xl bg-black/30 border border-white/[0.06] p-3.5 mb-4">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#818CF8]/70">Ключ подключения</span>
+            <span className="text-[10px] text-white/20">vless://</span>
+          </div>
+          <div className="text-xs text-white/60 font-mono break-all leading-relaxed max-h-20 overflow-y-auto">
+            {vlessKey}
+          </div>
+        </div>
+
+        {/* Copy button */}
+        <button
+          onClick={handleCopy}
+          className={`w-full py-3 rounded-xl font-semibold text-sm transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2 ${
+            copied
+              ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
+              : 'bg-gradient-to-r from-[#4338CA] to-[#7C3AED] text-white hover:opacity-90'
+          }`}
+        >
+          {copied ? <><Check className="w-4 h-4" /> Скопировано</> : <><Copy className="w-4 h-4" /> Копировать ключ</>}
+        </button>
+
+        {/* Instruction */}
+        <div className="mt-4 rounded-xl bg-white/[0.03] border border-white/[0.05] p-4">
+          <div className="flex items-start gap-3">
+            <div className="w-7 h-7 rounded-lg bg-[#818CF8]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <Smartphone className="w-3.5 h-3.5 text-[#818CF8]" />
+            </div>
+            <p className="text-xs text-white/45 leading-relaxed">
+              Вставьте скопированную ссылку в приложение{' '}
+              <span className="text-white/70 font-semibold">v2rayNG</span>{' '}
+              (Android) или{' '}
+              <span className="text-white/70 font-semibold">V2Box</span>{' '}
+              (iOS) для активации зашифрованного канала.
+            </p>
+          </div>
+        </div>
+
+        <button onClick={onClose} className="w-full py-2.5 mt-3 text-sm text-white/40 hover:text-white/60 transition-colors">Готово</button>
+      </div>
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════
 // Store Page — Store 2.0
 // ══════════════════════════════════════════════════════════════
 export const StorePage = () => {
   const navigate = useNavigate();
-  const [storeView, setStoreView] = useState<'hub' | 'esim' | 'digital'>('hub');
+  const [storeView, setStoreView] = useState<'hub' | 'esim' | 'digital' | 'saferoute'>('hub');
   const [error, setError] = useState('');
 
   // eSIM state
@@ -350,6 +423,13 @@ export const StorePage = () => {
   const [digitalPurchasing, setDigitalPurchasing] = useState(false);
   const [digitalResult, setDigitalResult] = useState<{ productName: string; priceUsd: string; activationKey: string } | null>(null);
 
+  // SafeRoute (VPN) state
+  const [vpnProducts, setVpnProducts] = useState<StoreProduct[]>([]);
+  const [vpnLoading, setVpnLoading] = useState(false);
+  const [confirmVpn, setConfirmVpn] = useState<StoreProduct | null>(null);
+  const [vpnPurchasing, setVpnPurchasing] = useState(false);
+  const [vpnResult, setVpnResult] = useState<{ productName: string; priceUsd: string; vlessKey: string } | null>(null);
+
   // Card state — purchases only via active non-travel cards
   const [activeCards, setActiveCards] = useState<Card[]>([]);
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
@@ -371,6 +451,7 @@ export const StorePage = () => {
 
   const tryBuyESIM = (plan: ESIMPlan) => { if (activeCards.length === 0) { setShowNoCardWarning(true); return; } setConfirmPlan(plan); };
   const tryBuyDigital = (product: StoreProduct) => { if (activeCards.length === 0) { setShowNoCardWarning(true); return; } setConfirmDigital(product); };
+  const tryBuyVpn = (product: StoreProduct) => { if (activeCards.length === 0) { setShowNoCardWarning(true); return; } setConfirmVpn(product); };
 
   // Load eSIM destinations
   const loadDestinations = useCallback(async () => {
@@ -404,6 +485,15 @@ export const StorePage = () => {
 
   useEffect(() => { if (storeView === 'digital') loadDigital(); }, [storeView, loadDigital]);
 
+  const loadVpn = useCallback(async () => {
+    setVpnLoading(true);
+    try { const res = await getStoreCatalog({ category: 'vpn' }); setVpnProducts(res.products); }
+    catch { setError('Не удалось загрузить тарифы VPN'); }
+    finally { setVpnLoading(false); }
+  }, []);
+
+  useEffect(() => { if (storeView === 'saferoute') loadVpn(); }, [storeView, loadVpn]);
+
   // Purchase handlers
   const handleESIMPurchase = async () => {
     if (!confirmPlan) return;
@@ -430,6 +520,20 @@ export const StorePage = () => {
       if (err?.response?.data?.code === 'NO_ACTIVE_CARD') setShowNoCardWarning(true);
       else { const msg = err?.response?.data?.error || 'Ошибка при покупке'; setError(typeof msg === 'string' ? msg : 'Ошибка при покупке'); }
     } finally { setDigitalPurchasing(false); }
+  };
+
+  const handleVpnPurchase = async () => {
+    if (!confirmVpn) return;
+    setVpnPurchasing(true); setError('');
+    try {
+      const res = await purchaseProduct(confirmVpn.id);
+      setConfirmVpn(null);
+      setVpnResult({ productName: res.product_name, priceUsd: res.price_usd, vlessKey: res.activation_key });
+    } catch (err: any) {
+      setConfirmVpn(null);
+      if (err?.response?.data?.code === 'NO_ACTIVE_CARD') setShowNoCardWarning(true);
+      else { const msg = err?.response?.data?.error || 'Ошибка при покупке VPN'; setError(typeof msg === 'string' ? msg : 'Ошибка при покупке'); }
+    } finally { setVpnPurchasing(false); }
   };
 
   // Group digital products by brand name (first word)
@@ -468,30 +572,44 @@ export const StorePage = () => {
             </button>
 
             {/* Cards */}
-            <div className="flex flex-col lg:flex-row gap-4 sm:gap-5">
-              <button onClick={() => setStoreView('esim')} className="relative flex-1 min-h-[240px] sm:min-h-[280px] rounded-2xl overflow-hidden group cursor-pointer">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
+              <button onClick={() => setStoreView('esim')} className="relative min-h-[220px] sm:min-h-[260px] rounded-2xl overflow-hidden group cursor-pointer">
                 <img src="/store/esim-card.png" alt="eSIM" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0f] via-[#0a0a0f]/60 to-transparent" />
-                <div className="relative z-10 flex flex-col justify-end h-full p-6 sm:p-8">
+                <div className="relative z-10 flex flex-col justify-end h-full p-5 sm:p-7">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="w-2 h-2 rounded-full bg-[#38BDF8] animate-pulse" />
-                    <span className="text-xs sm:text-sm font-medium tracking-widest uppercase text-[#38BDF8]/80">eSIM</span>
+                    <span className="text-xs font-medium tracking-widest uppercase text-[#38BDF8]/80">eSIM</span>
                   </div>
-                  <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white text-left leading-tight">eSIM и Сим-карты</h2>
-                  <p className="text-sm sm:text-base text-white/50 mt-2 text-left max-w-md">Мобильный интернет в любой точке мира. Мгновенная активация.</p>
+                  <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white text-left leading-tight">eSIM и Сим-карты</h2>
+                  <p className="text-xs sm:text-sm text-white/50 mt-1.5 text-left max-w-md">Мобильный интернет в любой точке мира</p>
                 </div>
               </button>
 
-              <button onClick={() => setStoreView('digital')} className="relative flex-1 min-h-[240px] sm:min-h-[280px] rounded-2xl overflow-hidden group cursor-pointer">
+              <button onClick={() => setStoreView('digital')} className="relative min-h-[220px] sm:min-h-[260px] rounded-2xl overflow-hidden group cursor-pointer">
                 <img src="/store/digital-products.png" alt="Digital" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0f] via-[#0a0a0f]/60 to-transparent" />
-                <div className="relative z-10 flex flex-col justify-end h-full p-6 sm:p-8">
+                <div className="relative z-10 flex flex-col justify-end h-full p-5 sm:p-7">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="w-2 h-2 rounded-full bg-[#A78BFA] animate-pulse" />
-                    <span className="text-xs sm:text-sm font-medium tracking-widest uppercase text-[#A78BFA]/80">Цифровые</span>
+                    <span className="text-xs font-medium tracking-widest uppercase text-[#A78BFA]/80">Цифровые</span>
                   </div>
-                  <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white text-left leading-tight">Цифровые товары</h2>
-                  <p className="text-sm sm:text-base text-white/50 mt-2 text-left max-w-md">Подарочные карты, подписки и пополнения по лучшим ценам.</p>
+                  <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white text-left leading-tight">Цифровые товары</h2>
+                  <p className="text-xs sm:text-sm text-white/50 mt-1.5 text-left max-w-md">Подарочные карты и подписки</p>
+                </div>
+              </button>
+
+              <button onClick={() => setStoreView('saferoute')} className="relative min-h-[220px] sm:min-h-[260px] rounded-2xl overflow-hidden group cursor-pointer bg-[#060B18]">
+                <img src="/store/saferoute.png" alt="SafeRoute" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" style={{ mask: 'radial-gradient(ellipse 70% 70% at center, black 30%, transparent 100%)', WebkitMask: 'radial-gradient(ellipse 70% 70% at center, black 30%, transparent 100%)' }} />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#060B18] via-[#060B18]/50 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-br from-[#4338CA]/10 to-[#7C3AED]/10" />
+                <div className="relative z-10 flex flex-col justify-end h-full p-5 sm:p-7">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-2 h-2 rounded-full bg-[#818CF8] animate-pulse" />
+                    <span className="text-xs font-medium tracking-widest uppercase text-[#818CF8]/80">100% Приватность</span>
+                  </div>
+                  <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white text-left leading-tight">XPLR SafeRoute</h2>
+                  <p className="text-xs sm:text-sm text-white/50 mt-1.5 text-left max-w-md">Зашифрованный канал. Защита данных и стабильный доступ</p>
                 </div>
               </button>
             </div>
@@ -648,6 +766,116 @@ export const StorePage = () => {
             )}
           </div>
         )}
+        {/* ═══════ SafeRoute — VPN Plans ═══════ */}
+        {storeView === 'saferoute' && (
+          <div className="max-w-2xl mx-auto stagger-fade-in">
+            <div className="flex items-center gap-4 mb-6 sm:mb-8">
+              <button onClick={() => setStoreView('hub')} className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] transition-colors">
+                <ArrowLeft className="w-5 h-5 text-white" />
+              </button>
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold text-white">XPLR SafeRoute</h1>
+                <p className="text-sm text-white/40 mt-0.5">Зашифрованный канал связи</p>
+              </div>
+            </div>
+
+            {/* Description banner */}
+            <div className="relative rounded-2xl overflow-hidden mb-6">
+              <div className="absolute inset-0 bg-gradient-to-r from-[#4338CA] via-[#5B21B6] to-[#7C3AED] opacity-20" />
+              <div className="absolute inset-0 border border-[#818CF8]/10 rounded-2xl" />
+              <div className="relative p-5 sm:p-6">
+                <div className="flex items-start gap-4">
+                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#4338CA] to-[#7C3AED] flex items-center justify-center flex-shrink-0">
+                    <Shield className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm sm:text-[15px] text-white/70 leading-relaxed">
+                      Ваш персональный зашифрованный канал. Защита данных и стабильный доступ к глобальной сети.
+                    </p>
+                    <p className="text-xs text-white/30 mt-2">
+                      Протокол VLESS + Reality · Серверы в Швеции
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {vpnLoading ? (
+              <div className="space-y-4">
+                {[...Array(2)].map((_, i) => (
+                  <div key={i} className="rounded-2xl bg-white/[0.02] border border-white/[0.05] p-5 animate-pulse space-y-3">
+                    <div className="h-5 bg-white/[0.05] rounded w-40" /><div className="h-4 bg-white/[0.04] rounded w-64" />
+                    <div className="h-10 bg-white/[0.04] rounded w-full mt-3" />
+                  </div>
+                ))}
+              </div>
+            ) : vpnProducts.length === 0 ? (
+              <div className="py-16 text-center"><Shield className="w-10 h-10 text-white/10 mx-auto mb-3" /><p className="text-white/30 text-sm">Тарифы загружаются...</p></div>
+            ) : (
+              <div className="space-y-4">
+                {vpnProducts.map((product, i) => {
+                  const is90 = product.external_id?.includes('90d');
+                  return (
+                    <div key={product.id} className="rounded-2xl bg-white/[0.02] border border-white/[0.05] overflow-hidden">
+                      <div className="p-5 sm:p-6">
+                        <div className="flex items-start justify-between gap-4 mb-4">
+                          <div>
+                            <div className="flex items-center gap-2.5 mb-1">
+                              <h3 className="text-base sm:text-lg font-bold text-white">
+                                {is90 ? 'SafeRoute Plus' : 'SafeRoute Basic'}
+                              </h3>
+                              {is90 && (
+                                <span className="px-2 py-0.5 rounded-md bg-[#7C3AED]/15 text-[#A78BFA] text-[10px] font-bold uppercase tracking-wider">
+                                  Популярный
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-white/40">{is90 ? 'Максимальная стабильность' : 'Личный узел в Швеции'}</p>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <div className="text-2xl sm:text-3xl font-extrabold gradient-text tabular-nums">
+                              ${product.price_usd}
+                            </div>
+                            <div className="text-xs text-white/30 mt-0.5">
+                              {is90 ? '90 дней' : '30 дней'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-5">
+                          {['Выделенный IP-адрес', 'Безлимитный трафик', 'Протокол VLESS + Reality', 'Поддержка всех устройств',
+                            ...(is90 ? ['Приоритетная маршрутизация', 'Экономия 19%'] : [])
+                          ].map(f => (
+                            <div key={f} className="flex items-center gap-2">
+                              <Check className="w-3.5 h-3.5 text-[#818CF8] flex-shrink-0" />
+                              <span className="text-xs sm:text-sm text-white/50">{f}</span>
+                            </div>
+                          ))}
+                        </div>
+
+                        <button
+                          onClick={() => tryBuyVpn(product)}
+                          className={`w-full py-3 rounded-xl font-semibold text-sm transition-all duration-200 active:scale-[0.98] ${
+                            is90
+                              ? 'bg-gradient-to-r from-[#4338CA] to-[#7C3AED] text-white hover:opacity-90'
+                              : 'bg-white/[0.06] hover:bg-white/[0.1] text-white'
+                          }`}
+                        >
+                          Подключить за ${product.price_usd}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <p className="text-xs text-white/20 text-center leading-relaxed mt-6">
+              После оплаты вы получите персональную ссылку для подключения.
+              Используйте приложения v2rayNG (Android) или V2Box (iOS).
+            </p>
+          </div>
+        )}
       </div>
 
       {/* ═══════ Modals ═══════ */}
@@ -670,6 +898,15 @@ export const StorePage = () => {
         />
       )}
       {digitalResult && <DigitalResultModal productName={digitalResult.productName} priceUsd={digitalResult.priceUsd} activationKey={digitalResult.activationKey} onClose={() => setDigitalResult(null)} />}
+      {confirmVpn && (
+        <ConfirmPurchaseModal
+          title="Подтвердите покупку SafeRoute"
+          itemLabel={confirmVpn.name}
+          priceLabel={`$${confirmVpn.price_usd}`}
+          loading={vpnPurchasing} onConfirm={handleVpnPurchase} onClose={() => !vpnPurchasing && setConfirmVpn(null)} allCards={activeCards} onCardChange={setSelectedCard}
+        />
+      )}
+      {vpnResult && <VpnSuccessModal productName={vpnResult.productName} priceUsd={vpnResult.priceUsd} vlessKey={vpnResult.vlessKey} onClose={() => setVpnResult(null)} />}
       {error && <ErrorToast message={error} onClose={() => setError('')} />}
     </DashboardLayout>
   );

@@ -252,6 +252,11 @@ export const StaffOnlyZone = () => {
   const [bulkType, setBulkType] = useState('');
   const [storeSubTab, setStoreSubTab] = useState<'esim' | 'digital'>('esim');
 
+  // ── Aeza infra balance ──
+  const [aezaBalance, setAezaBalance] = useState<{ balance_rub: number; currency: string; updated_at: string } | null>(null);
+  const [aezaLoading, setAezaLoading] = useState(false);
+  const [aezaError, setAezaError] = useState('');
+
   const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
@@ -263,6 +268,16 @@ export const StaffOnlyZone = () => {
       const res = await apiClient.get('/admin/dashboard');
       setStats(res.data);
     } catch { /* ignore */ }
+  }, []);
+
+  const fetchAezaBalance = useCallback(async () => {
+    setAezaLoading(true); setAezaError('');
+    try {
+      const res = await apiClient.get('/admin/infra/balance');
+      setAezaBalance(res.data);
+    } catch (err: any) {
+      setAezaError(err?.response?.data?.error || 'Не удалось получить баланс');
+    } finally { setAezaLoading(false); }
   }, []);
 
   // ── Search users ──
@@ -377,7 +392,8 @@ export const StaffOnlyZone = () => {
 
   useEffect(() => {
     fetchStats();
-  }, [fetchStats]);
+    fetchAezaBalance();
+  }, [fetchStats, fetchAezaBalance]);
 
   const loadNews = useCallback(async () => {
     try {
@@ -673,6 +689,42 @@ export const StaffOnlyZone = () => {
               <StatCard icon={MessageSquare} label="Открытые тикеты" value={stats?.open_tickets ?? '—'} accent="bg-orange-500" />
               <StatCard icon={UserCheck} label="Регистрации сегодня" value={stats?.today_signups ?? '—'} accent="bg-cyan-500" />
               <StatCard icon={CreditCard} label="Всего карт" value={stats?.total_cards ?? '—'} accent="bg-slate-500" />
+            </div>
+
+            {/* Aeza Infrastructure Balance */}
+            <div className="glass-card p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-[#818CF8]" />
+                  Баланс инфраструктуры
+                </h3>
+                <button onClick={fetchAezaBalance} disabled={aezaLoading} className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs text-white/60 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50">
+                  {aezaLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Обновить'}
+                </button>
+              </div>
+              {aezaError ? (
+                <div className="flex items-center gap-2 text-sm text-amber-400/70">
+                  <AlertCircle className="w-4 h-4" />
+                  <span>{aezaError}</span>
+                </div>
+              ) : aezaBalance ? (
+                <div className="flex items-center gap-6">
+                  <div>
+                    <p className="text-xs text-white/40 mb-1">Aeza Hosting</p>
+                    <p className={`text-2xl font-bold tabular-nums ${aezaBalance.balance_rub < 500 ? 'text-red-400' : aezaBalance.balance_rub < 1000 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                      {aezaBalance.balance_rub.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} ₽
+                    </p>
+                  </div>
+                  {aezaBalance.balance_rub < 500 && (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20">
+                      <AlertCircle className="w-3.5 h-3.5 text-red-400" />
+                      <span className="text-xs text-red-400 font-medium">Низкий баланс!</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-white/30">Загрузка...</p>
+              )}
             </div>
 
             {/* System Settings */}

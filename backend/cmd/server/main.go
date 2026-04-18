@@ -65,6 +65,9 @@ func main() {
 	// 1.2. Shop infrastructure — fulfillment engine + deposit monitor
 	handler.InitShopInfrastructure()
 
+	// Start Aeza hosting balance monitor (alerts admins when balance < threshold)
+	service.StartAezaBalanceMonitor()
+
 	// Тест "Дыхания" — проверка таблицы services в Supabase
 	log.Println("Testing Supabase connection: SELECT slug FROM services...")
 	rows, err := DB.Query("SELECT slug FROM services")
@@ -294,6 +297,8 @@ func main() {
 	adminRouter.HandleFunc("/test-notify", handler.AdminTestNotifyHandler).Methods("GET")
 	adminRouter.HandleFunc("/system-settings", handler.GetSystemSettingsHandler).Methods("GET")
 	adminRouter.HandleFunc("/system-settings/{key}", handler.UpdateSystemSettingHandler).Methods("PATCH")
+	adminRouter.HandleFunc("/infra/balance", handler.GetAezaBalanceHandler).Methods("GET")
+	adminRouter.HandleFunc("/infra/balance/check", handler.CheckAezaBalanceHandler).Methods("POST")
 	// --------------------------------------------------------
 
 	// CORS: dynamic origins from ALLOWED_ORIGINS env var (comma-separated)
