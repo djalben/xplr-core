@@ -168,21 +168,33 @@ func (v *VlessProvider) CreateOrder(externalProductID string) (*shop.OrderResult
 		durationDays = 365
 	}
 
+	// Traffic quota per plan (bytes): protect against abuse
+	trafficQuotas := map[int]int64{
+		7:   15 * 1024 * 1024 * 1024,  // 15 GB
+		30:  60 * 1024 * 1024 * 1024,  // 60 GB
+		180: 300 * 1024 * 1024 * 1024, // 300 GB
+		365: 600 * 1024 * 1024 * 1024, // 600 GB
+	}
+	totalBytes := trafficQuotas[durationDays]
+	if totalBytes == 0 {
+		totalBytes = 60 * 1024 * 1024 * 1024 // fallback 60 GB
+	}
+
 	// Generate unique client UUID and email tag
 	clientUUID := uuid.New().String()
 	clientEmail := fmt.Sprintf("xplr-%s", clientUUID[:8])
 	expiryMs := time.Now().Add(time.Duration(durationDays) * 24 * time.Hour).UnixMilli()
 
-	// Add client to 3X-UI inbound
-	if err := v.addClient(clientUUID, clientEmail, expiryMs); err != nil {
+	// Add client to 3X-UI inbound (limitIp=1, traffic quota enforced)
+	if err := v.addClient(clientUUID, clientEmail, expiryMs, totalBytes); err != nil {
 		return nil, fmt.Errorf("failed to create VPN key: %w", err)
 	}
 
 	// Build the vless:// connection link
 	connLink := v.buildVlessLink(clientUUID, clientEmail)
 
-	log.Printf("[VLESS] ✅ Created key: email=%s uuid=%s...%s expires=%dd",
-		clientEmail, clientUUID[:8], clientUUID[len(clientUUID)-4:], durationDays)
+	log.Printf("[VLESS] ✅ Created key: email=%s uuid=%s...%s expires=%dd limitIp=1 quota=%dGB",
+		clientEmail, clientUUID[:8], clientUUID[len(clientUUID)-4:], durationDays, totalBytes/(1024*1024*1024))
 
 	return &shop.OrderResult{
 		ProviderRef:   clientEmail,
@@ -255,15 +267,17 @@ func (v *VlessProvider) login() error {
 }
 
 // addClient adds a new VLESS client to the configured inbound.
-func (v *VlessProvider) addClient(clientUUID, email string, expiryMs int64) error {
+func (v *VlessProvider) addClient(clientUUID, email string, expiryMs int64, totalBytes int64) error {
 	// Build the client settings JSON
+	// limitIp=1 → strict 1 IP per key policy (revenue protection)
+	// total    → traffic quota in bytes (anti-abuse)
 	clientSettings := []map[string]any{
 		{
 			"id":         clientUUID,
 			"flow":       v.cfg.Flow,
 			"email":      email,
-			"limitIp":    2,
-			"totalGB":    0, // unlimited
+			"limitIp":    1,
+			"total":      totalBytes,
 			"expiryTime": expiryMs,
 			"enable":     true,
 			"tgId":       "",
