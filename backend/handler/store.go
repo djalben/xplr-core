@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -330,34 +331,44 @@ func StorePurchaseHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 4. Payment via Card (direct wallet deduction FORBIDDEN)
-	details := fmt.Sprintf("Покупка товара ID_%d (%s) — $%s", product.ID, product.Name, product.PriceUSD.StringFixed(2))
-	cardID, cardLast4, payErr := repository.PurchaseViaCard(userID, product.PriceUSD, details)
-	if payErr != nil {
-		errMsg := payErr.Error()
-		if errMsg == "NO_ACTIVE_CARD" {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusPaymentRequired)
-			json.NewEncoder(w).Encode(map[string]string{
-				"error": "Для покупки товаров необходимо иметь активную карту. Пожалуйста, приобретите карту в разделе «Карты» и пополните её с кошелька XPLR.",
-				"code":  "NO_ACTIVE_CARD",
-			})
+	// DEV_MODE: bypass payment for testing
+	var cardID int
+	var cardLast4 string
+	if os.Getenv("DEV_MODE") == "true" {
+		log.Printf("[STORE-PURCHASE] 🟢 TEST MODE: Покупка прошла по зеленому коридору (user=%d, product=%d, price=$%s)",
+			userID, product.ID, product.PriceUSD.StringFixed(2))
+		cardID = 0
+		cardLast4 = "TEST"
+	} else {
+		details := fmt.Sprintf("Покупка товара ID_%d (%s) — $%s", product.ID, product.Name, product.PriceUSD.StringFixed(2))
+		var payErr error
+		cardID, cardLast4, payErr = repository.PurchaseViaCard(userID, product.PriceUSD, details)
+		if payErr != nil {
+			errMsg := payErr.Error()
+			if errMsg == "NO_ACTIVE_CARD" {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusPaymentRequired)
+				json.NewEncoder(w).Encode(map[string]string{
+					"error": "Для покупки товаров необходимо иметь активную карту. Пожалуйста, приобретите карту в разделе «Карты» и пополните её с кошелька XPLR.",
+					"code":  "NO_ACTIVE_CARD",
+				})
+				return
+			}
+			if len(errMsg) > 18 && errMsg[:18] == "INSUFFICIENT_FUNDS" {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusPaymentRequired)
+				json.NewEncoder(w).Encode(map[string]string{
+					"error": "Недостаточно средств в системе XPLR для проведения операции",
+					"code":  "INSUFFICIENT_FUNDS",
+				})
+				return
+			}
+			log.Printf("[STORE-PURCHASE] ❌ Payment failed for user %d: %v", userID, payErr)
+			http.Error(w, "Payment failed: "+errMsg, http.StatusInternalServerError)
 			return
 		}
-		if len(errMsg) > 18 && errMsg[:18] == "INSUFFICIENT_FUNDS" {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusPaymentRequired)
-			json.NewEncoder(w).Encode(map[string]string{
-				"error": "Недостаточно средств в системе XPLR для проведения операции",
-				"code":  "INSUFFICIENT_FUNDS",
-			})
-			return
-		}
-		log.Printf("[STORE-PURCHASE] ❌ Payment failed for user %d: %v", userID, payErr)
-		http.Error(w, "Payment failed: "+errMsg, http.StatusInternalServerError)
-		return
+		log.Printf("[STORE-PURCHASE] Покупка товара ID_%d через Карту ID_%d (*%s)", product.ID, cardID, cardLast4)
 	}
-
-	log.Printf("[STORE-PURCHASE] Покупка товара ID_%d через Карту ID_%d (*%s)", product.ID, cardID, cardLast4)
 
 	// 5. Record order
 	var orderID int
