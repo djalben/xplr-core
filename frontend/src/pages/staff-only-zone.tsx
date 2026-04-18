@@ -253,7 +253,7 @@ export const StaffOnlyZone = () => {
   const [storeSubTab, setStoreSubTab] = useState<'esim' | 'digital' | 'vpn'>('esim');
 
   // ── Aeza infra balance ──
-  const [aezaBalance, setAezaBalance] = useState<{ balance_rub: number; currency: string; updated_at: string } | null>(null);
+  const [aezaBalance, setAezaBalance] = useState<{ balance: number; currency: string; updated_at: string } | null>(null);
   const [aezaLoading, setAezaLoading] = useState(false);
   const [aezaError, setAezaError] = useState('');
 
@@ -711,11 +711,11 @@ export const StaffOnlyZone = () => {
                 <div className="flex items-center gap-6">
                   <div>
                     <p className="text-xs text-white/40 mb-1">Aeza Hosting</p>
-                    <p className={`text-2xl font-bold tabular-nums ${aezaBalance.balance_rub < 500 ? 'text-red-400' : aezaBalance.balance_rub < 1000 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                      {aezaBalance.balance_rub.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} ₽
+                    <p className={`text-2xl font-bold tabular-nums ${aezaBalance.balance < 2 ? 'text-red-400' : aezaBalance.balance < 5 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                      {aezaBalance.balance.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} €
                     </p>
                   </div>
-                  {aezaBalance.balance_rub < 500 && (
+                  {aezaBalance.balance < 2 && (
                     <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20">
                       <AlertCircle className="w-3.5 h-3.5 text-red-400" />
                       <span className="text-xs text-red-400 font-medium">Низкий баланс!</span>

@@ -599,17 +599,16 @@ export const StorePage = () => {
                 </div>
               </button>
 
-              <button onClick={() => setStoreView('saferoute')} className="relative min-h-[220px] sm:min-h-[260px] rounded-2xl overflow-hidden group cursor-pointer bg-[#060B18]">
-                <img src="/store/saferoute.png" alt="SafeRoute" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" style={{ mask: 'radial-gradient(ellipse 70% 70% at center, black 30%, transparent 100%)', WebkitMask: 'radial-gradient(ellipse 70% 70% at center, black 30%, transparent 100%)' }} />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#060B18] via-[#060B18]/50 to-transparent" />
+              <button onClick={() => setStoreView('saferoute')} className="relative min-h-[220px] sm:min-h-[260px] rounded-2xl overflow-hidden group cursor-pointer" style={{ backgroundColor: '#000000' }}>
+                <img src="/store/saferoute.png" alt="Безопасный доступ" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" style={{ maskImage: 'radial-gradient(circle, black 35%, transparent 85%)', WebkitMaskImage: 'radial-gradient(circle, black 35%, transparent 85%)' }} />
                 <div className="absolute inset-0 bg-gradient-to-br from-[#4338CA]/10 to-[#7C3AED]/10" />
                 <div className="relative z-10 flex flex-col justify-end h-full p-5 sm:p-7">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="w-2 h-2 rounded-full bg-[#818CF8] animate-pulse" />
-                    <span className="text-xs font-medium tracking-widest uppercase text-[#818CF8]/80">100% Приватность</span>
+                    <span className="text-xs font-medium tracking-widest uppercase text-[#818CF8]/80">100% ПРИВАТНОСТЬ</span>
                   </div>
-                  <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white text-left leading-tight">XPLR SafeRoute</h2>
-                  <p className="text-xs sm:text-sm text-white/50 mt-1.5 text-left max-w-md">Зашифрованный канал. Защита данных и стабильный доступ</p>
+                  <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white text-left leading-tight">Безопасный доступ</h2>
+                  <p className="text-xs sm:text-sm text-white/50 mt-1.5 text-left max-w-md">Зашифрованный канал для защиты данных и стабильного интернета</p>
                 </div>
               </button>
             </div>
@@ -774,7 +773,7 @@ export const StorePage = () => {
                 <ArrowLeft className="w-5 h-5 text-white" />
               </button>
               <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-white">XPLR SafeRoute</h1>
+                <h1 className="text-xl sm:text-2xl font-bold text-white">Безопасный доступ</h1>
                 <p className="text-sm text-white/40 mt-0.5">Зашифрованный канал связи</p>
               </div>
             </div>
@@ -822,7 +821,7 @@ export const StorePage = () => {
                           <div>
                             <div className="flex items-center gap-2.5 mb-1">
                               <h3 className="text-base sm:text-lg font-bold text-white">
-                                {is90 ? 'SafeRoute Plus' : 'SafeRoute Basic'}
+                                {is90 ? 'Безопасный доступ Plus' : 'Безопасный доступ Basic'}
                               </h3>
                               {is90 && (
                                 <span className="px-2 py-0.5 rounded-md bg-[#7C3AED]/15 text-[#A78BFA] text-[10px] font-bold uppercase tracking-wider">
@@ -900,7 +899,7 @@ export const StorePage = () => {
       {digitalResult && <DigitalResultModal productName={digitalResult.productName} priceUsd={digitalResult.priceUsd} activationKey={digitalResult.activationKey} onClose={() => setDigitalResult(null)} />}
       {confirmVpn && (
         <ConfirmPurchaseModal
-          title="Подтвердите покупку SafeRoute"
+          title="Подтвердите покупку — Безопасный доступ"
           itemLabel={confirmVpn.name}
           priceLabel={`$${confirmVpn.price_usd}`}
           loading={vpnPurchasing} onConfirm={handleVpnPurchase} onClose={() => !vpnPurchasing && setConfirmVpn(null)} allCards={activeCards} onCardChange={setSelectedCard}
