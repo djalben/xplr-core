@@ -56,16 +56,29 @@ func NewVlessProvider() *VlessProvider {
 		return nil
 	}
 
+	username := os.Getenv("XPANEL_USERNAME")
+	password := os.Getenv("XPANEL_PASSWORD")
+	publicKey := os.Getenv("XPANEL_REALITY_PUBLIC_KEY")
+	shortID := os.Getenv("XPANEL_REALITY_SHORT_ID")
+
+	// Validate critical env vars
+	if username == "" || password == "" {
+		log.Println("🚨🚨🚨 [CRITICAL] XPANEL_USERNAME or XPANEL_PASSWORD is EMPTY — VPN purchases will FAIL!")
+	}
+	if publicKey == "" || shortID == "" {
+		log.Println("🚨 [CRITICAL] XPANEL_REALITY_PUBLIC_KEY or XPANEL_REALITY_SHORT_ID is EMPTY — VPN links will be BROKEN!")
+	}
+
 	cfg := Config{
 		PanelURL:   strings.TrimRight(panelURL, "/"),
-		Username:   os.Getenv("XPANEL_USERNAME"),
-		Password:   os.Getenv("XPANEL_PASSWORD"),
+		Username:   username,
+		Password:   password,
 		InboundID:  1, // default; override via XPANEL_INBOUND_ID
 		ServerIP:   getEnvOr("XPANEL_SERVER_IP", "109.120.157.144"),
 		ServerPort: getEnvOr("XPANEL_SERVER_PORT", "443"),
 		SNI:        getEnvOr("XPANEL_SNI", "google.com"),
-		PublicKey:  os.Getenv("XPANEL_REALITY_PUBLIC_KEY"),
-		ShortID:    os.Getenv("XPANEL_REALITY_SHORT_ID"),
+		PublicKey:  publicKey,
+		ShortID:    shortID,
 		Flow:       getEnvOr("XPANEL_FLOW", "xtls-rprx-vision"),
 	}
 
@@ -79,19 +92,16 @@ func NewVlessProvider() *VlessProvider {
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 	client := &http.Client{
-		Timeout:   15 * time.Second,
+		Timeout:   8 * time.Second, // Must stay under Vercel's 10s function timeout
 		Transport: transport,
 		Jar:       jar,
 	}
 
 	p := &VlessProvider{cfg: cfg, client: client}
 
-	// Authenticate on startup
-	if err := p.login(); err != nil {
-		log.Printf("[VLESS] ❌ Initial login failed: %v (will retry on demand)", err)
-	} else {
-		log.Printf("[VLESS] ✅ Authenticated to 3X-UI panel at %s", cfg.PanelURL)
-	}
+	// Lazy login: do NOT block initialization — doAPIRequest will auto-login on first call.
+	// This prevents Vercel cold-start timeouts caused by slow panel connections.
+	log.Printf("[VLESS] ✅ Provider created (panel=%s, lazy-auth, timeout=8s)", cfg.PanelURL)
 
 	return p
 }
@@ -347,8 +357,10 @@ func (v *VlessProvider) getClientTraffic(email string) (*clientTrafficStats, err
 }
 
 // doAPIRequest makes an authenticated request to the 3X-UI API.
-// Automatically re-authenticates on 401.
+// Automatically authenticates on first call (lazy login) and re-authenticates on 401.
 func (v *VlessProvider) doAPIRequest(method, path string, formData url.Values) (*http.Response, error) {
+	start := time.Now()
+
 	makeReq := func() (*http.Response, error) {
 		var body io.Reader
 		contentType := "application/json"
@@ -367,17 +379,33 @@ func (v *VlessProvider) doAPIRequest(method, path string, formData url.Values) (
 
 	resp, err := makeReq()
 	if err != nil {
-		return nil, err
+		elapsed := time.Since(start)
+		log.Printf("[VLESS-API] ❌ %s %s failed after %dms: %v", method, path, elapsed.Milliseconds(), err)
+		// If first request fails (no session yet), try login then retry
+		if loginErr := v.login(); loginErr != nil {
+			return nil, fmt.Errorf("API call failed and re-login also failed: %w (original: %v)", loginErr, err)
+		}
+		resp, err = makeReq()
+		if err != nil {
+			return nil, fmt.Errorf("API call failed after re-login: %w", err)
+		}
 	}
 
 	// If unauthorized, re-login and retry once
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
 		resp.Body.Close()
+		log.Printf("[VLESS-API] 🔄 Got %d on %s %s — re-authenticating...", resp.StatusCode, method, path)
 		if err := v.login(); err != nil {
 			return nil, fmt.Errorf("re-login failed: %w", err)
 		}
-		return makeReq()
+		resp, err = makeReq()
+		if err != nil {
+			return nil, err
+		}
 	}
+
+	elapsed := time.Since(start)
+	log.Printf("[VLESS-API] %s %s → %d (%dms)", method, path, resp.StatusCode, elapsed.Milliseconds())
 
 	return resp, nil
 }

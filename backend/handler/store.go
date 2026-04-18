@@ -132,7 +132,15 @@ func calculatePrice(cost, markupPct decimal.Decimal) decimal.Decimal {
 
 // applyMarkup recalculates PriceUSD and OldPrice from CostPrice + MarkupPercent.
 // If the product has no per-product markup (0 or missing), uses global_markup_percent from settings.
+// VPN products are EXCLUDED — their price_usd is the authoritative retail price (set directly in seed).
 func applyMarkup(p *StoreProduct) {
+	// VPN products have fixed retail prices — never recalculate from cost+markup
+	if p.ProductType == "vpn" || p.Provider == "vless" {
+		if p.PriceUSD.IsPositive() {
+			p.OldPrice = calculatePrice(p.PriceUSD, decimal.NewFromInt(20))
+		}
+		return
+	}
 	if p.CostPrice.IsPositive() {
 		markup := p.MarkupPercent
 		if !markup.IsPositive() {
@@ -883,9 +891,11 @@ func AdminStoreProductsHandler(w http.ResponseWriter, r *http.Request) {
 			&p.CostPrice, &p.MarkupPercent, &p.RetailPrice, &p.InStock, &p.ExternalID, &p.ImageURL, &p.CountryCode); err != nil {
 			continue
 		}
-		// Recalculate retail price from cost + markup
-		if p.CostPrice.IsPositive() && p.MarkupPercent.IsPositive() {
-			p.RetailPrice = calculatePrice(p.CostPrice, p.MarkupPercent)
+		// VPN products: price_usd IS the retail price — never recalculate
+		if p.ProductType != "vpn" && p.Provider != "vless" {
+			if p.CostPrice.IsPositive() && p.MarkupPercent.IsPositive() {
+				p.RetailPrice = calculatePrice(p.CostPrice, p.MarkupPercent)
+			}
 		}
 		if p.RetailPrice.IsPositive() {
 			p.OldPrice = calculatePrice(p.RetailPrice, decimal.NewFromInt(20))
