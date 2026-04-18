@@ -246,11 +246,11 @@ export const StaffOnlyZone = () => {
   const editNewsFileRef = useRef<HTMLInputElement>(null);
 
   // ── Store pricing state ──
-  const [storeProducts, setStoreProducts] = useState<{ id: number; name: string; product_type: string; provider: string; cost_price: string; markup_percent: string; retail_price: string; old_price: string; in_stock: boolean; external_id: string; image_url: string }[]>([]);
+  const [storeProducts, setStoreProducts] = useState<{ id: number; name: string; product_type: string; provider: string; cost_price: string; markup_percent: string; retail_price: string; old_price: string; in_stock: boolean; external_id: string; image_url: string; country_code: string }[]>([]);
   const [editingProduct, setEditingProduct] = useState<{ id: number; cost_price: string; markup_percent: string; image_url: string } | null>(null);
   const [bulkDelta, setBulkDelta] = useState('10');
   const [bulkType, setBulkType] = useState('');
-  const [storeSubTab, setStoreSubTab] = useState<'esim' | 'digital'>('esim');
+  const [storeSubTab, setStoreSubTab] = useState<'esim' | 'digital' | 'vpn'>('esim');
 
   // ── Aeza infra balance ──
   const [aezaBalance, setAezaBalance] = useState<{ balance_rub: number; currency: string; updated_at: string } | null>(null);
@@ -1693,7 +1693,7 @@ export const StaffOnlyZone = () => {
             {/* Header: sub-tabs + bulk markup */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex gap-2">
-                {([['esim', 'eSIM'], ['digital', 'Цифровые']] as const).map(([key, label]) => (
+                {([['esim', 'eSIM'], ['digital', 'Цифровые'], ['vpn', 'VPN']] as const).map(([key, label]) => (
                   <button key={key} onClick={() => { setStoreSubTab(key); setEditingProduct(null); }}
                     className={`px-4 py-2 rounded-xl text-xs font-medium border transition-all ${
                       storeSubTab === key
@@ -1733,13 +1733,35 @@ export const StaffOnlyZone = () => {
                       <tr key={p.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                         <td className="px-4 py-3 text-slate-500 font-mono text-xs">{p.id}</td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            {p.image_url ? (
-                              <img src={p.image_url} alt="" className="w-6 h-6 rounded object-contain shrink-0 bg-white/5" />
+                          <div className="flex items-center gap-2.5">
+                            {p.product_type === 'esim' && p.country_code ? (
+                              p.country_code === 'GLOBAL' || p.country_code === 'EU' ? (
+                                <div className="w-7 h-5 rounded-[3px] bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-white/10 flex items-center justify-center shrink-0">
+                                  <span className="text-[9px] font-bold text-blue-300">{p.country_code}</span>
+                                </div>
+                              ) : (
+                                <img
+                                  src={`https://flagcdn.com/w80/${p.country_code.toLowerCase()}.png`}
+                                  srcSet={`https://flagcdn.com/w160/${p.country_code.toLowerCase()}.png 2x`}
+                                  alt={p.country_code}
+                                  className="w-7 h-5 rounded-[3px] object-cover shadow-sm shrink-0"
+                                  loading="lazy"
+                                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                />
+                              )
+                            ) : p.product_type === 'vpn' ? (
+                              <div className="w-7 h-7 rounded bg-gradient-to-br from-indigo-600/30 to-purple-600/30 border border-indigo-500/20 flex items-center justify-center shrink-0">
+                                <Shield className="w-3.5 h-3.5 text-indigo-400" />
+                              </div>
+                            ) : p.image_url ? (
+                              <img src={p.image_url} alt="" className="w-7 h-7 rounded object-contain shrink-0 bg-white/5 p-0.5" />
                             ) : (
-                              <div className="w-6 h-6 rounded bg-white/5 shrink-0" />
+                              <div className="w-7 h-7 rounded bg-white/5 shrink-0" />
                             )}
-                            <span className="text-white text-xs font-medium truncate max-w-[160px]" title={p.name}>{p.name}</span>
+                            <div className="min-w-0">
+                              <span className="text-white text-xs font-medium truncate block max-w-[180px]" title={p.name}>{p.name}</span>
+                              <span className="text-[10px] text-slate-500 font-mono">{p.external_id}</span>
+                            </div>
                           </div>
                         </td>
                         <td className="px-4 py-3">

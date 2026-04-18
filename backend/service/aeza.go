@@ -26,8 +26,8 @@ type AezaBalance struct {
 }
 
 var (
-	aezaLastAlert   time.Time
-	aezaAlertMu     sync.Mutex
+	aezaLastAlert     time.Time
+	aezaAlertMu       sync.Mutex
 	aezaAlertCooldown = 6 * time.Hour
 )
 
@@ -39,7 +39,7 @@ func GetAezaBalance() (*AezaBalance, error) {
 		return nil, fmt.Errorf("AEZA_API_KEY not configured")
 	}
 
-	req, err := http.NewRequest("GET", "https://my.aeza.net/api/balance", nil)
+	req, err := http.NewRequest("GET", "https://my.aeza.net/api/account", nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -59,23 +59,18 @@ func GetAezaBalance() (*AezaBalance, error) {
 		return nil, fmt.Errorf("aeza API returned %d: %s", resp.StatusCode, string(body))
 	}
 
-	// Aeza API response format: {"data": {"balance": "1234.56"}}
+	// Aeza API response: {"data": {"balance": 1234.56, "email": "...", ...}}
 	var result struct {
 		Data struct {
-			Balance string `json:"balance"`
+			Balance float64 `json:"balance"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("failed to parse aeza response: %w (body: %s)", err, string(body))
 	}
 
-	balanceVal, err := strconv.ParseFloat(result.Data.Balance, 64)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse balance value %q: %w", result.Data.Balance, err)
-	}
-
 	return &AezaBalance{
-		BalanceRUB: balanceVal,
+		BalanceRUB: result.Data.Balance,
 		Currency:   "RUB",
 		UpdatedAt:  time.Now().Format(time.RFC3339),
 	}, nil
@@ -110,13 +105,13 @@ func CheckAezaBalanceAndNotify() {
 		aezaAlertMu.Unlock()
 
 		if canAlert {
-			subject := "⚠️ Низкий баланс Aeza"
+			subject := "⚠️ Баланс Aeza на исходе!"
 			msg := fmt.Sprintf(
-				"<b>⚠️ Низкий баланс инфраструктуры</b>\n\n"+
-					"Баланс Aeza: <b>%.2f ₽</b>\n"+
-					"Порог: <b>%.0f ₽</b>\n\n"+
-					"Необходимо пополнить баланс хостинга для продолжения работы VPN-серверов.\n\n"+
-					"<a href=\"https://my.aeza.net/billing\">Перейти в Aeza</a>",
+				"<b>⚠️ Внимание! Баланс Aeza (XPLR Infrastructure) на исходе: %.2f руб.</b>\n\n"+
+					"Пожалуйста, пополните счет, чтобы избежать отключения серверов.\n"+
+					"Срочно пополните счет для работы SafeRoute.\n\n"+
+					"Порог: <b>%.0f ₽</b>\n"+
+					"<a href=\"https://my.aeza.net/billing\">Перейти в Aeza →</a>",
 				balance.BalanceRUB, threshold)
 
 			NotifyAdmins(subject, msg)

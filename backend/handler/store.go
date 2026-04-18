@@ -812,6 +812,7 @@ type AdminStoreProduct struct {
 	InStock       bool            `json:"in_stock"`
 	ExternalID    string          `json:"external_id"`
 	ImageURL      string          `json:"image_url"`
+	CountryCode   string          `json:"country_code"`
 }
 
 // GET /api/v1/admin/store/products — list all products with pricing
@@ -819,7 +820,8 @@ func AdminStoreProductsHandler(w http.ResponseWriter, r *http.Request) {
 	rows, err := GlobalDB.Query(`
 		SELECT id, name, product_type, provider,
 			COALESCE(cost_price, 0), COALESCE(markup_percent, 20),
-			price_usd, in_stock, COALESCE(external_id, ''), COALESCE(image_url, '')
+			price_usd, in_stock, COALESCE(external_id, ''), COALESCE(image_url, ''),
+			COALESCE(country_code, '')
 		FROM store_products ORDER BY product_type, sort_order, id`)
 	if err != nil {
 		http.Error(w, "Failed to fetch products", http.StatusInternalServerError)
@@ -831,7 +833,7 @@ func AdminStoreProductsHandler(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var p AdminStoreProduct
 		if err := rows.Scan(&p.ID, &p.Name, &p.ProductType, &p.Provider,
-			&p.CostPrice, &p.MarkupPercent, &p.RetailPrice, &p.InStock, &p.ExternalID, &p.ImageURL); err != nil {
+			&p.CostPrice, &p.MarkupPercent, &p.RetailPrice, &p.InStock, &p.ExternalID, &p.ImageURL, &p.CountryCode); err != nil {
 			continue
 		}
 		// Recalculate retail price from cost + markup
