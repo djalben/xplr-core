@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { X, AlertCircle } from 'lucide-react';
 import { useRates } from '../store/rates-context';
 import { ModalPortal } from './modal-portal';
-import { topUpWallet } from '../api/wallet';
-import { getSBPStatus } from '../api/system-settings';
+import { topUpWallet } from '../services/wallet';
+import { getSBPStatus } from '../services/system-settings';
 
 // Inline SVG bank logos
 const SbpLogo = () => (

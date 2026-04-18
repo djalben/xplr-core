@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useRates } from '../store/rates-context';
 import { DashboardLayout } from '../components/dashboard-layout';
 import { BackButton } from '../components/back-button';
-import apiClient from '../api/axios';
+import apiClient from '../services/axios';
 import { DollarSign, Save, RefreshCw, Check, AlertTriangle } from 'lucide-react';
 
 export const AdminRatesPage = () => {

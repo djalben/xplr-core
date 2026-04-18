@@ -9,7 +9,7 @@ import (
 
 	_ "github.com/lib/pq"
 
-	"github.com/djalben/xplr-core/backend/handlers"
+	h "github.com/djalben/xplr-core/backend/handler"
 	"github.com/djalben/xplr-core/backend/repository"
 )
 
@@ -41,7 +41,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Wire DB
-	handlers.GlobalDB = db
+	h.GlobalDB = db
 	repository.GlobalDB = db
 
 	// Run sync

@@ -1,0 +1,246 @@
+package handler
+
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+
+	"github.com/djalben/xplr-core/backend/middleware"
+	"github.com/djalben/xplr-core/backend/domain"
+	"github.com/djalben/xplr-core/backend/repository"
+	"github.com/djalben/xplr-core/backend/service"
+	"github.com/shopspring/decimal"
+)
+
+// GetUserProfileHandler - Возвращает профиль пользователя: email, user_id, balance
+func GetUserProfileHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	user, err := repository.GetUserByID(userID)
+	if err != nil {
+		log.Printf("Error fetching user %d profile: %v", userID, err)
+		http.Error(w, "Failed to fetch user profile", http.StatusInternalServerError)
+		return
+	}
+
+	response := struct {
+		UserID  int    `json:"user_id"`
+		Email   string `json:"email"`
+		Balance string `json:"balance"`
+	}{
+		UserID:  user.ID,
+		Email:   user.Email,
+		Balance: user.BalanceRub.String(),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// TopUpBalanceHandler - POST /api/v1/user/topup
+// Accepts optional { "amount_rub": 5000 }. If omitted, defaults to $100 equivalent.
+// Converts RUB to USD using the current final_rate from exchange_rates table.
+func TopUpBalanceHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		AmountRub *decimal.Decimal `json:"amount_rub"`
+		Wallet    string           `json:"wallet"` // "arbitrage" or "personal"
+	}
+	json.NewDecoder(r.Body).Decode(&req) // best-effort; if empty body, defaults apply
+	if req.Wallet == "" {
+		req.Wallet = "arbitrage"
+	}
+
+	// Get current RUB/USD exchange rate
+	rate, err := repository.GetFinalRate("RUB", "USD")
+	if err != nil || rate.IsZero() {
+		// Fallback: no rate available, use legacy flat $100
+		log.Printf("TopUp: exchange rate not available, using legacy flat $100: %v", err)
+		amount := decimal.NewFromInt(100)
+		if err := repository.ProcessDeposit(userID, amount); err != nil {
+			http.Error(w, "Failed to top up balance", http.StatusInternalServerError)
+			return
+		}
+		log.Printf("[EVENT] User %d performed topup (flat $%s). Triggering notifications...", userID, amount.StringFixed(2))
+		go service.NotifyUser(userID, "Пополнение баланса",
+			fmt.Sprintf("💰 <b>Баланс пополнен</b>\n\n"+
+				"Сумма: <b>$%s</b>\n\n"+
+				"<a href=\"https://xplr.pro/wallet\">Открыть кошелёк</a>",
+				amount.StringFixed(2)))
+		user, _ := repository.GetUserByID(userID)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"message":     "Balance topped up successfully (flat rate)",
+			"amount_usd":  amount.String(),
+			"new_balance": user.BalanceRub.String(),
+		})
+		return
+	}
+
+	var amountUsd decimal.Decimal
+	var amountRub decimal.Decimal
+
+	if req.AmountRub != nil && req.AmountRub.GreaterThan(decimal.Zero) {
+		// User specified RUB amount → convert to USD
+		amountRub = *req.AmountRub
+		amountUsd = amountRub.Div(rate).Round(2)
+	} else {
+		// Default: $100
+		amountUsd = decimal.NewFromInt(100)
+		amountRub = amountUsd.Mul(rate).Round(2)
+	}
+
+	if amountUsd.LessThanOrEqual(decimal.Zero) {
+		http.Error(w, "Amount must be positive", http.StatusBadRequest)
+		return
+	}
+
+	if err := repository.ProcessDeposit(userID, amountUsd); err != nil {
+		log.Printf("Error topping up user %d: %v", userID, err)
+		http.Error(w, "Failed to top up balance", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("[EVENT] User %d performed topup (amount=%s ₽ → $%s). Triggering notifications...", userID, amountRub.StringFixed(2), amountUsd.StringFixed(2))
+	go service.NotifyUser(userID, "Пополнение баланса",
+		fmt.Sprintf("💰 <b>Баланс пополнен</b>\n\n"+
+			"Сумма: <b>%s ₽</b> → <b>$%s</b>\n\n"+
+			"<a href=\"https://xplr.pro/wallet\">Открыть кошелёк</a>",
+			amountRub.StringFixed(2), amountUsd.StringFixed(2)))
+
+	// Credit the specific wallet
+	walletCol := "balance_arbitrage"
+	if req.Wallet == "personal" {
+		walletCol = "balance_personal"
+	}
+	if repository.GlobalDB != nil {
+		_, _ = repository.GlobalDB.Exec(
+			"UPDATE users SET "+walletCol+" = COALESCE("+walletCol+", 0) + $1 WHERE id = $2",
+			amountUsd, userID,
+		)
+	}
+
+	user, err := repository.GetUserByID(userID)
+	if err != nil {
+		log.Printf("Error fetching user %d after topup: %v", userID, err)
+		http.Error(w, "Top up succeeded but failed to fetch updated balance", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message":           "Balance topped up successfully",
+		"wallet":            req.Wallet,
+		"amount_usd":        amountUsd.StringFixed(2),
+		"amount_rub":        amountRub.StringFixed(2),
+		"rate":              rate.StringFixed(4),
+		"new_balance":       user.BalanceRub.String(),
+		"balance_arbitrage": user.BalanceArbitrage.String(),
+		"balance_personal":  user.BalancePersonal.String(),
+	})
+}
+
+// GetUserStatsHandler - GET /api/v1/user/stats - Returns spend totals grouped by card category (last 30 days)
+func GetUserStatsHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	stats, err := repository.GetUserSpendStats(userID)
+	if err != nil {
+		log.Printf("Error fetching stats for user %d: %v", userID, err)
+		http.Error(w, "Failed to fetch stats", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"period":     "last_30_days",
+		"categories": stats,
+	})
+}
+
+// GetMeHandler - Возвращает данные о текущем пользователе (Задача 3.1)
+func GetMeHandler(w http.ResponseWriter, r *http.Request) {
+	// 1. Извлечение UserID из контекста JWT/API Key
+	// Используем UserIDKey, который устанавливает AuthMiddleware
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	// 2. Получение данных пользователя из БД (с fallback)
+	user, err := repository.GetUserByID(userID)
+	if err != nil {
+		log.Printf("[/me] Full query failed for user %d: %v — trying basic fallback", userID, err)
+		user, err = repository.GetUserByIDBasic(userID)
+		if err != nil {
+			log.Printf("[/me] ❌ Basic fallback also failed for user %d: %v", userID, err)
+			http.Error(w, "Failed to fetch user data", http.StatusInternalServerError)
+			return
+		}
+		log.Printf("[/me] ✅ Basic fallback succeeded for user %d (%s)", user.ID, user.Email)
+	}
+
+	// 3. Получение API Key (для отображения в профиле)
+	apiKey, err := repository.GetAPIKeyByUserID(userID)
+	// Игнорируем ошибку, если у пользователя еще нет ключа.
+	if err != nil && err.Error() != "sql: no rows in result set" {
+		log.Printf("Warning: Failed to fetch API Key for user %d: %v", userID, err)
+	}
+
+	// 4. Получение Grade пользователя
+	gradeInfo, err := repository.GetUserGradeInfo(userID)
+	if err != nil {
+		log.Printf("Warning: Failed to fetch grade info for user %d: %v", userID, err)
+		// Используем стандартный Grade если не удалось получить
+		gradeInfo = &domain.GradeInfo{
+			Grade:      "STANDARD",
+			TotalSpent: decimal.Zero,
+			FeePercent: decimal.NewFromFloat(6.70),
+		}
+	}
+
+	// 5. Формирование ответа
+	response := struct {
+		ID          int    `json:"id"`
+		Email       string `json:"email"`
+		DisplayName string `json:"display_name"`
+		Balance     string `json:"balance"`
+		Status      string `json:"status"`
+		APIKey      string `json:"api_key"`
+		Grade       string `json:"grade"`
+		FeePercent  string `json:"fee_percent"`
+		Role        string `json:"role"`
+		IsAdmin     bool   `json:"is_admin"`
+		IsVerified  bool   `json:"is_verified"`
+	}{
+		ID:          user.ID,
+		Email:       user.Email,
+		DisplayName: user.DisplayName,
+		Balance:     user.BalanceRub.String(),
+		Status:      user.Status,
+		APIKey:      apiKey,
+		Grade:       gradeInfo.Grade,
+		FeePercent:  gradeInfo.FeePercent.String(),
+		Role:        user.Role,
+		IsAdmin:     user.IsAdmin || user.Role == "admin",
+		IsVerified:  user.IsVerified,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}

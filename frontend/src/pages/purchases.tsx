@@ -5,7 +5,7 @@ import {
   ArrowLeft, ShoppingBag, Loader2, Clock, ChevronDown, ChevronUp, Wifi
 } from 'lucide-react';
 import { DashboardLayout } from '../components/dashboard-layout';
-import { getStoreOrders, type StoreOrder } from '../api/store';
+import { getStoreOrders, type StoreOrder } from '../services/store';
 
 // ── Country flag emoji ──
 const countryFlag = (code: string) => {

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { LANG_KEY } from '../i18n';
 import { DashboardLayout } from '../components/dashboard-layout';
 import { BackButton } from '../components/back-button';
-import apiClient from '../api/axios';
+import apiClient from '../services/axios';
 import { useAuth } from '../store/auth-context';
 import { QRCodeSVG } from 'qrcode.react';
 import { 

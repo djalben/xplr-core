@@ -15,8 +15,8 @@ import {
   Calendar,
   Filter,
 } from 'lucide-react';
-import apiClient from '../api/axios';
-import { API_BASE_URL } from '../api/axios';
+import apiClient from '../services/axios';
+import { API_BASE_URL } from '../services/axios';
 
 type Period = 'day' | 'week' | 'month' | 'custom';
 

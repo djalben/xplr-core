@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Wifi, Eye, EyeOff, Lock, Mail, ChevronRight, ArrowLeft, Check, X } from 'lucide-react';
-import { login, register } from '../api/auth';
+import { login, register } from '../services/auth';
 import { useAuth } from '../store/auth-context';
 
 type AuthMode = 'login' | 'register';

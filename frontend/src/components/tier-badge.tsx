@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Crown, ArrowUpRight, RefreshCw } from 'lucide-react';
-import { getTierInfo, type TierInfo } from '../api/tier';
+import { getTierInfo, type TierInfo } from '../services/tier';
 import { TierUpgradeModal } from './tier-upgrade-modal';
-import { getWallet, type InternalBalance } from '../api/wallet';
+import { getWallet, type InternalBalance } from '../services/wallet';
 
 export const TierBadge = () => {
   const [tierInfo, setTierInfo] = useState<TierInfo | null>(null);

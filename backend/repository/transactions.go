@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/djalben/xplr-core/backend/models"
+	"github.com/djalben/xplr-core/backend/domain"
 	"github.com/shopspring/decimal"
 )
 
@@ -34,7 +34,7 @@ func RecordTransaction(userID int, cardID *int, amount decimal.Decimal, fee deci
 
 // GetUnifiedTransactions — получить все транзакции пользователя с JOIN на cards для last4.
 // Поддерживает фильтры: start_date, end_date, source_type, search, limit, offset.
-func GetUnifiedTransactions(userID int, filters map[string]interface{}) ([]models.Transaction, int, error) {
+func GetUnifiedTransactions(userID int, filters map[string]interface{}) ([]domain.Transaction, int, error) {
 	if GlobalDB == nil {
 		return nil, 0, fmt.Errorf("database connection not initialized")
 	}
@@ -133,9 +133,9 @@ func GetUnifiedTransactions(userID int, filters map[string]interface{}) ([]model
 	}
 	defer rows.Close()
 
-	var txs []models.Transaction
+	var txs []domain.Transaction
 	for rows.Next() {
-		var tx models.Transaction
+		var tx domain.Transaction
 		var cardID sql.NullInt64
 		var sourceID sql.NullInt64
 		var last4 string
@@ -167,7 +167,7 @@ func GetUnifiedTransactions(userID int, filters map[string]interface{}) ([]model
 	}
 
 	if txs == nil {
-		txs = []models.Transaction{}
+		txs = []domain.Transaction{}
 	}
 	return txs, total, nil
 }

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/djalben/xplr-core/backend/models"
+	"github.com/djalben/xplr-core/backend/domain"
 	"github.com/shopspring/decimal"
 )
 
@@ -14,7 +14,7 @@ type ReportSummary struct {
 	TotalTransactions int                  `json:"total_transactions"`
 	TotalAmount       decimal.Decimal      `json:"total_amount"`
 	TotalFee          decimal.Decimal      `json:"total_fee"`
-	Transactions      []models.Transaction `json:"transactions"`
+	Transactions      []domain.Transaction `json:"transactions"`
 }
 
 // GetUserTransactionReport - Извлекает отчет по транзакциям только для данного пользователя.
@@ -96,12 +96,12 @@ func GetUserTransactionReport(userID int, filters map[string]interface{}) (Repor
 	defer rows.Close()
 
 	var report ReportSummary
-	report.Transactions = []models.Transaction{}
+	report.Transactions = []domain.Transaction{}
 	report.TotalAmount = decimal.Zero
 	report.TotalFee = decimal.Zero
 
 	for rows.Next() {
-		var tx models.Transaction
+		var tx domain.Transaction
 		
 		err := rows.Scan(
 			&tx.TransactionID, 
@@ -151,12 +151,12 @@ func GetAdminTransactionReport() (ReportSummary, error) {
 	defer rows.Close()
 
 	var report ReportSummary
-	report.Transactions = []models.Transaction{}
+	report.Transactions = []domain.Transaction{}
 	report.TotalAmount = decimal.Zero
 	report.TotalFee = decimal.Zero
 
 	for rows.Next() {
-        var tx models.Transaction
+        var tx domain.Transaction
 		var cardID sql.NullInt64
 		
 		err := rows.Scan(

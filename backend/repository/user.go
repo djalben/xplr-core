@@ -7,7 +7,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/djalben/xplr-core/backend/models"
+	"github.com/djalben/xplr-core/backend/domain"
 	"github.com/shopspring/decimal"
 )
 
@@ -16,9 +16,9 @@ import (
 // --- ФУНКЦИИ АУТЕНТИФИКАЦИИ И ПОЛУЧЕНИЯ ДАННЫХ ---
 
 // CreateUser создает нового пользователя и сохраняет его в БД.
-func CreateUser(user models.User) (models.User, error) {
+func CreateUser(user domain.User) (domain.User, error) {
 	if GlobalDB == nil {
-		return models.User{}, fmt.Errorf("database connection not initialized")
+		return domain.User{}, fmt.Errorf("database connection not initialized")
 	}
 
 	queryUser := `
@@ -26,14 +26,14 @@ func CreateUser(user models.User) (models.User, error) {
 		VALUES ($1, $2, 0.00, 0.00, 'pending', 'personal', 'ACTIVE') 
 		RETURNING id, created_at, balance, balance_rub
 	`
-	var createdUser models.User
+	var createdUser domain.User
 
 	err := GlobalDB.QueryRow(queryUser, user.Email, user.PasswordHash).
 		Scan(&createdUser.ID, &createdUser.CreatedAt, &createdUser.Balance, &createdUser.BalanceRub)
 
 	if err != nil {
 		log.Printf("Error creating user %s: %v", user.Email, err)
-		return models.User{}, err
+		return domain.User{}, err
 	}
 
 	createdUser.Email = user.Email
@@ -51,32 +51,32 @@ func CreateUser(user models.User) (models.User, error) {
 
 // GetUserByEmailBasic fetches only the essential columns needed for password verification.
 // Used as a fallback when the full GetUserByEmail fails due to schema issues.
-func GetUserByEmailBasic(email string) (models.User, error) {
+func GetUserByEmailBasic(email string) (domain.User, error) {
 	if GlobalDB == nil {
-		return models.User{}, fmt.Errorf("database connection not initialized")
+		return domain.User{}, fmt.Errorf("database connection not initialized")
 	}
 
 	query := `SELECT id, email, password_hash, COALESCE(status, 'ACTIVE') FROM users WHERE email = $1`
-	var user models.User
+	var user domain.User
 	err := GlobalDB.QueryRow(query, email).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Status)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return models.User{}, errors.New("пользователь не найден")
+			return domain.User{}, errors.New("пользователь не найден")
 		}
-		return models.User{}, err
+		return domain.User{}, err
 	}
 	return user, nil
 }
 
 // GetUserByEmail - Находит пользователя по email.
-func GetUserByEmail(email string) (models.User, error) {
+func GetUserByEmail(email string) (domain.User, error) {
 	if GlobalDB == nil {
-		return models.User{}, fmt.Errorf("database connection not initialized")
+		return domain.User{}, fmt.Errorf("database connection not initialized")
 	}
 
 	query := `SELECT id, email, password_hash, balance, COALESCE(balance_rub, 0), COALESCE(balance_arbitrage, 0), COALESCE(balance_personal, 0), COALESCE(kyc_status, ''), COALESCE(active_mode, 'personal'), created_at, status, telegram_chat_id, COALESCE(is_admin, FALSE), COALESCE(is_verified, FALSE), COALESCE(role, 'user') FROM users WHERE email = $1`
 
-	var user models.User
+	var user domain.User
 
 	err := GlobalDB.QueryRow(query, email).Scan(
 		&user.ID,
@@ -98,24 +98,24 @@ func GetUserByEmail(email string) (models.User, error) {
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return models.User{}, errors.New("пользователь не найден")
+			return domain.User{}, errors.New("пользователь не найден")
 		}
 		log.Printf("DB Error GetUserByEmail: %v", err)
-		return models.User{}, err
+		return domain.User{}, err
 	}
 
 	return user, nil
 }
 
 // GetUserByID - Находит пользователя по ID.
-func GetUserByID(userID int) (models.User, error) {
+func GetUserByID(userID int) (domain.User, error) {
 	if GlobalDB == nil {
-		return models.User{}, fmt.Errorf("database connection not initialized")
+		return domain.User{}, fmt.Errorf("database connection not initialized")
 	}
 
 	query := `SELECT id, email, password_hash, balance, COALESCE(balance_rub, 0), COALESCE(balance_arbitrage, 0), COALESCE(balance_personal, 0), COALESCE(kyc_status, ''), COALESCE(active_mode, 'personal'), created_at, status, telegram_chat_id, COALESCE(is_admin, FALSE), COALESCE(is_verified, FALSE), COALESCE(role, 'user'), COALESCE(display_name, '') FROM users WHERE id = $1`
 
-	var user models.User
+	var user domain.User
 
 	err := GlobalDB.QueryRow(query, userID).Scan(
 		&user.ID,
@@ -138,10 +138,10 @@ func GetUserByID(userID int) (models.User, error) {
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return models.User{}, errors.New("пользователь не найден")
+			return domain.User{}, errors.New("пользователь не найден")
 		}
 		log.Printf("DB Error GetUserByID: %v", err)
-		return models.User{}, err
+		return domain.User{}, err
 	}
 
 	return user, nil

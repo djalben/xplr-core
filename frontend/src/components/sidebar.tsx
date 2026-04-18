@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import apiClient from '../api/axios';
+import apiClient from '../services/axios';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useRates } from '../store/rates-context';
@@ -21,7 +21,7 @@ import {
   Newspaper,
   ShoppingBag
 } from 'lucide-react';
-import { getUnreadNewsCount } from '../api/news';
+import { getUnreadNewsCount } from '../services/news';
 
 const Logo = ({ onTripleClick }: { onTripleClick?: () => void }) => {
   const clickRef = useRef<{ count: number; timer: ReturnType<typeof setTimeout> | null }>({ count: 0, timer: null });

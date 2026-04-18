@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Lock, Eye, EyeOff, CheckCircle, Check, X, AlertTriangle } from 'lucide-react';
-import { resetPassword } from '../api/auth';
+import { resetPassword } from '../services/auth';
 
 const passwordRules = [
   { key: 'length', label: 'Минимум 8 символов', test: (p: string) => p.length >= 8 },

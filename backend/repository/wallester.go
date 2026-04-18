@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/djalben/xplr-core/backend/models"
+	"github.com/djalben/xplr-core/backend/domain"
 	"github.com/shopspring/decimal"
 )
 
@@ -114,7 +114,7 @@ func (wr *WallesterRepository) IssueCard(
 	cardType string,
 	nickname string,
 	dailyLimit decimal.Decimal,
-) (*models.Card, error) {
+) (*domain.Card, error) {
 	if GlobalDB == nil {
 		return nil, fmt.Errorf("database connection not initialized")
 	}
@@ -198,7 +198,7 @@ func (wr *WallesterRepository) IssueCard(
 	}
 
 	// 6. Сохранение карты в таблицу cards Supabase
-	card := models.Card{
+	card := domain.Card{
 		UserID:          userID,
 		ServiceID:       serviceID,
 		ProviderCardID:  wallesterResp.CardID,

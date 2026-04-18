@@ -84,12 +84,7 @@ backend/xplr-backend
 # Parcel
 .parcel-cache/
 
-# ============ Legacy Submodules (local only) ============
-epn-killer-docs/
-epn-killer-mvp/
-
-# ============ Temp UI Reference (not part of build) ============
-temp_new_ui/
+# ============ Legacy (removed) ============
 
 # ============ Keep These Files ============
 !.env.example

@@ -6,13 +6,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/djalben/xplr-core/backend/models"
+	"github.com/djalben/xplr-core/backend/domain"
 	"github.com/shopspring/decimal"
 )
 
 // GetInternalBalance — получить внутренний баланс (Кошелёк) пользователя.
 // Если записи нет — создаёт с нулевым балансом (upsert).
-func GetInternalBalance(userID int) (*models.InternalBalance, error) {
+func GetInternalBalance(userID int) (*domain.InternalBalance, error) {
 	if GlobalDB == nil {
 		return nil, fmt.Errorf("database connection not initialized")
 	}
@@ -33,7 +33,7 @@ func GetInternalBalance(userID int) (*models.InternalBalance, error) {
 		 VALUES ($1, 0, NOW()) ON CONFLICT (user_id) DO NOTHING`, userID,
 	)
 
-	var ib models.InternalBalance
+	var ib domain.InternalBalance
 	err := GlobalDB.QueryRow(
 		`SELECT id, user_id, master_balance, COALESCE(auto_topup_enabled, FALSE), updated_at FROM internal_balances WHERE user_id = $1`,
 		userID,
@@ -48,7 +48,7 @@ func GetInternalBalance(userID int) (*models.InternalBalance, error) {
 
 // TopUpInternalBalance — пополнить Кошелёк пользователя.
 // Принимает сумму в рублях, конвертирует в USD по текущему курсу и зачисляет в master_balance (USD).
-func TopUpInternalBalance(userID int, amountRub decimal.Decimal) (*models.InternalBalance, error) {
+func TopUpInternalBalance(userID int, amountRub decimal.Decimal) (*domain.InternalBalance, error) {
 	if GlobalDB == nil {
 		return nil, fmt.Errorf("database connection not initialized")
 	}
@@ -280,7 +280,7 @@ func PurchaseViaCard(userID int, amount decimal.Decimal, description string) (in
 // TransferWalletToCard — перевести средства из Кошелька (USD) на карту.
 // Если карта в EUR, конвертирует USD→EUR по внутреннему курсу.
 // Атомарно: проверяет баланс, списывает из wallet, зачисляет на card_balance, записывает транзакцию.
-func TransferWalletToCard(userID int, cardID int, amountInCardCurrency decimal.Decimal, cardCurrency string) (*models.InternalBalance, error) {
+func TransferWalletToCard(userID int, cardID int, amountInCardCurrency decimal.Decimal, cardCurrency string) (*domain.InternalBalance, error) {
 	if GlobalDB == nil {
 		return nil, fmt.Errorf("database connection not initialized")
 	}

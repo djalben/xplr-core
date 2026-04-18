@@ -4,9 +4,9 @@ import { useRates } from '../store/rates-context';
 import { DashboardLayout } from '../components/dashboard-layout';
 import { ModalPortal } from '../components/modal-portal';
 import { BackButton } from '../components/back-button';
-import { getWallet, transferWalletToCard } from '../api/wallet';
-import { getUserCards, issuePersonalCard, getCardDetails, updateCardStatus, type Card as BackendCard } from '../api/cards';
-import { getTierInfo, type TierInfo } from '../api/tier';
+import { getWallet, transferWalletToCard } from '../services/wallet';
+import { getUserCards, issuePersonalCard, getCardDetails, updateCardStatus, type Card as BackendCard } from '../services/cards';
+import { getTierInfo, type TierInfo } from '../services/tier';
 import { 
   Plus, 
   CreditCard as CardIcon,

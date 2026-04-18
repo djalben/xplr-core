@@ -11,8 +11,8 @@ import {
   getStoreCatalog, purchaseProduct,
   getESIMDestinations, getESIMPlans, orderESIM,
   type StoreProduct, type ESIMDestination, type ESIMPlan, type ESIMOrderResult,
-} from '../api/store';
-import { getUserCards, type Card } from '../api/cards';
+} from '../services/store';
+import { getUserCards, type Card } from '../services/cards';
 
 // ── Country flag (SVG via flagcdn — cross-platform) ──
 const CountryFlag = ({ code, size = 24 }: { code: string; size?: number }) => {

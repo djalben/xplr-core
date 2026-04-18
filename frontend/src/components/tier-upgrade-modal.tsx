@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X, Crown, Check, CreditCard } from 'lucide-react';
 import { ModalPortal } from './modal-portal';
-import { upgradeTier, type TierInfo } from '../api/tier';
+import { upgradeTier, type TierInfo } from '../services/tier';
 
 interface TierUpgradeModalProps {
   tierInfo: TierInfo;

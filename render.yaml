@@ -11,8 +11,8 @@ services:
     name: xplr-backend
     env: go
     plan: free
-    rootDir: backend
-    buildCommand: go build -mod=vendor -o main .
+    rootDir: .
+    buildCommand: go build -o main ./backend/cmd/server
     startCommand: ./main
     healthCheckPath: /health
     envVars:

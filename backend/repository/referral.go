@@ -8,7 +8,7 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/djalben/xplr-core/backend/models"
+	"github.com/djalben/xplr-core/backend/domain"
 	"github.com/djalben/xplr-core/backend/notification"
 	"github.com/shopspring/decimal"
 )
@@ -72,7 +72,7 @@ func GetUserReferralCode(userID int) (string, error) {
 }
 
 // GetReferralStats returns referral program statistics for a user.
-func GetReferralStats(userID int) (*models.ReferralStats, error) {
+func GetReferralStats(userID int) (*domain.ReferralStats, error) {
 	if GlobalDB == nil {
 		return nil, fmt.Errorf("database connection not initialized")
 	}
@@ -100,7 +100,7 @@ func GetReferralStats(userID int) (*models.ReferralStats, error) {
 		return nil, fmt.Errorf("failed to fetch referral stats")
 	}
 
-	return &models.ReferralStats{
+	return &domain.ReferralStats{
 		TotalReferrals:  totalReferrals,
 		ActiveReferrals: activeReferrals,
 		TotalCommission: totalCommission,

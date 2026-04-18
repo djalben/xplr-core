@@ -5,16 +5,16 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/djalben/xplr-core/backend/models"
+	"github.com/djalben/xplr-core/backend/domain"
 )
 
 // CreateTeam - Создать команду
-func CreateTeam(ownerID int, name string) (*models.Team, error) {
+func CreateTeam(ownerID int, name string) (*domain.Team, error) {
 	if GlobalDB == nil {
 		return nil, fmt.Errorf("database connection not initialized")
 	}
 
-	var team models.Team
+	var team domain.Team
 	err := GlobalDB.QueryRow(
 		`INSERT INTO teams (name, owner_id) 
 		 VALUES ($1, $2) 
@@ -45,7 +45,7 @@ func CreateTeam(ownerID int, name string) (*models.Team, error) {
 }
 
 // GetUserTeams - Получить команды пользователя
-func GetUserTeams(userID int) ([]models.Team, error) {
+func GetUserTeams(userID int) ([]domain.Team, error) {
 	if GlobalDB == nil {
 		return nil, fmt.Errorf("database connection not initialized")
 	}
@@ -64,9 +64,9 @@ func GetUserTeams(userID int) ([]models.Team, error) {
 	}
 	defer rows.Close()
 
-	var teams []models.Team
+	var teams []domain.Team
 	for rows.Next() {
-		var team models.Team
+		var team domain.Team
 		err := rows.Scan(&team.ID, &team.Name, &team.OwnerID, &team.CreatedAt, &team.UpdatedAt)
 		if err != nil {
 			log.Printf("Error scanning team: %v", err)
@@ -79,12 +79,12 @@ func GetUserTeams(userID int) ([]models.Team, error) {
 }
 
 // GetTeam - Получить команду по ID
-func GetTeam(teamID int) (*models.Team, error) {
+func GetTeam(teamID int) (*domain.Team, error) {
 	if GlobalDB == nil {
 		return nil, fmt.Errorf("database connection not initialized")
 	}
 
-	var team models.Team
+	var team domain.Team
 	err := GlobalDB.QueryRow(
 		"SELECT id, name, owner_id, created_at, updated_at FROM teams WHERE id = $1",
 		teamID,
@@ -102,7 +102,7 @@ func GetTeam(teamID int) (*models.Team, error) {
 }
 
 // GetTeamMembers - Получить участников команды
-func GetTeamMembers(teamID int) ([]models.TeamMember, error) {
+func GetTeamMembers(teamID int) ([]domain.TeamMember, error) {
 	if GlobalDB == nil {
 		return nil, fmt.Errorf("database connection not initialized")
 	}
@@ -122,10 +122,10 @@ func GetTeamMembers(teamID int) ([]models.TeamMember, error) {
 	}
 	defer rows.Close()
 
-	var members []models.TeamMember
+	var members []domain.TeamMember
 	for rows.Next() {
-		var member models.TeamMember
-		var user models.User
+		var member domain.TeamMember
+		var user domain.User
 		var invitedBy sql.NullInt64
 
 		err := rows.Scan(

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DashboardLayout } from '../components/dashboard-layout';
 import { BackButton } from '../components/back-button';
-import apiClient from '../api/axios';
+import apiClient from '../services/axios';
 import {
   MessageCircle,
   Send,

@@ -9,7 +9,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/djalben/xplr-core/backend/repository"
-	"github.com/djalben/xplr-core/backend/utils"
+	"github.com/djalben/xplr-core/backend/pkg/utils"
 )
 
 // Контекстный ключ для хранения ID пользователя после проверки токена

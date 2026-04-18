@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/djalben/xplr-core/backend/models"
+	"github.com/djalben/xplr-core/backend/domain"
 	"github.com/shopspring/decimal"
 )
 
@@ -27,12 +27,12 @@ var (
 )
 
 // GetUserGrade - Получить Grade пользователя
-func GetUserGrade(userID int) (*models.UserGrade, error) {
+func GetUserGrade(userID int) (*domain.UserGrade, error) {
 	if GlobalDB == nil {
 		return nil, fmt.Errorf("database connection not initialized")
 	}
 
-	var grade models.UserGrade
+	var grade domain.UserGrade
 	err := GlobalDB.QueryRow(
 		"SELECT id, user_id, grade, total_spent, fee_percent, updated_at FROM user_grades WHERE user_id = $1",
 		userID,
@@ -47,12 +47,12 @@ func GetUserGrade(userID int) (*models.UserGrade, error) {
 }
 
 // CreateUserGrade - Создать Grade для пользователя (STANDARD по умолчанию)
-func CreateUserGrade(userID int) (*models.UserGrade, error) {
+func CreateUserGrade(userID int) (*domain.UserGrade, error) {
 	if GlobalDB == nil {
 		return nil, fmt.Errorf("database connection not initialized")
 	}
 
-	var grade models.UserGrade
+	var grade domain.UserGrade
 	err := GlobalDB.QueryRow(
 		`INSERT INTO user_grades (user_id, grade, total_spent, fee_percent) 
 		 VALUES ($1, $2, $3, $4) 
@@ -137,13 +137,13 @@ func UpdateUserGrade(userID int) error {
 }
 
 // GetUserGradeInfo - Получить информацию о Grade с деталями для UI
-func GetUserGradeInfo(userID int) (*models.GradeInfo, error) {
+func GetUserGradeInfo(userID int) (*domain.GradeInfo, error) {
 	grade, err := GetUserGrade(userID)
 	if err != nil {
 		return nil, err
 	}
 
-	info := &models.GradeInfo{
+	info := &domain.GradeInfo{
 		Grade:      grade.Grade,
 		TotalSpent: grade.TotalSpent,
 		FeePercent: grade.FeePercent,

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Newspaper, Bell, BellOff, ChevronLeft, ChevronRight, ImageIcon, X } from 'lucide-react';
 import { DashboardLayout } from '../components/dashboard-layout';
 import { BackButton } from '../components/back-button';
-import { getNews, getNewsNotifications, updateNewsNotifications, markNewsAsRead, type NewsItem } from '../api/news';
+import { getNews, getNewsNotifications, updateNewsNotifications, markNewsAsRead, type NewsItem } from '../services/news';
 
 const PAGE_SIZE = 6;
 

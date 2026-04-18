@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getSystemSettings, updateSystemSetting } from '../api/system-settings';
+import { getSystemSettings, updateSystemSetting } from '../services/system-settings';
 
 export const SBPToggle = () => {
   const [sbpEnabled, setSbpEnabled] = useState(true);

@@ -24,9 +24,9 @@ import {
   Clock,
   Eye
 } from 'lucide-react';
-import apiClient, { API_BASE_URL } from '../api/axios';
-import { getUserGrade, type GradeInfo } from '../api/grade';
-import { getWallet, type InternalBalance } from '../api/wallet';
+import apiClient, { API_BASE_URL } from '../services/axios';
+import { getUserGrade, type GradeInfo } from '../services/grade';
+import { getWallet, type InternalBalance } from '../services/wallet';
 import { WalletTopUpModal } from '../components/wallet-topup-modal';
 import { TierBadge } from '../components/tier-badge';
 

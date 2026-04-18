@@ -9,18 +9,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/djalben/xplr-core/backend/models"
+	"github.com/djalben/xplr-core/backend/domain"
 	"github.com/djalben/xplr-core/backend/notification"
 	"github.com/djalben/xplr-core/backend/telegram"
 	"github.com/shopspring/decimal"
 )
 
 // GetCardByID извлекает карту со всеми полями
-func GetCardByID(id int) (models.Card, error) {
+func GetCardByID(id int) (domain.Card, error) {
 	if GlobalDB == nil {
-		return models.Card{}, fmt.Errorf("database connection not initialized")
+		return domain.Card{}, fmt.Errorf("database connection not initialized")
 	}
-	var card models.Card
+	var card domain.Card
 	var teamID sql.NullInt64
 	query := `
 		SELECT id, user_id, provider_card_id, bin, last_4_digits, card_status, 
@@ -50,7 +50,7 @@ func GetCardByID(id int) (models.Card, error) {
 
 // GetUserCards извлекает все карты пользователя. По архитектуре XPLR баланс каждой карты
 // виртуальный — в ответе card_balance = BalanceRub пользователя (как в Platipomiru).
-func GetUserCards(userID int) ([]models.Card, error) {
+func GetUserCards(userID int) ([]domain.Card, error) {
 	if GlobalDB == nil {
 		return nil, fmt.Errorf("database connection not initialized")
 	}
@@ -77,9 +77,9 @@ func GetUserCards(userID int) ([]models.Card, error) {
 	}
 	defer rows.Close()
 
-	var cards []models.Card
+	var cards []domain.Card
 	for rows.Next() {
-		var card models.Card
+		var card domain.Card
 		var teamID sql.NullInt64
 		err := rows.Scan(
 			&card.ID,
@@ -124,11 +124,11 @@ func GetUserCards(userID int) ([]models.Card, error) {
 // GetFirstActiveCard — returns the first ACTIVE card for a user (for store purchases).
 // IMPORTANT: Travel cards (service_slug='travel') are EXCLUDED from store purchases.
 // Only subscription/premium/arbitrage cards are allowed.
-func GetFirstActiveCard(userID int) (*models.Card, error) {
+func GetFirstActiveCard(userID int) (*domain.Card, error) {
 	if GlobalDB == nil {
 		return nil, fmt.Errorf("database connection not initialized")
 	}
-	var card models.Card
+	var card domain.Card
 	var teamID sql.NullInt64
 	err := GlobalDB.QueryRow(`
 		SELECT id, user_id, provider_card_id, bin, last_4_digits, card_status,
@@ -461,14 +461,14 @@ func cryptoRand4() string {
 
 // IssueCards — Mock-провайдер для выпуска виртуальных карт (песочница).
 // Генерирует карты с BIN 4455, случайным номером, CVV и Exp Date.
-func IssueCards(userID int, req models.MassIssueRequest) (interface{}, error) {
+func IssueCards(userID int, req domain.MassIssueRequest) (interface{}, error) {
 	if GlobalDB == nil {
 		return nil, fmt.Errorf("database connection not initialized")
 	}
 
 	log.Printf("IssueCards: User %d requested %d cards", userID, req.Count)
 
-	var results []models.CardIssueResult
+	var results []domain.CardIssueResult
 	successCount := 0
 	failedCount := 0
 
@@ -520,7 +520,7 @@ func IssueCards(userID int, req models.MassIssueRequest) (interface{}, error) {
 			if err != nil || !hasAccess {
 				log.Printf("Access denied: User %d does not have access to team %d", userID, *req.TeamID)
 				failedCount++
-				results = append(results, models.CardIssueResult{
+				results = append(results, domain.CardIssueResult{
 					Success:   false,
 					Status:    "FAILED",
 					CardLast4: last4,
@@ -555,7 +555,7 @@ func IssueCards(userID int, req models.MassIssueRequest) (interface{}, error) {
 		if err != nil {
 			log.Printf("Failed to insert card for user %d: %v", userID, err)
 			failedCount++
-			results = append(results, models.CardIssueResult{
+			results = append(results, domain.CardIssueResult{
 				Success:   false,
 				Status:    "FAILED",
 				CardLast4: last4,
@@ -579,13 +579,13 @@ func IssueCards(userID int, req models.MassIssueRequest) (interface{}, error) {
 
 		// Успешно создана карта
 		successCount++
-		results = append(results, models.CardIssueResult{
+		results = append(results, domain.CardIssueResult{
 			Success:   true,
 			Status:    "ACTIVE",
 			CardLast4: last4,
 			Nickname:  req.CardNickname,
 			Message:   "Card issued successfully",
-			Card: &models.Card{
+			Card: &domain.Card{
 				ID:              cardID,
 				UserID:          userID,
 				TeamID:          req.TeamID,
@@ -604,7 +604,7 @@ func IssueCards(userID int, req models.MassIssueRequest) (interface{}, error) {
 		})
 	}
 
-	response := models.MassIssueResponse{
+	response := domain.MassIssueResponse{
 		Successful: successCount,
 		Failed:     failedCount,
 		Results:    results,
@@ -693,7 +693,7 @@ func UpdateCardAutoReplenishment(cardID int, userID int, enabled bool, threshold
 }
 
 // GetCardsNeedingReplenishment - Получить карты, требующие пополнения
-func GetCardsNeedingReplenishment() ([]models.Card, error) {
+func GetCardsNeedingReplenishment() ([]domain.Card, error) {
 	if GlobalDB == nil {
 		return nil, fmt.Errorf("database connection not initialized")
 	}
@@ -716,9 +716,9 @@ func GetCardsNeedingReplenishment() ([]models.Card, error) {
 	}
 	defer rows.Close()
 
-	var cards []models.Card
+	var cards []domain.Card
 	for rows.Next() {
-		var card models.Card
+		var card domain.Card
 		var teamID sql.NullInt64
 		err := rows.Scan(
 			&card.ID, &card.UserID, &card.ProviderCardID, &card.BIN, &card.Last4Digits,

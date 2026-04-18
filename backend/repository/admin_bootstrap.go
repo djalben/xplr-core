@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/djalben/xplr-core/backend/models"
+	"github.com/djalben/xplr-core/backend/domain"
 )
 
 // HasAnyAdmin returns true if at least one user with is_admin=true or role='admin' exists.
@@ -40,21 +40,21 @@ func PromoteToAdmin(userID int) error {
 
 // GetUserByIDBasic fetches only essential columns for a user by ID.
 // Fallback when the full GetUserByID fails due to schema issues.
-func GetUserByIDBasic(userID int) (models.User, error) {
+func GetUserByIDBasic(userID int) (domain.User, error) {
 	if GlobalDB == nil {
-		return models.User{}, fmt.Errorf("database connection not initialized")
+		return domain.User{}, fmt.Errorf("database connection not initialized")
 	}
 
 	query := `SELECT id, email, password_hash, COALESCE(status, 'ACTIVE'), COALESCE(is_admin, FALSE), COALESCE(role, 'user') FROM users WHERE id = $1`
-	var user models.User
+	var user domain.User
 	err := GlobalDB.QueryRow(query, userID).Scan(
 		&user.ID, &user.Email, &user.PasswordHash, &user.Status, &user.IsAdmin, &user.Role,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return models.User{}, errors.New("пользователь не найден")
+			return domain.User{}, errors.New("пользователь не найден")
 		}
-		return models.User{}, err
+		return domain.User{}, err
 	}
 	return user, nil
 }

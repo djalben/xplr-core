@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import apiClient from '../api/axios';
+import apiClient from '../services/axios';
 import { useAuth } from '../store/auth-context';
 import { SBPToggle } from '../components/sbp-toggle';
 import { compressImage } from '../utils/compress-image';

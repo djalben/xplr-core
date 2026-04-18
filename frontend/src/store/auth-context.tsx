@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
-import apiClient from '../api/axios';
+import apiClient from '../services/axios';
 
 export type UserRole = 'OWNER' | 'MEMBER';
 export type UserMode = 'personal';
