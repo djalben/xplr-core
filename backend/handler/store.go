@@ -45,6 +45,9 @@ func InitShopInfrastructure() {
 	// Register VLESS VPN provider (if configured)
 	if vp := vless.NewVlessProvider(); vp != nil {
 		registry.Register(vp)
+		log.Println("[SHOP] ✅ VlessProvider registered successfully")
+	} else {
+		log.Println("[SHOP] ⚠️ VlessProvider NOT registered — XPANEL_URL env var missing or empty")
 	}
 
 	// Create fulfillment engine
@@ -478,9 +481,17 @@ func callDemoProvider(product StoreProduct) (string, string, string, error) {
 
 // Vless — uses the real VlessProvider from the shop registry
 func callVlessProvider(product StoreProduct) (string, string, string, error) {
-	provider := shop.GetRegistry().Get("vless")
+	registry := shop.GetRegistry()
+	provider := registry.Get("vless")
 	if provider == nil {
-		return "", "", "", fmt.Errorf("vless provider not registered")
+		// Log all registered providers for debugging
+		all := registry.All()
+		names := make([]string, len(all))
+		for i, p := range all {
+			names[i] = p.Name()
+		}
+		log.Printf("[VLESS-PURCHASE] ❌ vless provider not found in registry. Registered providers: %v", names)
+		return "", "", "", fmt.Errorf("vless provider not registered (registered: %v)", names)
 	}
 
 	vp, ok := provider.(*vless.VlessProvider)

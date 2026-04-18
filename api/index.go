@@ -435,24 +435,38 @@ func ensureDB() {
 	var vpnCatID int
 	db.QueryRow(`SELECT id FROM store_categories WHERE slug='vpn'`).Scan(&vpnCatID)
 	if vpnCatID > 0 {
+		// Delete any stale/orphan VPN products that don't match canonical external_ids
+		canonicalIDs := []string{"vless-stockholm-7d", "vless-stockholm-30d", "vless-stockholm-180d", "vless-stockholm-365d"}
+		res, _ := db.Exec(`DELETE FROM store_products WHERE product_type = 'vpn' AND external_id NOT IN ($1,$2,$3,$4)`,
+			canonicalIDs[0], canonicalIDs[1], canonicalIDs[2], canonicalIDs[3])
+		if n, _ := res.RowsAffected(); n > 0 {
+			log.Printf("[VPN-SEED] 🗑️ Deleted %d stale VPN products with non-canonical external_ids", n)
+		}
+		// Also delete any VPN products with old wrong prices (€2.9, €3.9, €7.9, etc.)
+		res2, _ := db.Exec(`DELETE FROM store_products WHERE product_type = 'vpn' AND price_usd NOT IN (5.00, 10.00, 35.00, 55.00) AND provider = 'vless'`)
+		if n, _ := res2.RowsAffected(); n > 0 {
+			log.Printf("[VPN-SEED] 🗑️ Deleted %d VPN products with stale prices", n)
+		}
+
 		vpnProducts := []struct {
 			extID, name, desc string
-			price             float64
+			price, cost       float64
 		}{
-			{"vless-stockholm-7d", "Безопасный доступ — 7 дней", "VLESS+Reality VPN ключ (Швеция). Лимит 15 ГБ, 7 дней.", 5.00},
-			{"vless-stockholm-30d", "Безопасный доступ — 30 дней", "VLESS+Reality VPN ключ (Швеция). Лимит 60 ГБ, 30 дней.", 10.00},
-			{"vless-stockholm-180d", "Безопасный доступ — 180 дней", "VLESS+Reality VPN ключ (Швеция). Лимит 300 ГБ, 180 дней.", 35.00},
-			{"vless-stockholm-365d", "Безопасный доступ — 365 дней", "VLESS+Reality VPN ключ (Швеция). Лимит 600 ГБ, 365 дней.", 55.00},
+			{"vless-stockholm-7d", "Безопасный доступ — 7 дней", "VLESS+Reality VPN ключ (Швеция). Лимит 15 ГБ, 7 дней.", 5.00, 0.88},
+			{"vless-stockholm-30d", "Безопасный доступ — 30 дней", "VLESS+Reality VPN ключ (Швеция). Лимит 60 ГБ, 30 дней.", 10.00, 1.76},
+			{"vless-stockholm-180d", "Безопасный доступ — 180 дней", "VLESS+Reality VPN ключ (Швеция). Лимит 300 ГБ, 180 дней.", 35.00, 5.28},
+			{"vless-stockholm-365d", "Безопасный доступ — 365 дней", "VLESS+Reality VPN ключ (Швеция). Лимит 600 ГБ, 365 дней.", 55.00, 10.56},
 		}
 		for i, p := range vpnProducts {
-			db.Exec(`INSERT INTO store_products (category_id, provider, external_id, name, description, price_usd, product_type, sort_order)
-				SELECT $1,'vless',$2,$3,$4,$5,'vpn',$6
+			db.Exec(`INSERT INTO store_products (category_id, provider, external_id, name, description, price_usd, cost_price, product_type, in_stock, sort_order)
+				SELECT $1,'vless',$2,$3,$4,$5,$6,'vpn',true,$7
 				WHERE NOT EXISTS (SELECT 1 FROM store_products WHERE external_id=$2)`,
-				vpnCatID, p.extID, p.name, p.desc, p.price, i)
-			// Force-update existing rows to new EUR prices
-			db.Exec(`UPDATE store_products SET price_usd = $1, description = $2, name = $3 WHERE external_id = $4`,
-				p.price, p.desc, p.name, p.extID)
+				vpnCatID, p.extID, p.name, p.desc, p.price, p.cost, i)
+			// Force-update ALL fields on existing rows
+			db.Exec(`UPDATE store_products SET price_usd=$1, description=$2, name=$3, provider='vless', in_stock=true, cost_price=$4, product_type='vpn' WHERE external_id=$5`,
+				p.price, p.desc, p.name, p.cost, p.extID)
 		}
+		log.Printf("[VPN-SEED] ✅ VPN products synced: 4 plans (€5/€10/€35/€55)")
 	}
 
 	// 9c10b. Add image_url to store_categories + cost_price/markup_percent to store_products
