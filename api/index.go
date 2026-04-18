@@ -81,6 +81,9 @@ func ensureDB() {
 	// 4. Wallester
 	h.InitWallesterRepository()
 
+	// 4b. Shop infrastructure — registers VlessProvider, fulfillment engine, deposit monitor
+	h.InitShopInfrastructure()
+
 	// 5. Start auto-replenishment (runs as goroutine inside the invocation)
 	go usecase.StartAutoReplenishmentWorker()
 
@@ -364,11 +367,12 @@ func ensureDB() {
 	}{
 		{"esim", "eSIM — Весь мир", "Мобильный интернет в 190+ странах", "globe", 1},
 		{"digital", "Цифровые товары", "Игровые ключи, подписки, пополнения", "gamepad", 2},
-		{"vpn", "VPN — Безопасный доступ", "VLESS+Reality VPN ключи, безлимитный трафик", "shield", 3},
+		{"vpn", "VPN — Безопасный доступ", "VLESS+Reality VPN ключи, серверы в Швеции", "shield", 3},
 	}
 	for _, sc := range storeCatSeeds {
 		db.Exec(`INSERT INTO store_categories (slug, name, description, icon, sort_order) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (slug) DO NOTHING`,
 			sc.slug, sc.name, sc.desc, sc.icon, sc.sort)
+		db.Exec(`UPDATE store_categories SET description = $1 WHERE slug = $2`, sc.desc, sc.slug)
 	}
 
 	// 9c10. Seed demo store products (idempotent via external_id uniqueness check)
