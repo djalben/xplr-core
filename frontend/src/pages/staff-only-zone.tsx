@@ -256,6 +256,7 @@ export const StaffOnlyZone = () => {
   const [aezaBalance, setAezaBalance] = useState<{ balance: number; currency: string; updated_at: string } | null>(null);
   const [aezaLoading, setAezaLoading] = useState(false);
   const [aezaError, setAezaError] = useState('');
+  const [activeKeys, setActiveKeys] = useState<number | null>(null);
 
   const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
     setToast({ msg, type });
@@ -278,6 +279,13 @@ export const StaffOnlyZone = () => {
     } catch (err: any) {
       setAezaError(err?.response?.data?.error || 'Не удалось получить баланс');
     } finally { setAezaLoading(false); }
+  }, []);
+
+  const fetchActiveKeys = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/admin/infra/active-keys');
+      setActiveKeys(res.data?.active_keys ?? null);
+    } catch { /* ignore */ }
   }, []);
 
   // ── Search users ──
@@ -393,7 +401,8 @@ export const StaffOnlyZone = () => {
   useEffect(() => {
     fetchStats();
     fetchAezaBalance();
-  }, [fetchStats, fetchAezaBalance]);
+    fetchActiveKeys();
+  }, [fetchStats, fetchAezaBalance, fetchActiveKeys]);
 
   const loadNews = useCallback(async () => {
     try {
@@ -708,19 +717,30 @@ export const StaffOnlyZone = () => {
                   <span>{aezaError}</span>
                 </div>
               ) : aezaBalance ? (
-                <div className="flex items-center gap-6">
-                  <div>
-                    <p className="text-xs text-white/40 mb-1">Aeza Hosting</p>
-                    <p className={`text-2xl font-bold tabular-nums ${aezaBalance.balance < 2 ? 'text-red-400' : aezaBalance.balance < 5 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                      {aezaBalance.balance.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} €
-                    </p>
-                  </div>
-                  {aezaBalance.balance < 2 && (
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20">
-                      <AlertCircle className="w-3.5 h-3.5 text-red-400" />
-                      <span className="text-xs text-red-400 font-medium">Низкий баланс!</span>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-6">
+                    <div>
+                      <p className="text-xs text-white/40 mb-1">Aeza Hosting</p>
+                      <p className={`text-2xl font-bold tabular-nums ${aezaBalance.balance < 2 ? 'text-red-400' : aezaBalance.balance < 5 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                        {aezaBalance.balance.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} €
+                      </p>
                     </div>
-                  )}
+                    {aezaBalance.balance < 2 && (
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20">
+                        <AlertCircle className="w-3.5 h-3.5 text-red-400" />
+                        <span className="text-xs text-red-400 font-medium">Низкий баланс!</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 pt-3 border-t border-white/5">
+                    <div className="w-8 h-8 rounded-lg bg-[#818CF8]/10 flex items-center justify-center">
+                      <Activity className="w-4 h-4 text-[#818CF8]" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-white/40">Активных ключей (Стокгольм)</p>
+                      <p className="text-lg font-bold text-white tabular-nums">{activeKeys !== null ? activeKeys : '—'}</p>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <p className="text-sm text-white/30">Загрузка...</p>
@@ -1823,7 +1843,7 @@ export const StaffOnlyZone = () => {
                     type="text"
                     value={editingProduct.image_url}
                     onChange={e => setEditingProduct({ ...editingProduct, image_url: e.target.value })}
-                    placeholder="https://cdn.simpleicons.org/steam/white"
+                    placeholder="https://cdn.simpleicons.org/steam/eeeeee"
                     className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-xs outline-none focus:border-blue-500/50 placeholder-slate-600"
                   />
                 </div>

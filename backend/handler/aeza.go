@@ -5,7 +5,9 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/djalben/xplr-core/backend/providers/vless"
 	"github.com/djalben/xplr-core/backend/service"
+	"github.com/djalben/xplr-core/backend/shop"
 )
 
 // GetAezaBalanceHandler - GET /api/v1/admin/infra/balance
@@ -36,4 +38,31 @@ func CheckAezaBalanceHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{
 		"status": "checked",
 	})
+}
+
+// GetActiveVPNKeysHandler - GET /api/v1/admin/infra/active-keys
+// Returns the count of active VPN keys from the 3X-UI panel.
+func GetActiveVPNKeysHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	provider := shop.GetRegistry().Get("vless")
+	if provider == nil {
+		json.NewEncoder(w).Encode(map[string]any{"active_keys": 0, "error": "vless provider not registered"})
+		return
+	}
+
+	vp, ok := provider.(*vless.VlessProvider)
+	if !ok {
+		json.NewEncoder(w).Encode(map[string]any{"active_keys": 0, "error": "provider type assertion failed"})
+		return
+	}
+
+	count, err := vp.GetActiveClients()
+	if err != nil {
+		log.Printf("[INFRA] ❌ GetActiveClients error: %v", err)
+		json.NewEncoder(w).Encode(map[string]any{"active_keys": 0, "error": err.Error()})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]any{"active_keys": count})
 }

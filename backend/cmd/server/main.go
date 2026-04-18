@@ -299,6 +299,7 @@ func main() {
 	adminRouter.HandleFunc("/system-settings/{key}", handler.UpdateSystemSettingHandler).Methods("PATCH")
 	adminRouter.HandleFunc("/infra/balance", handler.GetAezaBalanceHandler).Methods("GET")
 	adminRouter.HandleFunc("/infra/balance/check", handler.CheckAezaBalanceHandler).Methods("POST")
+	adminRouter.HandleFunc("/infra/active-keys", handler.GetActiveVPNKeysHandler).Methods("GET")
 	// --------------------------------------------------------
 
 	// CORS: dynamic origins from ALLOWED_ORIGINS env var (comma-separated)

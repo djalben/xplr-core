@@ -605,7 +605,7 @@ export const StorePage = () => {
                 <div className="relative z-10 flex flex-col justify-end h-full p-5 sm:p-7">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="w-2 h-2 rounded-full bg-[#818CF8] animate-pulse" />
-                    <span className="text-xs font-medium tracking-widest uppercase text-[#818CF8]/80">100% ПРИВАТНОСТЬ</span>
+                    <span className="text-xs font-bold tracking-widest uppercase text-[#818CF8] px-2 py-0.5 rounded-md bg-black/40" style={{ textShadow: '0px 2px 4px rgba(0,0,0,0.8)' }}>100% ПРИВАТНОСТЬ</span>
                   </div>
                   <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white text-left leading-tight">Безопасный доступ</h2>
                   <p className="text-xs sm:text-sm text-white/50 mt-1.5 text-left max-w-md">Зашифрованный канал для защиты данных и стабильного интернета</p>
@@ -801,7 +801,7 @@ export const StorePage = () => {
 
             {vpnLoading ? (
               <div className="space-y-4">
-                {[...Array(2)].map((_, i) => (
+                {[...Array(4)].map((_, i) => (
                   <div key={i} className="rounded-2xl bg-white/[0.02] border border-white/[0.05] p-5 animate-pulse space-y-3">
                     <div className="h-5 bg-white/[0.05] rounded w-40" /><div className="h-4 bg-white/[0.04] rounded w-64" />
                     <div className="h-10 bg-white/[0.04] rounded w-full mt-3" />
@@ -812,50 +812,62 @@ export const StorePage = () => {
               <div className="py-16 text-center"><Shield className="w-10 h-10 text-white/10 mx-auto mb-3" /><p className="text-white/30 text-sm">Тарифы загружаются...</p></div>
             ) : (
               <div className="space-y-4">
-                {vpnProducts.map((product, i) => {
-                  const is90 = product.external_id?.includes('90d');
+                {vpnProducts.map((product) => {
+                  const ext = product.external_id || '';
+                  const is7 = ext.includes('7d');
+                  const is30 = ext.includes('30d');
+                  const is180 = ext.includes('180d');
+                  const is365 = ext.includes('365d');
+                  const isFeatured = is30;
+
+                  const planLabel = is7 ? '7 дней' : is30 ? '30 дней' : is180 ? '180 дней' : is365 ? '365 дней' : product.name;
+                  const planTitle = is7 ? 'Тест-драйв' : is30 ? 'Оптимальный' : is180 ? 'Полгода' : is365 ? 'Годовой' : product.name;
+                  const planDesc = is7 ? 'Идеально для теста' : is30 ? 'Чистая прибыль, оптимальный выбор' : is180 ? 'Скидка для лояльных' : is365 ? 'Самый выгодный тариф' : '';
+                  const badge = is30 ? 'Популярный' : is365 ? 'Выгодный' : null;
+
+                  const features = ['Выделенный IP-адрес', 'Безлимитный трафик', 'Протокол VLESS + Reality', 'Поддержка всех устройств',
+                    ...(is180 || is365 ? ['Приоритетная маршрутизация'] : []),
+                    ...(is365 ? ['Максимальная экономия'] : []),
+                  ];
+
                   return (
-                    <div key={product.id} className="rounded-2xl bg-white/[0.02] border border-white/[0.05] overflow-hidden">
+                    <div key={product.id} className={`rounded-2xl overflow-hidden ${isFeatured ? 'bg-white/[0.04] border-2 border-[#818CF8]/30' : 'bg-white/[0.02] border border-white/[0.05]'}`}>
                       <div className="p-5 sm:p-6">
                         <div className="flex items-start justify-between gap-4 mb-4">
                           <div>
                             <div className="flex items-center gap-2.5 mb-1">
-                              <h3 className="text-base sm:text-lg font-bold text-white">
-                                {is90 ? 'Безопасный доступ Plus' : 'Безопасный доступ Basic'}
-                              </h3>
-                              {is90 && (
+                              <h3 className="text-base sm:text-lg font-bold text-white">{planTitle}</h3>
+                              {badge && (
                                 <span className="px-2 py-0.5 rounded-md bg-[#7C3AED]/15 text-[#A78BFA] text-[10px] font-bold uppercase tracking-wider">
-                                  Популярный
+                                  {badge}
                                 </span>
                               )}
                             </div>
-                            <p className="text-sm text-white/40">{is90 ? 'Максимальная стабильность' : 'Личный узел в Швеции'}</p>
+                            <p className="text-sm text-white/40">{planDesc}</p>
                           </div>
                           <div className="text-right flex-shrink-0">
-                            <div className="text-2xl sm:text-3xl font-extrabold gradient-text tabular-nums">
+                            <div className={`text-2xl sm:text-3xl font-extrabold tabular-nums ${isFeatured ? 'gradient-text' : 'text-white'}`}>
                               ${product.price_usd}
                             </div>
-                            <div className="text-xs text-white/30 mt-0.5">
-                              {is90 ? '90 дней' : '30 дней'}
-                            </div>
+                            <div className="text-xs text-white/30 mt-0.5">{planLabel}</div>
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-5">
-                          {['Выделенный IP-адрес', 'Безлимитный трафик', 'Протокол VLESS + Reality', 'Поддержка всех устройств',
-                            ...(is90 ? ['Приоритетная маршрутизация', 'Экономия 19%'] : [])
-                          ].map(f => (
-                            <div key={f} className="flex items-center gap-2">
-                              <Check className="w-3.5 h-3.5 text-[#818CF8] flex-shrink-0" />
-                              <span className="text-xs sm:text-sm text-white/50">{f}</span>
-                            </div>
-                          ))}
-                        </div>
+                        {!is7 && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-5">
+                            {features.map(f => (
+                              <div key={f} className="flex items-center gap-2">
+                                <Check className="w-3.5 h-3.5 text-[#818CF8] flex-shrink-0" />
+                                <span className="text-xs sm:text-sm text-white/50">{f}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
 
                         <button
                           onClick={() => tryBuyVpn(product)}
                           className={`w-full py-3 rounded-xl font-semibold text-sm transition-all duration-200 active:scale-[0.98] ${
-                            is90
+                            isFeatured
                               ? 'bg-gradient-to-r from-[#4338CA] to-[#7C3AED] text-white hover:opacity-90'
                               : 'bg-white/[0.06] hover:bg-white/[0.1] text-white'
                           }`}

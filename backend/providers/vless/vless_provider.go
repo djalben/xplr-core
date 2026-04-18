@@ -104,28 +104,52 @@ func (v *VlessProvider) GetCatalog() ([]shop.CatalogProduct, error) {
 	// VPN keys are generated on-demand, so we return predefined plans
 	plans := []shop.CatalogProduct{
 		{
+			ExternalID:  "vless-stockholm-7d",
+			Name:        "Безопасный доступ — 7 дней",
+			Description: "VLESS+Reality VPN ключ (Швеция). Безлимитный трафик, 7 дней. Идеально для теста.",
+			Category:    "vpn",
+			Country:     "Швеция",
+			CountryCode: "SE",
+			CostPrice:   decimal.NewFromFloat(0.88),
+			Currency:    "USD",
+			InStock:     true,
+			Meta:        map[string]any{"duration_days": 7, "server": "Stockholm"},
+		},
+		{
 			ExternalID:  "vless-stockholm-30d",
-			Name:        "VPN Стокгольм — 30 дней",
+			Name:        "Безопасный доступ — 30 дней",
 			Description: "VLESS+Reality VPN ключ (Швеция). Безлимитный трафик, 30 дней.",
 			Category:    "vpn",
 			Country:     "Швеция",
 			CountryCode: "SE",
-			CostPrice:   decimal.NewFromFloat(0),
+			CostPrice:   decimal.NewFromFloat(5.30),
 			Currency:    "USD",
 			InStock:     true,
 			Meta:        map[string]any{"duration_days": 30, "server": "Stockholm"},
 		},
 		{
-			ExternalID:  "vless-stockholm-90d",
-			Name:        "VPN Стокгольм — 90 дней",
-			Description: "VLESS+Reality VPN ключ (Швеция). Безлимитный трафик, 90 дней.",
+			ExternalID:  "vless-stockholm-180d",
+			Name:        "Безопасный доступ — 180 дней",
+			Description: "VLESS+Reality VPN ключ (Швеция). Безлимитный трафик, 180 дней. Скидка для лояльных.",
 			Category:    "vpn",
 			Country:     "Швеция",
 			CountryCode: "SE",
-			CostPrice:   decimal.NewFromFloat(0),
+			CostPrice:   decimal.NewFromFloat(26.50),
 			Currency:    "USD",
 			InStock:     true,
-			Meta:        map[string]any{"duration_days": 90, "server": "Stockholm"},
+			Meta:        map[string]any{"duration_days": 180, "server": "Stockholm"},
+		},
+		{
+			ExternalID:  "vless-stockholm-365d",
+			Name:        "Безопасный доступ — 365 дней",
+			Description: "VLESS+Reality VPN ключ (Швеция). Безлимитный трафик, 365 дней. Самый выгодный тариф.",
+			Category:    "vpn",
+			Country:     "Швеция",
+			CountryCode: "SE",
+			CostPrice:   decimal.NewFromFloat(48.00),
+			Currency:    "USD",
+			InStock:     true,
+			Meta:        map[string]any{"duration_days": 365, "server": "Stockholm"},
 		},
 	}
 	return plans, nil
@@ -134,7 +158,9 @@ func (v *VlessProvider) GetCatalog() ([]shop.CatalogProduct, error) {
 func (v *VlessProvider) CreateOrder(externalProductID string) (*shop.OrderResult, error) {
 	// Determine duration from product ID
 	durationDays := 30
-	if strings.Contains(externalProductID, "90d") {
+	if strings.Contains(externalProductID, "7d") {
+		durationDays = 7
+	} else if strings.Contains(externalProductID, "90d") {
 		durationDays = 90
 	} else if strings.Contains(externalProductID, "180d") {
 		durationDays = 180

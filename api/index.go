@@ -435,8 +435,10 @@ func ensureDB() {
 			extID, name, desc string
 			price             float64
 		}{
-			{"vless-stockholm-30d", "VPN Стокгольм — 30 дней", "VLESS+Reality VPN ключ (Швеция). Безлимитный трафик.", 2.50},
-			{"vless-stockholm-90d", "VPN Стокгольм — 90 дней", "VLESS+Reality VPN ключ (Швеция). Безлимитный трафик.", 6.00},
+			{"vless-stockholm-7d", "Безопасный доступ — 7 дней", "VLESS+Reality VPN ключ (Швеция). Безлимитный трафик, 7 дней. Идеально для теста.", 1.99},
+			{"vless-stockholm-30d", "Безопасный доступ — 30 дней", "VLESS+Reality VPN ключ (Швеция). Безлимитный трафик, 30 дней.", 6.99},
+			{"vless-stockholm-180d", "Безопасный доступ — 180 дней", "VLESS+Reality VPN ключ (Швеция). Безлимитный трафик, 180 дней. Скидка для лояльных.", 34.99},
+			{"vless-stockholm-365d", "Безопасный доступ — 365 дней", "VLESS+Reality VPN ключ (Швеция). Безлимитный трафик, 365 дней. Самый выгодный тариф.", 59.99},
 		}
 		for i, p := range vpnProducts {
 			db.Exec(`INSERT INTO store_products (category_id, provider, external_id, name, description, price_usd, product_type, sort_order)
@@ -465,24 +467,24 @@ func ensureDB() {
 
 	// 9c10c. Backfill image_url for store products and categories
 	productImages := map[string]string{
-		"steam-10":    "https://cdn.simpleicons.org/steam/white",
-		"steam-25":    "https://cdn.simpleicons.org/steam/white",
-		"steam-50":    "https://cdn.simpleicons.org/steam/white",
-		"psn-10":      "https://cdn.simpleicons.org/playstation/white",
-		"psn-25":      "https://cdn.simpleicons.org/playstation/white",
-		"xbox-10":     "https://cdn.simpleicons.org/xbox/white",
-		"xbox-25":     "https://cdn.simpleicons.org/xbox/white",
-		"nintendo-10": "https://cdn.simpleicons.org/nintendo/white",
+		"steam-10":    "https://cdn.simpleicons.org/steam/eeeeee",
+		"steam-25":    "https://cdn.simpleicons.org/steam/eeeeee",
+		"steam-50":    "https://cdn.simpleicons.org/steam/eeeeee",
+		"psn-10":      "https://cdn.simpleicons.org/playstation/eeeeee",
+		"psn-25":      "https://cdn.simpleicons.org/playstation/eeeeee",
+		"xbox-10":     "https://cdn.simpleicons.org/xbox/eeeeee",
+		"xbox-25":     "https://cdn.simpleicons.org/xbox/eeeeee",
+		"nintendo-10": "https://cdn.simpleicons.org/nintendo/eeeeee",
 		"spotify-1m":  "https://cdn.simpleicons.org/spotify/1DB954",
 		"netflix-1m":  "https://cdn.simpleicons.org/netflix/E50914",
 	}
 	for extID, imgURL := range productImages {
-		db.Exec(`UPDATE store_products SET image_url = $1 WHERE external_id = $2 AND (image_url = '' OR image_url IS NULL)`, imgURL, extID)
+		db.Exec(`UPDATE store_products SET image_url = $1 WHERE external_id = $2`, imgURL, extID)
 	}
 	// Category images
-	db.Exec(`UPDATE store_categories SET image_url = 'https://cdn.simpleicons.org/esim/3b82f6' WHERE slug = 'esim' AND (image_url = '' OR image_url IS NULL)`)
-	db.Exec(`UPDATE store_categories SET image_url = 'https://cdn.simpleicons.org/gamepad/a855f7' WHERE slug = 'digital' AND (image_url = '' OR image_url IS NULL)`)
-	db.Exec(`UPDATE store_categories SET image_url = 'https://cdn.simpleicons.org/wireguard/88171a' WHERE slug = 'vpn' AND (image_url = '' OR image_url IS NULL)`)
+	db.Exec(`UPDATE store_categories SET image_url = 'https://cdn.simpleicons.org/esim/3b82f6' WHERE slug = 'esim'`)
+	db.Exec(`UPDATE store_categories SET image_url = 'https://cdn.simpleicons.org/gamepad/a855f7' WHERE slug = 'digital'`)
+	db.Exec(`UPDATE store_categories SET image_url = 'https://cdn.simpleicons.org/wireguard/88171a' WHERE slug = 'vpn'`)
 	log.Println("[STORE-IMAGES] ✅ Product and category image_url backfilled")
 
 	log.Println("[STORE-MIGRATION] ✅ Store tables + seed data ensured")
@@ -716,6 +718,9 @@ func buildRouter() *mux.Router {
 	admin.HandleFunc("/store/products", h.AdminStoreProductsHandler).Methods("GET")
 	admin.HandleFunc("/store/products/{id}", h.AdminUpdateStoreProductHandler).Methods("PATCH")
 	admin.HandleFunc("/store/bulk-markup", h.AdminBulkMarkupHandler).Methods("POST")
+	admin.HandleFunc("/infra/balance", h.GetAezaBalanceHandler).Methods("GET")
+	admin.HandleFunc("/infra/balance/check", h.CheckAezaBalanceHandler).Methods("POST")
+	admin.HandleFunc("/infra/active-keys", h.GetActiveVPNKeysHandler).Methods("GET")
 
 	log.Println("✅ [ROUTER] All routes registered successfully")
 	return r
