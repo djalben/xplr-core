@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   ShoppingBag, Search, Globe, Gamepad2, X, Copy, Check, Loader2,
   AlertTriangle, QrCode, Key, ChevronRight, ArrowLeft,
-  Download, Smartphone, Wifi, CreditCard, Shield
+  Download, Smartphone, Wifi, CreditCard, Shield, Zap
 } from 'lucide-react';
 import { DashboardLayout } from '../components/dashboard-layout';
 import { BackButton } from '../components/back-button';
@@ -881,10 +881,73 @@ export const StorePage = () => {
               </div>
             )}
 
-            <p className="text-xs text-white/20 text-center leading-relaxed mt-6">
-              После оплаты вы получите персональную ссылку для подключения.
-              Используйте приложения v2rayNG (Android) или V2Box (iOS).
-            </p>
+            {/* ── Quick Start Block ── */}
+            <div className="mt-8 rounded-2xl border border-white/[0.08] bg-white/[0.02] overflow-hidden">
+              <div className="p-5 sm:p-6">
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/10 flex items-center justify-center">
+                    <Zap className="w-4.5 h-4.5 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">Быстрый старт</h3>
+                    <p className="text-xs text-white/35">Три шага до защищённого соединения</p>
+                  </div>
+                </div>
+
+                {/* 3 Steps */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+                  {[
+                    { step: '1', title: 'Скачайте', desc: 'Установите приложение для вашего устройства' },
+                    { step: '2', title: 'Купите тариф', desc: 'Выберите план и скопируйте ключ доступа' },
+                    { step: '3', title: 'Подключитесь', desc: 'Добавьте ключ через кнопку «+» или «Импорт»' },
+                  ].map(s => (
+                    <div key={s.step} className="flex items-start gap-3 p-3.5 rounded-xl bg-white/[0.03] border border-white/[0.05]">
+                      <div className="w-7 h-7 rounded-lg bg-[#818CF8]/10 flex items-center justify-center flex-shrink-0">
+                        <span className="text-xs font-bold text-[#818CF8]">{s.step}</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-white/80">{s.title}</p>
+                        <p className="text-xs text-white/35 mt-0.5 leading-relaxed">{s.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Download Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <a
+                    href="https://apps.apple.com/app/v2box-v2ray-client/id1640137564"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 flex items-center justify-center gap-2.5 px-5 py-3 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white font-medium text-sm hover:bg-white/[0.1] hover:border-white/[0.15] transition-all duration-200 active:scale-[0.98]"
+                  >
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+                    V2Box для iOS
+                  </a>
+                  <a
+                    href="https://play.google.com/store/apps/details?id=com.v2ray.ang"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 flex items-center justify-center gap-2.5 px-5 py-3 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white font-medium text-sm hover:bg-white/[0.1] hover:border-white/[0.15] transition-all duration-200 active:scale-[0.98]"
+                  >
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M3.18 23.73c.44.26.96.27 1.41.01l16.34-9.47-3.69-3.69L3.18 23.73zm-.55-1.7V1.97c0-.46.2-.85.55-1.1L14.53 12.2 3.18 23.73l-.55-1.7zM20.95 11.45L17.47 9.5l-3.8 3.8 3.8 3.8 3.48-2.11c.73-.42.73-1.12 0-1.54zM4.81.32l12.44 7.31L13.56 11.3 4.81.32z"/></svg>
+                    v2rayNG для Android
+                  </a>
+                </div>
+
+                {/* APK fallback */}
+                <p className="text-center mt-4">
+                  <a
+                    href="https://github.com/2dust/v2rayNG/releases/latest"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-white/30 hover:text-white/50 transition-colors underline underline-offset-2 decoration-white/10 hover:decoration-white/30"
+                  >
+                    Не работает Google Play? Скачать APK (v2rayNG)
+                  </a>
+                </p>
+              </div>
+            </div>
           </div>
         )}
       </div>
