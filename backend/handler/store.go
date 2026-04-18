@@ -439,6 +439,8 @@ func callProvider(product StoreProduct) (activationKey string, qrData string, pr
 	switch product.Provider {
 	case "mobimatter":
 		return callMobiMatter(product)
+	case "vless":
+		return callVlessProvider(product)
 	case "razer":
 		return callRazerGold(product)
 	case "demo":
@@ -461,6 +463,29 @@ func callDemoProvider(product StoreProduct) (string, string, string, error) {
 	// Digital product — return activation key
 	key := fmt.Sprintf("XPLR-%s-%d", product.ExternalID, time.Now().UnixMilli())
 	return key, "", ref, nil
+}
+
+// Vless — uses the real VlessProvider from the shop registry
+func callVlessProvider(product StoreProduct) (string, string, string, error) {
+	provider := shop.GetRegistry().Get("vless")
+	if provider == nil {
+		return "", "", "", fmt.Errorf("vless provider not registered")
+	}
+
+	vp, ok := provider.(*vless.VlessProvider)
+	if !ok {
+		return "", "", "", fmt.Errorf("vless provider type assertion failed")
+	}
+
+	result, err := vp.CreateOrder(product.ExternalID)
+	if err != nil {
+		return "", "", "", fmt.Errorf("vless CreateOrder failed: %w", err)
+	}
+
+	log.Printf("[VLESS-PURCHASE] ✅ Key created: ref=%s link=%s...", result.ProviderRef, result.ActivationKey[:min(60, len(result.ActivationKey))])
+
+	// activation_key = vless:// URI, qr_data = same URI (scannable), provider_ref = email tag
+	return result.ActivationKey, result.QRData, result.ProviderRef, nil
 }
 
 // MobiMatter — uses the real eSIM provider wrapper
