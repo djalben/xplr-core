@@ -9,11 +9,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/djalben/xplr-core/backend/shop"
 	"github.com/djalben/xplr-core/backend/middleware"
 	"github.com/djalben/xplr-core/backend/providers"
+	"github.com/djalben/xplr-core/backend/providers/vless"
 	"github.com/djalben/xplr-core/backend/repository"
 	"github.com/djalben/xplr-core/backend/service"
+	"github.com/djalben/xplr-core/backend/shop"
 	"github.com/shopspring/decimal"
 )
 
@@ -39,6 +40,11 @@ func InitShopInfrastructure() {
 
 	// Get provider registry and register demo (auto-registered)
 	registry := shop.GetRegistry()
+
+	// Register VLESS VPN provider (if configured)
+	if vp := vless.NewVlessProvider(); vp != nil {
+		registry.Register(vp)
+	}
 
 	// Create fulfillment engine
 	shopFulfillment = shop.NewFulfillmentEngine(

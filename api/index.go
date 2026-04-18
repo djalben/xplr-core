@@ -11,12 +11,12 @@ import (
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
 
-	"github.com/djalben/xplr-core/backend/usecase"
 	h "github.com/djalben/xplr-core/backend/handler"
 	"github.com/djalben/xplr-core/backend/middleware"
 	"github.com/djalben/xplr-core/backend/repository"
 	"github.com/djalben/xplr-core/backend/service"
 	"github.com/djalben/xplr-core/backend/telegram"
+	"github.com/djalben/xplr-core/backend/usecase"
 )
 
 var (
@@ -364,6 +364,7 @@ func ensureDB() {
 	}{
 		{"esim", "eSIM — Весь мир", "Мобильный интернет в 190+ странах", "globe", 1},
 		{"digital", "Цифровые товары", "Игровые ключи, подписки, пополнения", "gamepad", 2},
+		{"vpn", "VPN — Безопасный доступ", "VLESS+Reality VPN ключи, безлимитный трафик", "shield", 3},
 	}
 	for _, sc := range storeCatSeeds {
 		db.Exec(`INSERT INTO store_categories (slug, name, description, icon, sort_order) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (slug) DO NOTHING`,
@@ -426,6 +427,25 @@ func ensureDB() {
 				digitalCatID, p.extID, p.name, p.desc, p.price, i)
 		}
 	}
+	// Seed VPN products
+	var vpnCatID int
+	db.QueryRow(`SELECT id FROM store_categories WHERE slug='vpn'`).Scan(&vpnCatID)
+	if vpnCatID > 0 {
+		vpnProducts := []struct {
+			extID, name, desc string
+			price             float64
+		}{
+			{"vless-stockholm-30d", "VPN Стокгольм — 30 дней", "VLESS+Reality VPN ключ (Швеция). Безлимитный трафик.", 2.50},
+			{"vless-stockholm-90d", "VPN Стокгольм — 90 дней", "VLESS+Reality VPN ключ (Швеция). Безлимитный трафик.", 6.00},
+		}
+		for i, p := range vpnProducts {
+			db.Exec(`INSERT INTO store_products (category_id, provider, external_id, name, description, price_usd, product_type, sort_order)
+				SELECT $1,'vless',$2,$3,$4,$5,'vpn',$6
+				WHERE NOT EXISTS (SELECT 1 FROM store_products WHERE external_id=$2)`,
+				vpnCatID, p.extID, p.name, p.desc, p.price, i)
+		}
+	}
+
 	// 9c10b. Add image_url to store_categories + cost_price/markup_percent to store_products
 	for _, ddl := range []string{
 		`ALTER TABLE store_categories ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT ''`,
@@ -462,6 +482,7 @@ func ensureDB() {
 	// Category images
 	db.Exec(`UPDATE store_categories SET image_url = 'https://cdn.simpleicons.org/esim/3b82f6' WHERE slug = 'esim' AND (image_url = '' OR image_url IS NULL)`)
 	db.Exec(`UPDATE store_categories SET image_url = 'https://cdn.simpleicons.org/gamepad/a855f7' WHERE slug = 'digital' AND (image_url = '' OR image_url IS NULL)`)
+	db.Exec(`UPDATE store_categories SET image_url = 'https://cdn.simpleicons.org/wireguard/88171a' WHERE slug = 'vpn' AND (image_url = '' OR image_url IS NULL)`)
 	log.Println("[STORE-IMAGES] ✅ Product and category image_url backfilled")
 
 	log.Println("[STORE-MIGRATION] ✅ Store tables + seed data ensured")
