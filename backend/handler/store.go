@@ -335,12 +335,12 @@ func StorePurchaseHandler(w http.ResponseWriter, r *http.Request) {
 	var cardID int
 	var cardLast4 string
 	if os.Getenv("DEV_MODE") == "true" {
-		log.Printf("[STORE-PURCHASE] 🟢 TEST MODE: Покупка прошла по зеленому коридору (user=%d, product=%d, price=$%s)",
+		log.Printf("[STORE-PURCHASE] 🟢 TEST MODE: Покупка прошла по зеленому коридору (user=%d, product=%d, price=€%s)",
 			userID, product.ID, product.PriceUSD.StringFixed(2))
 		cardID = 0
 		cardLast4 = "TEST"
 	} else {
-		details := fmt.Sprintf("Покупка товара ID_%d (%s) — $%s", product.ID, product.Name, product.PriceUSD.StringFixed(2))
+		details := fmt.Sprintf("Покупка товара ID_%d (%s) — €%s", product.ID, product.Name, product.PriceUSD.StringFixed(2))
 		var payErr error
 		cardID, cardLast4, payErr = repository.PurchaseViaCard(userID, product.PriceUSD, details)
 		if payErr != nil {
@@ -381,7 +381,7 @@ func StorePurchaseHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[STORE-PURCHASE] ❌ Failed to record order: %v", err)
 	}
 
-	log.Printf("[STORE-PURCHASE] ✅ User %d purchased '%s' for $%s via Card %d (order #%d)",
+	log.Printf("[STORE-PURCHASE] ✅ User %d purchased '%s' for €%s via Card %d (order #%d)",
 		userID, product.Name, product.PriceUSD.StringFixed(2), cardID, orderID)
 
 	// 6. Notify user
@@ -549,7 +549,7 @@ func notifyStorePurchase(userID int, product StoreProduct, activationKey, qrData
 
 	tgMsg := fmt.Sprintf("🛒 <b>Покупка успешна!</b>\n\n"+
 		"%sТовар: <b>%s</b>\n"+
-		"Цена: <b>$%s</b>\n\n"+
+		"Цена: <b>€%s</b>\n\n"+
 		"%s\n\n"+
 		"<a href=\"https://xplr.pro/store\">Открыть магазин</a>",
 		flagEmoji, product.Name, product.PriceUSD.StringFixed(2), resultInfo)
@@ -558,7 +558,7 @@ func notifyStorePurchase(userID int, product StoreProduct, activationKey, qrData
 		<p style="color:#cbd5e1;font-size:16px;line-height:1.5;margin:0 0 16px;font-weight:700;">🛒 Покупка успешна!</p>
 		<table style="width:100%%;border-collapse:collapse;margin:0 0 24px;">
 			<tr><td style="color:#94a3b8;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);">Товар</td><td style="color:#fff;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);text-align:right;font-weight:600;">%s</td></tr>
-			<tr><td style="color:#94a3b8;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);">Цена</td><td style="color:#fff;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);text-align:right;font-weight:600;">$%s</td></tr>
+			<tr><td style="color:#94a3b8;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);">Цена</td><td style="color:#fff;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);text-align:right;font-weight:600;">€%s</td></tr>
 		</table>`,
 		product.Name, product.PriceUSD.StringFixed(2))
 

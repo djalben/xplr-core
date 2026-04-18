@@ -127,7 +127,7 @@ const ESIMActivationModal = ({
               <Check className="w-8 h-8 text-emerald-400" />
             </div>
             <h2 className="text-lg font-bold text-white mb-1">eSIM активирована!</h2>
-            <p className="text-sm text-white/40">{planName} — ${result.price_usd}</p>
+            <p className="text-sm text-white/40">{planName} — €{result.price_usd}</p>
           </div>
           <div ref={qrRef} className="text-center mb-6">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#38BDF8]/10 border border-[#38BDF8]/20 text-[#38BDF8] text-xs font-medium mb-4">
@@ -201,7 +201,7 @@ const DigitalResultModal = ({ productName, priceUsd, activationKey, onClose }: {
           <Check className="w-7 h-7 text-emerald-400" />
         </div>
         <h3 className="text-lg font-bold text-white text-center mb-1">Покупка успешна!</h3>
-        <p className="text-sm text-white/40 text-center mb-6">{productName} — ${priceUsd}</p>
+        <p className="text-sm text-white/40 text-center mb-6">{productName} — €{priceUsd}</p>
         {activationKey && (
           <div className="mb-6">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#A78BFA]/10 border border-[#A78BFA]/20 text-[#A78BFA] text-xs font-medium mb-3"><Key className="w-3.5 h-3.5" /> Ключ активации</div>
@@ -696,8 +696,8 @@ export const StorePage = () => {
                     </div>
                     <div className="flex items-center gap-3 flex-shrink-0">
                       <div className="text-right">
-                        <span className="text-sm sm:text-[15px] font-bold gradient-text tabular-nums">${plan.price_usd.toFixed(2)}</span>
-                        {plan.old_price > 0 && plan.old_price > plan.price_usd && <span className="block text-[10px] text-white/20 line-through">${plan.old_price.toFixed(2)}</span>}
+                        <span className="text-sm sm:text-[15px] font-bold gradient-text tabular-nums">€{plan.price_usd.toFixed(2)}</span>
+                        {plan.old_price > 0 && plan.old_price > plan.price_usd && <span className="block text-[10px] text-white/20 line-through">€{plan.old_price.toFixed(2)}</span>}
                       </div>
                       {plan.in_stock ? (
                         <button onClick={() => tryBuyESIM(plan)} className="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold bg-white/[0.06] hover:bg-white/[0.1] text-white transition-all duration-200 active:scale-[0.96]">Купить</button>
@@ -751,7 +751,7 @@ export const StorePage = () => {
                             {product.description && <div className="text-xs text-white/35 mt-0.5 truncate">{product.description}</div>}
                           </div>
                           <div className="flex items-center gap-3 flex-shrink-0">
-                            <span className="text-sm sm:text-[15px] font-bold gradient-text tabular-nums">${product.price_usd}</span>
+                            <span className="text-sm sm:text-[15px] font-bold gradient-text tabular-nums">€{product.price_usd}</span>
                             {product.in_stock ? (
                               <button onClick={() => tryBuyDigital(product)} className="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold bg-white/[0.06] hover:bg-white/[0.1] text-white transition-all duration-200 active:scale-[0.96]">Купить</button>
                             ) : <span className="text-xs text-white/20">Нет</span>}
@@ -821,8 +821,8 @@ export const StorePage = () => {
                   const isFeatured = is30;
 
                   const planLabel = is7 ? '7 дней' : is30 ? '30 дней' : is180 ? '180 дней' : is365 ? '365 дней' : product.name;
-                  const planTitle = is7 ? 'Тест-драйв' : is30 ? 'Оптимальный' : is180 ? 'Полгода' : is365 ? 'Годовой' : product.name;
-                  const planDesc = is7 ? 'Идеально для теста' : is30 ? 'Чистая прибыль, оптимальный выбор' : is180 ? 'Скидка для лояльных' : is365 ? 'Самый выгодный тариф' : '';
+                  const planTitle = is7 ? 'Недельный' : is30 ? 'Оптимальный' : is180 ? 'Полугодовой' : is365 ? 'Годовой' : product.name;
+                  const planDesc = is7 ? 'Быстрый старт на неделю' : is30 ? 'Оптимальный выбор' : is180 ? 'Скидка для лояльных' : is365 ? 'Самый выгодный тариф' : '';
                   const badge = is30 ? 'Популярный' : is365 ? 'Выгодный' : null;
 
                   const features = ['Выделенный IP-адрес', 'Безлимитный трафик', 'Протокол VLESS + Reality', 'Поддержка всех устройств',
@@ -847,7 +847,7 @@ export const StorePage = () => {
                           </div>
                           <div className="text-right flex-shrink-0">
                             <div className={`text-2xl sm:text-3xl font-extrabold tabular-nums ${isFeatured ? 'gradient-text' : 'text-white'}`}>
-                              ${product.price_usd}
+                              €{product.price_usd}
                             </div>
                             <div className="text-xs text-white/30 mt-0.5">{planLabel}</div>
                           </div>
@@ -872,7 +872,7 @@ export const StorePage = () => {
                               : 'bg-white/[0.06] hover:bg-white/[0.1] text-white'
                           }`}
                         >
-                          Подключить за ${product.price_usd}
+                          Подключить за €{product.price_usd}
                         </button>
                       </div>
                     </div>
@@ -958,7 +958,7 @@ export const StorePage = () => {
         <ConfirmPurchaseModal
           title="Подтвердите покупку eSIM"
           itemLabel={`${confirmPlan.name} — ${confirmPlan.country}`}
-          priceLabel={`$${confirmPlan.price_usd.toFixed(2)}`}
+          priceLabel={`€${confirmPlan.price_usd.toFixed(2)}`}
           loading={esimPurchasing} onConfirm={handleESIMPurchase} onClose={() => !esimPurchasing && setConfirmPlan(null)} allCards={activeCards} onCardChange={setSelectedCard}
         />
       )}
@@ -967,7 +967,7 @@ export const StorePage = () => {
         <ConfirmPurchaseModal
           title="Подтвердите покупку"
           itemLabel={confirmDigital.name}
-          priceLabel={`$${confirmDigital.price_usd}`}
+          priceLabel={`€${confirmDigital.price_usd}`}
           loading={digitalPurchasing} onConfirm={handleDigitalPurchase} onClose={() => !digitalPurchasing && setConfirmDigital(null)} allCards={activeCards} onCardChange={setSelectedCard}
         />
       )}
@@ -976,7 +976,7 @@ export const StorePage = () => {
         <ConfirmPurchaseModal
           title="Подтвердите покупку — Безопасный доступ"
           itemLabel={confirmVpn.name}
-          priceLabel={`$${confirmVpn.price_usd}`}
+          priceLabel={`€${confirmVpn.price_usd}`}
           loading={vpnPurchasing} onConfirm={handleVpnPurchase} onClose={() => !vpnPurchasing && setConfirmVpn(null)} allCards={activeCards} onCardChange={setSelectedCard}
         />
       )}

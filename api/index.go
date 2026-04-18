@@ -435,16 +435,19 @@ func ensureDB() {
 			extID, name, desc string
 			price             float64
 		}{
-			{"vless-stockholm-7d", "Безопасный доступ — 7 дней", "VLESS+Reality VPN ключ (Швеция). Безлимитный трафик, 7 дней. Идеально для теста.", 1.99},
-			{"vless-stockholm-30d", "Безопасный доступ — 30 дней", "VLESS+Reality VPN ключ (Швеция). Безлимитный трафик, 30 дней.", 6.99},
-			{"vless-stockholm-180d", "Безопасный доступ — 180 дней", "VLESS+Reality VPN ключ (Швеция). Безлимитный трафик, 180 дней. Скидка для лояльных.", 34.99},
-			{"vless-stockholm-365d", "Безопасный доступ — 365 дней", "VLESS+Reality VPN ключ (Швеция). Безлимитный трафик, 365 дней. Самый выгодный тариф.", 59.99},
+			{"vless-stockholm-7d", "Безопасный доступ — 7 дней", "VLESS+Reality VPN ключ (Швеция). Лимит 15 ГБ, 7 дней.", 5.00},
+			{"vless-stockholm-30d", "Безопасный доступ — 30 дней", "VLESS+Reality VPN ключ (Швеция). Лимит 60 ГБ, 30 дней.", 10.00},
+			{"vless-stockholm-180d", "Безопасный доступ — 180 дней", "VLESS+Reality VPN ключ (Швеция). Лимит 300 ГБ, 180 дней.", 35.00},
+			{"vless-stockholm-365d", "Безопасный доступ — 365 дней", "VLESS+Reality VPN ключ (Швеция). Лимит 600 ГБ, 365 дней.", 55.00},
 		}
 		for i, p := range vpnProducts {
 			db.Exec(`INSERT INTO store_products (category_id, provider, external_id, name, description, price_usd, product_type, sort_order)
 				SELECT $1,'vless',$2,$3,$4,$5,'vpn',$6
 				WHERE NOT EXISTS (SELECT 1 FROM store_products WHERE external_id=$2)`,
 				vpnCatID, p.extID, p.name, p.desc, p.price, i)
+			// Force-update existing rows to new EUR prices
+			db.Exec(`UPDATE store_products SET price_usd = $1, description = $2, name = $3 WHERE external_id = $4`,
+				p.price, p.desc, p.name, p.extID)
 		}
 	}
 

@@ -195,10 +195,10 @@ const gradeColors: Record<string, string> = {
 // ── Russian labels for system_settings keys ──
 const SETTING_LABELS: Record<string, string> = {
   sbp_enabled: 'СБП (пополнение)',
-  gold_tier_price: 'Цена Gold-пакета (USD)',
+  gold_tier_price: 'Цена Gold-пакета (€)',
   gold_tier_duration_days: 'Длительность Gold (дней)',
-  fee_standard: 'Комиссия — тир Стандарт ($)',
-  fee_gold: 'Комиссия — тир Gold ($)',
+  fee_standard: 'Комиссия — тир Стандарт (€)',
+  fee_gold: 'Комиссия — тир Gold (€)',
 };
 
 // ══════════════════════════════════════
@@ -693,7 +693,7 @@ export const StaffOnlyZone = () => {
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <StatCard icon={Users} label="Всего юзеров" value={stats?.total_users ?? '—'} accent="bg-blue-500" />
-              <StatCard icon={DollarSign} label="Сумма в кошельках" value={stats ? `$${parseFloat(stats.total_balance).toLocaleString()}` : '—'} accent="bg-emerald-500" />
+              <StatCard icon={DollarSign} label="Сумма в кошельках" value={stats ? `€${parseFloat(stats.total_balance).toLocaleString()}` : '—'} accent="bg-emerald-500" />
               <StatCard icon={CreditCard} label="Активные карты" value={stats?.active_cards ?? '—'} accent="bg-purple-500" />
               <StatCard icon={MessageSquare} label="Открытые тикеты" value={stats?.open_tickets ?? '—'} accent="bg-orange-500" />
               <StatCard icon={UserCheck} label="Регистрации сегодня" value={stats?.today_signups ?? '—'} accent="bg-cyan-500" />
