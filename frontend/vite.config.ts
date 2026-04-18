@@ -4,12 +4,12 @@ import tailwind from '@tailwindcss/vite';
 import path from 'path';
 
 export default defineConfig({
-  root: path.resolve(__dirname, 'epn-killer-web'),
-  publicDir: path.resolve(__dirname, 'epn-killer-web/public'),
+  root: __dirname,
+  publicDir: path.resolve(__dirname, 'public'),
   plugins: [react(), tailwind()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, 'epn-killer-web/src'),
+      '@': path.resolve(__dirname, 'src'),
     },
   },
   server: {
@@ -17,6 +17,7 @@ export default defineConfig({
   },
   build: {
     outDir: path.resolve(__dirname, 'dist'),
+    sourcemap: false,
     emptyOutDir: true,
   },
 });

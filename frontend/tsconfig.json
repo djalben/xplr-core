@@ -18,8 +18,8 @@
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["epn-killer-web/src/*"]
+      "@/*": ["src/*"]
     }
   },
-  "include": ["epn-killer-web/src", "vite-env.d.ts"]
+  "include": ["src", "vite-env.d.ts"]
 }
