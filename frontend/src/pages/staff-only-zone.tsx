@@ -259,6 +259,14 @@ export const StaffOnlyZone = () => {
   const [aezaError, setAezaError] = useState('');
   const [activeKeys, setActiveKeys] = useState<number | null>(null);
 
+  // ── Aeza Server Info ──
+  const [aezaServer, setAezaServer] = useState<{
+    id: number; name: string; status: string; ip: string;
+    cost_eur: number; expires_at: string;
+    cpu: number; ram_mb: number; disk_gb: number; disk_type: string;
+    os: string; location: string; api_status: string;
+  } | null>(null);
+
   // ── VPN Server Status ──
   const [vpnServerStatus, setVpnServerStatus] = useState<{
     active_clients: number;
@@ -323,6 +331,13 @@ export const StaffOnlyZone = () => {
     } catch (err: any) {
       setAezaError(err?.response?.data?.error || 'Не удалось получить баланс');
     } finally { setAezaLoading(false); }
+  }, []);
+
+  const fetchAezaServerInfo = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/admin/infra/server-info');
+      if (res.data && res.data.api_status !== 'error') setAezaServer(res.data);
+    } catch { /* ignore */ }
   }, []);
 
   const fetchActiveKeys = useCallback(async () => {
@@ -507,10 +522,11 @@ export const StaffOnlyZone = () => {
   useEffect(() => {
     fetchStats();
     fetchAezaBalance();
+    fetchAezaServerInfo();
     fetchActiveKeys();
     fetchVPNServerStatus();
     fetchVPNActiveClients();
-  }, [fetchStats, fetchAezaBalance, fetchActiveKeys, fetchVPNServerStatus, fetchVPNActiveClients]);
+  }, [fetchStats, fetchAezaBalance, fetchAezaServerInfo, fetchActiveKeys, fetchVPNServerStatus, fetchVPNActiveClients]);
 
   const loadNews = useCallback(async () => {
     try {
@@ -838,14 +854,61 @@ export const StaffOnlyZone = () => {
               </div>
             )}
 
-            {/* ── Здоровье сервера ── */}
+            {/* ── Aeza Server Info ── */}
+            {aezaServer && aezaServer.api_status !== 'error' && (
+              <div className="glass-card p-6">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
+                  <Activity className="w-5 h-5 text-cyan-400" />
+                  VPN-сервер (Aeza #{aezaServer.id})
+                  <span className={`ml-auto px-2 py-0.5 rounded-full text-[10px] font-medium ${aezaServer.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                    {aezaServer.status === 'active' ? 'Активен' : aezaServer.status}
+                  </span>
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3">
+                    <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Стоимость</p>
+                    <p className="text-lg font-bold text-white tabular-nums">€{aezaServer.cost_eur.toFixed(2)}</p>
+                    <p className="text-[10px] text-white/30">/мес</p>
+                  </div>
+                  <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3">
+                    <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Оплачен до</p>
+                    <p className="text-lg font-bold text-white tabular-nums">
+                      {aezaServer.expires_at ? new Date(aezaServer.expires_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                    </p>
+                    {aezaServer.expires_at && (() => {
+                      const days = Math.ceil((new Date(aezaServer.expires_at).getTime() - Date.now()) / 86400000);
+                      return <p className={`text-[10px] ${days < 7 ? 'text-red-400' : days < 14 ? 'text-amber-400' : 'text-emerald-400'}`}>{days > 0 ? `${days} дн.` : 'Истёк!'}</p>;
+                    })()}
+                  </div>
+                  <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3">
+                    <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">CPU / RAM</p>
+                    <p className="text-lg font-bold text-white tabular-nums">{aezaServer.cpu} vCPU</p>
+                    <p className="text-[10px] text-white/30">{(aezaServer.ram_mb / 1024).toFixed(0)} GB RAM</p>
+                  </div>
+                  <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3">
+                    <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Диск</p>
+                    <p className="text-lg font-bold text-white tabular-nums">{aezaServer.disk_gb} GB</p>
+                    <p className="text-[10px] text-white/30">{aezaServer.disk_type}</p>
+                  </div>
+                </div>
+                {aezaServer.ip && (
+                  <div className="mt-3 flex items-center gap-3 text-xs text-white/40">
+                    <span>IP: <code className="text-white/60">{aezaServer.ip}</code></span>
+                    {aezaServer.os && <span>OS: <code className="text-white/60">{aezaServer.os}</code></span>}
+                    {aezaServer.location && <span>📍 {aezaServer.location}</span>}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Выданные доступы ── */}
             <div className="glass-card p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
                   <Shield className="w-5 h-5 text-indigo-400" />
-                  Здоровье сервера
+                  Выданные доступы
                 </h3>
-                <button onClick={() => { fetchVPNServerStatus(); fetchActiveKeys(); fetchVPNActiveClients(); }} disabled={vpnServerLoading} className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs text-white/60 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50">
+                <button onClick={() => { fetchVPNServerStatus(); fetchActiveKeys(); fetchVPNActiveClients(); fetchAezaServerInfo(); }} disabled={vpnServerLoading} className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs text-white/60 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50">
                   {vpnServerLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Обновить'}
                 </button>
               </div>

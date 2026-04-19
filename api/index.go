@@ -761,6 +761,7 @@ func buildRouter() *mux.Router {
 	admin.HandleFunc("/store/bulk-markup", h.AdminBulkMarkupHandler).Methods("POST")
 	admin.HandleFunc("/infra/balance", h.GetAezaBalanceHandler).Methods("GET")
 	admin.HandleFunc("/infra/balance/check", h.CheckAezaBalanceHandler).Methods("POST")
+	admin.HandleFunc("/infra/server-info", h.GetAezaServerInfoHandler).Methods("GET")
 	admin.HandleFunc("/infra/active-keys", h.GetActiveVPNKeysHandler).Methods("GET")
 	admin.HandleFunc("/infra/vpn-server-status", h.AdminVPNServerStatusHandler).Methods("GET")
 	admin.HandleFunc("/infra/vpn-active-clients", h.AdminVPNActiveClientsHandler).Methods("GET")

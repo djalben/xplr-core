@@ -302,6 +302,7 @@ func main() {
 	adminRouter.HandleFunc("/system-settings/{key}", handler.UpdateSystemSettingHandler).Methods("PATCH")
 	adminRouter.HandleFunc("/infra/balance", handler.GetAezaBalanceHandler).Methods("GET")
 	adminRouter.HandleFunc("/infra/balance/check", handler.CheckAezaBalanceHandler).Methods("POST")
+	adminRouter.HandleFunc("/infra/server-info", handler.GetAezaServerInfoHandler).Methods("GET")
 	adminRouter.HandleFunc("/infra/active-keys", handler.GetActiveVPNKeysHandler).Methods("GET")
 	adminRouter.HandleFunc("/infra/vpn-server-status", handler.AdminVPNServerStatusHandler).Methods("GET")
 	adminRouter.HandleFunc("/infra/vpn-active-clients", handler.AdminVPNActiveClientsHandler).Methods("GET")

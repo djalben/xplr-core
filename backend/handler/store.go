@@ -671,9 +671,12 @@ func notifyStorePurchase(userID int, product StoreProduct, activationKey, qrData
 // notifyVPNPurchase sends VPN-specific email with VLESS link + app download buttons
 // and notifies admins via TG with financial summary.
 func notifyVPNPurchase(userID int, product StoreProduct, activationKey string) {
+	log.Printf("[VPN-NOTIFY] 🔔 START notifyVPNPurchase: userID=%d product=%q price=%s provider=%s type=%s",
+		userID, product.Name, product.PriceUSD.StringFixed(2), product.Provider, product.ProductType)
+
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("[VPN-NOTIFY-PANIC] %v", r)
+			log.Printf("[VPN-NOTIFY-PANIC] ❌ PANIC in notifyVPNPurchase for user %d: %v", userID, r)
 		}
 	}()
 
@@ -682,8 +685,10 @@ func notifyVPNPurchase(userID int, product StoreProduct, activationKey string) {
 		log.Printf("[VPN-NOTIFY] ❌ Cannot fetch user %d: %v", userID, err)
 		return
 	}
+	log.Printf("[VPN-NOTIFY] 👤 User %d email=%s", userID, user.Email)
 
-	// 1. Admin TG notification with margin
+	// 1. Admin TG notification with margin (for ALL VPN plans, no size filter)
+	log.Printf("[VPN-NOTIFY] 📤 Dispatching admin TG notification for %q...", product.Name)
 	go NotifyAdminVPNPurchase(product.Name, product.PriceUSD.StringFixed(2), user.Email)
 
 	// 2. User TG notification

@@ -42,6 +42,24 @@ func CheckAezaBalanceHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GetAezaServerInfoHandler - GET /api/v1/admin/infra/server-info
+// Returns Aeza VPS server status, cost, expiry, and specs.
+func GetAezaServerInfoHandler(w http.ResponseWriter, r *http.Request) {
+	info, err := service.GetAezaServerInfo()
+	if err != nil {
+		log.Printf("[AEZA-SERVER-HANDLER] ❌ %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error":      err.Error(),
+			"api_status": "error",
+		})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(info)
+}
+
 // GetActiveVPNKeysHandler - GET /api/v1/admin/infra/active-keys
 // Returns the count of active VPN keys from the 3X-UI panel.
 func GetActiveVPNKeysHandler(w http.ResponseWriter, r *http.Request) {

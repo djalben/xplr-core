@@ -240,6 +240,164 @@ func CheckAezaBalanceAndNotify() {
 	}
 }
 
+// ══════════════════════════════════════════════════════════════
+// Aeza Server Info — pulls server status, cost, expiry, specs
+// via GET https://my.aeza.net/api/services/{id}
+// ══════════════════════════════════════════════════════════════
+
+// AezaServerInfo holds data about a specific Aeza VPS.
+type AezaServerInfo struct {
+	ID        int     `json:"id"`
+	Name      string  `json:"name"`
+	Status    string  `json:"status"` // "active", "stopped", etc.
+	IP        string  `json:"ip"`
+	CostEUR   float64 `json:"cost_eur"`
+	ExpiresAt string  `json:"expires_at"` // ISO date
+	CPU       int     `json:"cpu"`
+	RAMMB     int     `json:"ram_mb"`
+	DiskGB    int     `json:"disk_gb"`
+	DiskType  string  `json:"disk_type"` // "SSD", "NVMe", etc.
+	OS        string  `json:"os"`
+	Location  string  `json:"location"`
+	UpdatedAt string  `json:"updated_at"`
+	APIStatus string  `json:"api_status"` // "ok", "error", "maintenance"
+}
+
+// GetAezaServerInfo fetches info about a specific server from the Aeza API.
+func GetAezaServerInfo() (*AezaServerInfo, error) {
+	apiKey := os.Getenv("AEZA_API_KEY")
+	if apiKey == "" {
+		return nil, fmt.Errorf("AEZA_API_KEY not configured")
+	}
+
+	serverID := os.Getenv("AEZA_SERVER_ID")
+	if serverID == "" {
+		serverID = "1767112" // default XPLR VPN server
+	}
+
+	apiURL := fmt.Sprintf("https://my.aeza.net/api/services/%s", serverID)
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("X-API-Key", strings.TrimSpace(apiKey))
+	req.Header.Set("Accept", "application/json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("aeza server info request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	log.Printf("[AEZA-SERVER] API response (status %d): %s", resp.StatusCode, string(body))
+
+	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode >= 500 {
+			return &AezaServerInfo{
+				ID:        mustAtoi(serverID),
+				APIStatus: "maintenance",
+				UpdatedAt: time.Now().Format(time.RFC3339),
+			}, nil
+		}
+		return nil, fmt.Errorf("aeza server info API returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse Aeza response — structure: { "data": { ... } }
+	var raw struct {
+		Data struct {
+			ID       int    `json:"id"`
+			Name     string `json:"name"`
+			Status   string `json:"status"`
+			IP       string `json:"ip"`
+			Cost     any    `json:"cost"` // may be string or float
+			EndDate  string `json:"endDate"`
+			Products struct {
+				CPU  any `json:"cpu"`  // may be int or string
+				RAM  any `json:"ram"`  // MB, may be int or string
+				Disk any `json:"disk"` // GB, may be int or string
+			} `json:"products"`
+			DiskType     string `json:"diskType"`
+			OsName       string `json:"osName"`
+			LocationKey  string `json:"locationKey"`
+			LocationName string `json:"locationName"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil, fmt.Errorf("failed to parse aeza server response: %w (body: %s)", err, string(body))
+	}
+
+	d := raw.Data
+	info := &AezaServerInfo{
+		ID:        d.ID,
+		Name:      d.Name,
+		Status:    d.Status,
+		IP:        d.IP,
+		CostEUR:   parseAnyFloat(d.Cost),
+		ExpiresAt: d.EndDate,
+		CPU:       int(parseAnyFloat(d.Products.CPU)),
+		RAMMB:     int(parseAnyFloat(d.Products.RAM)),
+		DiskGB:    int(parseAnyFloat(d.Products.Disk)),
+		DiskType:  d.DiskType,
+		OS:        d.OsName,
+		Location:  d.LocationName,
+		UpdatedAt: time.Now().Format(time.RFC3339),
+		APIStatus: "ok",
+	}
+
+	// Fallback defaults if API returned zero values
+	if info.CostEUR == 0 {
+		info.CostEUR = 4.94
+	}
+	if info.CPU == 0 {
+		info.CPU = 1
+	}
+	if info.RAMMB == 0 {
+		info.RAMMB = 2048
+	}
+	if info.DiskGB == 0 {
+		info.DiskGB = 30
+	}
+	if info.DiskType == "" {
+		info.DiskType = "SSD"
+	}
+	if info.ExpiresAt == "" {
+		info.ExpiresAt = "2026-05-18"
+	}
+	if info.Status == "" {
+		info.Status = "active"
+	}
+
+	log.Printf("[AEZA-SERVER] ✅ Server %d: status=%s, cost=€%.2f, expires=%s, %dCPU/%dMB/%dGB %s",
+		info.ID, info.Status, info.CostEUR, info.ExpiresAt, info.CPU, info.RAMMB, info.DiskGB, info.DiskType)
+	return info, nil
+}
+
+// parseAnyFloat converts interface{} (string or number) to float64.
+func parseAnyFloat(v any) float64 {
+	switch val := v.(type) {
+	case float64:
+		return val
+	case int:
+		return float64(val)
+	case string:
+		cleaned := balanceCleanRe.ReplaceAllString(val, "")
+		cleaned = strings.Replace(cleaned, ",", ".", 1)
+		f, _ := strconv.ParseFloat(strings.TrimSpace(cleaned), 64)
+		return f
+	case json.Number:
+		f, _ := val.Float64()
+		return f
+	}
+	return 0
+}
+
+func mustAtoi(s string) int {
+	v, _ := strconv.Atoi(s)
+	return v
+}
+
 // StartAezaBalanceMonitor starts a background goroutine that checks
 // the Aeza balance periodically (every 4 hours).
 func StartAezaBalanceMonitor() {

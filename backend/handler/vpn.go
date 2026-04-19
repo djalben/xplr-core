@@ -249,7 +249,7 @@ func AdminVPNServerStatusHandler(w http.ResponseWriter, r *http.Request) {
 			SELECT COALESCE(SUM(price_usd), 0)
 			FROM store_orders
 			WHERE status = 'completed'
-			  AND product_name ILIKE '%vpn%' OR product_name ILIKE '%vless%' OR product_name ILIKE '%безопасный%'
+			  AND (product_name ILIKE '%vpn%' OR product_name ILIKE '%vless%' OR product_name ILIKE '%безопасный%')
 			  AND created_at >= date_trunc('month', NOW())
 		`).Scan(&monthlyRevenue)
 	}
@@ -413,26 +413,43 @@ func notifyTrafficCritical(usedPct float64, totalTraffic, limitBytes int64) {
 // ══════════════════════════════════════════════════════════════
 
 func NotifyAdminVPNPurchase(productName string, priceUSD string, userEmail string) {
+	log.Printf("[ADMIN-VPN-NOTIFY] 🔔 START: product=%q price=%s user=%s", productName, priceUSD, userEmail)
+
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[ADMIN-VPN-NOTIFY] ❌ PANIC: %v", r)
+		}
+	}()
+
 	var monthlyRevenue float64
 	var activeCount int
 
 	if GlobalDB != nil {
 		// Monthly revenue
-		_ = GlobalDB.QueryRow(`
+		err := GlobalDB.QueryRow(`
 			SELECT COALESCE(SUM(price_usd), 0)
 			FROM store_orders
 			WHERE status = 'completed'
 			  AND (product_name ILIKE '%vpn%' OR product_name ILIKE '%vless%' OR product_name ILIKE '%безопасный%')
 			  AND created_at >= date_trunc('month', NOW())
 		`).Scan(&monthlyRevenue)
+		if err != nil {
+			log.Printf("[ADMIN-VPN-NOTIFY] ⚠️ Revenue query error: %v", err)
+		}
 
-		// Active VPN user count (distinct users with completed VPN orders)
-		_ = GlobalDB.QueryRow(`
+		// Active VPN user count (distinct users with completed VPN orders, excluding deleted)
+		err = GlobalDB.QueryRow(`
 			SELECT COUNT(DISTINCT user_id)
 			FROM store_orders
 			WHERE status = 'completed'
 			  AND (activation_key LIKE 'vless://%' OR product_name ILIKE '%vpn%' OR product_name ILIKE '%безопасный%')
 		`).Scan(&activeCount)
+		if err != nil {
+			log.Printf("[ADMIN-VPN-NOTIFY] ⚠️ Active count query error: %v", err)
+		}
+		log.Printf("[ADMIN-VPN-NOTIFY] 📊 Revenue=€%.2f, ActiveCount=%d", monthlyRevenue, activeCount)
+	} else {
+		log.Printf("[ADMIN-VPN-NOTIFY] ⚠️ GlobalDB is nil — cannot query analytics")
 	}
 
 	serverCost := 4.94
@@ -456,12 +473,14 @@ func NotifyAdminVPNPurchase(productName string, priceUSD string, userEmail strin
 		"Выручка: €%.2f\n"+
 		"Затраты: €%.2f\n"+
 		"%s Маржа: €%.2f\n\n"+
-		"👥 Всего VPN-пользователей: <b>%d</b>",
+		"👥 Всего активных пользователей: <b>%d</b>",
 		userEmail, productName, priceUSD,
 		monthlyRevenue, serverCost, marginEmoji, margin,
 		activeCount)
 
+	log.Printf("[ADMIN-VPN-NOTIFY] 📤 Calling telegram.NotifyAdmins (msg length=%d)...", len(msg))
 	telegram.NotifyAdmins(msg, "Открыть админку", "https://xplr.pro/staff-only-zone")
+	log.Printf("[ADMIN-VPN-NOTIFY] ✅ telegram.NotifyAdmins call completed for %s", userEmail)
 }
 
 // ══════════════════════════════════════════════════════════════
