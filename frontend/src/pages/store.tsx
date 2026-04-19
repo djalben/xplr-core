@@ -902,8 +902,6 @@ export const StorePage = () => {
                   const is30 = ext.includes('30d');
                   const is180 = ext.includes('180d');
                   const is365 = ext.includes('365d');
-                  const isFeatured = is30;
-
                   const planLabel = is7 ? '7 дней' : is30 ? '30 дней' : is180 ? '180 дней' : is365 ? '365 дней' : product.name;
                   const planTitle = is7 ? 'Недельный' : is30 ? 'Оптимальный' : is180 ? 'Полугодовой' : is365 ? 'Годовой' : product.name;
                   const planDesc = is7 ? 'Быстрый старт на неделю' : is30 ? 'Оптимальный выбор' : is180 ? 'Скидка для лояльных' : is365 ? 'Самый выгодный тариф' : '';
@@ -916,7 +914,7 @@ export const StorePage = () => {
                   ];
 
                   return (
-                    <div key={product.id} className={`rounded-2xl overflow-hidden ${isFeatured ? 'bg-white/[0.04] border-2 border-[#818CF8]/30' : 'bg-white/[0.02] border border-white/[0.05]'}`}>
+                    <div key={product.id} className="group rounded-2xl overflow-hidden bg-white/[0.02] border border-white/[0.06] hover:border-[#818CF8]/40 hover:bg-white/[0.05] hover:shadow-[0_0_24px_rgba(129,140,248,0.12)] transition-all duration-300">
                       <div className="p-5 sm:p-6">
                         <div className="flex items-start justify-between gap-4 mb-3">
                           <div>
@@ -931,15 +929,15 @@ export const StorePage = () => {
                             <p className="text-sm text-white/40">{planDesc}</p>
                           </div>
                           <div className="text-right flex-shrink-0">
-                            <div className={`text-2xl sm:text-3xl font-extrabold tabular-nums ${isFeatured ? 'gradient-text' : 'text-white'}`}>
+                            <div className="text-2xl sm:text-3xl font-extrabold tabular-nums text-white group-hover:gradient-text transition-all duration-300">
                               €{product.price_usd}
                             </div>
-                            <div className="text-xs text-white/30 mt-0.5">{planLabel}</div>
+                            <div className="text-sm font-bold text-white/70 mt-0.5">{planLabel}</div>
                           </div>
                         </div>
 
                         {/* Traffic limit — prominent */}
-                        <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg bg-[#818CF8]/[0.07] border border-[#818CF8]/10">
+                        <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg bg-[#818CF8]/[0.07] border border-[#818CF8]/10 group-hover:bg-[#818CF8]/[0.12] group-hover:border-[#818CF8]/20 transition-all duration-300">
                           <Wifi className="w-4 h-4 text-[#818CF8] flex-shrink-0" />
                           <span className="text-sm font-semibold text-[#A78BFA]">{trafficGB} ГБ</span>
                           <span className="text-xs text-white/35">трафика · 1 устройство</span>
@@ -958,11 +956,7 @@ export const StorePage = () => {
 
                         <button
                           onClick={() => tryBuyVpn(product)}
-                          className={`w-full py-3 rounded-xl font-semibold text-sm transition-all duration-200 active:scale-[0.98] ${
-                            isFeatured
-                              ? 'bg-gradient-to-r from-[#4338CA] to-[#7C3AED] text-white hover:opacity-90'
-                              : 'bg-white/[0.06] hover:bg-white/[0.1] text-white'
-                          }`}
+                          className="w-full py-3 rounded-xl font-semibold text-sm transition-all duration-300 active:scale-[0.98] bg-white/[0.06] text-white group-hover:bg-gradient-to-r group-hover:from-[#4338CA] group-hover:to-[#7C3AED] group-hover:shadow-lg group-hover:shadow-indigo-500/20"
                         >
                           Подключить за €{product.price_usd}
                         </button>

@@ -247,7 +247,7 @@ export const StaffOnlyZone = () => {
 
   // ── Store pricing state ──
   const [storeProducts, setStoreProducts] = useState<{ id: number; name: string; product_type: string; provider: string; cost_price: string; markup_percent: string; retail_price: string; old_price: string; in_stock: boolean; external_id: string; image_url: string; country_code: string }[]>([]);
-  const [editingProduct, setEditingProduct] = useState<{ id: number; cost_price: string; markup_percent: string; image_url: string } | null>(null);
+  const [editingProduct, setEditingProduct] = useState<{ id: number; cost_price: string; markup_percent: string; image_url: string; retail_price?: string } | null>(null);
   const [bulkDelta, setBulkDelta] = useState('10');
   const [bulkType, setBulkType] = useState('');
   const [storeSubTab, setStoreSubTab] = useState<'esim' | 'digital' | 'vpn'>('esim');
@@ -531,11 +531,15 @@ export const StaffOnlyZone = () => {
     if (!editingProduct) return;
     setSaving(true);
     try {
-      await apiClient.patch(`/admin/store/products/${editingProduct.id}`, {
+      const payload: Record<string, any> = {
         cost_price: parseFloat(editingProduct.cost_price),
         markup_percent: parseFloat(editingProduct.markup_percent),
         image_url: editingProduct.image_url,
-      });
+      };
+      if (editingProduct.retail_price !== undefined) {
+        payload.retail_price = parseFloat(editingProduct.retail_price);
+      }
+      await apiClient.patch(`/admin/store/products/${editingProduct.id}`, payload);
       showToast('Цена обновлена');
       setEditingProduct(null);
       loadStoreProducts();
@@ -722,77 +726,24 @@ export const StaffOnlyZone = () => {
               <StatCard icon={CreditCard} label="Всего карт" value={stats?.total_cards ?? '—'} accent="bg-slate-500" />
             </div>
 
-            {/* Aeza Infrastructure Balance */}
-            <div className="glass-card p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-[#818CF8]" />
-                  Баланс инфраструктуры
-                </h3>
-                <button onClick={fetchAezaBalance} disabled={aezaLoading} className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs text-white/60 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50">
-                  {aezaLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Обновить'}
-                </button>
-              </div>
-              {aezaError ? (
-                <div className="flex items-center gap-2 text-sm text-amber-400/70">
-                  <AlertCircle className="w-4 h-4" />
-                  <span>{aezaError}</span>
-                </div>
-              ) : aezaBalance ? (
-                <div className="space-y-4">
-                  {aezaBalance.status === 'maintenance' ? (
-                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
-                      <Loader2 className="w-4 h-4 text-amber-400 animate-spin flex-shrink-0" />
-                      <div>
-                        <p className="text-sm text-amber-400 font-medium">Aeza API временно недоступен (500)</p>
-                        <p className="text-xs text-amber-400/60 mt-0.5">Повторная попытка при следующем обновлении...</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-6">
-                      <div>
-                        <p className="text-xs text-white/40 mb-1">Aeza Hosting</p>
-                        <p className={`text-2xl font-bold tabular-nums ${aezaBalance.balance < 2 ? 'text-red-400' : aezaBalance.balance < 5 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                          {aezaBalance.balance.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} €
-                        </p>
-                      </div>
-                      {aezaBalance.balance < 2 && (
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20">
-                          <AlertCircle className="w-3.5 h-3.5 text-red-400" />
-                          <span className="text-xs text-red-400 font-medium">Низкий баланс!</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  <div className="flex items-center gap-3 pt-3 border-t border-white/5">
-                    <div className="w-8 h-8 rounded-lg bg-[#818CF8]/10 flex items-center justify-center">
-                      <Activity className="w-4 h-4 text-[#818CF8]" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-white/40">Активных ключей (Стокгольм)</p>
-                      <p className="text-lg font-bold text-white tabular-nums">{activeKeys !== null ? activeKeys : '—'}</p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-white/30">Загрузка...</p>
-              )}
-            </div>
-
-            {/* VPN Server Status */}
+            {/* VPN Server Status + Active Keys */}
             <div className="glass-card p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
                   <Shield className="w-5 h-5 text-indigo-400" />
                   Состояние сервера
                 </h3>
-                <button onClick={fetchVPNServerStatus} disabled={vpnServerLoading} className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs text-white/60 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50">
+                <button onClick={() => { fetchVPNServerStatus(); fetchActiveKeys(); }} disabled={vpnServerLoading} className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs text-white/60 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50">
                   {vpnServerLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Обновить'}
                 </button>
               </div>
               {vpnServerStatus ? (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3">
+                      <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Активных ключей</p>
+                      <p className="text-xl font-bold text-white tabular-nums">{activeKeys !== null ? activeKeys : vpnServerStatus.active_clients}</p>
+                    </div>
                     <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3">
                       <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Активных клиентов</p>
                       <p className="text-xl font-bold text-white tabular-nums">{vpnServerStatus.active_clients}</p>
@@ -1831,10 +1782,10 @@ export const StaffOnlyZone = () => {
                     <tr className="border-b border-white/10">
                       <th className="text-left px-4 py-3 text-slate-400 font-medium">ID</th>
                       <th className="text-left px-4 py-3 text-slate-400 font-medium">Товар</th>
-                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Себестоимость</th>
-                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Наценка %</th>
+                      {storeSubTab !== 'vpn' && <th className="text-left px-4 py-3 text-slate-400 font-medium">Себестоимость</th>}
+                      {storeSubTab !== 'vpn' && <th className="text-left px-4 py-3 text-slate-400 font-medium">Наценка %</th>}
                       <th className="text-left px-4 py-3 text-slate-400 font-medium">Розница</th>
-                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Старая цена</th>
+                      {storeSubTab !== 'vpn' && <th className="text-left px-4 py-3 text-slate-400 font-medium">Старая цена</th>}
                       <th className="text-left px-4 py-3 text-slate-400 font-medium">Статус</th>
                       <th className="text-left px-4 py-3 text-slate-400 font-medium"></th>
                     </tr>
@@ -1875,22 +1826,41 @@ export const StaffOnlyZone = () => {
                             </div>
                           </div>
                         </td>
+                        {storeSubTab !== 'vpn' && (
+                          <td className="px-4 py-3">
+                            {editingProduct?.id === p.id ? (
+                              <input type="number" step="0.01" value={editingProduct.cost_price} onChange={e => setEditingProduct({ ...editingProduct, cost_price: e.target.value })} className="w-20 px-2 py-1 bg-white/10 border border-blue-500/50 rounded text-white text-xs outline-none" />
+                            ) : (
+                              <span className="text-emerald-400 font-medium text-xs">${parseFloat(p.cost_price).toFixed(2)}</span>
+                            )}
+                          </td>
+                        )}
+                        {storeSubTab !== 'vpn' && (
+                          <td className="px-4 py-3">
+                            {editingProduct?.id === p.id ? (
+                              <input type="number" step="1" value={editingProduct.markup_percent} onChange={e => setEditingProduct({ ...editingProduct, markup_percent: e.target.value })} className="w-16 px-2 py-1 bg-white/10 border border-blue-500/50 rounded text-white text-xs outline-none" />
+                            ) : (
+                              <span className="text-orange-400 font-medium text-xs">{parseFloat(p.markup_percent).toFixed(0)}%</span>
+                            )}
+                          </td>
+                        )}
                         <td className="px-4 py-3">
                           {editingProduct?.id === p.id ? (
-                            <input type="number" step="0.01" value={editingProduct.cost_price} onChange={e => setEditingProduct({ ...editingProduct, cost_price: e.target.value })} className="w-20 px-2 py-1 bg-white/10 border border-blue-500/50 rounded text-white text-xs outline-none" />
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={editingProduct.retail_price ?? p.retail_price}
+                              onChange={e => setEditingProduct({ ...editingProduct, retail_price: e.target.value })}
+                              className="w-20 px-2 py-1 bg-white/10 border border-blue-500/50 rounded text-white text-xs outline-none"
+                              autoFocus={storeSubTab === 'vpn'}
+                            />
                           ) : (
-                            <span className="text-emerald-400 font-medium text-xs">${parseFloat(p.cost_price).toFixed(2)}</span>
+                            <span className="text-white font-bold text-xs">${parseFloat(p.retail_price).toFixed(2)}</span>
                           )}
                         </td>
-                        <td className="px-4 py-3">
-                          {editingProduct?.id === p.id ? (
-                            <input type="number" step="1" value={editingProduct.markup_percent} onChange={e => setEditingProduct({ ...editingProduct, markup_percent: e.target.value })} className="w-16 px-2 py-1 bg-white/10 border border-blue-500/50 rounded text-white text-xs outline-none" />
-                          ) : (
-                            <span className="text-orange-400 font-medium text-xs">{parseFloat(p.markup_percent).toFixed(0)}%</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-white font-bold text-xs">${parseFloat(p.retail_price).toFixed(2)}</td>
-                        <td className="px-4 py-3 text-slate-500 text-xs line-through">${parseFloat(p.old_price).toFixed(2)}</td>
+                        {storeSubTab !== 'vpn' && (
+                          <td className="px-4 py-3 text-slate-500 text-xs line-through">${parseFloat(p.old_price).toFixed(2)}</td>
+                        )}
                         <td className="px-4 py-3">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${p.in_stock ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
                             {p.in_stock ? 'В наличии' : 'Нет'}
@@ -1907,7 +1877,7 @@ export const StaffOnlyZone = () => {
                               </button>
                             </div>
                           ) : (
-                            <button onClick={() => setEditingProduct({ id: p.id, cost_price: p.cost_price, markup_percent: p.markup_percent, image_url: p.image_url })} className="text-blue-400 hover:text-blue-300 text-xs transition-colors">
+                            <button onClick={() => setEditingProduct({ id: p.id, cost_price: p.cost_price, markup_percent: p.markup_percent, image_url: p.image_url, retail_price: p.retail_price })} className="text-blue-400 hover:text-blue-300 text-xs transition-colors">
                               Изменить
                             </button>
                           )}
@@ -1915,15 +1885,15 @@ export const StaffOnlyZone = () => {
                       </tr>
                     ))}
                     {filtered.length === 0 && (
-                      <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">Нет товаров</td></tr>
+                      <tr><td colSpan={storeSubTab === 'vpn' ? 5 : 8} className="px-4 py-8 text-center text-slate-500">Нет товаров</td></tr>
                     )}
                   </tbody>
                 </table>
               </div>
             </div>
 
-            {/* Image URL editor (shown when editing a product) */}
-            {editingProduct && (
+            {/* Image URL editor (shown when editing non-VPN product) */}
+            {editingProduct && storeSubTab !== 'vpn' && (
               <div className="glass-card p-4">
                 <label className="text-xs text-slate-500 mb-1.5 block">Изображение товара (URL логотипа / флага)</label>
                 <div className="flex items-center gap-3">

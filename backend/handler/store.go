@@ -967,6 +967,7 @@ func AdminUpdateStoreProductHandler(w http.ResponseWriter, r *http.Request) {
 		CostPrice     *float64 `json:"cost_price"`
 		MarkupPercent *float64 `json:"markup_percent"`
 		ImageURL      *string  `json:"image_url"`
+		RetailPrice   *float64 `json:"retail_price"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
@@ -992,11 +993,20 @@ func AdminUpdateStoreProductHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Also update the stored price_usd column for consistency
-	GlobalDB.Exec(`
-		UPDATE store_products SET price_usd = cost_price * (1 + markup_percent / 100) WHERE id = $1`, productID)
+	// Direct retail price override (used for VPN products)
+	if req.RetailPrice != nil {
+		if _, err := GlobalDB.Exec(`UPDATE store_products SET price_usd = $1 WHERE id = $2`, *req.RetailPrice, productID); err != nil {
+			http.Error(w, "Failed to update retail price", http.StatusInternalServerError)
+			return
+		}
+		log.Printf("[ADMIN-STORE] Updated product %d: retail_price=%.2f (direct)", productID, *req.RetailPrice)
+	} else {
+		// Recalculate from cost + markup when retail_price not set directly
+		GlobalDB.Exec(`
+			UPDATE store_products SET price_usd = cost_price * (1 + markup_percent / 100) WHERE id = $1`, productID)
+	}
 
-	log.Printf("[ADMIN-STORE] Updated product %d: cost=%v markup=%v", productID, req.CostPrice, req.MarkupPercent)
+	log.Printf("[ADMIN-STORE] Updated product %d: cost=%v markup=%v retail=%v", productID, req.CostPrice, req.MarkupPercent, req.RetailPrice)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
