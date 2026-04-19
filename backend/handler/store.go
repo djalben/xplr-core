@@ -347,7 +347,7 @@ func StorePurchaseHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 3. Call provider API (stub — returns simulated activation data)
-	activationKey, qrData, providerRef, providerErr := callProvider(product)
+	activationKey, qrData, providerRef, orderMeta, providerErr := callProvider(product)
 	if providerErr != nil {
 		log.Printf("[STORE-PURCHASE] ❌ Provider error for product %d: %v", product.ID, providerErr)
 		w.Header().Set("Content-Type", "application/json")
@@ -399,12 +399,12 @@ func StorePurchaseHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[STORE-PURCHASE] Покупка товара ID_%d через Карту ID_%d (*%s)", product.ID, cardID, cardLast4)
 	}
 
-	// 5. Record order
+	// 5. Record order (with meta for VPN traffic tracking)
 	var orderID int
 	err = GlobalDB.QueryRow(`
-		INSERT INTO store_orders (user_id, product_id, product_name, price_usd, status, activation_key, qr_data, provider_ref)
-		VALUES ($1, $2, $3, $4, 'completed', $5, $6, $7) RETURNING id`,
-		userID, product.ID, product.Name, product.PriceUSD, activationKey, qrData, providerRef,
+		INSERT INTO store_orders (user_id, product_id, product_name, price_usd, status, activation_key, qr_data, provider_ref, meta)
+		VALUES ($1, $2, $3, $4, 'completed', $5, $6, $7, $8) RETURNING id`,
+		userID, product.ID, product.Name, product.PriceUSD, activationKey, qrData, providerRef, orderMeta,
 	).Scan(&orderID)
 	if err != nil {
 		log.Printf("[STORE-PURCHASE] ❌ Failed to record order: %v", err)
@@ -475,18 +475,22 @@ func StoreOrdersHandler(w http.ResponseWriter, r *http.Request) {
 // Provider abstraction — stub for MobiMatter / Razer Gold
 // ══════════════════════════════════════════════════════════════
 
-func callProvider(product StoreProduct) (activationKey string, qrData string, providerRef string, err error) {
+func callProvider(product StoreProduct) (activationKey string, qrData string, providerRef string, orderMeta string, err error) {
 	switch product.Provider {
 	case "mobimatter":
-		return callMobiMatter(product)
+		a, q, r, e := callMobiMatter(product)
+		return a, q, r, "{}", e
 	case "vless":
 		return callVlessProvider(product)
 	case "razer":
-		return callRazerGold(product)
+		a, q, r, e := callRazerGold(product)
+		return a, q, r, "{}", e
 	case "demo":
-		return callDemoProvider(product)
+		a, q, r, e := callDemoProvider(product)
+		return a, q, r, "{}", e
 	default:
-		return callDemoProvider(product)
+		a, q, r, e := callDemoProvider(product)
+		return a, q, r, "{}", e
 	}
 }
 
@@ -507,7 +511,7 @@ func callDemoProvider(product StoreProduct) (string, string, string, error) {
 
 // Vless — uses the real VlessProvider from the shop registry.
 // Self-healing: if the provider is missing (e.g. cold-start env race), tries to register it on-the-fly.
-func callVlessProvider(product StoreProduct) (string, string, string, error) {
+func callVlessProvider(product StoreProduct) (string, string, string, string, error) {
 	registry := shop.GetRegistry()
 	provider := registry.Get("vless")
 
@@ -526,22 +530,22 @@ func callVlessProvider(product StoreProduct) (string, string, string, error) {
 			}
 			log.Printf("[VLESS-PURCHASE] ❌ FATAL: vless provider cannot be created. XPANEL_URL=%q. Registered: %v",
 				os.Getenv("XPANEL_URL"), names)
-			return "", "", "", fmt.Errorf("vless provider not registered — check XPANEL_URL env var (registered: %v)", names)
+			return "", "", "", "{}", fmt.Errorf("vless provider not registered — check XPANEL_URL env var (registered: %v)", names)
 		}
 	}
 
 	vp, ok := provider.(*vless.VlessProvider)
 	if !ok {
-		return "", "", "", fmt.Errorf("vless provider type assertion failed")
+		return "", "", "", "{}", fmt.Errorf("vless provider type assertion failed")
 	}
 
 	result, err := vp.CreateOrder(product.ExternalID)
 	if err != nil {
-		return "", "", "", fmt.Errorf("vless CreateOrder failed: %w", err)
+		return "", "", "", "{}", fmt.Errorf("vless CreateOrder failed: %w", err)
 	}
 
 	if len(result.ActivationKey) == 0 {
-		return "", "", "", fmt.Errorf("vless CreateOrder returned empty activation key")
+		return "", "", "", "{}", fmt.Errorf("vless CreateOrder returned empty activation key")
 	}
 
 	linkPreview := result.ActivationKey
@@ -551,7 +555,11 @@ func callVlessProvider(product StoreProduct) (string, string, string, error) {
 	log.Printf("[VLESS-PURCHASE] ✅ Key created: ref=%s link=%s...", result.ProviderRef, linkPreview)
 
 	// activation_key = vless:// URI, qr_data = same URI (scannable), provider_ref = email tag
-	return result.ActivationKey, result.QRData, result.ProviderRef, nil
+	orderMeta := "{}"
+	if len(result.RawResponse) > 0 {
+		orderMeta = string(result.RawResponse)
+	}
+	return result.ActivationKey, result.QRData, result.ProviderRef, orderMeta, nil
 }
 
 // MobiMatter — uses the real eSIM provider wrapper

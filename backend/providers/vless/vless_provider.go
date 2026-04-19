@@ -139,7 +139,7 @@ func (v *VlessProvider) GetCatalog() ([]shop.CatalogProduct, error) {
 			CostPrice:   decimal.NewFromFloat(0.88),
 			Currency:    "EUR",
 			InStock:     true,
-			Meta:        map[string]any{"duration_days": 7, "server": "Stockholm", "retail_price": 5.00},
+			Meta:        map[string]any{"duration_days": 7, "server": "Stockholm", "retail_price": 5.00, "traffic_bytes": int64(15) * 1024 * 1024 * 1024},
 		},
 		{
 			ExternalID:  "vless-stockholm-30d",
@@ -151,7 +151,7 @@ func (v *VlessProvider) GetCatalog() ([]shop.CatalogProduct, error) {
 			CostPrice:   decimal.NewFromFloat(5.30),
 			Currency:    "EUR",
 			InStock:     true,
-			Meta:        map[string]any{"duration_days": 30, "server": "Stockholm", "retail_price": 10.00},
+			Meta:        map[string]any{"duration_days": 30, "server": "Stockholm", "retail_price": 10.00, "traffic_bytes": int64(60) * 1024 * 1024 * 1024},
 		},
 		{
 			ExternalID:  "vless-stockholm-180d",
@@ -163,7 +163,7 @@ func (v *VlessProvider) GetCatalog() ([]shop.CatalogProduct, error) {
 			CostPrice:   decimal.NewFromFloat(26.50),
 			Currency:    "EUR",
 			InStock:     true,
-			Meta:        map[string]any{"duration_days": 180, "server": "Stockholm", "retail_price": 35.00},
+			Meta:        map[string]any{"duration_days": 180, "server": "Stockholm", "retail_price": 35.00, "traffic_bytes": int64(300) * 1024 * 1024 * 1024},
 		},
 		{
 			ExternalID:  "vless-stockholm-365d",
@@ -175,7 +175,7 @@ func (v *VlessProvider) GetCatalog() ([]shop.CatalogProduct, error) {
 			CostPrice:   decimal.NewFromFloat(48.00),
 			Currency:    "EUR",
 			InStock:     true,
-			Meta:        map[string]any{"duration_days": 365, "server": "Stockholm", "retail_price": 55.00},
+			Meta:        map[string]any{"duration_days": 365, "server": "Stockholm", "retail_price": 55.00, "traffic_bytes": int64(600) * 1024 * 1024 * 1024},
 		},
 	}
 	return plans, nil
@@ -220,16 +220,25 @@ func (v *VlessProvider) CreateOrder(externalProductID string) (*shop.OrderResult
 	log.Printf("[VLESS] ✅ Created key: email=%s uuid=%s...%s expires=%dd limitIp=1 quota=%dGB",
 		clientEmail, clientUUID[:8], clientUUID[len(clientUUID)-4:], durationDays, totalBytes/(1024*1024*1024))
 
+	// Store traffic metadata as JSON for subscription endpoint
+	orderMeta, _ := json.Marshal(map[string]any{
+		"traffic_bytes": totalBytes,
+		"expire_ms":     expiryMs,
+		"client_email":  clientEmail,
+		"duration_days": durationDays,
+	})
+
 	return &shop.OrderResult{
 		ProviderRef:   clientEmail,
 		ActivationKey: connLink,
 		QRData:        connLink, // QR scanners can use the vless:// link directly
 		Status:        "completed",
+		RawResponse:   orderMeta,
 	}, nil
 }
 
 func (v *VlessProvider) CheckStatus(providerRef string) (*shop.OrderStatus, error) {
-	stats, err := v.getClientTraffic(providerRef)
+	stats, err := v.GetClientTraffic(providerRef)
 	if err != nil {
 		return &shop.OrderStatus{
 			ProviderRef:  providerRef,
@@ -340,16 +349,19 @@ func (v *VlessProvider) addClient(clientUUID, email string, expiryMs int64, tota
 	return nil
 }
 
-// clientTrafficStats holds traffic info returned by the panel.
-type clientTrafficStats struct {
+// ClientTrafficStats holds traffic info returned by the panel.
+type ClientTrafficStats struct {
 	Email  string `json:"email"`
 	Enable bool   `json:"enable"`
 	Up     int64  `json:"up"`
 	Down   int64  `json:"down"`
 }
 
-// getClientTraffic queries traffic stats for a client by email tag.
-func (v *VlessProvider) getClientTraffic(email string) (*clientTrafficStats, error) {
+// Alias for internal compat
+type clientTrafficStats = ClientTrafficStats
+
+// GetClientTraffic queries traffic stats for a client by email tag.
+func (v *VlessProvider) GetClientTraffic(email string) (*clientTrafficStats, error) {
 	resp, err := v.doAPIRequest("GET", v.writeAPI()+"/getClientTraffics/"+email, nil)
 	if err != nil {
 		return nil, err
@@ -548,4 +560,61 @@ func (v *VlessProvider) GetActiveClients() (int, error) {
 		}
 	}
 	return count, nil
+}
+
+// ServerTrafficStats holds aggregate traffic data for the admin dashboard.
+type ServerTrafficStats struct {
+	ActiveClients int   `json:"active_clients"`
+	TotalUp       int64 `json:"total_up"`
+	TotalDown     int64 `json:"total_down"`
+	TotalTraffic  int64 `json:"total_traffic"`
+}
+
+// GetServerTraffic returns aggregate traffic stats for all clients in the inbound.
+func (v *VlessProvider) GetServerTraffic() (*ServerTrafficStats, error) {
+	resp, err := v.doAPIRequest("GET", v.readAPI()+"/get/"+fmt.Sprintf("%d", v.cfg.InboundID), nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+
+	var result struct {
+		Success bool `json:"success"`
+		Obj     struct {
+			Up          int64 `json:"up"`
+			Down        int64 `json:"down"`
+			ClientStats []struct {
+				Email  string `json:"email"`
+				Enable bool   `json:"enable"`
+				Up     int64  `json:"up"`
+				Down   int64  `json:"down"`
+			} `json:"clientStats"`
+		} `json:"obj"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("GetServerTraffic parse error: %w", err)
+	}
+
+	stats := &ServerTrafficStats{
+		TotalUp:   result.Obj.Up,
+		TotalDown: result.Obj.Down,
+	}
+	stats.TotalTraffic = stats.TotalUp + stats.TotalDown
+
+	for _, cs := range result.Obj.ClientStats {
+		if cs.Enable {
+			stats.ActiveClients++
+		}
+	}
+
+	return stats, nil
+}
+
+// GetSubscriptionConfig returns the vless:// link for a client by looking up the order in the DB.
+// The caller must provide the activation_key (vless link) and meta from the order.
+func (v *VlessProvider) BuildSubscriptionResponse(activationKey string) string {
+	// Subscription body is base64-encoded list of proxy configs
+	return activationKey
 }

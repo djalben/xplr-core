@@ -497,6 +497,11 @@ func ensureDB() {
 	db.Exec(`UPDATE store_products SET markup_percent = 20 WHERE product_type = 'digital' AND (markup_percent IS NULL OR markup_percent = 0)`)
 	log.Println("[STORE-MARKUP] ✅ cost_price + markup_percent columns ensured")
 
+	// 9c10b2. Add meta column to store_orders (for VPN traffic limits, etc.)
+	if _, err := db.Exec(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS meta TEXT DEFAULT '{}'`); err != nil {
+		log.Printf("[STORE-ORDERS] meta column migration: %v (may already exist, OK)", err)
+	}
+
 	// 9c10c. Backfill image_url for store products and categories
 	productImages := map[string]string{
 		"steam-10":    "https://cdn.simpleicons.org/steam/eeeeee",
@@ -605,6 +610,9 @@ func buildRouter() *mux.Router {
 	// Notification diagnostic (secret-key protected)
 	r.HandleFunc("/api/v1/diag/test-notify", h.DiagTestNotifyHandler).Methods("GET")
 
+	// Public VPN subscription endpoint (called by v2rayNG / Happ Proxy apps)
+	r.HandleFunc("/api/v1/sub/{ref}", h.VPNSubscriptionHandler).Methods("GET")
+
 	// Public card types endpoint
 	r.HandleFunc("/api/v1/cards/types", h.GetCardTypesHandler).Methods("GET")
 
@@ -663,6 +671,7 @@ func buildRouter() *mux.Router {
 	protected.HandleFunc("/store/esim/destinations", h.ESIMDestinationsHandler).Methods("GET")
 	protected.HandleFunc("/store/esim/plans", h.ESIMPlansHandler).Methods("GET")
 	protected.HandleFunc("/store/esim/order", h.ESIMOrderHandler).Methods("POST")
+	protected.HandleFunc("/store/vpn-status", h.VPNKeyStatusHandler).Methods("GET")
 
 	log.Println("Registered route: GET /api/v1/user/dashboard-stats")
 
@@ -753,6 +762,7 @@ func buildRouter() *mux.Router {
 	admin.HandleFunc("/infra/balance", h.GetAezaBalanceHandler).Methods("GET")
 	admin.HandleFunc("/infra/balance/check", h.CheckAezaBalanceHandler).Methods("POST")
 	admin.HandleFunc("/infra/active-keys", h.GetActiveVPNKeysHandler).Methods("GET")
+	admin.HandleFunc("/infra/vpn-server-status", h.AdminVPNServerStatusHandler).Methods("GET")
 
 	log.Println("✅ [ROUTER] All routes registered successfully")
 	return r

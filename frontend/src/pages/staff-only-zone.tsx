@@ -258,6 +258,18 @@ export const StaffOnlyZone = () => {
   const [aezaError, setAezaError] = useState('');
   const [activeKeys, setActiveKeys] = useState<number | null>(null);
 
+  // ── VPN Server Status ──
+  const [vpnServerStatus, setVpnServerStatus] = useState<{
+    active_clients: number;
+    total_upload: number;
+    total_download: number;
+    total_traffic: number;
+    server_limit_bytes: number;
+    server_limit_gb: number;
+    used_percent: number;
+  } | null>(null);
+  const [vpnServerLoading, setVpnServerLoading] = useState(false);
+
   const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
@@ -286,6 +298,15 @@ export const StaffOnlyZone = () => {
       const res = await apiClient.get('/admin/infra/active-keys');
       setActiveKeys(res.data?.active_keys ?? null);
     } catch { /* ignore */ }
+  }, []);
+
+  const fetchVPNServerStatus = useCallback(async () => {
+    setVpnServerLoading(true);
+    try {
+      const res = await apiClient.get('/admin/infra/vpn-server-status');
+      if (!res.data?.error) setVpnServerStatus(res.data);
+    } catch { /* ignore */ }
+    finally { setVpnServerLoading(false); }
   }, []);
 
   // ── Search users ──
@@ -402,7 +423,8 @@ export const StaffOnlyZone = () => {
     fetchStats();
     fetchAezaBalance();
     fetchActiveKeys();
-  }, [fetchStats, fetchAezaBalance, fetchActiveKeys]);
+    fetchVPNServerStatus();
+  }, [fetchStats, fetchAezaBalance, fetchActiveKeys, fetchVPNServerStatus]);
 
   const loadNews = useCallback(async () => {
     try {
@@ -754,6 +776,65 @@ export const StaffOnlyZone = () => {
                 </div>
               ) : (
                 <p className="text-sm text-white/30">Загрузка...</p>
+              )}
+            </div>
+
+            {/* VPN Server Status */}
+            <div className="glass-card p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-indigo-400" />
+                  Состояние сервера
+                </h3>
+                <button onClick={fetchVPNServerStatus} disabled={vpnServerLoading} className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs text-white/60 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50">
+                  {vpnServerLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Обновить'}
+                </button>
+              </div>
+              {vpnServerStatus ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3">
+                      <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Активных клиентов</p>
+                      <p className="text-xl font-bold text-white tabular-nums">{vpnServerStatus.active_clients}</p>
+                    </div>
+                    <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3">
+                      <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Лимит сервера</p>
+                      <p className="text-xl font-bold text-white tabular-nums">{vpnServerStatus.server_limit_gb} ГБ</p>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs text-white/50">Общий трафик</span>
+                      <span className="text-xs text-white/50 tabular-nums">
+                        {(vpnServerStatus.total_traffic / (1024 * 1024 * 1024)).toFixed(1)} / {vpnServerStatus.server_limit_gb} ГБ
+                      </span>
+                    </div>
+                    <div className="h-3 bg-white/5 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          vpnServerStatus.used_percent > 90 ? 'bg-red-500' :
+                          vpnServerStatus.used_percent > 70 ? 'bg-amber-500' : 'bg-emerald-500'
+                        }`}
+                        style={{ width: `${Math.min(vpnServerStatus.used_percent, 100)}%` }}
+                      />
+                    </div>
+                    <p className="text-[10px] text-white/30 mt-1 text-right tabular-nums">
+                      {vpnServerStatus.used_percent.toFixed(1)}% использовано
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-white/5">
+                    <div>
+                      <p className="text-[10px] text-white/40 mb-0.5">↑ Upload</p>
+                      <p className="text-sm font-semibold text-white tabular-nums">{(vpnServerStatus.total_upload / (1024 * 1024 * 1024)).toFixed(2)} ГБ</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-white/40 mb-0.5">↓ Download</p>
+                      <p className="text-sm font-semibold text-white tabular-nums">{(vpnServerStatus.total_download / (1024 * 1024 * 1024)).toFixed(2)} ГБ</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-white/30">{vpnServerLoading ? 'Загрузка...' : 'Нет данных'}</p>
               )}
             </div>
 

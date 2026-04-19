@@ -185,6 +185,9 @@ func main() {
 	// Public SBP status check
 	router.HandleFunc("/api/v1/sbp-status", handler.GetSBPStatusHandler).Methods("GET")
 
+	// Public VPN subscription endpoint (called by v2rayNG / Happ Proxy apps)
+	router.HandleFunc("/api/v1/sub/{ref}", handler.VPNSubscriptionHandler).Methods("GET")
+
 	// --- НАСТРОЙКА ЗАЩИЩЕННЫХ МАРШРУТОВ (Protected Routes) ---
 	// Создаем Subrouter с префиксом /api/v1/user
 	protectedRouter := router.PathPrefix("/api/v1/user").Subrouter()
@@ -300,6 +303,7 @@ func main() {
 	adminRouter.HandleFunc("/infra/balance", handler.GetAezaBalanceHandler).Methods("GET")
 	adminRouter.HandleFunc("/infra/balance/check", handler.CheckAezaBalanceHandler).Methods("POST")
 	adminRouter.HandleFunc("/infra/active-keys", handler.GetActiveVPNKeysHandler).Methods("GET")
+	adminRouter.HandleFunc("/infra/vpn-server-status", handler.AdminVPNServerStatusHandler).Methods("GET")
 	// --------------------------------------------------------
 
 	// CORS: dynamic origins from ALLOWED_ORIGINS env var (comma-separated)

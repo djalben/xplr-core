@@ -122,6 +122,27 @@ export const getESIMPlans = async (countryCode: string): Promise<{ plans: ESIMPl
   return response.data;
 };
 
+// ── VPN Status API ──
+
+export interface VPNKeyStatus {
+  ref: string;
+  status: string; // "active" | "traffic_exhausted" | "disabled"
+  upload: number;
+  download: number;
+  used: number;
+  total: number;
+  remaining: number;
+  exhausted: boolean;
+  expire_ms: number;
+  duration_days: number;
+  used_percent: number;
+}
+
+export const getVPNKeyStatus = async (ref: string): Promise<VPNKeyStatus> => {
+  const response = await apiClient.get('/user/store/vpn-status', { params: { ref } });
+  return response.data;
+};
+
 export const orderESIM = async (plan: ESIMPlan): Promise<ESIMOrderResult> => {
   const response = await apiClient.post('/user/store/esim/order', {
     plan_id: plan.plan_id,

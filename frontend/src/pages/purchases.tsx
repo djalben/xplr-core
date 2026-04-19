@@ -2,10 +2,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FileText, QrCode, Key, Copy, Check, X, Download, Smartphone,
-  ArrowLeft, ShoppingBag, Loader2, Clock, ChevronDown, ChevronUp, Wifi
+  ArrowLeft, ShoppingBag, Loader2, Clock, ChevronDown, ChevronUp, Wifi, Shield, AlertTriangle
 } from 'lucide-react';
 import { DashboardLayout } from '../components/dashboard-layout';
-import { getStoreOrders, type StoreOrder } from '../services/store';
+import { getStoreOrders, getVPNKeyStatus, type StoreOrder, type VPNKeyStatus } from '../services/store';
 
 // ── Country flag emoji ──
 const countryFlag = (code: string) => {
@@ -227,6 +227,90 @@ const OrderSkeleton = () => (
   </div>
 );
 
+// ── Format bytes to human-readable ──
+const formatBytes = (bytes: number): string => {
+  if (bytes <= 0) return '0 B';
+  const gb = bytes / (1024 * 1024 * 1024);
+  if (gb >= 1) return `${gb.toFixed(1)} ГБ`;
+  const mb = bytes / (1024 * 1024);
+  if (mb >= 1) return `${mb.toFixed(1)} МБ`;
+  return `${(bytes / 1024).toFixed(0)} КБ`;
+};
+
+// ── VPN Traffic Status Bar ──
+const VPNTrafficBar = ({ providerRef }: { providerRef: string }) => {
+  const [status, setStatus] = useState<VPNKeyStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!providerRef) return;
+    setLoading(true);
+    getVPNKeyStatus(providerRef)
+      .then(setStatus)
+      .catch(() => setStatus(null))
+      .finally(() => setLoading(false));
+  }, [providerRef]);
+
+  if (loading) {
+    return (
+      <div className="mt-3 pt-3 border-t border-white/5">
+        <div className="h-2 bg-white/5 rounded-full animate-pulse" />
+      </div>
+    );
+  }
+
+  if (!status || status.total === 0) return null;
+
+  const pct = Math.min(status.used_percent, 100);
+  const barColor = status.exhausted
+    ? 'bg-red-500'
+    : pct > 80
+      ? 'bg-amber-500'
+      : 'bg-emerald-500';
+
+  return (
+    <div className="mt-3 pt-3 border-t border-white/5">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[11px] text-slate-400">Трафик</span>
+        <span className="text-[11px] text-slate-500">
+          {formatBytes(status.used)} / {formatBytes(status.total)}
+        </span>
+      </div>
+      <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      {status.exhausted && (
+        <div className="mt-2 flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-red-400">
+            <AlertTriangle className="w-3.5 h-3.5" />
+            <span className="text-xs font-semibold">Трафик закончился</span>
+          </div>
+          <button
+            onClick={(e) => { e.stopPropagation(); navigate('/store'); }}
+            className="text-[11px] text-blue-400 hover:text-blue-300 font-medium transition-colors"
+          >
+            Купить новый пакет
+          </button>
+        </div>
+      )}
+      {!status.exhausted && status.expire_ms > 0 && (
+        <div className="mt-1.5 flex items-center justify-between">
+          <span className="text-[10px] text-slate-500">
+            {pct.toFixed(0)}% использовано
+          </span>
+          <span className="text-[10px] text-slate-500">
+            до {new Date(status.expire_ms).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ══════════════════════════════════════════════════════════════
 // Purchases Page
 // ══════════════════════════════════════════════════════════════
@@ -261,6 +345,7 @@ export const PurchasesPage = () => {
   };
 
   const hasActivationData = (order: StoreOrder) => !!(order.qr_data || order.activation_key);
+  const isVPN = (order: StoreOrder) => order.activation_key?.startsWith('vless://') || order.product_name?.includes('VPN') || order.product_name?.includes('Безопасный доступ');
 
   return (
     <DashboardLayout>
@@ -304,7 +389,8 @@ export const PurchasesPage = () => {
           <div className="space-y-3">
             {orders.map(order => {
               const status = statusLabel(order.status);
-              const isEsim = !!order.qr_data;
+              const isEsim = !!order.qr_data && !isVPN(order);
+              const vpn = isVPN(order);
               return (
                 <div
                   key={order.id}
@@ -318,11 +404,13 @@ export const PurchasesPage = () => {
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                        isEsim
-                          ? 'bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-blue-500/30'
-                          : 'bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30'
+                        vpn
+                          ? 'bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30'
+                          : isEsim
+                            ? 'bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-blue-500/30'
+                            : 'bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30'
                       }`}>
-                        {isEsim ? <Wifi className="w-5 h-5 text-blue-400" /> : <Key className="w-5 h-5 text-purple-400" />}
+                        {vpn ? <Shield className="w-5 h-5 text-indigo-400" /> : isEsim ? <Wifi className="w-5 h-5 text-blue-400" /> : <Key className="w-5 h-5 text-purple-400" />}
                       </div>
                       <div>
                         <h3 className="text-sm font-bold text-white">{order.product_name}</h3>
@@ -341,8 +429,13 @@ export const PurchasesPage = () => {
                     </div>
                   </div>
 
+                  {/* VPN traffic bar */}
+                  {vpn && order.provider_ref && (
+                    <VPNTrafficBar providerRef={order.provider_ref} />
+                  )}
+
                   {/* Quick info */}
-                  {hasActivationData(order) && (
+                  {hasActivationData(order) && !vpn && (
                     <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
                       <div className="flex items-center gap-2">
                         {isEsim ? (
@@ -355,6 +448,14 @@ export const PurchasesPage = () => {
                           </span>
                         )}
                       </div>
+                      <span className="text-[11px] text-slate-500">Нажмите для просмотра</span>
+                    </div>
+                  )}
+                  {vpn && hasActivationData(order) && (
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
+                      <span className="inline-flex items-center gap-1 text-[11px] text-indigo-400/70">
+                        <Shield className="w-3 h-3" /> VPN ключ доступен
+                      </span>
                       <span className="text-[11px] text-slate-500">Нажмите для просмотра</span>
                     </div>
                   )}
