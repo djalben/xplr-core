@@ -125,6 +125,42 @@ func TestVlessPurchaseChain(t *testing.T) {
 	t.Logf("[VLESS] ✅ Created key successfully: ref=%s link=%s...", result.ProviderRef, result.ActivationKey[:min(60, len(result.ActivationKey))])
 }
 
+// TestSelfHealingRegistration simulates the critical Vercel scenario:
+// vless provider is NOT in registry (cold-start failure), but gets registered on-the-fly during purchase.
+func TestSelfHealingRegistration(t *testing.T) {
+	r := &Registry{providers: make(map[string]ProductProvider)}
+	r.Register(NewDemoProvider())
+
+	// Initially: only demo is registered (simulating the Vercel bug)
+	provider := r.Get("vless")
+	if provider != nil {
+		t.Fatal("vless should NOT be registered yet")
+	}
+	t.Log("[SELF-HEAL] Step 1: vless not in registry (reproducing bug)")
+
+	// Simulate self-healing: register vless on-the-fly
+	vp := &mockVlessProvider{}
+	r.Register(vp)
+	t.Log("[SELF-HEAL] Step 2: on-the-fly registration attempted")
+
+	// Now it should be available
+	provider = r.Get("vless")
+	if provider == nil {
+		t.Fatal("CRITICAL: vless still not in registry after on-the-fly registration")
+	}
+	t.Log("[SELF-HEAL] Step 3: vless found in registry after self-heal")
+
+	// Complete a purchase
+	result, err := provider.CreateOrder("vless-stockholm-7d")
+	if err != nil {
+		t.Fatalf("CreateOrder failed after self-heal: %v", err)
+	}
+	if result.ActivationKey == "" || result.ActivationKey[:8] != "vless://" {
+		t.Fatalf("Invalid activation key after self-heal: %q", result.ActivationKey)
+	}
+	t.Logf("[SELF-HEAL] ✅ Purchase succeeded after self-healing: %s...", result.ActivationKey[:min(60, len(result.ActivationKey))])
+}
+
 // TestVPNRetailPriceIntegrity verifies that VPN retail prices match the business requirement
 // and are not overwritten by markup calculations.
 func TestVPNRetailPriceIntegrity(t *testing.T) {

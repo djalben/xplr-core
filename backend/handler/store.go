@@ -30,25 +30,43 @@ var (
 
 // InitShopInfrastructure wires up the internal/shop package with DB, notifications, and email.
 // Must be called once after GlobalDB is set (e.g. in main.go).
+// Wrapped in panic recovery to prevent crashing the entire init chain.
 func InitShopInfrastructure() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("🚨🚨🚨 [SHOP] PANIC in InitShopInfrastructure: %v", r)
+		}
+	}()
+
 	if GlobalDB == nil {
 		log.Println("[SHOP] ⚠️ Cannot init shop infrastructure — DB not ready")
 		return
 	}
+
+	log.Println("[SHOP] 🔧 InitShopInfrastructure starting...")
 
 	// Init markup cache with DB reference
 	shop.InitMarkup(GlobalDB)
 
 	// Get provider registry and register demo (auto-registered)
 	registry := shop.GetRegistry()
+	log.Printf("[SHOP] Registry obtained, current providers: %d", len(registry.All()))
 
 	// Register VLESS VPN provider (if configured)
 	if vp := vless.NewVlessProvider(); vp != nil {
 		registry.Register(vp)
 		log.Println("[SHOP] ✅ VlessProvider registered successfully")
 	} else {
-		log.Println("[SHOP] ⚠️ VlessProvider NOT registered — XPANEL_URL env var missing or empty")
+		log.Printf("[SHOP] ⚠️ VlessProvider NOT registered — XPANEL_URL=%q", os.Getenv("XPANEL_URL"))
 	}
+
+	// Log final registry state
+	all := registry.All()
+	names := make([]string, len(all))
+	for i, p := range all {
+		names[i] = p.Name()
+	}
+	log.Printf("[SHOP] Registry after init: %v", names)
 
 	// Create fulfillment engine
 	shopFulfillment = shop.NewFulfillmentEngine(
@@ -487,19 +505,29 @@ func callDemoProvider(product StoreProduct) (string, string, string, error) {
 	return key, "", ref, nil
 }
 
-// Vless — uses the real VlessProvider from the shop registry
+// Vless — uses the real VlessProvider from the shop registry.
+// Self-healing: if the provider is missing (e.g. cold-start env race), tries to register it on-the-fly.
 func callVlessProvider(product StoreProduct) (string, string, string, error) {
 	registry := shop.GetRegistry()
 	provider := registry.Get("vless")
+
+	// ── Self-healing: if provider missing, attempt on-the-fly registration ──
 	if provider == nil {
-		// Log all registered providers for debugging
-		all := registry.All()
-		names := make([]string, len(all))
-		for i, p := range all {
-			names[i] = p.Name()
+		log.Println("[VLESS-PURCHASE] ⚠️ vless not in registry — attempting on-the-fly registration...")
+		if vp := vless.NewVlessProvider(); vp != nil {
+			registry.Register(vp)
+			provider = vp
+			log.Println("[VLESS-PURCHASE] ✅ On-the-fly registration succeeded!")
+		} else {
+			all := registry.All()
+			names := make([]string, len(all))
+			for i, p := range all {
+				names[i] = p.Name()
+			}
+			log.Printf("[VLESS-PURCHASE] ❌ FATAL: vless provider cannot be created. XPANEL_URL=%q. Registered: %v",
+				os.Getenv("XPANEL_URL"), names)
+			return "", "", "", fmt.Errorf("vless provider not registered — check XPANEL_URL env var (registered: %v)", names)
 		}
-		log.Printf("[VLESS-PURCHASE] ❌ vless provider not found in registry. Registered providers: %v", names)
-		return "", "", "", fmt.Errorf("vless provider not registered (registered: %v)", names)
 	}
 
 	vp, ok := provider.(*vless.VlessProvider)
@@ -512,7 +540,15 @@ func callVlessProvider(product StoreProduct) (string, string, string, error) {
 		return "", "", "", fmt.Errorf("vless CreateOrder failed: %w", err)
 	}
 
-	log.Printf("[VLESS-PURCHASE] ✅ Key created: ref=%s link=%s...", result.ProviderRef, result.ActivationKey[:min(60, len(result.ActivationKey))])
+	if len(result.ActivationKey) == 0 {
+		return "", "", "", fmt.Errorf("vless CreateOrder returned empty activation key")
+	}
+
+	linkPreview := result.ActivationKey
+	if len(linkPreview) > 60 {
+		linkPreview = linkPreview[:60]
+	}
+	log.Printf("[VLESS-PURCHASE] ✅ Key created: ref=%s link=%s...", result.ProviderRef, linkPreview)
 
 	// activation_key = vless:// URI, qr_data = same URI (scannable), provider_ref = email tag
 	return result.ActivationKey, result.QRData, result.ProviderRef, nil

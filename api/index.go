@@ -760,6 +760,16 @@ func buildRouter() *mux.Router {
 
 // Handler is the Vercel serverless entry point.
 func Handler(w http.ResponseWriter, r *http.Request) {
+	// Global panic recovery — prevents Vercel 502 from unhandled panics
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Printf("🚨🚨🚨 [HANDLER] PANIC recovered: %v", rec)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(`{"error":"Internal server error (panic recovered). Check Vercel logs."}`))
+		}
+	}()
+
 	ensureRouter()
 	ensureDB()
 
