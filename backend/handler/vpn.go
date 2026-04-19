@@ -9,10 +9,12 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/djalben/xplr-core/backend/middleware"
 	"github.com/djalben/xplr-core/backend/providers/vless"
 	"github.com/djalben/xplr-core/backend/shop"
+	"github.com/djalben/xplr-core/backend/telegram"
 )
 
 // ══════════════════════════════════════════════════════════════
@@ -160,17 +162,17 @@ func VPNKeyStatusHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
-		"ref":            ref,
-		"status":         status,
-		"upload":         upload,
-		"download":       download,
-		"used":           used,
-		"total":          total,
-		"remaining":      remaining,
-		"exhausted":      exhausted,
-		"expire_ms":      meta.ExpireMs,
-		"duration_days":  meta.DurationDays,
-		"used_percent":   safePercent(used, total),
+		"ref":           ref,
+		"status":        status,
+		"upload":        upload,
+		"download":      download,
+		"used":          used,
+		"total":         total,
+		"remaining":     remaining,
+		"exhausted":     exhausted,
+		"expire_ms":     meta.ExpireMs,
+		"duration_days": meta.DurationDays,
+		"used_percent":  safePercent(used, total),
 	})
 }
 
@@ -187,7 +189,8 @@ func safePercent(used, total int64) float64 {
 
 // ══════════════════════════════════════════════════════════════
 // GET /api/v1/admin/infra/vpn-server-status — Admin server monitoring
-// Returns aggregate traffic, active clients, and % of server limit.
+// Returns aggregate traffic, active clients, % of server limit,
+// and financial metrics (revenue, cost, margin).
 // ══════════════════════════════════════════════════════════════
 
 func AdminVPNServerStatusHandler(w http.ResponseWriter, r *http.Request) {
@@ -195,26 +198,20 @@ func AdminVPNServerStatusHandler(w http.ResponseWriter, r *http.Request) {
 
 	provider := shop.GetRegistry().Get("vless")
 	if provider == nil {
-		json.NewEncoder(w).Encode(map[string]any{
-			"error": "vless provider not registered",
-		})
+		json.NewEncoder(w).Encode(map[string]any{"error": "vless provider not registered"})
 		return
 	}
 
 	vp, ok := provider.(*vless.VlessProvider)
 	if !ok {
-		json.NewEncoder(w).Encode(map[string]any{
-			"error": "provider type assertion failed",
-		})
+		json.NewEncoder(w).Encode(map[string]any{"error": "provider type assertion failed"})
 		return
 	}
 
 	stats, err := vp.GetServerTraffic()
 	if err != nil {
 		log.Printf("[VPN-SERVER-STATUS] ❌ GetServerTraffic error: %v", err)
-		json.NewEncoder(w).Encode(map[string]any{
-			"error": err.Error(),
-		})
+		json.NewEncoder(w).Encode(map[string]any{"error": err.Error()})
 		return
 	}
 
@@ -235,6 +232,37 @@ func AdminVPNServerStatusHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// ── Financial metrics ──
+	// Monthly server cost from env (EUR)
+	serverCostEUR := 4.94
+	if envCost := os.Getenv("VPN_SERVER_MONTHLY_COST"); envCost != "" {
+		if v, err := strconv.ParseFloat(envCost, 64); err == nil && v > 0 {
+			serverCostEUR = v
+		}
+	}
+
+	// Revenue: sum of all completed VPN orders this month
+	var monthlyRevenue float64
+	if GlobalDB != nil {
+		_ = GlobalDB.QueryRow(`
+			SELECT COALESCE(SUM(price_usd), 0)
+			FROM store_orders
+			WHERE status = 'completed'
+			  AND product_name ILIKE '%vpn%' OR product_name ILIKE '%vless%' OR product_name ILIKE '%безопасный%'
+			  AND created_at >= date_trunc('month', NOW())
+		`).Scan(&monthlyRevenue)
+	}
+
+	margin := monthlyRevenue - serverCostEUR
+
+	// ── Traffic alert (>90%) ──
+	trafficAlert := false
+	if usedPercent >= 90 {
+		trafficAlert = true
+		// Fire async admin TG alert (dedup via log — in production use a flag/cache)
+		go notifyTrafficCritical(usedPercent, stats.TotalTraffic, serverLimitBytes)
+	}
+
 	json.NewEncoder(w).Encode(map[string]any{
 		"active_clients":     stats.ActiveClients,
 		"total_upload":       stats.TotalUp,
@@ -243,5 +271,182 @@ func AdminVPNServerStatusHandler(w http.ResponseWriter, r *http.Request) {
 		"server_limit_bytes": serverLimitBytes,
 		"server_limit_gb":    serverLimitGB,
 		"used_percent":       usedPercent,
+		"traffic_alert":      trafficAlert,
+		// Financial
+		"monthly_revenue": monthlyRevenue,
+		"server_cost":     serverCostEUR,
+		"margin":          margin,
 	})
+}
+
+// ══════════════════════════════════════════════════════════════
+// GET /api/v1/admin/infra/vpn-active-clients — Active VPN users list
+// Returns email, tariff, used GB, expiry for each active client.
+// ══════════════════════════════════════════════════════════════
+
+func AdminVPNActiveClientsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if GlobalDB == nil {
+		json.NewEncoder(w).Encode(map[string]any{"error": "DB not ready"})
+		return
+	}
+
+	// Fetch all completed VPN orders with meta
+	rows, err := GlobalDB.Query(`
+		SELECT o.provider_ref, o.product_name, o.price_usd, o.created_at,
+		       COALESCE(o.meta, '{}'),
+		       COALESCE(u.email, '')
+		FROM store_orders o
+		LEFT JOIN users u ON u.id = o.user_id
+		WHERE o.status = 'completed'
+		  AND o.provider_ref != ''
+		  AND (o.activation_key LIKE 'vless://%' OR o.product_name ILIKE '%vpn%' OR o.product_name ILIKE '%безопасный%')
+		ORDER BY o.created_at DESC
+	`)
+	if err != nil {
+		log.Printf("[VPN-ACTIVE-CLIENTS] ❌ Query error: %v", err)
+		json.NewEncoder(w).Encode(map[string]any{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	type clientRow struct {
+		Email        string  `json:"email"`
+		ProductName  string  `json:"product_name"`
+		PriceUSD     float64 `json:"price_usd"`
+		CreatedAt    string  `json:"created_at"`
+		ProviderRef  string  `json:"provider_ref"`
+		TrafficBytes int64   `json:"traffic_bytes"`
+		ExpireMs     int64   `json:"expire_ms"`
+		DurationDays int     `json:"duration_days"`
+		UsedBytes    int64   `json:"used_bytes"`
+		UsedPercent  float64 `json:"used_percent"`
+		Active       bool    `json:"active"`
+	}
+
+	// Get VlessProvider for live traffic queries
+	var vp *vless.VlessProvider
+	provider := shop.GetRegistry().Get("vless")
+	if provider != nil {
+		vp, _ = provider.(*vless.VlessProvider)
+	}
+
+	var clients []clientRow
+	for rows.Next() {
+		var ref, productName, email, metaStr string
+		var priceUSD float64
+		var createdAt string
+		if err := rows.Scan(&ref, &productName, &priceUSD, &createdAt, &metaStr, &email); err != nil {
+			continue
+		}
+
+		var meta struct {
+			TrafficBytes int64 `json:"traffic_bytes"`
+			ExpireMs     int64 `json:"expire_ms"`
+			DurationDays int   `json:"duration_days"`
+		}
+		json.Unmarshal([]byte(metaStr), &meta)
+
+		// Query live traffic
+		var usedBytes int64
+		if vp != nil {
+			if stats, err := vp.GetClientTraffic(ref); err == nil {
+				usedBytes = stats.Up + stats.Down
+			}
+		}
+
+		usedPct := float64(0)
+		if meta.TrafficBytes > 0 {
+			usedPct = float64(usedBytes) / float64(meta.TrafficBytes) * 100
+			if usedPct > 100 {
+				usedPct = 100
+			}
+		}
+
+		// Consider active if not expired and traffic not exhausted
+		nowMs := time.Now().UnixMilli()
+		active := (meta.ExpireMs == 0 || nowMs < meta.ExpireMs) && (meta.TrafficBytes == 0 || usedBytes < meta.TrafficBytes)
+
+		clients = append(clients, clientRow{
+			Email:        email,
+			ProductName:  productName,
+			PriceUSD:     priceUSD,
+			CreatedAt:    createdAt,
+			ProviderRef:  ref,
+			TrafficBytes: meta.TrafficBytes,
+			ExpireMs:     meta.ExpireMs,
+			DurationDays: meta.DurationDays,
+			UsedBytes:    usedBytes,
+			UsedPercent:  usedPct,
+			Active:       active,
+		})
+	}
+	if clients == nil {
+		clients = []clientRow{}
+	}
+
+	json.NewEncoder(w).Encode(map[string]any{"clients": clients})
+}
+
+// ══════════════════════════════════════════════════════════════
+// Traffic critical alert — sends TG notification to all admins
+// when server traffic exceeds 90%.
+// ══════════════════════════════════════════════════════════════
+
+func notifyTrafficCritical(usedPct float64, totalTraffic, limitBytes int64) {
+	usedGB := float64(totalTraffic) / (1024 * 1024 * 1024)
+	limitGB := float64(limitBytes) / (1024 * 1024 * 1024)
+	msg := fmt.Sprintf("🚨 <b>КРИТИЧЕСКИЙ АЛЕРТ: Трафик сервера</b>\n\n"+
+		"Использовано: <b>%.1f%%</b> (%.1f / %.0f ГБ)\n\n"+
+		"⚠️ Серверный лимит трафика почти исчерпан.\n"+
+		"Рекомендуется увеличить лимит или ограничить новые подключения.",
+		usedPct, usedGB, limitGB)
+	telegram.NotifyAdmins(msg, "", "")
+}
+
+// ══════════════════════════════════════════════════════════════
+// NotifyAdminVPNPurchase — sends TG notification to admins
+// after each VPN purchase with order details + monthly margin.
+// Called from notifyStorePurchase when product is VPN.
+// ══════════════════════════════════════════════════════════════
+
+func NotifyAdminVPNPurchase(productName string, priceUSD string, userEmail string) {
+	// Get monthly revenue
+	var monthlyRevenue float64
+	if GlobalDB != nil {
+		_ = GlobalDB.QueryRow(`
+			SELECT COALESCE(SUM(price_usd), 0)
+			FROM store_orders
+			WHERE status = 'completed'
+			  AND (product_name ILIKE '%vpn%' OR product_name ILIKE '%vless%' OR product_name ILIKE '%безопасный%')
+			  AND created_at >= date_trunc('month', NOW())
+		`).Scan(&monthlyRevenue)
+	}
+
+	serverCost := 4.94
+	if envCost := os.Getenv("VPN_SERVER_MONTHLY_COST"); envCost != "" {
+		if v, err := strconv.ParseFloat(envCost, 64); err == nil && v > 0 {
+			serverCost = v
+		}
+	}
+	margin := monthlyRevenue - serverCost
+
+	marginEmoji := "📈"
+	if margin < 0 {
+		marginEmoji = "📉"
+	}
+
+	msg := fmt.Sprintf("🔐 <b>Новая VPN-покупка</b>\n\n"+
+		"👤 %s\n"+
+		"📦 %s\n"+
+		"💰 €%s\n\n"+
+		"<b>Месячная аналитика:</b>\n"+
+		"Выручка: €%.2f\n"+
+		"Затраты: €%.2f\n"+
+		"%s Маржа: €%.2f",
+		userEmail, productName, priceUSD,
+		monthlyRevenue, serverCost, marginEmoji, margin)
+
+	telegram.NotifyAdmins(msg, "Открыть админку", "https://xplr.pro/staff-only-zone")
 }

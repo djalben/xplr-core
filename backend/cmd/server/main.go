@@ -304,6 +304,7 @@ func main() {
 	adminRouter.HandleFunc("/infra/balance/check", handler.CheckAezaBalanceHandler).Methods("POST")
 	adminRouter.HandleFunc("/infra/active-keys", handler.GetActiveVPNKeysHandler).Methods("GET")
 	adminRouter.HandleFunc("/infra/vpn-server-status", handler.AdminVPNServerStatusHandler).Methods("GET")
+	adminRouter.HandleFunc("/infra/vpn-active-clients", handler.AdminVPNActiveClientsHandler).Methods("GET")
 	// --------------------------------------------------------
 
 	// CORS: dynamic origins from ALLOWED_ORIGINS env var (comma-separated)

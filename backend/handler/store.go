@@ -596,6 +596,12 @@ func callRazerGold(product StoreProduct) (string, string, string, error) {
 // ══════════════════════════════════════════════════════════════
 
 func notifyStorePurchase(userID int, product StoreProduct, activationKey, qrData string) {
+	// ── VPN-specific notifications ──
+	if product.Provider == "vless" || product.ProductType == "vpn" {
+		go notifyVPNPurchase(userID, product, activationKey)
+		return
+	}
+
 	var resultInfo string
 	if qrData != "" {
 		resultInfo = "QR-код для активации eSIM отправлен ниже."
@@ -659,6 +665,100 @@ func notifyStorePurchase(userID int, product StoreProduct, activationKey, qrData
 				log.Printf("[STORE-NOTIFY] ❌ Email to user %d failed: %v", userID, err)
 			}
 		}()
+	}
+}
+
+// notifyVPNPurchase sends VPN-specific email with VLESS link + app download buttons
+// and notifies admins via TG with financial summary.
+func notifyVPNPurchase(userID int, product StoreProduct, activationKey string) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[VPN-NOTIFY-PANIC] %v", r)
+		}
+	}()
+
+	user, err := repository.GetUserByID(userID)
+	if err != nil {
+		log.Printf("[VPN-NOTIFY] ❌ Cannot fetch user %d: %v", userID, err)
+		return
+	}
+
+	// 1. Admin TG notification with margin
+	go NotifyAdminVPNPurchase(product.Name, product.PriceUSD.StringFixed(2), user.Email)
+
+	// 2. User TG notification
+	tgMsg := fmt.Sprintf("🔐 <b>VPN подключен!</b>\n\n"+
+		"📦 Тариф: <b>%s</b>\n"+
+		"💰 Цена: <b>€%s</b>\n\n"+
+		"Ваш ключ подключения уже отправлен на email.\n\n"+
+		"📱 Скачайте приложение:\n"+
+		"• <a href=\"https://play.google.com/store/apps/details?id=com.v2ray.ang\">v2rayNG (Android)</a>\n"+
+		"• <a href=\"https://apps.apple.com/app/happ-proxy-utility/id6504287215\">Happ Proxy (iOS)</a>\n\n"+
+		"<a href=\"https://xplr.pro/purchases\">Мои покупки</a>",
+		product.Name, product.PriceUSD.StringFixed(2))
+	service.NotifyUser(userID, "VPN подключен — XPLR", tgMsg)
+
+	// 3. Email with VLESS link + download buttons
+	if user.Email == "" {
+		return
+	}
+
+	// Truncate key for display
+	keyPreview := activationKey
+	if len(keyPreview) > 80 {
+		keyPreview = keyPreview[:80] + "..."
+	}
+
+	emailBody := fmt.Sprintf(`
+		<p style="color:#FFFFFF;font-size:16px;line-height:1.6;margin:0 0 8px;">🔐 VPN подключен!</p>
+		<p style="color:#d1d5db;font-size:14px;line-height:1.6;margin:0 0 24px;">Ваш тариф <strong style="color:#fff;">%s</strong> успешно активирован.</p>
+
+		<!-- VLESS Key -->
+		<div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);border-radius:12px;padding:20px;margin:0 0 24px;">
+			<p style="color:#a5b4fc;font-size:12px;margin:0 0 8px;text-transform:uppercase;letter-spacing:1px;">Ваш ключ подключения</p>
+			<p style="color:#fff;font-size:11px;font-family:monospace;word-break:break-all;line-height:1.5;margin:0 0 12px;background:rgba(0,0,0,0.3);padding:12px;border-radius:8px;">%s</p>
+			<p style="color:#9ca3af;font-size:11px;margin:0;">Скопируйте эту ссылку и вставьте в приложение VPN-клиента.</p>
+		</div>
+
+		<!-- App Download Buttons -->
+		<p style="color:#e2e8f0;font-size:14px;font-weight:700;margin:0 0 16px;">📱 Скачайте приложение:</p>
+		<table width="100%%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+			<tr>
+				<td style="padding:0 8px 8px 0;">
+					<a href="https://play.google.com/store/apps/details?id=com.v2ray.ang" style="display:block;padding:14px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:12px;text-align:center;text-decoration:none;">
+						<span style="color:#4ade80;font-size:14px;font-weight:600;">🤖 v2rayNG</span><br/>
+						<span style="color:#9ca3af;font-size:11px;">Android</span>
+					</a>
+				</td>
+				<td style="padding:0 0 8px 8px;">
+					<a href="https://apps.apple.com/app/happ-proxy-utility/id6504287215" style="display:block;padding:14px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);border-radius:12px;text-align:center;text-decoration:none;">
+						<span style="color:#60a5fa;font-size:14px;font-weight:600;">🍎 Happ Proxy</span><br/>
+						<span style="color:#9ca3af;font-size:11px;">iOS / macOS</span>
+					</a>
+				</td>
+			</tr>
+		</table>
+
+		<!-- Instructions -->
+		<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px 20px;margin:0 0 24px;">
+			<p style="color:#e2e8f0;font-size:13px;font-weight:700;margin:0 0 12px;">Как подключить:</p>
+			<p style="color:#94a3b8;font-size:13px;line-height:1.7;margin:0;">
+				1. Скачайте приложение для вашего устройства<br/>
+				2. Откройте приложение → нажмите «+» → «Импорт из буфера обмена»<br/>
+				3. Скопируйте ключ выше и вставьте его<br/>
+				4. Нажмите кнопку подключения ▶️
+			</p>
+		</div>
+
+		<div style="text-align:center;">
+			<a href="https://xplr.pro/purchases" style="display:inline-block;padding:14px 40px;background:linear-gradient(135deg,#4338CA,#7C3AED);color:#fff;text-decoration:none;border-radius:12px;font-size:14px;font-weight:600;">Мои покупки</a>
+		</div>`,
+		product.Name, activationKey)
+
+	if err := service.SendGenericEmail(user.Email, "VPN подключен — ваш ключ доступа", emailBody); err != nil {
+		log.Printf("[VPN-NOTIFY] ❌ Email to user %d (%s) failed: %v", userID, user.Email, err)
+	} else {
+		log.Printf("[VPN-NOTIFY] ✅ VPN email sent to %s", user.Email)
 	}
 }
 

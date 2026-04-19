@@ -267,8 +267,27 @@ export const StaffOnlyZone = () => {
     server_limit_bytes: number;
     server_limit_gb: number;
     used_percent: number;
+    traffic_alert: boolean;
+    monthly_revenue: number;
+    server_cost: number;
+    margin: number;
   } | null>(null);
   const [vpnServerLoading, setVpnServerLoading] = useState(false);
+
+  // ── VPN Active Clients ──
+  const [vpnClients, setVpnClients] = useState<{
+    email: string;
+    product_name: string;
+    price_usd: number;
+    created_at: string;
+    provider_ref: string;
+    traffic_bytes: number;
+    expire_ms: number;
+    duration_days: number;
+    used_bytes: number;
+    used_percent: number;
+    active: boolean;
+  }[]>([]);
 
   const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
     setToast({ msg, type });
@@ -307,6 +326,13 @@ export const StaffOnlyZone = () => {
       if (!res.data?.error) setVpnServerStatus(res.data);
     } catch { /* ignore */ }
     finally { setVpnServerLoading(false); }
+  }, []);
+
+  const fetchVPNActiveClients = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/admin/infra/vpn-active-clients');
+      setVpnClients(res.data?.clients || []);
+    } catch { /* ignore */ }
   }, []);
 
   // ── Search users ──
@@ -424,7 +450,8 @@ export const StaffOnlyZone = () => {
     fetchAezaBalance();
     fetchActiveKeys();
     fetchVPNServerStatus();
-  }, [fetchStats, fetchAezaBalance, fetchActiveKeys, fetchVPNServerStatus]);
+    fetchVPNActiveClients();
+  }, [fetchStats, fetchAezaBalance, fetchActiveKeys, fetchVPNServerStatus, fetchVPNActiveClients]);
 
   const loadNews = useCallback(async () => {
     try {
@@ -726,36 +753,72 @@ export const StaffOnlyZone = () => {
               <StatCard icon={CreditCard} label="Всего карт" value={stats?.total_cards ?? '—'} accent="bg-slate-500" />
             </div>
 
-            {/* VPN Server Status + Active Keys */}
+            {/* ── Финансы VPN ── */}
+            {vpnServerStatus && (
+              <div className="glass-card p-6">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
+                  <DollarSign className="w-5 h-5 text-emerald-400" />
+                  Финансы VPN (текущий месяц)
+                </h3>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-emerald-500/[0.08] border border-emerald-500/20 rounded-xl p-4">
+                    <p className="text-[10px] text-emerald-400/60 uppercase tracking-wider mb-1">Выручка</p>
+                    <p className="text-2xl font-bold text-emerald-400 tabular-nums">€{vpnServerStatus.monthly_revenue?.toFixed(2) ?? '0.00'}</p>
+                  </div>
+                  <div className="bg-red-500/[0.06] border border-red-500/15 rounded-xl p-4">
+                    <p className="text-[10px] text-red-400/60 uppercase tracking-wider mb-1">Затраты</p>
+                    <p className="text-2xl font-bold text-red-400 tabular-nums">€{vpnServerStatus.server_cost?.toFixed(2) ?? '4.94'}</p>
+                  </div>
+                  <div className={`${(vpnServerStatus.margin ?? 0) >= 0 ? 'bg-blue-500/[0.08] border-blue-500/20' : 'bg-amber-500/[0.08] border-amber-500/20'} border rounded-xl p-4`}>
+                    <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Прибыль</p>
+                    <p className={`text-2xl font-bold tabular-nums ${(vpnServerStatus.margin ?? 0) >= 0 ? 'text-blue-400' : 'text-amber-400'}`}>
+                      {(vpnServerStatus.margin ?? 0) >= 0 ? '+' : ''}€{vpnServerStatus.margin?.toFixed(2) ?? '0.00'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Здоровье сервера ── */}
             <div className="glass-card p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
                   <Shield className="w-5 h-5 text-indigo-400" />
-                  Состояние сервера
+                  Здоровье сервера
                 </h3>
-                <button onClick={() => { fetchVPNServerStatus(); fetchActiveKeys(); }} disabled={vpnServerLoading} className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs text-white/60 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50">
+                <button onClick={() => { fetchVPNServerStatus(); fetchActiveKeys(); fetchVPNActiveClients(); }} disabled={vpnServerLoading} className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs text-white/60 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50">
                   {vpnServerLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Обновить'}
                 </button>
               </div>
               {vpnServerStatus ? (
                 <div className="space-y-4">
+                  {/* Traffic alert banner */}
+                  {vpnServerStatus.traffic_alert && (
+                    <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20">
+                      <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                      <p className="text-sm text-red-400 font-medium">Трафик сервера превышает 90% — рекомендуется увеличить лимит!</p>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-3 gap-3">
                     <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3">
                       <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Активных ключей</p>
                       <p className="text-xl font-bold text-white tabular-nums">{activeKeys !== null ? activeKeys : vpnServerStatus.active_clients}</p>
                     </div>
                     <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3">
-                      <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Активных клиентов</p>
+                      <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Клиентов</p>
                       <p className="text-xl font-bold text-white tabular-nums">{vpnServerStatus.active_clients}</p>
                     </div>
                     <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3">
-                      <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Лимит сервера</p>
+                      <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Лимит</p>
                       <p className="text-xl font-bold text-white tabular-nums">{vpnServerStatus.server_limit_gb} ГБ</p>
                     </div>
                   </div>
+
+                  {/* Traffic bar */}
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs text-white/50">Общий трафик</span>
+                      <span className="text-xs text-white/50">Трафик сервера</span>
                       <span className="text-xs text-white/50 tabular-nums">
                         {(vpnServerStatus.total_traffic / (1024 * 1024 * 1024)).toFixed(1)} / {vpnServerStatus.server_limit_gb} ГБ
                       </span>
@@ -773,6 +836,8 @@ export const StaffOnlyZone = () => {
                       {vpnServerStatus.used_percent.toFixed(1)}% использовано
                     </p>
                   </div>
+
+                  {/* Upload / Download */}
                   <div className="grid grid-cols-2 gap-3 pt-2 border-t border-white/5">
                     <div>
                       <p className="text-[10px] text-white/40 mb-0.5">↑ Upload</p>
@@ -783,11 +848,88 @@ export const StaffOnlyZone = () => {
                       <p className="text-sm font-semibold text-white tabular-nums">{(vpnServerStatus.total_download / (1024 * 1024 * 1024)).toFixed(2)} ГБ</p>
                     </div>
                   </div>
+
+                  {/* Server payment remaining estimate */}
+                  <div className="pt-3 border-t border-white/5">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2.5 h-2.5 rounded-full ${vpnServerStatus.used_percent < 70 ? 'bg-emerald-500' : vpnServerStatus.used_percent < 90 ? 'bg-amber-500' : 'bg-red-500'} animate-pulse`} />
+                      <span className="text-xs text-white/50">
+                        Оплаченный период: <strong className="text-white/80">~{Math.max(0, 30 - new Date().getDate())} дн. до конца месяца</strong>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <div className={`w-2.5 h-2.5 rounded-full ${100 - vpnServerStatus.used_percent > 30 ? 'bg-emerald-500' : 100 - vpnServerStatus.used_percent > 10 ? 'bg-amber-500' : 'bg-red-500'}`} />
+                      <span className="text-xs text-white/50">
+                        Остаток трафика: <strong className="text-white/80">{(100 - vpnServerStatus.used_percent).toFixed(1)}% ({((vpnServerStatus.server_limit_bytes - vpnServerStatus.total_traffic) / (1024 * 1024 * 1024)).toFixed(1)} ГБ)</strong>
+                      </span>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <p className="text-sm text-white/30">{vpnServerLoading ? 'Загрузка...' : 'Нет данных'}</p>
               )}
             </div>
+
+            {/* ── Активные VPN-пользователи ── */}
+            {vpnClients.length > 0 && (
+              <div className="glass-card p-6">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
+                  <Users className="w-5 h-5 text-purple-400" />
+                  Активные VPN-пользователи
+                  <span className="ml-auto text-xs text-white/30 font-normal">{vpnClients.length} записей</span>
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-white/10">
+                        <th className="text-left px-3 py-2 text-slate-400 font-medium text-xs">Email</th>
+                        <th className="text-left px-3 py-2 text-slate-400 font-medium text-xs">Тариф</th>
+                        <th className="text-left px-3 py-2 text-slate-400 font-medium text-xs">Использовано</th>
+                        <th className="text-left px-3 py-2 text-slate-400 font-medium text-xs">Срок</th>
+                        <th className="text-left px-3 py-2 text-slate-400 font-medium text-xs">Статус</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {vpnClients.map((c, i) => {
+                        const usedGB = (c.used_bytes / (1024 * 1024 * 1024)).toFixed(1);
+                        const totalGB = (c.traffic_bytes / (1024 * 1024 * 1024)).toFixed(0);
+                        const expiryDate = c.expire_ms > 0 ? new Date(c.expire_ms).toLocaleDateString('ru-RU') : '—';
+                        const daysLeft = c.expire_ms > 0 ? Math.max(0, Math.ceil((c.expire_ms - Date.now()) / 86400000)) : null;
+
+                        return (
+                          <tr key={c.provider_ref + i} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                            <td className="px-3 py-2.5 text-white/80 text-xs truncate max-w-[160px]" title={c.email}>{c.email || '—'}</td>
+                            <td className="px-3 py-2.5 text-xs">
+                              <span className="text-indigo-400 font-medium">{c.product_name}</span>
+                            </td>
+                            <td className="px-3 py-2.5 text-xs">
+                              <div className="flex items-center gap-2">
+                                <div className="w-16 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full ${c.used_percent > 90 ? 'bg-red-500' : c.used_percent > 70 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                                    style={{ width: `${Math.min(c.used_percent, 100)}%` }}
+                                  />
+                                </div>
+                                <span className="text-white/50 tabular-nums">{usedGB}/{totalGB} ГБ</span>
+                              </div>
+                            </td>
+                            <td className="px-3 py-2.5 text-xs text-white/50">
+                              {expiryDate}
+                              {daysLeft !== null && <span className="text-white/30 ml-1">({daysLeft}д)</span>}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${c.active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                                {c.active ? 'Активен' : 'Истёк'}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
             {/* System Settings */}
             <div className="glass-card p-6">
