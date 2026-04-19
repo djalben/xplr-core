@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"name": "ТЗ",
+			"path": "../../../Документы/Стартап/ТЗ"
+		},
+		{
+			"name": "xplr-core",
+			"path": ".."
+		}
+	],
+	"settings": {
+		"go.useLanguageServer": true,
+		"git.confirmSync": false,
+		"explorer.confirmDelete": false
+	}
+}
