@@ -34,7 +34,7 @@ type Config struct {
 	InboundID  int    // ID of the VLESS+Reality inbound
 	ServerIP   string // public IP of the VPN server
 	ServerPort string // listening port (typically "443")
-	SNI        string // TLS SNI / dest domain (e.g. "google.com")
+	SNI        string // TLS SNI / dest domain (e.g. "www.microsoft.com")
 	PublicKey  string // Reality public key (x25519)
 	ShortID    string // Reality short ID
 	Flow       string // typically "xtls-rprx-vision"
@@ -92,7 +92,7 @@ func NewVlessProvider() *VlessProvider {
 		InboundID:  1, // default; override via XPANEL_INBOUND_ID
 		ServerIP:   getEnvOr("XPANEL_SERVER_IP", "109.120.157.144"),
 		ServerPort: getEnvOr("XPANEL_SERVER_PORT", "443"),
-		SNI:        getEnvOr("XPANEL_SNI", "google.com"),
+		SNI:        getEnvOr("XPANEL_SNI", "www.microsoft.com"),
 		PublicKey:  publicKey,
 		ShortID:    shortID,
 		Flow:       getEnvOr("XPANEL_FLOW", "xtls-rprx-vision"),

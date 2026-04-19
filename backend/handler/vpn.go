@@ -412,9 +412,11 @@ func notifyTrafficCritical(usedPct float64, totalTraffic, limitBytes int64) {
 // ══════════════════════════════════════════════════════════════
 
 func NotifyAdminVPNPurchase(productName string, priceUSD string, userEmail string) {
-	// Get monthly revenue
 	var monthlyRevenue float64
+	var activeCount int
+
 	if GlobalDB != nil {
+		// Monthly revenue
 		_ = GlobalDB.QueryRow(`
 			SELECT COALESCE(SUM(price_usd), 0)
 			FROM store_orders
@@ -422,6 +424,14 @@ func NotifyAdminVPNPurchase(productName string, priceUSD string, userEmail strin
 			  AND (product_name ILIKE '%vpn%' OR product_name ILIKE '%vless%' OR product_name ILIKE '%безопасный%')
 			  AND created_at >= date_trunc('month', NOW())
 		`).Scan(&monthlyRevenue)
+
+		// Active VPN user count (distinct users with completed VPN orders)
+		_ = GlobalDB.QueryRow(`
+			SELECT COUNT(DISTINCT user_id)
+			FROM store_orders
+			WHERE status = 'completed'
+			  AND (activation_key LIKE 'vless://%' OR product_name ILIKE '%vpn%' OR product_name ILIKE '%безопасный%')
+		`).Scan(&activeCount)
 	}
 
 	serverCost := 4.94
@@ -444,9 +454,11 @@ func NotifyAdminVPNPurchase(productName string, priceUSD string, userEmail strin
 		"<b>Месячная аналитика:</b>\n"+
 		"Выручка: €%.2f\n"+
 		"Затраты: €%.2f\n"+
-		"%s Маржа: €%.2f",
+		"%s Маржа: €%.2f\n\n"+
+		"👥 Всего VPN-пользователей: <b>%d</b>",
 		userEmail, productName, priceUSD,
-		monthlyRevenue, serverCost, marginEmoji, margin)
+		monthlyRevenue, serverCost, marginEmoji, margin,
+		activeCount)
 
 	telegram.NotifyAdmins(msg, "Открыть админку", "https://xplr.pro/staff-only-zone")
 }

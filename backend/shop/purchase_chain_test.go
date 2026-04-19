@@ -22,7 +22,7 @@ func (m *mockVlessProvider) GetCatalog() ([]CatalogProduct, error) {
 func (m *mockVlessProvider) CreateOrder(externalProductID string) (*OrderResult, error) {
 	return &OrderResult{
 		ProviderRef:   "xplr-test-1234",
-		ActivationKey: "vless://test-uuid@109.120.157.144:443?encryption=none&flow=xtls-rprx-vision&type=tcp&security=reality&sni=google.com&fp=chrome&pbk=testkey&sid=ab#xplr-test",
+		ActivationKey: "vless://test-uuid@109.120.157.144:443?encryption=none&flow=xtls-rprx-vision&type=tcp&security=reality&sni=www.microsoft.com&fp=chrome&pbk=testkey&sid=ab#xplr-test",
 		QRData:        "vless://test-uuid@109.120.157.144:443",
 		Status:        "completed",
 	}, nil

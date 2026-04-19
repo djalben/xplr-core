@@ -271,13 +271,15 @@ const VPNTrafficBar = ({ providerRef }: { providerRef: string }) => {
 
   return (
     <div className="mt-3 pt-3 border-t border-white/5">
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[11px] text-slate-400">Трафик</span>
-        <span className="text-[11px] text-slate-500">
-          {formatBytes(status.used)} / {formatBytes(status.total)}
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-semibold text-slate-300">
+          Использовано <span className="text-white">{formatBytes(status.used)}</span> из <span className="text-white">{formatBytes(status.total)}</span>
+        </span>
+        <span className={`text-xs font-bold tabular-nums ${status.exhausted ? 'text-red-400' : pct > 80 ? 'text-amber-400' : 'text-emerald-400'}`}>
+          {pct.toFixed(0)}%
         </span>
       </div>
-      <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+      <div className="h-2.5 bg-white/5 rounded-full overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-500 ${barColor}`}
           style={{ width: `${pct}%` }}
@@ -300,7 +302,7 @@ const VPNTrafficBar = ({ providerRef }: { providerRef: string }) => {
       {!status.exhausted && status.expire_ms > 0 && (
         <div className="mt-1.5 flex items-center justify-between">
           <span className="text-[10px] text-slate-500">
-            {pct.toFixed(0)}% использовано
+            ↑ {formatBytes(status.upload)} &nbsp; ↓ {formatBytes(status.download)}
           </span>
           <span className="text-[10px] text-slate-500">
             до {new Date(status.expire_ms).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
