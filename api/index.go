@@ -81,7 +81,18 @@ func ensureDB() {
 	// 4. Wallester
 	h.InitWallesterRepository()
 
-	// 4b. Shop infrastructure — registers VlessProvider, fulfillment engine, deposit monitor
+	// 4b. VPN panel env-var diagnostic (no secrets logged)
+	xpanelURL := os.Getenv("XPANEL_URL")
+	xpanelUser := os.Getenv("XPANEL_USERNAME")
+	xpanelPass := os.Getenv("XPANEL_PASSWORD")
+	xpanelPubKey := os.Getenv("XPANEL_REALITY_PUBLIC_KEY")
+	log.Printf("[INIT-DIAG] XPANEL_URL=%q (len=%d), USERNAME=%q (len=%d), PASSWORD_len=%d, PUBKEY_len=%d",
+		xpanelURL, len(xpanelURL), xpanelUser, len(xpanelUser), len(xpanelPass), len(xpanelPubKey))
+	if xpanelURL == "" {
+		log.Println("🚨🚨🚨 [CRITICAL] XPANEL_URL is EMPTY — VPN purchases will be IMPOSSIBLE!")
+	}
+
+	// 4c. Shop infrastructure — registers VlessProvider, fulfillment engine, deposit monitor
 	h.InitShopInfrastructure()
 
 	// 5. Start auto-replenishment (runs as goroutine inside the invocation)
@@ -462,8 +473,8 @@ func ensureDB() {
 				SELECT $1,'vless',$2,$3,$4,$5,$6,'vpn',true,$7
 				WHERE NOT EXISTS (SELECT 1 FROM store_products WHERE external_id=$2)`,
 				vpnCatID, p.extID, p.name, p.desc, p.price, p.cost, i)
-			// Force-update ALL fields on existing rows
-			db.Exec(`UPDATE store_products SET price_usd=$1, description=$2, name=$3, provider='vless', in_stock=true, cost_price=$4, product_type='vpn' WHERE external_id=$5`,
+			// Force-update ALL fields on existing rows (markup_percent=0 blocks auto-recalculation)
+			db.Exec(`UPDATE store_products SET price_usd=$1, description=$2, name=$3, provider='vless', in_stock=true, cost_price=$4, product_type='vpn', markup_percent=0 WHERE external_id=$5`,
 				p.price, p.desc, p.name, p.cost, p.extID)
 		}
 		log.Printf("[VPN-SEED] ✅ VPN products synced: 4 plans (€5/€10/€35/€55)")
