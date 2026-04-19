@@ -15,6 +15,7 @@ import (
 	"github.com/djalben/xplr-core/backend/providers/vless"
 	"github.com/djalben/xplr-core/backend/shop"
 	"github.com/djalben/xplr-core/backend/telegram"
+	"github.com/gorilla/mux"
 )
 
 // ══════════════════════════════════════════════════════════════
@@ -461,4 +462,190 @@ func NotifyAdminVPNPurchase(productName string, priceUSD string, userEmail strin
 		activeCount)
 
 	telegram.NotifyAdmins(msg, "Открыть админку", "https://xplr.pro/staff-only-zone")
+}
+
+// ══════════════════════════════════════════════════════════════
+// DELETE /api/v1/admin/vpn/client/{email}
+// Deletes client from 3X-UI panel first, then removes DB record.
+// ══════════════════════════════════════════════════════════════
+
+func AdminDeleteVPNClientHandler(w http.ResponseWriter, r *http.Request) {
+	email := mux.Vars(r)["email"]
+	if email == "" {
+		http.Error(w, `{"error":"missing email"}`, http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("[VPN-DELETE] 🗑 Deleting client %s...", email)
+
+	// 1. Look up the client UUID from the activation_key (vless://UUID@...)
+	var activationKey string
+	err := GlobalDB.QueryRow(`
+		SELECT COALESCE(activation_key, '')
+		FROM store_orders
+		WHERE provider_ref = $1 AND status = 'completed'
+		ORDER BY created_at DESC LIMIT 1
+	`, email).Scan(&activationKey)
+	if err != nil || activationKey == "" {
+		http.Error(w, `{"error":"order not found"}`, http.StatusNotFound)
+		return
+	}
+
+	// Extract UUID from vless://UUID@...
+	clientUUID := extractUUIDFromVlessLink(activationKey)
+	if clientUUID == "" {
+		http.Error(w, `{"error":"cannot extract UUID from activation key"}`, http.StatusInternalServerError)
+		return
+	}
+
+	// 2. Delete from 3X-UI panel FIRST
+	provider := shop.GetRegistry().Get("vless")
+	if provider == nil {
+		http.Error(w, `{"error":"vless provider not registered"}`, http.StatusInternalServerError)
+		return
+	}
+	vp, ok := provider.(*vless.VlessProvider)
+	if !ok {
+		http.Error(w, `{"error":"provider type assertion failed"}`, http.StatusInternalServerError)
+		return
+	}
+
+	if err := vp.DeleteClient(clientUUID); err != nil {
+		log.Printf("[VPN-DELETE] ❌ 3X-UI deleteClient failed for %s: %v", email, err)
+		http.Error(w, fmt.Sprintf(`{"error":"3X-UI delete failed: %s"}`, err.Error()), http.StatusBadGateway)
+		return
+	}
+	log.Printf("[VPN-DELETE] ✅ Client %s removed from 3X-UI panel", email)
+
+	// 3. Mark order as deleted in DB (soft-delete: set status = 'deleted')
+	_, err = GlobalDB.Exec(`
+		UPDATE store_orders SET status = 'deleted'
+		WHERE provider_ref = $1 AND status = 'completed'
+	`, email)
+	if err != nil {
+		log.Printf("[VPN-DELETE] ⚠️ DB update failed for %s: %v (client already removed from panel)", email, err)
+	}
+
+	log.Printf("[VPN-DELETE] ✅ Client %s fully deleted", email)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"ok":      true,
+		"message": "Client deleted from panel and database",
+	})
+}
+
+// ══════════════════════════════════════════════════════════════
+// PATCH /api/v1/admin/vpn/client/{email}
+// Updates client total_bytes and/or expiry_time on 3X-UI + DB.
+// ══════════════════════════════════════════════════════════════
+
+func AdminEditVPNClientHandler(w http.ResponseWriter, r *http.Request) {
+	email := mux.Vars(r)["email"]
+	if email == "" {
+		http.Error(w, `{"error":"missing email"}`, http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		TotalBytes *int64 `json:"total_bytes"`
+		ExpiryMs   *int64 `json:"expiry_ms"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid JSON body"}`, http.StatusBadRequest)
+		return
+	}
+	if req.TotalBytes == nil && req.ExpiryMs == nil {
+		http.Error(w, `{"error":"nothing to update"}`, http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("[VPN-EDIT] ✏️ Editing client %s: totalBytes=%v expiryMs=%v", email, req.TotalBytes, req.ExpiryMs)
+
+	// 1. Fetch current order data
+	var activationKey, metaStr string
+	err := GlobalDB.QueryRow(`
+		SELECT COALESCE(activation_key, ''), COALESCE(meta, '{}')
+		FROM store_orders
+		WHERE provider_ref = $1 AND status = 'completed'
+		ORDER BY created_at DESC LIMIT 1
+	`, email).Scan(&activationKey, &metaStr)
+	if err != nil || activationKey == "" {
+		http.Error(w, `{"error":"order not found"}`, http.StatusNotFound)
+		return
+	}
+
+	clientUUID := extractUUIDFromVlessLink(activationKey)
+	if clientUUID == "" {
+		http.Error(w, `{"error":"cannot extract UUID from activation key"}`, http.StatusInternalServerError)
+		return
+	}
+
+	// Parse existing meta
+	var meta struct {
+		TrafficBytes int64 `json:"traffic_bytes"`
+		ExpireMs     int64 `json:"expire_ms"`
+		DurationDays int   `json:"duration_days"`
+	}
+	json.Unmarshal([]byte(metaStr), &meta)
+
+	// Apply updates
+	newTotal := meta.TrafficBytes
+	newExpiry := meta.ExpireMs
+	if req.TotalBytes != nil {
+		newTotal = *req.TotalBytes
+	}
+	if req.ExpiryMs != nil {
+		newExpiry = *req.ExpiryMs
+	}
+
+	// 2. Update on 3X-UI panel
+	provider := shop.GetRegistry().Get("vless")
+	if provider == nil {
+		http.Error(w, `{"error":"vless provider not registered"}`, http.StatusInternalServerError)
+		return
+	}
+	vp, ok := provider.(*vless.VlessProvider)
+	if !ok {
+		http.Error(w, `{"error":"provider type assertion failed"}`, http.StatusInternalServerError)
+		return
+	}
+
+	if err := vp.UpdateClient(clientUUID, email, newTotal, newExpiry); err != nil {
+		log.Printf("[VPN-EDIT] ❌ 3X-UI updateClient failed for %s: %v", email, err)
+		http.Error(w, fmt.Sprintf(`{"error":"3X-UI update failed: %s"}`, err.Error()), http.StatusBadGateway)
+		return
+	}
+
+	// 3. Update meta in DB
+	meta.TrafficBytes = newTotal
+	meta.ExpireMs = newExpiry
+	newMetaJSON, _ := json.Marshal(meta)
+	_, err = GlobalDB.Exec(`
+		UPDATE store_orders SET meta = $1
+		WHERE provider_ref = $2 AND status = 'completed'
+	`, string(newMetaJSON), email)
+	if err != nil {
+		log.Printf("[VPN-EDIT] ⚠️ DB meta update failed for %s: %v", email, err)
+	}
+
+	log.Printf("[VPN-EDIT] ✅ Client %s updated: totalBytes=%d expiryMs=%d", email, newTotal, newExpiry)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"ok":          true,
+		"total_bytes": newTotal,
+		"expiry_ms":   newExpiry,
+	})
+}
+
+// extractUUIDFromVlessLink extracts the UUID from a vless://UUID@IP:PORT?... link.
+func extractUUIDFromVlessLink(link string) string {
+	if !strings.HasPrefix(link, "vless://") {
+		return ""
+	}
+	rest := strings.TrimPrefix(link, "vless://")
+	atIdx := strings.Index(rest, "@")
+	if atIdx <= 0 {
+		return ""
+	}
+	return rest[:atIdx]
 }

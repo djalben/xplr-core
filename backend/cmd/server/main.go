@@ -305,6 +305,8 @@ func main() {
 	adminRouter.HandleFunc("/infra/active-keys", handler.GetActiveVPNKeysHandler).Methods("GET")
 	adminRouter.HandleFunc("/infra/vpn-server-status", handler.AdminVPNServerStatusHandler).Methods("GET")
 	adminRouter.HandleFunc("/infra/vpn-active-clients", handler.AdminVPNActiveClientsHandler).Methods("GET")
+	adminRouter.HandleFunc("/vpn/client/{email}", handler.AdminDeleteVPNClientHandler).Methods("DELETE")
+	adminRouter.HandleFunc("/vpn/client/{email}", handler.AdminEditVPNClientHandler).Methods("PATCH")
 	// --------------------------------------------------------
 
 	// CORS: dynamic origins from ALLOWED_ORIGINS env var (comma-separated)

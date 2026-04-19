@@ -764,6 +764,8 @@ func buildRouter() *mux.Router {
 	admin.HandleFunc("/infra/active-keys", h.GetActiveVPNKeysHandler).Methods("GET")
 	admin.HandleFunc("/infra/vpn-server-status", h.AdminVPNServerStatusHandler).Methods("GET")
 	admin.HandleFunc("/infra/vpn-active-clients", h.AdminVPNActiveClientsHandler).Methods("GET")
+	admin.HandleFunc("/vpn/client/{email}", h.AdminDeleteVPNClientHandler).Methods("DELETE")
+	admin.HandleFunc("/vpn/client/{email}", h.AdminEditVPNClientHandler).Methods("PATCH")
 
 	log.Println("✅ [ROUTER] All routes registered successfully")
 	return r

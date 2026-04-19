@@ -502,6 +502,47 @@ func (v *VlessProvider) DeleteClient(clientUUID string) error {
 	return nil
 }
 
+// UpdateClient updates a client's totalBytes and/or expiryTime on the 3X-UI panel.
+// clientUUID is the client UUID, email is the client email tag.
+func (v *VlessProvider) UpdateClient(clientUUID, email string, totalBytes int64, expiryMs int64) error {
+	clientSettings := []map[string]any{
+		{
+			"id":         clientUUID,
+			"flow":       v.cfg.Flow,
+			"email":      email,
+			"limitIp":    1,
+			"total":      totalBytes,
+			"expiryTime": expiryMs,
+			"enable":     true,
+			"tgId":       "",
+			"subId":      "",
+		},
+	}
+	settingsJSON, _ := json.Marshal(clientSettings)
+
+	formData := url.Values{}
+	formData.Set("id", fmt.Sprintf("%d", v.cfg.InboundID))
+	formData.Set("settings", fmt.Sprintf(`{"clients":%s}`, string(settingsJSON)))
+
+	path := fmt.Sprintf("%s/%d/updateClient/%s", v.writeAPI(), v.cfg.InboundID, clientUUID)
+	resp, err := v.doAPIRequest("POST", path, formData)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	var result struct {
+		Success bool   `json:"success"`
+		Msg     string `json:"msg"`
+	}
+	json.Unmarshal(body, &result)
+	if !result.Success {
+		return fmt.Errorf("updateClient failed: %s", result.Msg)
+	}
+	return nil
+}
+
 // ResetClientTraffic resets traffic counters for a client.
 func (v *VlessProvider) ResetClientTraffic(email string) error {
 	path := fmt.Sprintf("%s/%d/resetClientTraffic/%s", v.writeAPI(), v.cfg.InboundID, email)

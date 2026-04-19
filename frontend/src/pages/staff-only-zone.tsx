@@ -36,6 +36,7 @@ import {
   ImageIcon,
   Tag,
   ShoppingBag,
+  Pencil,
 } from 'lucide-react';
 
 type Tab = 'dashboard' | 'users' | 'commissions' | 'tickets' | 'news' | 'logs' | 'store';
@@ -289,6 +290,18 @@ export const StaffOnlyZone = () => {
     active: boolean;
   }[]>([]);
 
+  // ── VPN Client Management Modals ──
+  const [vpnDeleteConfirm, setVpnDeleteConfirm] = useState<{ email: string; providerRef: string } | null>(null);
+  const [vpnDeleting, setVpnDeleting] = useState(false);
+  const [vpnEditModal, setVpnEditModal] = useState<{
+    providerRef: string;
+    email: string;
+    trafficBytes: number;
+    expireMs: number;
+  } | null>(null);
+  const [vpnEditForm, setVpnEditForm] = useState({ trafficGB: '', expiryDate: '' });
+  const [vpnEditing, setVpnEditing] = useState(false);
+
   const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
@@ -334,6 +347,52 @@ export const StaffOnlyZone = () => {
       setVpnClients(res.data?.clients || []);
     } catch { /* ignore */ }
   }, []);
+
+  const handleDeleteVPNClient = async () => {
+    if (!vpnDeleteConfirm) return;
+    setVpnDeleting(true);
+    try {
+      await apiClient.delete(`/admin/vpn/client/${encodeURIComponent(vpnDeleteConfirm.providerRef)}`);
+      showToast('Пользователь успешно удален, доступ заблокирован');
+      setVpnDeleteConfirm(null);
+      fetchVPNActiveClients();
+      fetchVPNServerStatus();
+      fetchActiveKeys();
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || 'Ошибка удаления клиента';
+      showToast(msg, 'err');
+    } finally {
+      setVpnDeleting(false);
+    }
+  };
+
+  const handleEditVPNClient = async () => {
+    if (!vpnEditModal) return;
+    setVpnEditing(true);
+    try {
+      const body: { total_bytes?: number; expiry_ms?: number } = {};
+      if (vpnEditForm.trafficGB) {
+        body.total_bytes = Math.round(parseFloat(vpnEditForm.trafficGB) * 1024 * 1024 * 1024);
+      }
+      if (vpnEditForm.expiryDate) {
+        body.expiry_ms = new Date(vpnEditForm.expiryDate).getTime();
+      }
+      if (!body.total_bytes && !body.expiry_ms) {
+        showToast('Нечего обновлять', 'err');
+        setVpnEditing(false);
+        return;
+      }
+      await apiClient.patch(`/admin/vpn/client/${encodeURIComponent(vpnEditModal.providerRef)}`, body);
+      showToast('Клиент успешно обновлён');
+      setVpnEditModal(null);
+      fetchVPNActiveClients();
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || 'Ошибка обновления клиента';
+      showToast(msg, 'err');
+    } finally {
+      setVpnEditing(false);
+    }
+  };
 
   // ── Search users ──
   const searchUsers = useCallback(async () => {
@@ -887,6 +946,7 @@ export const StaffOnlyZone = () => {
                         <th className="text-left px-3 py-2 text-slate-400 font-medium text-xs">Использовано</th>
                         <th className="text-left px-3 py-2 text-slate-400 font-medium text-xs">Срок</th>
                         <th className="text-left px-3 py-2 text-slate-400 font-medium text-xs">Статус</th>
+                        <th className="text-left px-3 py-2 text-slate-400 font-medium text-xs">Действия</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -922,11 +982,135 @@ export const StaffOnlyZone = () => {
                                 {c.active ? 'Активен' : 'Истёк'}
                               </span>
                             </td>
+                            <td className="px-3 py-2.5">
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  title="Редактировать"
+                                  onClick={() => {
+                                    setVpnEditModal({
+                                      providerRef: c.provider_ref,
+                                      email: c.email,
+                                      trafficBytes: c.traffic_bytes,
+                                      expireMs: c.expire_ms,
+                                    });
+                                    setVpnEditForm({
+                                      trafficGB: (c.traffic_bytes / (1024 * 1024 * 1024)).toFixed(0),
+                                      expiryDate: c.expire_ms > 0 ? new Date(c.expire_ms).toISOString().slice(0, 10) : '',
+                                    });
+                                  }}
+                                  className="p-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/20 transition-all"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  title="Удалить"
+                                  onClick={() => setVpnDeleteConfirm({ email: c.email, providerRef: c.provider_ref })}
+                                  className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
+                </div>
+              </div>
+            )}
+
+            {/* ── VPN Delete Confirmation Modal ── */}
+            {vpnDeleteConfirm && (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => !vpnDeleting && setVpnDeleteConfirm(null)}>
+                <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+                <div className="relative w-full max-w-sm rounded-2xl bg-[#111118] border border-white/10 shadow-2xl p-6" onClick={e => e.stopPropagation()}>
+                  <div className="text-center mb-5">
+                    <div className="w-14 h-14 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-3">
+                      <Trash2 className="w-7 h-7 text-red-400" />
+                    </div>
+                    <h3 className="text-lg font-bold text-white mb-2">Удалить VPN-клиента?</h3>
+                    <p className="text-sm text-slate-400 leading-relaxed">
+                      Вы уверены, что хотите удалить пользователя <strong className="text-white">{vpnDeleteConfirm.email || vpnDeleteConfirm.providerRef}</strong> и заблокировать его доступ?
+                    </p>
+                    <p className="text-xs text-red-400/60 mt-2">Это действие необратимо. Ссылка будет мгновенно деактивирована.</p>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setVpnDeleteConfirm(null)}
+                      disabled={vpnDeleting}
+                      className="flex-1 py-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-300 text-sm font-medium hover:bg-white/10 transition-all disabled:opacity-50"
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      onClick={handleDeleteVPNClient}
+                      disabled={vpnDeleting}
+                      className="flex-1 py-2.5 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-sm font-semibold hover:bg-red-500/30 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {vpnDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                      {vpnDeleting ? 'Удаление...' : 'Удалить'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── VPN Edit Modal ── */}
+            {vpnEditModal && (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => !vpnEditing && setVpnEditModal(null)}>
+                <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+                <div className="relative w-full max-w-md rounded-2xl bg-[#111118] border border-white/10 shadow-2xl p-6" onClick={e => e.stopPropagation()}>
+                  <button onClick={() => setVpnEditModal(null)} className="absolute top-3 right-3 p-2 rounded-xl bg-black/50 border border-white/10 text-slate-400 hover:text-white transition-all">
+                    <X className="w-4 h-4" />
+                  </button>
+                  <div className="mb-5">
+                    <div className="w-12 h-12 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mb-3">
+                      <Pencil className="w-6 h-6 text-indigo-400" />
+                    </div>
+                    <h3 className="text-lg font-bold text-white mb-1">Редактировать клиента</h3>
+                    <p className="text-sm text-slate-400">{vpnEditModal.email || vpnEditModal.providerRef}</p>
+                  </div>
+                  <div className="space-y-4 mb-6">
+                    <div>
+                      <label className="text-xs text-slate-400 mb-1.5 block">Лимит трафика (ГБ)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={vpnEditForm.trafficGB}
+                        onChange={e => setVpnEditForm(prev => ({ ...prev, trafficGB: e.target.value }))}
+                        className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-indigo-500/50 transition-all"
+                        placeholder={`Текущий: ${(vpnEditModal.trafficBytes / (1024 * 1024 * 1024)).toFixed(0)} ГБ`}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-400 mb-1.5 block">Дата окончания</label>
+                      <input
+                        type="date"
+                        value={vpnEditForm.expiryDate}
+                        onChange={e => setVpnEditForm(prev => ({ ...prev, expiryDate: e.target.value }))}
+                        className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-indigo-500/50 transition-all"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setVpnEditModal(null)}
+                      disabled={vpnEditing}
+                      className="flex-1 py-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-300 text-sm font-medium hover:bg-white/10 transition-all disabled:opacity-50"
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      onClick={handleEditVPNClient}
+                      disabled={vpnEditing}
+                      className="flex-1 py-2.5 rounded-xl bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 text-sm font-semibold hover:bg-indigo-500/30 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {vpnEditing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      {vpnEditing ? 'Сохранение...' : 'Сохранить'}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
