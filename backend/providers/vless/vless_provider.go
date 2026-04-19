@@ -28,6 +28,7 @@ import (
 // Config holds all settings loaded from environment variables.
 type Config struct {
 	PanelURL   string // e.g. "https://109.120.157.144:2053"
+	BasePath   string // panel URI path, e.g. "/panel" (set in 3X-UI settings)
 	Username   string // 3X-UI admin username
 	Password   string // 3X-UI admin password
 	InboundID  int    // ID of the VLESS+Reality inbound
@@ -45,6 +46,18 @@ type VlessProvider struct {
 	client *http.Client
 	mu     sync.Mutex
 	cookie string // session cookie from 3X-UI login
+}
+
+// readAPI returns the prefix for read-only API endpoints (list, get, server/status).
+// 3X-UI registers these under {basePath}/xui/API/inbounds/
+func (v *VlessProvider) readAPI() string {
+	return v.cfg.BasePath + "/xui/API/inbounds"
+}
+
+// writeAPI returns the prefix for write API endpoints (addClient, delClient, update).
+// 3X-UI v2.6+ registers these under {basePath}/panel/api/inbounds/
+func (v *VlessProvider) writeAPI() string {
+	return v.cfg.BasePath + "/panel/api/inbounds"
 }
 
 // NewVlessProvider creates a provider from environment variables.
@@ -69,8 +82,11 @@ func NewVlessProvider() *VlessProvider {
 		log.Println("🚨 [CRITICAL] XPANEL_REALITY_PUBLIC_KEY or XPANEL_REALITY_SHORT_ID is EMPTY — VPN links will be BROKEN!")
 	}
 
+	basePath := strings.TrimRight(getEnvOr("XPANEL_BASE_PATH", "/panel"), "/")
+
 	cfg := Config{
 		PanelURL:   strings.TrimRight(panelURL, "/"),
+		BasePath:   basePath,
 		Username:   username,
 		Password:   password,
 		InboundID:  1, // default; override via XPANEL_INBOUND_ID
@@ -101,7 +117,7 @@ func NewVlessProvider() *VlessProvider {
 
 	// Lazy login: do NOT block initialization — doAPIRequest will auto-login on first call.
 	// This prevents Vercel cold-start timeouts caused by slow panel connections.
-	log.Printf("[VLESS] ✅ Provider created (panel=%s, lazy-auth, timeout=8s)", cfg.PanelURL)
+	log.Printf("[VLESS] ✅ Provider created (panel=%s, basePath=%s, lazy-auth, timeout=8s)", cfg.PanelURL, cfg.BasePath)
 
 	return p
 }
@@ -247,7 +263,7 @@ func (v *VlessProvider) login() error {
 
 	payload := fmt.Sprintf(`{"username":"%s","password":"%s"}`, v.cfg.Username, v.cfg.Password)
 	resp, err := v.client.Post(
-		v.cfg.PanelURL+"/login",
+		v.cfg.PanelURL+v.cfg.BasePath+"/login",
 		"application/json",
 		strings.NewReader(payload),
 	)
@@ -270,6 +286,7 @@ func (v *VlessProvider) login() error {
 	}
 
 	// Session cookie is stored in the cookie jar automatically
+	v.cookie = "active"
 	log.Printf("[VLESS] 🔑 Logged into 3X-UI panel")
 	return nil
 }
@@ -301,7 +318,7 @@ func (v *VlessProvider) addClient(clientUUID, email string, expiryMs int64, tota
 	formData.Set("settings", fmt.Sprintf(`{"clients":%s}`, string(settingsJSON)))
 
 	// Try the request; re-login if session expired
-	resp, err := v.doAPIRequest("POST", "/panel/api/inbounds/addClient", formData)
+	resp, err := v.doAPIRequest("POST", v.writeAPI()+"/addClient", formData)
 	if err != nil {
 		return err
 	}
@@ -333,7 +350,7 @@ type clientTrafficStats struct {
 
 // getClientTraffic queries traffic stats for a client by email tag.
 func (v *VlessProvider) getClientTraffic(email string) (*clientTrafficStats, error) {
-	resp, err := v.doAPIRequest("GET", "/panel/api/inbounds/getClientTraffics/"+email, nil)
+	resp, err := v.doAPIRequest("GET", v.writeAPI()+"/getClientTraffics/"+email, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -357,7 +374,8 @@ func (v *VlessProvider) getClientTraffic(email string) (*clientTrafficStats, err
 }
 
 // doAPIRequest makes an authenticated request to the 3X-UI API.
-// Automatically authenticates on first call (lazy login) and re-authenticates on 401.
+// Handles lazy login: if no session exists, logs in before the first call.
+// Also handles 3X-UI v2.6+ security: unauthenticated requests return 404 (not 401).
 func (v *VlessProvider) doAPIRequest(method, path string, formData url.Values) (*http.Response, error) {
 	start := time.Now()
 
@@ -377,11 +395,19 @@ func (v *VlessProvider) doAPIRequest(method, path string, formData url.Values) (
 		return v.client.Do(req)
 	}
 
+	// Proactive lazy login: if we haven't logged in yet, do it now
+	if v.cookie == "" {
+		log.Println("[VLESS-API] 🔑 No session — performing initial login...")
+		if err := v.login(); err != nil {
+			return nil, fmt.Errorf("initial login failed: %w", err)
+		}
+	}
+
 	resp, err := makeReq()
 	if err != nil {
 		elapsed := time.Since(start)
 		log.Printf("[VLESS-API] ❌ %s %s failed after %dms: %v", method, path, elapsed.Milliseconds(), err)
-		// If first request fails (no session yet), try login then retry
+		// Network error — re-login and retry
 		if loginErr := v.login(); loginErr != nil {
 			return nil, fmt.Errorf("API call failed and re-login also failed: %w (original: %v)", loginErr, err)
 		}
@@ -391,8 +417,11 @@ func (v *VlessProvider) doAPIRequest(method, path string, formData url.Values) (
 		}
 	}
 
-	// If unauthorized, re-login and retry once
-	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+	// 3X-UI v2.6+ returns 404 for unauthenticated requests (security feature).
+	// Also handle classic 401/403. In all cases: re-login and retry once.
+	if resp.StatusCode == http.StatusNotFound ||
+		resp.StatusCode == http.StatusUnauthorized ||
+		resp.StatusCode == http.StatusForbidden {
 		resp.Body.Close()
 		log.Printf("[VLESS-API] 🔄 Got %d on %s %s — re-authenticating...", resp.StatusCode, method, path)
 		if err := v.login(); err != nil {
@@ -401,6 +430,11 @@ func (v *VlessProvider) doAPIRequest(method, path string, formData url.Values) (
 		resp, err = makeReq()
 		if err != nil {
 			return nil, err
+		}
+		// If still 404 after re-login, the endpoint truly doesn't exist
+		if resp.StatusCode == http.StatusNotFound {
+			elapsed := time.Since(start)
+			log.Printf("[VLESS-API] ❌ %s %s → 404 even after re-login (%dms) — endpoint does not exist", method, path, elapsed.Milliseconds())
 		}
 	}
 
@@ -437,7 +471,7 @@ func (v *VlessProvider) buildVlessLink(clientUUID, remark string) string {
 
 // DeleteClient removes a client from the inbound (for refunds/expiry cleanup).
 func (v *VlessProvider) DeleteClient(clientUUID string) error {
-	path := fmt.Sprintf("/panel/api/inbounds/%d/delClient/%s", v.cfg.InboundID, clientUUID)
+	path := fmt.Sprintf("%s/%d/delClient/%s", v.writeAPI(), v.cfg.InboundID, clientUUID)
 	resp, err := v.doAPIRequest("POST", path, nil)
 	if err != nil {
 		return err
@@ -458,7 +492,7 @@ func (v *VlessProvider) DeleteClient(clientUUID string) error {
 
 // ResetClientTraffic resets traffic counters for a client.
 func (v *VlessProvider) ResetClientTraffic(email string) error {
-	path := fmt.Sprintf("/panel/api/inbounds/%d/resetClientTraffic/%s", v.cfg.InboundID, email)
+	path := fmt.Sprintf("%s/%d/resetClientTraffic/%s", v.writeAPI(), v.cfg.InboundID, email)
 	resp, err := v.doAPIRequest("POST", path, nil)
 	if err != nil {
 		return err
@@ -480,7 +514,7 @@ func getEnvOr(key, fallback string) string {
 // GetActiveClients returns the number of active (enabled) clients.
 // Useful for admin dashboard monitoring.
 func (v *VlessProvider) GetActiveClients() (int, error) {
-	resp, err := v.doAPIRequest("POST", "/panel/api/inbounds/list", nil)
+	resp, err := v.doAPIRequest("POST", v.readAPI()+"/list", nil)
 	if err != nil {
 		return 0, err
 	}
