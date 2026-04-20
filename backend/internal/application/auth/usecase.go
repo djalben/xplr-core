@@ -105,7 +105,9 @@ func (uc *UseCase) Register(ctx context.Context, email, password string) (*domai
 
 	verifyURL := uc.publicBaseURL + "/api/v1/auth/verify-email?token=" + plain
 	body := "Подтвердите email, перейдя по ссылке:\n" + verifyURL
-	_ = uc.mailer.SendPlain(ctx, email, "Подтверждение регистрации XPLR", body)
+	if err = uc.mailer.SendPlain(ctx, email, "Подтверждение регистрации XPLR", body); err != nil {
+		return nil, wrapper.Wrapf(err, "failed to send verification email")
+	}
 
 	return user, nil
 }
@@ -235,7 +237,7 @@ func (uc *UseCase) RequestPasswordReset(ctx context.Context, email string) error
 	resetURL := uc.publicBaseURL + "/api/v1/auth/reset-password?token=" + plain
 	body := "Сброс пароля XPLR:\n" + resetURL + "\nСсылка действует 1 час."
 
-	_ = uc.mailer.SendPlain(ctx, email, "Сброс пароля XPLR", body)
+	_ = uc.mailer.SendPlain(ctx, email, "Сброс пароля XPLR", body) // не раскрываем пользователю наличие email в базе
 
 	return nil
 }
