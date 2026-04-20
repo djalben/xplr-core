@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"os"
 	"sync"
 
 	"github.com/djalben/xplr-core/backend/vercel"
