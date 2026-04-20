@@ -11,26 +11,26 @@ export interface LoginRequest {
 }
 
 export interface AuthResponse {
-  token: string;
-  user: {
+  token?: string;
+  user?: {
     id: number;
     email: string;
-    balance: string;
-    status: string;
+    balance?: string;
+    status?: string;
     is_admin?: boolean;
     role?: string;
     is_verified?: boolean;
+    email_verified?: boolean;
   };
+  message?: string;
+  email?: string;
+  email_verified?: boolean;
 }
 
 // Регистрация нового пользователя
 export const register = async (data: RegisterRequest): Promise<AuthResponse> => {
+  // В продовом флоу backend НЕ возвращает token на register (нужна верификация email).
   const response = await apiClient.post<AuthResponse>('/auth/register', data);
-
-  if (response.data.token) {
-    localStorage.setItem('token', response.data.token);
-  }
-
   return response.data;
 };
 

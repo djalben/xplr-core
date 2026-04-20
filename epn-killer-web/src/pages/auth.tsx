@@ -25,6 +25,7 @@ const translateError = (raw: string): string => {
     'Email already registered': 'Этот Email уже зарегистрирован',
     'invalid email or password': 'Неверный email или пароль',
     'Invalid email or password': 'Неверный email или пароль',
+    'email not verified': 'Email не подтверждён. Проверьте почту и перейдите по ссылке.',
     'user not found': 'Пользователь не найден',
     'User not found': 'Пользователь не найден',
   };
@@ -79,6 +80,17 @@ export const AuthPage = () => {
 
       const res = mode === 'login' ? await login(payload) : await register(payload);
       console.log('[Auth] Response:', { token: res.token ? 'yes' : 'NO', user: res.user });
+
+      if (mode === 'register') {
+        // В продовом флоу токен на register не выдаётся — показываем сообщение и переводим на вход.
+        setError('');
+        const emailStr = res.email || payload.email;
+        setMode('login');
+        setPassword('');
+        setConfirmPassword('');
+        setError(`Регистрация успешна. Подтвердите email (${emailStr}) по ссылке из письма, затем войдите.`);
+        return;
+      }
 
       // Immediately apply user data to auth context (including is_admin/role)
       if (res.user) {
