@@ -18,8 +18,6 @@ type ENV struct {
 
 	// JWT
 	JWTSecret string `env:"JWT_SECRET_TOKEN" required:"true"`
-	// Backward-compat: историческая опечатка/старое имя переменной.
-	JWTSecretLegacy string `env:"JWT_SECRE_TOKEN"`
 
 	// Логи
 	LogLevel string `env:"LOG_LEVEL" default:"info"`
@@ -44,9 +42,7 @@ type ENV struct {
 	SMTPHost     string `env:"SMTP_HOST"`
 	SMTPPort     int    `env:"SMTP_PORT" default:"465"`
 	SMTPUser     string `env:"SMTP_USER"`
-	SMTPPassword string `env:"SMTP_PASSWORD"`
-	// Backward-compat: env.example и часть окружений используют SMTP_PASS.
-	SMTPPassLegacy string `env:"SMTP_PASS"`
+	SMTPPassword string `env:"SMTP_PASS"`
 	SMTPFrom     string `env:"SMTP_FROM"`
 }
 
