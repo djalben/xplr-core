@@ -17,7 +17,7 @@ type ENV struct {
 	CORSAllowedOrigins string `env:"CORS_ALLOWED_ORIGINS"`
 
 	// JWT
-	JWTSecret string `env:"JWT_SECRET" required:"true"`
+	JWTSecret string `env:"JWT_SECRET_TOKEN" required:"true"`
 
 	// Логи
 	LogLevel string `env:"LOG_LEVEL" default:"info"`
