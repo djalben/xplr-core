@@ -55,13 +55,5 @@ func Parse() (ENV, error) {
 		return ENV{}, wrapper.Wrap(err)
 	}
 
-	// Aliases (без os.Getenv; остаёмся в envparse-модели).
-	if cfg.JWTSecret == "" {
-		cfg.JWTSecret = cfg.JWTSecret
-	}
-	if cfg.SMTPPassword == "" {
-		cfg.SMTPPassword = cfg.SMTPPassword
-	}
-
 	return cfg, nil
 }

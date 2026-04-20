@@ -105,7 +105,6 @@ func (uc *UseCase) Register(ctx context.Context, email, password string) (*domai
 
 	verifyURL := uc.publicBaseURL + "/api/v1/auth/verify-email?token=" + plain
 	body := "Подтвердите email, перейдя по ссылке:\n" + verifyURL
-
 	_ = uc.mailer.SendPlain(ctx, email, "Подтверждение регистрации XPLR", body)
 
 	return user, nil

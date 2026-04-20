@@ -75,7 +75,14 @@ func NewContainer(cfg *config.ENV) (*Container, error) {
 
 	// WalletUseCase создаём первым — он нужен для CardUseCase
 	walletUC := wallet.NewUseCase(walletRepo, transactionRepo, commissionRepo)
-	authUC := auth.NewUseCase(userRepo, walletRepo, gradeRepo, []byte(cfg.JWTSecret), mail, cfg.AppPublicURL)
+	authUC := auth.NewUseCase(
+		userRepo,
+		walletRepo,
+		gradeRepo,
+		[]byte(cfg.JWTSecret),
+		mail,
+		cfg.AppPublicURL,
+	)
 	userUC := user.NewUseCase(userRepo, walletRepo, gradeRepo, referralRepo, commissionRepo)
 	kycUC := kyc.NewUseCase(kycRepo, userRepo)
 
