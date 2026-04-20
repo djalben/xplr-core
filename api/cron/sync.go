@@ -2,15 +2,11 @@ package handler
 
 import (
 	"context"
-	"database/sql"
-	"log"
 	"net/http"
 	"os"
+	"strconv"
 
-	_ "github.com/lib/pq"
-
-	"github.com/djalben/xplr-core/backend/handlers"
-	"github.com/djalben/xplr-core/backend/repository"
+	"github.com/djalben/xplr-core/backend/cron"
 )
 
 // Handler is the Vercel Cron entry point for syncing card balances.
@@ -30,36 +26,12 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db, err := sql.Open("postgres", dbURL)
+	rows, err := cron.SyncCardBalances(context.Background(), dbURL)
 	if err != nil {
-		http.Error(w, "DB open error: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer db.Close()
-
-	db.SetMaxOpenConns(3)
-	if err = db.PingContext(context.Background()); err != nil {
-		http.Error(w, "DB ping error: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Wire DB
-	handlers.GlobalDB = db
-	repository.GlobalDB = db
-
-	// Run sync
-	wallesterRepo := repository.NewWallesterRepository()
-	if wallesterRepo == nil {
-		http.Error(w, "Wallester not configured", http.StatusInternalServerError)
-		return
-	}
-
-	if err := wallesterRepo.SyncAllCardsBalances(); err != nil {
-		log.Printf("Cron sync error: %v", err)
 		http.Error(w, "Sync error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("OK: balances synced"))
+	w.Write([]byte("OK: balances synced, updated rows: " + strconv.FormatInt(rows, 10)))
 }
