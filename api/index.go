@@ -7,9 +7,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/djalben/xplr-core/backend/internal/app"
-	"github.com/djalben/xplr-core/backend/internal/config"
-	httpServer "github.com/djalben/xplr-core/backend/internal/transport/http"
+	"github.com/djalben/xplr-core/backend/vercel"
 )
 
 var (
@@ -20,23 +18,14 @@ var (
 
 func ensureRouter() {
 	routerOnce.Do(func() {
-		cfg, err := config.Parse()
+		h, err := vercel.NewHTTPHandlerFromEnv(context.Background())
 		if err != nil {
 			initErr = err
-			log.Printf("config parse error: %v", err)
+			log.Printf("router init error: %v", err)
 			return
 		}
 
-		container, err := app.NewContainer(&cfg)
-		if err != nil {
-			initErr = err
-			log.Printf("container init error: %v", err)
-			return
-		}
-
-		// Important: in serverless we don't call ListenAndServe; we use the router directly.
-		s := httpServer.NewServer(container, cfg.ServerHost, cfg.ServerPort, []byte(cfg.JWTSecret), cfg.CORSAllowedOrigins)
-		handler = s.Handler()
+		handler = h
 	})
 }
 
