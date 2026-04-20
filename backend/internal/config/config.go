@@ -18,6 +18,8 @@ type ENV struct {
 
 	// JWT
 	JWTSecret string `env:"JWT_SECRET_TOKEN" required:"true"`
+	// Backward-compat: историческая опечатка/старое имя переменной.
+	JWTSecretLegacy string `env:"JWT_SECRE_TOKEN"`
 
 	// Логи
 	LogLevel string `env:"LOG_LEVEL" default:"info"`
@@ -43,6 +45,8 @@ type ENV struct {
 	SMTPPort     int    `env:"SMTP_PORT" default:"465"`
 	SMTPUser     string `env:"SMTP_USER"`
 	SMTPPassword string `env:"SMTP_PASSWORD"`
+	// Backward-compat: env.example и часть окружений используют SMTP_PASS.
+	SMTPPassLegacy string `env:"SMTP_PASS"`
 	SMTPFrom     string `env:"SMTP_FROM"`
 }
 
@@ -53,6 +57,14 @@ func Parse() (ENV, error) {
 	err := envparse.Process("", &cfg)
 	if err != nil {
 		return ENV{}, wrapper.Wrap(err)
+	}
+
+	// Aliases (без os.Getenv; остаёмся в envparse-модели).
+	if cfg.JWTSecret == "" {
+		cfg.JWTSecret = cfg.JWTSecretLegacy
+	}
+	if cfg.SMTPPassword == "" {
+		cfg.SMTPPassword = cfg.SMTPPassLegacy
 	}
 
 	return cfg, nil
