@@ -40,7 +40,7 @@ type ENV struct {
 
 	// SMTP (пустой SMTP_HOST — письма не отправляются, только Noop mailer)
 	SMTPHost     string `env:"SMTP_HOST"`
-	SMTPPort     int    `env:"SMTP_PORT" default:"587"`
+	SMTPPort     int    `env:"SMTP_PORT" default:"465"`
 	SMTPUser     string `env:"SMTP_USER"`
 	SMTPPassword string `env:"SMTP_PASSWORD"`
 	SMTPFrom     string `env:"SMTP_FROM"`
