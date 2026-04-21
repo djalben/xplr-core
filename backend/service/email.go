@@ -77,9 +77,8 @@ func sendMailWith(cfg *smtpConfig, to, subject, htmlBody string) error {
 	if cfg.Port == "465" {
 		err = sendImplicitTLS(cfg, addr, to, msg)
 	} else {
-		// Fallback: STARTTLS (port 587 etc.)
-		auth := smtp.PlainAuth("", cfg.User, cfg.Pass, cfg.Host)
-		err = smtp.SendMail(addr, auth, cfg.From, []string{to}, msg)
+		// STARTTLS (port 587 etc.) with timeout to prevent hangs
+		err = sendSTARTTLS(cfg, addr, to, msg)
 	}
 
 	if err != nil {
@@ -106,6 +105,51 @@ func sendImplicitTLS(cfg *smtpConfig, addr, to string, msg []byte) error {
 		return fmt.Errorf("smtp new client: %w", err)
 	}
 	defer client.Quit()
+
+	auth := smtp.PlainAuth("", cfg.User, cfg.Pass, cfg.Host)
+	if err = client.Auth(auth); err != nil {
+		return fmt.Errorf("smtp auth: %w", err)
+	}
+	if err = client.Mail(cfg.From); err != nil {
+		return fmt.Errorf("smtp mail from: %w", err)
+	}
+	if err = client.Rcpt(to); err != nil {
+		return fmt.Errorf("smtp rcpt to: %w", err)
+	}
+	w, err := client.Data()
+	if err != nil {
+		return fmt.Errorf("smtp data: %w", err)
+	}
+	if _, err = w.Write(msg); err != nil {
+		return fmt.Errorf("smtp write: %w", err)
+	}
+	return w.Close()
+}
+
+// sendSTARTTLS — connects with plain TCP + STARTTLS upgrade (port 587).
+// Uses 15s dial timeout to prevent indefinite hangs.
+func sendSTARTTLS(cfg *smtpConfig, addr, to string, msg []byte) error {
+	conn, err := net.DialTimeout("tcp", addr, 15*time.Second)
+	if err != nil {
+		return fmt.Errorf("tcp dial (timeout 15s): %w", err)
+	}
+	defer conn.Close()
+
+	// Set overall deadline for the entire SMTP conversation
+	conn.SetDeadline(time.Now().Add(30 * time.Second))
+
+	host, _, _ := net.SplitHostPort(addr)
+	client, err := smtp.NewClient(conn, host)
+	if err != nil {
+		return fmt.Errorf("smtp new client: %w", err)
+	}
+	defer client.Quit()
+
+	// Upgrade to TLS
+	tlsConfig := &tls.Config{ServerName: cfg.Host}
+	if err = client.StartTLS(tlsConfig); err != nil {
+		return fmt.Errorf("starttls: %w", err)
+	}
 
 	auth := smtp.PlainAuth("", cfg.User, cfg.Pass, cfg.Host)
 	if err = client.Auth(auth); err != nil {

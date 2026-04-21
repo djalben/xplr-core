@@ -133,6 +133,27 @@ func UpdateBaseRateByID(id int, newBase decimal.Decimal) error {
 	return nil
 }
 
+// UpdateFinalRateByID sets the final_rate directly (manual override).
+// This takes priority over auto-calculation from base_rate + markup.
+func UpdateFinalRateByID(id int, newFinal decimal.Decimal) error {
+	if GlobalDB == nil {
+		return fmt.Errorf("database connection not initialized")
+	}
+	_, err := GlobalDB.Exec(
+		`UPDATE exchange_rates 
+		 SET final_rate = $1, 
+		     updated_at = NOW()
+		 WHERE id = $2`,
+		newFinal, id,
+	)
+	if err != nil {
+		log.Printf("UpdateFinalRateByID id=%d: DB error: %v", id, err)
+		return fmt.Errorf("failed to update final rate")
+	}
+	log.Printf("✅ Exchange rate id=%d final_rate manually set to %s", id, newFinal.String())
+	return nil
+}
+
 // SeedDefaultExchangeRates inserts default rates if table is empty.
 func SeedDefaultExchangeRates() {
 	if GlobalDB == nil {

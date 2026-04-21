@@ -256,7 +256,7 @@ export const StaffOnlyZone = () => {
   // ── Exchange Rates ──
   const [exchangeRates, setExchangeRates] = useState<{ id: number; currency_from: string; currency_to: string; base_rate: string; markup_percent: string; final_rate: string; updated_at: string }[]>([]);
   const [ratesLoading, setRatesLoading] = useState(false);
-  const [editingRate, setEditingRate] = useState<{ id: number; base_rate: string; markup_percent: string } | null>(null);
+  const [editingRate, setEditingRate] = useState<{ id: number; base_rate: string; markup_percent: string; final_rate: string } | null>(null);
 
   const fetchExchangeRates = useCallback(async () => {
     setRatesLoading(true);
@@ -274,8 +274,15 @@ export const StaffOnlyZone = () => {
       const payload: Record<string, number> = {};
       const br = parseFloat(editingRate.base_rate);
       const mp = parseFloat(editingRate.markup_percent);
+      const fr = parseFloat(editingRate.final_rate);
+      // Find original rate to detect manual final_rate override
+      const orig = exchangeRates.find(r => r.id === editingRate.id);
       if (!isNaN(br) && br > 0) payload.base_rate = br;
       if (!isNaN(mp) && mp >= 0) payload.markup_percent = mp;
+      // If final_rate was manually changed (different from what auto-calc would give), send it as override
+      if (!isNaN(fr) && fr > 0 && orig && editingRate.final_rate !== orig.final_rate) {
+        payload.final_rate = fr;
+      }
       const res = await apiClient.patch(`/admin/rates/${editingRate.id}/markup`, payload);
       setExchangeRates(res.data || []);
       setEditingRate(null);
@@ -2439,7 +2446,17 @@ export const StaffOnlyZone = () => {
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            <span className="text-white font-bold tabular-nums">{parseFloat(rate.final_rate).toFixed(2)} ₽</span>
+                            {editingRate?.id === rate.id ? (
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={editingRate.final_rate}
+                                onChange={e => setEditingRate({ ...editingRate, final_rate: e.target.value })}
+                                className="w-24 px-2 py-1 bg-white/10 border border-purple-500/50 rounded text-white text-xs outline-none"
+                              />
+                            ) : (
+                              <span className="text-white font-bold tabular-nums">{parseFloat(rate.final_rate).toFixed(2)} ₽</span>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-slate-500 text-xs">
                             {rate.updated_at ? new Date(rate.updated_at).toLocaleString('ru-RU') : '—'}
@@ -2456,7 +2473,7 @@ export const StaffOnlyZone = () => {
                               </div>
                             ) : (
                               <button
-                                onClick={() => setEditingRate({ id: rate.id, base_rate: rate.base_rate, markup_percent: rate.markup_percent })}
+                                onClick={() => setEditingRate({ id: rate.id, base_rate: rate.base_rate, markup_percent: rate.markup_percent, final_rate: rate.final_rate })}
                                 className="text-blue-400 hover:text-blue-300 text-xs transition-colors"
                               >
                                 Изменить
@@ -2476,9 +2493,10 @@ export const StaffOnlyZone = () => {
             <div className="glass-card p-6">
               <h3 className="text-sm font-semibold text-white/60 mb-3">Как это работает</h3>
               <div className="space-y-2 text-xs text-white/40 leading-relaxed">
-                <p><strong className="text-white/60">Реальный курс (ЦБ)</strong> — автоматически обновляется из API Центробанка.</p>
-                <p><strong className="text-white/60">Наценка %</strong> — ваша наценка поверх базового курса. Применяется ко всем пополнениям, покупкам и расчёту маржи.</p>
-                <p><strong className="text-white/60">Внутренний курс</strong> = Реальный × (1 + Наценка / 100). Используется для всех операций на платформе.</p>
+                <p><strong className="text-white/60">Реальный курс (ЦБ)</strong> — базовый курс. Можно обновлять вручную.</p>
+                <p><strong className="text-white/60">Наценка %</strong> — ваша наценка поверх базового курса.</p>
+                <p><strong className="text-white/60">Внутренний курс</strong> = Реальный × (1 + Наценка / 100). Используется для всех операций: Магазин, Пополнение карт, Кошелёк, Маржа.</p>
+                <p><strong className="text-purple-400">Ручной ввод</strong> — если вы измените Внутренний курс напрямую, он будет использован вместо автоматического расчёта (приоритет).</p>
               </div>
             </div>
           </div>

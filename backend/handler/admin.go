@@ -122,7 +122,9 @@ func AdminGetExchangeRatesHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // AdminUpdateRateHandler - PATCH /api/v1/admin/rates/{id}/markup
-// Accepts both base_rate and markup_percent (either or both).
+// Accepts base_rate, markup_percent, and/or final_rate.
+// If final_rate is provided explicitly, it takes priority (manual override).
+// Otherwise final_rate is auto-calculated from base_rate × (1 + markup/100).
 func AdminUpdateMarkupHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	rateID, err := strconv.Atoi(vars["id"])
@@ -133,17 +135,18 @@ func AdminUpdateMarkupHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		BaseRate      *decimal.Decimal `json:"base_rate"`
 		MarkupPercent *decimal.Decimal `json:"markup_percent"`
+		FinalRate     *decimal.Decimal `json:"final_rate"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	if req.BaseRate == nil && req.MarkupPercent == nil {
+	if req.BaseRate == nil && req.MarkupPercent == nil && req.FinalRate == nil {
 		http.Error(w, "nothing to update", http.StatusBadRequest)
 		return
 	}
 
-	// Update base_rate first (if provided)
+	// Update base_rate (if provided) — also recalculates final_rate
 	if req.BaseRate != nil {
 		if req.BaseRate.LessThanOrEqual(decimal.Zero) {
 			http.Error(w, "base_rate must be positive", http.StatusBadRequest)
@@ -155,13 +158,25 @@ func AdminUpdateMarkupHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Update markup (if provided) — recalculates final_rate
+	// Update markup (if provided) — also recalculates final_rate
 	if req.MarkupPercent != nil {
 		if req.MarkupPercent.LessThan(decimal.Zero) {
 			http.Error(w, "markup_percent cannot be negative", http.StatusBadRequest)
 			return
 		}
 		if err := repository.UpdateMarkupPercent(rateID, *req.MarkupPercent); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Manual final_rate override — takes highest priority, applied LAST
+	if req.FinalRate != nil {
+		if req.FinalRate.LessThanOrEqual(decimal.Zero) {
+			http.Error(w, "final_rate must be positive", http.StatusBadRequest)
+			return
+		}
+		if err := repository.UpdateFinalRateByID(rateID, *req.FinalRate); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

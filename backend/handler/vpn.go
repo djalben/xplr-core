@@ -554,14 +554,40 @@ func AdminDeleteVPNClientHandler(w http.ResponseWriter, r *http.Request) {
 		ORDER BY created_at DESC LIMIT 1
 	`, email).Scan(&activationKey)
 	if err != nil || activationKey == "" {
+		log.Printf("[VPN-DELETE] ❌ Order not found for provider_ref=%q, err=%v, key=%q", email, err, activationKey)
 		http.Error(w, `{"error":"order not found"}`, http.StatusNotFound)
 		return
 	}
 
+	preview := activationKey
+	if len(preview) > 120 {
+		preview = preview[:120]
+	}
+	log.Printf("[VPN-DELETE] 🔍 Raw activation_key for %s: %q (len=%d)", email, preview, len(activationKey))
+
+	// If activation_key looks like base64, try decoding it first
+	keyToExtract := activationKey
+	if !strings.Contains(activationKey, "://") && len(activationKey) > 40 {
+		if decoded, err := base64.StdEncoding.DecodeString(activationKey); err == nil {
+			decodedStr := string(decoded)
+			if strings.Contains(strings.ToLower(decodedStr), "vless://") {
+				log.Printf("[VPN-DELETE] 🔄 Decoded base64 activation_key: %q", decodedStr[:min(120, len(decodedStr))])
+				keyToExtract = decodedStr
+			}
+		} else if decoded, err := base64.RawStdEncoding.DecodeString(activationKey); err == nil {
+			decodedStr := string(decoded)
+			if strings.Contains(strings.ToLower(decodedStr), "vless://") {
+				log.Printf("[VPN-DELETE] 🔄 Decoded raw-base64 activation_key: %q", decodedStr[:min(120, len(decodedStr))])
+				keyToExtract = decodedStr
+			}
+		}
+	}
+
 	// Extract UUID from vless://UUID@...
-	clientUUID := extractUUIDFromVlessLink(activationKey)
+	clientUUID := extractUUIDFromVlessLink(keyToExtract)
 	if clientUUID == "" {
-		http.Error(w, `{"error":"cannot extract UUID from activation key"}`, http.StatusInternalServerError)
+		log.Printf("[VPN-DELETE] ❌ Cannot extract UUID. Raw key: %q", preview)
+		http.Error(w, fmt.Sprintf(`{"error":"cannot extract UUID from activation key","activation_key_preview":"%s"}`, preview), http.StatusInternalServerError)
 		return
 	}
 
@@ -641,8 +667,23 @@ func AdminEditVPNClientHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	clientUUID := extractUUIDFromVlessLink(activationKey)
+	// Try base64 decode if not a direct vless:// link
+	keyToExtract := activationKey
+	if !strings.Contains(activationKey, "://") && len(activationKey) > 40 {
+		if decoded, decErr := base64.StdEncoding.DecodeString(activationKey); decErr == nil {
+			if strings.Contains(strings.ToLower(string(decoded)), "vless://") {
+				keyToExtract = string(decoded)
+			}
+		} else if decoded, decErr := base64.RawStdEncoding.DecodeString(activationKey); decErr == nil {
+			if strings.Contains(strings.ToLower(string(decoded)), "vless://") {
+				keyToExtract = string(decoded)
+			}
+		}
+	}
+
+	clientUUID := extractUUIDFromVlessLink(keyToExtract)
 	if clientUUID == "" {
+		log.Printf("[VPN-EDIT] ❌ Cannot extract UUID from key (len=%d): %q", len(activationKey), activationKey[:min(120, len(activationKey))])
 		http.Error(w, `{"error":"cannot extract UUID from activation key"}`, http.StatusInternalServerError)
 		return
 	}
