@@ -39,7 +39,7 @@ import {
   Pencil,
 } from 'lucide-react';
 
-type Tab = 'dashboard' | 'users' | 'commissions' | 'tickets' | 'news' | 'logs' | 'store';
+type Tab = 'dashboard' | 'users' | 'commissions' | 'tickets' | 'news' | 'logs' | 'store' | 'rates';
 
 interface DashboardStats {
   total_users: number;
@@ -253,6 +253,32 @@ export const StaffOnlyZone = () => {
   const [bulkType, setBulkType] = useState('');
   const [storeSubTab, setStoreSubTab] = useState<'esim' | 'digital' | 'vpn'>('esim');
 
+  // ── Exchange Rates ──
+  const [exchangeRates, setExchangeRates] = useState<{ id: number; currency_from: string; currency_to: string; base_rate: string; markup_percent: string; final_rate: string; updated_at: string }[]>([]);
+  const [ratesLoading, setRatesLoading] = useState(false);
+  const [editingRate, setEditingRate] = useState<{ id: number; markup_percent: string } | null>(null);
+
+  const fetchExchangeRates = useCallback(async () => {
+    setRatesLoading(true);
+    try {
+      const res = await apiClient.get('/admin/rates');
+      setExchangeRates(res.data || []);
+    } catch { /* ignore */ }
+    finally { setRatesLoading(false); }
+  }, []);
+
+  const handleSaveMarkup = async () => {
+    if (!editingRate) return;
+    setSaving(true);
+    try {
+      const res = await apiClient.patch(`/admin/rates/${editingRate.id}/markup`, { markup_percent: parseFloat(editingRate.markup_percent) });
+      setExchangeRates(res.data || []);
+      setEditingRate(null);
+      showToast('Наценка обновлена');
+    } catch { showToast('Ошибка обновления наценки', 'err'); }
+    finally { setSaving(false); }
+  };
+
   // ── Aeza infra balance ──
   const [aezaBalance, setAezaBalance] = useState<{ balance: number; currency: string; updated_at: string; status?: string } | null>(null);
   const [aezaLoading, setAezaLoading] = useState(false);
@@ -280,16 +306,21 @@ export const StaffOnlyZone = () => {
     monthly_revenue: number;
     server_cost: number;
     margin: number;
+    unique_vpn_clients: number;
+    current_month_clients: number;
+    prev_month_clients: number;
   } | null>(null);
   const [vpnServerLoading, setVpnServerLoading] = useState(false);
 
   // ── VPN Active Clients ──
   const [vpnClients, setVpnClients] = useState<{
     email: string;
+    full_name: string;
     product_name: string;
     price_usd: number;
     created_at: string;
     provider_ref: string;
+    activation_key: string;
     traffic_bytes: number;
     expire_ms: number;
     duration_days: number;
@@ -668,7 +699,8 @@ export const StaffOnlyZone = () => {
     if (tab === 'news') loadNews();
     if (tab === 'logs') loadLogs();
     if (tab === 'store') loadStoreProducts();
-  }, [tab, loadAllUsers, loadCommissions, loadSysSettings, loadTickets, loadChats, loadNews, loadLogs, loadStoreProducts]);
+    if (tab === 'rates') fetchExchangeRates();
+  }, [tab, loadAllUsers, loadCommissions, loadSysSettings, loadTickets, loadChats, loadNews, loadLogs, loadStoreProducts, fetchExchangeRates]);
 
   // ── Inspect User (Financial Passport) ──
   const inspectUserDetails = async (userId: number) => {
@@ -813,6 +845,7 @@ export const StaffOnlyZone = () => {
           <TabBtn id="tickets" icon={MessageSquare} label="Тикеты" />
           <TabBtn id="news" icon={Newspaper} label="Новости" />
           <TabBtn id="store" icon={ShoppingBag} label="Магазин" />
+          <TabBtn id="rates" icon={DollarSign} label="Курсы валют" />
           <TabBtn id="logs" icon={Clock} label="Логи" />
         </div>
 
@@ -929,7 +962,12 @@ export const StaffOnlyZone = () => {
                     </div>
                     <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3">
                       <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Клиентов</p>
-                      <p className="text-xl font-bold text-white tabular-nums">{vpnServerStatus.active_clients}</p>
+                      <p className="text-xl font-bold text-white tabular-nums">{vpnServerStatus.unique_vpn_clients ?? 0}</p>
+                      {vpnServerStatus.prev_month_clients > 0 && (() => {
+                        const growth = vpnServerStatus.current_month_clients - vpnServerStatus.prev_month_clients;
+                        const pct = ((growth / vpnServerStatus.prev_month_clients) * 100).toFixed(0);
+                        return <p className={`text-[10px] mt-0.5 ${growth >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{growth >= 0 ? '+' : ''}{pct}% vs прош. мес.</p>;
+                      })()}
                     </div>
                     <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3">
                       <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Лимит</p>
@@ -974,16 +1012,33 @@ export const StaffOnlyZone = () => {
                   {/* Server payment remaining estimate */}
                   <div className="pt-3 border-t border-white/5">
                     <div className="flex items-center gap-2">
-                      <div className={`w-2.5 h-2.5 rounded-full ${vpnServerStatus.used_percent < 70 ? 'bg-emerald-500' : vpnServerStatus.used_percent < 90 ? 'bg-amber-500' : 'bg-red-500'} animate-pulse`} />
-                      <span className="text-xs text-white/50">
-                        Оплаченный период: <strong className="text-white/80">~{Math.max(0, 30 - new Date().getDate())} дн. до конца месяца</strong>
-                      </span>
+                      {(() => {
+                        const expiryStr = aezaServer?.expires_at;
+                        const daysLeft = expiryStr ? Math.ceil((new Date(expiryStr).getTime() - Date.now()) / 86400000) : Math.max(0, 30 - new Date().getDate());
+                        const color = daysLeft < 7 ? 'bg-red-500' : daysLeft < 14 ? 'bg-amber-500' : 'bg-emerald-500';
+                        return (
+                          <>
+                            <div className={`w-2.5 h-2.5 rounded-full ${color} animate-pulse`} />
+                            <span className="text-xs text-white/50">
+                              Оплаченный период: <strong className="text-white/80">{daysLeft > 0 ? `${daysLeft} дн.` : 'Истёк!'}{expiryStr ? ` (до ${new Date(expiryStr).toLocaleDateString('ru-RU')})` : ''}</strong>
+                            </span>
+                          </>
+                        );
+                      })()}
                     </div>
                     <div className="flex items-center gap-2 mt-1.5">
-                      <div className={`w-2.5 h-2.5 rounded-full ${100 - vpnServerStatus.used_percent > 30 ? 'bg-emerald-500' : 100 - vpnServerStatus.used_percent > 10 ? 'bg-amber-500' : 'bg-red-500'}`} />
-                      <span className="text-xs text-white/50">
-                        Остаток трафика: <strong className="text-white/80">{(100 - vpnServerStatus.used_percent).toFixed(1)}% ({((vpnServerStatus.server_limit_bytes - vpnServerStatus.total_traffic) / (1024 * 1024 * 1024)).toFixed(1)} ГБ)</strong>
-                      </span>
+                      {(() => {
+                        const remainGB = (vpnServerStatus.server_limit_bytes - vpnServerStatus.total_traffic) / (1024 * 1024 * 1024);
+                        const color = remainGB < 10 ? 'bg-red-500' : remainGB < 20 ? 'bg-amber-500' : 'bg-emerald-500';
+                        return (
+                          <>
+                            <div className={`w-2.5 h-2.5 rounded-full ${color}`} />
+                            <span className="text-xs text-white/50">
+                              Остаток трафика: <strong className={`${remainGB < 10 ? 'text-red-400' : 'text-white/80'}`}>{remainGB.toFixed(1)} ГБ ({(100 - vpnServerStatus.used_percent).toFixed(1)}%)</strong>
+                            </span>
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -1005,7 +1060,9 @@ export const StaffOnlyZone = () => {
                     <thead>
                       <tr className="border-b border-white/10">
                         <th className="text-left px-3 py-2 text-slate-400 font-medium text-xs">Email</th>
+                        <th className="text-left px-3 py-2 text-slate-400 font-medium text-xs">Имя</th>
                         <th className="text-left px-3 py-2 text-slate-400 font-medium text-xs">Тариф</th>
+                        <th className="text-left px-3 py-2 text-slate-400 font-medium text-xs">Ключ</th>
                         <th className="text-left px-3 py-2 text-slate-400 font-medium text-xs">Использовано</th>
                         <th className="text-left px-3 py-2 text-slate-400 font-medium text-xs">Срок</th>
                         <th className="text-left px-3 py-2 text-slate-400 font-medium text-xs">Статус</th>
@@ -1022,8 +1079,20 @@ export const StaffOnlyZone = () => {
                         return (
                           <tr key={c.provider_ref + i} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                             <td className="px-3 py-2.5 text-white/80 text-xs truncate max-w-[160px]" title={c.email}>{c.email || '—'}</td>
+                            <td className="px-3 py-2.5 text-white/50 text-xs truncate max-w-[100px]" title={c.full_name}>{c.full_name || '—'}</td>
                             <td className="px-3 py-2.5 text-xs">
                               <span className="text-indigo-400 font-medium">{c.product_name}</span>
+                            </td>
+                            <td className="px-3 py-2.5 text-xs">
+                              {c.activation_key ? (
+                                <button
+                                  title="Скопировать ключ"
+                                  onClick={() => { navigator.clipboard.writeText(c.activation_key); showToast('Ключ скопирован'); }}
+                                  className="text-cyan-400/70 hover:text-cyan-400 truncate max-w-[80px] inline-block align-middle transition-colors"
+                                >
+                                  vless://…{c.activation_key.slice(-8)}
+                                </button>
+                              ) : '—'}
                             </td>
                             <td className="px-3 py-2.5 text-xs">
                               <div className="flex items-center gap-2">
@@ -2302,6 +2371,103 @@ export const StaffOnlyZone = () => {
           </div>
           );
         })()}
+
+        {/* ════════════ RATES TAB ════════════ */}
+        {tab === 'rates' && (
+          <div className="space-y-6">
+            <div className="glass-card p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <DollarSign className="w-5 h-5 text-amber-400" />
+                  Курсы валют
+                </h3>
+                <button onClick={fetchExchangeRates} disabled={ratesLoading} className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 rounded-xl transition-colors text-sm disabled:opacity-50">
+                  <Loader2 className={`w-4 h-4 ${ratesLoading ? 'animate-spin' : ''}`} />
+                  Обновить
+                </button>
+              </div>
+
+              {exchangeRates.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-white/10">
+                        <th className="text-left px-4 py-3 text-slate-400 font-medium text-xs">Пара</th>
+                        <th className="text-left px-4 py-3 text-slate-400 font-medium text-xs">Реальный курс (ЦБ)</th>
+                        <th className="text-left px-4 py-3 text-slate-400 font-medium text-xs">Наценка %</th>
+                        <th className="text-left px-4 py-3 text-slate-400 font-medium text-xs">Внутренний курс</th>
+                        <th className="text-left px-4 py-3 text-slate-400 font-medium text-xs">Обновлено</th>
+                        <th className="text-left px-4 py-3 text-slate-400 font-medium text-xs"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {exchangeRates.map(rate => (
+                        <tr key={rate.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                          <td className="px-4 py-3">
+                            <span className="text-white font-semibold text-sm">{rate.currency_from} → {rate.currency_to}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-emerald-400 font-medium tabular-nums">{parseFloat(rate.base_rate).toFixed(2)} ₽</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {editingRate?.id === rate.id ? (
+                              <input
+                                type="number"
+                                step="0.1"
+                                value={editingRate.markup_percent}
+                                onChange={e => setEditingRate({ ...editingRate, markup_percent: e.target.value })}
+                                className="w-20 px-2 py-1 bg-white/10 border border-blue-500/50 rounded text-white text-xs outline-none"
+                                autoFocus
+                              />
+                            ) : (
+                              <span className="text-orange-400 font-medium tabular-nums">{parseFloat(rate.markup_percent).toFixed(1)}%</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-white font-bold tabular-nums">{parseFloat(rate.final_rate).toFixed(2)} ₽</span>
+                          </td>
+                          <td className="px-4 py-3 text-slate-500 text-xs">
+                            {rate.updated_at ? new Date(rate.updated_at).toLocaleString('ru-RU') : '—'}
+                          </td>
+                          <td className="px-4 py-3">
+                            {editingRate?.id === rate.id ? (
+                              <div className="flex gap-1">
+                                <button onClick={handleSaveMarkup} disabled={saving} className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-xs transition-colors disabled:opacity-50">
+                                  {saving ? '...' : 'OK'}
+                                </button>
+                                <button onClick={() => setEditingRate(null)} className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-slate-300 rounded text-xs transition-colors">
+                                  ✕
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setEditingRate({ id: rate.id, markup_percent: rate.markup_percent })}
+                                className="text-blue-400 hover:text-blue-300 text-xs transition-colors"
+                              >
+                                Изменить
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-sm text-white/30">{ratesLoading ? 'Загрузка...' : 'Нет данных о курсах'}</p>
+              )}
+            </div>
+
+            <div className="glass-card p-6">
+              <h3 className="text-sm font-semibold text-white/60 mb-3">Как это работает</h3>
+              <div className="space-y-2 text-xs text-white/40 leading-relaxed">
+                <p><strong className="text-white/60">Реальный курс (ЦБ)</strong> — автоматически обновляется из API Центробанка.</p>
+                <p><strong className="text-white/60">Наценка %</strong> — ваша наценка поверх базового курса. Применяется ко всем пополнениям, покупкам и расчёту маржи.</p>
+                <p><strong className="text-white/60">Внутренний курс</strong> = Реальный × (1 + Наценка / 100). Используется для всех операций на платформе.</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ════════════ LOGS TAB ════════════ */}
         {tab === 'logs' && (

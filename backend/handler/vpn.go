@@ -216,8 +216,8 @@ func AdminVPNServerStatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Server traffic limit from env (in GB, default 1000 GB = 1 TB)
-	serverLimitGB := 1000
+	// Server traffic limit from env (in GB, default 30 GB — real Aeza plan)
+	serverLimitGB := 30
 	if envLimit := os.Getenv("VPN_SERVER_TRAFFIC_LIMIT_GB"); envLimit != "" {
 		if v, err := strconv.Atoi(envLimit); err == nil && v > 0 {
 			serverLimitGB = v
@@ -234,7 +234,6 @@ func AdminVPNServerStatusHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ── Financial metrics ──
-	// Monthly server cost from env (EUR)
 	serverCostEUR := 4.94
 	if envCost := os.Getenv("VPN_SERVER_MONTHLY_COST"); envCost != "" {
 		if v, err := strconv.ParseFloat(envCost, 64); err == nil && v > 0 {
@@ -244,6 +243,9 @@ func AdminVPNServerStatusHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Revenue: sum of all completed VPN orders this month
 	var monthlyRevenue float64
+	var uniqueVPNClients int
+	var currentMonthClients int
+	var prevMonthClients int
 	if GlobalDB != nil {
 		_ = GlobalDB.QueryRow(`
 			SELECT COALESCE(SUM(price_usd), 0)
@@ -252,27 +254,61 @@ func AdminVPNServerStatusHandler(w http.ResponseWriter, r *http.Request) {
 			  AND (product_name ILIKE '%vpn%' OR product_name ILIKE '%vless%' OR product_name ILIKE '%безопасный%')
 			  AND created_at >= date_trunc('month', NOW())
 		`).Scan(&monthlyRevenue)
+
+		// Unique VPN clients (users with at least one active=completed VPN order)
+		_ = GlobalDB.QueryRow(`
+			SELECT COUNT(DISTINCT user_id)
+			FROM store_orders
+			WHERE status = 'completed'
+			  AND (activation_key LIKE 'vless://%' OR product_name ILIKE '%vpn%' OR product_name ILIKE '%безопасный%')
+		`).Scan(&uniqueVPNClients)
+
+		// Current month new VPN clients
+		_ = GlobalDB.QueryRow(`
+			SELECT COUNT(DISTINCT user_id)
+			FROM store_orders
+			WHERE status = 'completed'
+			  AND (activation_key LIKE 'vless://%' OR product_name ILIKE '%vpn%' OR product_name ILIKE '%безопасный%')
+			  AND created_at >= date_trunc('month', NOW())
+		`).Scan(&currentMonthClients)
+
+		// Previous month VPN clients
+		_ = GlobalDB.QueryRow(`
+			SELECT COUNT(DISTINCT user_id)
+			FROM store_orders
+			WHERE status = 'completed'
+			  AND (activation_key LIKE 'vless://%' OR product_name ILIKE '%vpn%' OR product_name ILIKE '%безопасный%')
+			  AND created_at >= date_trunc('month', NOW()) - INTERVAL '1 month'
+			  AND created_at < date_trunc('month', NOW())
+		`).Scan(&prevMonthClients)
 	}
 
 	margin := monthlyRevenue - serverCostEUR
 
-	// ── Traffic alert (>90%) ──
+	// ── Traffic alert: critical when remaining < 10 GB ──
+	remainingBytes := serverLimitBytes - stats.TotalTraffic
+	if remainingBytes < 0 {
+		remainingBytes = 0
+	}
+	remainingGB := float64(remainingBytes) / (1024 * 1024 * 1024)
 	trafficAlert := false
-	if usedPercent >= 90 {
+	if remainingGB < 10 {
 		trafficAlert = true
-		// Fire async admin TG alert (dedup via log — in production use a flag/cache)
 		go notifyTrafficCritical(usedPercent, stats.TotalTraffic, serverLimitBytes)
 	}
 
 	json.NewEncoder(w).Encode(map[string]any{
-		"active_clients":     stats.ActiveClients,
-		"total_upload":       stats.TotalUp,
-		"total_download":     stats.TotalDown,
-		"total_traffic":      stats.TotalTraffic,
-		"server_limit_bytes": serverLimitBytes,
-		"server_limit_gb":    serverLimitGB,
-		"used_percent":       usedPercent,
-		"traffic_alert":      trafficAlert,
+		"active_clients":        stats.ActiveClients,
+		"total_upload":          stats.TotalUp,
+		"total_download":        stats.TotalDown,
+		"total_traffic":         stats.TotalTraffic,
+		"server_limit_bytes":    serverLimitBytes,
+		"server_limit_gb":       serverLimitGB,
+		"used_percent":          usedPercent,
+		"traffic_alert":         trafficAlert,
+		"unique_vpn_clients":    uniqueVPNClients,
+		"current_month_clients": currentMonthClients,
+		"prev_month_clients":    prevMonthClients,
 		// Financial
 		"monthly_revenue": monthlyRevenue,
 		"server_cost":     serverCostEUR,
@@ -293,11 +329,13 @@ func AdminVPNActiveClientsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fetch all completed VPN orders with meta
+	// Fetch all completed VPN orders with meta, user name, and activation key
 	rows, err := GlobalDB.Query(`
 		SELECT o.provider_ref, o.product_name, o.price_usd, o.created_at,
 		       COALESCE(o.meta, '{}'),
-		       COALESCE(u.email, '')
+		       COALESCE(u.email, ''),
+		       COALESCE(u.display_name, ''),
+		       COALESCE(o.activation_key, '')
 		FROM store_orders o
 		LEFT JOIN users u ON u.id = o.user_id
 		WHERE o.status = 'completed'
@@ -313,17 +351,19 @@ func AdminVPNActiveClientsHandler(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	type clientRow struct {
-		Email        string  `json:"email"`
-		ProductName  string  `json:"product_name"`
-		PriceUSD     float64 `json:"price_usd"`
-		CreatedAt    string  `json:"created_at"`
-		ProviderRef  string  `json:"provider_ref"`
-		TrafficBytes int64   `json:"traffic_bytes"`
-		ExpireMs     int64   `json:"expire_ms"`
-		DurationDays int     `json:"duration_days"`
-		UsedBytes    int64   `json:"used_bytes"`
-		UsedPercent  float64 `json:"used_percent"`
-		Active       bool    `json:"active"`
+		Email         string  `json:"email"`
+		FullName      string  `json:"full_name"`
+		ProductName   string  `json:"product_name"`
+		PriceUSD      float64 `json:"price_usd"`
+		CreatedAt     string  `json:"created_at"`
+		ProviderRef   string  `json:"provider_ref"`
+		ActivationKey string  `json:"activation_key"`
+		TrafficBytes  int64   `json:"traffic_bytes"`
+		ExpireMs      int64   `json:"expire_ms"`
+		DurationDays  int     `json:"duration_days"`
+		UsedBytes     int64   `json:"used_bytes"`
+		UsedPercent   float64 `json:"used_percent"`
+		Active        bool    `json:"active"`
 	}
 
 	// Get VlessProvider for live traffic queries
@@ -335,10 +375,10 @@ func AdminVPNActiveClientsHandler(w http.ResponseWriter, r *http.Request) {
 
 	var clients []clientRow
 	for rows.Next() {
-		var ref, productName, email, metaStr string
+		var ref, productName, email, metaStr, fullName, activationKey string
 		var priceUSD float64
 		var createdAt string
-		if err := rows.Scan(&ref, &productName, &priceUSD, &createdAt, &metaStr, &email); err != nil {
+		if err := rows.Scan(&ref, &productName, &priceUSD, &createdAt, &metaStr, &email, &fullName, &activationKey); err != nil {
 			continue
 		}
 
@@ -370,17 +410,19 @@ func AdminVPNActiveClientsHandler(w http.ResponseWriter, r *http.Request) {
 		active := (meta.ExpireMs == 0 || nowMs < meta.ExpireMs) && (meta.TrafficBytes == 0 || usedBytes < meta.TrafficBytes)
 
 		clients = append(clients, clientRow{
-			Email:        email,
-			ProductName:  productName,
-			PriceUSD:     priceUSD,
-			CreatedAt:    createdAt,
-			ProviderRef:  ref,
-			TrafficBytes: meta.TrafficBytes,
-			ExpireMs:     meta.ExpireMs,
-			DurationDays: meta.DurationDays,
-			UsedBytes:    usedBytes,
-			UsedPercent:  usedPct,
-			Active:       active,
+			Email:         email,
+			FullName:      fullName,
+			ProductName:   productName,
+			PriceUSD:      priceUSD,
+			CreatedAt:     createdAt,
+			ProviderRef:   ref,
+			ActivationKey: activationKey,
+			TrafficBytes:  meta.TrafficBytes,
+			ExpireMs:      meta.ExpireMs,
+			DurationDays:  meta.DurationDays,
+			UsedBytes:     usedBytes,
+			UsedPercent:   usedPct,
+			Active:        active,
 		})
 	}
 	if clients == nil {
@@ -398,12 +440,16 @@ func AdminVPNActiveClientsHandler(w http.ResponseWriter, r *http.Request) {
 func notifyTrafficCritical(usedPct float64, totalTraffic, limitBytes int64) {
 	usedGB := float64(totalTraffic) / (1024 * 1024 * 1024)
 	limitGB := float64(limitBytes) / (1024 * 1024 * 1024)
-	msg := fmt.Sprintf("🚨 <b>КРИТИЧЕСКИЙ АЛЕРТ: Трафик сервера</b>\n\n"+
-		"Использовано: <b>%.1f%%</b> (%.1f / %.0f ГБ)\n\n"+
-		"⚠️ Серверный лимит трафика почти исчерпан.\n"+
-		"Рекомендуется увеличить лимит или ограничить новые подключения.",
-		usedPct, usedGB, limitGB)
-	telegram.NotifyAdmins(msg, "", "")
+	remainingGB := limitGB - usedGB
+	if remainingGB < 0 {
+		remainingGB = 0
+	}
+	msg := fmt.Sprintf("🚨 <b>Внимание! Критический остаток трафика на сервере</b>\n\n"+
+		"Остаток: <b>%.1f ГБ</b> из %.0f ГБ\n"+
+		"Использовано: <b>%.1f%%</b> (%.1f ГБ)\n\n"+
+		"⚠️ Рекомендуется увеличить лимит или ограничить новые подключения.",
+		remainingGB, limitGB, usedPct, usedGB)
+	telegram.NotifyAdmins(msg, "Открыть админку", "https://xplr.pro/staff-only-zone")
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -657,14 +703,37 @@ func AdminEditVPNClientHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // extractUUIDFromVlessLink extracts the UUID from a vless://UUID@IP:PORT?... link.
+// Handles extra slashes, URL-encoded chars, and complex query parameters.
 func extractUUIDFromVlessLink(link string) string {
+	link = strings.TrimSpace(link)
 	if !strings.HasPrefix(link, "vless://") {
 		return ""
 	}
+
+	// Strip scheme and any extra leading slashes
 	rest := strings.TrimPrefix(link, "vless://")
+	rest = strings.TrimLeft(rest, "/")
+
+	// The UUID is the part before the first '@'
 	atIdx := strings.Index(rest, "@")
 	if atIdx <= 0 {
 		return ""
 	}
-	return rest[:atIdx]
+	uuid := rest[:atIdx]
+
+	// URL-decode in case the UUID was percent-encoded
+	uuid = strings.ReplaceAll(uuid, "%2D", "-")
+	uuid = strings.ReplaceAll(uuid, "%2d", "-")
+	uuid = strings.TrimSpace(uuid)
+
+	// Basic UUID format validation: 8-4-4-4-12 hex chars
+	if len(uuid) != 36 {
+		log.Printf("[UUID-PARSE] ⚠️ Extracted UUID has unexpected length %d: %q (from link prefix: %q)", len(uuid), uuid, link[:min(80, len(link))])
+	}
+	if uuid == "" {
+		log.Printf("[UUID-PARSE] ❌ Failed to extract UUID from link: %q", link[:min(80, len(link))])
+	} else {
+		log.Printf("[UUID-PARSE] ✅ Extracted UUID: %s", uuid)
+	}
+	return uuid
 }

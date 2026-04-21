@@ -946,7 +946,7 @@ const RealisticCreditCard = ({
           className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-xl transition-colors text-sm border border-emerald-500/30"
         >
           <Banknote className="w-4 h-4" />
-          Пополнить
+          Пополнить с кошелька
         </button>
         <button 
           onClick={onClose}

@@ -92,10 +92,11 @@ func sendMailWith(cfg *smtpConfig, to, subject, htmlBody string) error {
 
 // sendImplicitTLS — connects with TLS first, then authenticates (Zoho, port 465).
 func sendImplicitTLS(cfg *smtpConfig, addr, to string, msg []byte) error {
+	dialer := &net.Dialer{Timeout: 15 * time.Second}
 	tlsConfig := &tls.Config{ServerName: cfg.Host}
-	conn, err := tls.Dial("tcp", addr, tlsConfig)
+	conn, err := tls.DialWithDialer(dialer, "tcp", addr, tlsConfig)
 	if err != nil {
-		return fmt.Errorf("tls dial: %w", err)
+		return fmt.Errorf("tls dial (timeout 15s): %w", err)
 	}
 	defer conn.Close()
 
