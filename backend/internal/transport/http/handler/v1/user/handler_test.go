@@ -147,6 +147,7 @@ func TestHandler_GetWallet_ok(t *testing.T) {
 
 	m := newMockBundle(ctrl)
 	m.Wallet.EXPECT().GetBalance(gomock.Any(), uid).Return(domain.NewNumeric(7), nil)
+	m.Wallet.EXPECT().GetAutoTopUpEnabled(gomock.Any(), uid).Return(false, nil)
 
 	rec := httptest.NewRecorder()
 	m.H.GetWallet(rec, reqUser(uid, http.MethodGet, "/user/wallet", nil))

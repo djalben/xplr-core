@@ -9,8 +9,8 @@ import (
 
 // SyncCardBalances пересчитывает balance в таблице cards по данным из transactions.
 // Правило:
-// - TOPUP_CARD (COMPLETED) увеличивает баланс
-// - CARD_SPEND (COMPLETED) уменьшает баланс
+// - TOPUP_CARD (COMPLETED) увеличивает баланс.
+// - CARD_SPEND (COMPLETED) уменьшает баланс.
 func SyncCardBalances(ctx context.Context, dsn string) (int64, error) {
 	db, err := postgres.Connect(ctx, dsn)
 	if err != nil {
@@ -55,4 +55,3 @@ func SyncCardBalances(ctx context.Context, dsn string) (int64, error) {
 
 	return rows, nil
 }
-

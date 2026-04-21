@@ -46,9 +46,7 @@ type Container struct {
 	KYCUseCase         *kyc.UseCase
 }
 
-func NewContainer(cfg *config.ENV) (*Container, error) {
-	ctx := context.Background()
-
+func NewContainer(ctx context.Context, cfg *config.ENV) (*Container, error) {
 	db, err := postgres.Connect(ctx, cfg.PostgresDSN)
 	if err != nil {
 		return nil, wrapper.Wrap(err)

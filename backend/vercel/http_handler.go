@@ -18,15 +18,12 @@ func NewHTTPHandlerFromEnv(ctx context.Context) (http.Handler, error) {
 		return nil, wrapper.Wrap(err)
 	}
 
-	container, err := app.NewContainer(&cfg)
+	container, err := app.NewContainer(ctx, &cfg)
 	if err != nil {
 		return nil, wrapper.Wrap(err)
 	}
 
 	s := httpServer.NewServer(container, cfg.ServerHost, cfg.ServerPort, []byte(cfg.JWTSecret), cfg.CORSAllowedOrigins)
 
-	_ = ctx // на будущее: можно будет пробросить в коннекты/грейсфул
-
 	return s.Handler(), nil
 }
-

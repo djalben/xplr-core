@@ -143,8 +143,8 @@ func (h *Handler) GetWallet(w http.ResponseWriter, r *http.Request) {
 
 	// BFF: фронт ожидает master_balance.
 	handler.WriteJSON(w, http.StatusOK, map[string]any{
-		"master_balance":        balance.String(),
-		"auto_topup_enabled":    autoEnabled,
+		"master_balance":     balance.String(),
+		"auto_topup_enabled": autoEnabled,
 	})
 }
 

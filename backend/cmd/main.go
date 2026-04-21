@@ -20,7 +20,9 @@ import (
 func main() {
 	cfg, err := config.Parse()
 	if err != nil {
-		panic("failed to parse config: " + err.Error())
+		// Тут логгера ещё нет — пишем в stderr и выходим с кодом 1.
+		_, _ = os.Stderr.WriteString("failed to parse config: " + err.Error() + "\n")
+		os.Exit(1)
 	}
 
 	// Логгер
@@ -30,7 +32,7 @@ func main() {
 	logger.Info("🚀 Starting XPLR...")
 
 	// Контейнер
-	container, err := app.NewContainer(&cfg)
+	container, err := app.NewContainer(context.Background(), &cfg)
 	if err != nil {
 		logger.Error("failed to create container", "error", err)
 
