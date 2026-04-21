@@ -167,17 +167,12 @@ func ProcessReferralRegistration(referredID int, referralCode string) error {
 	}
 	log.Printf("✅ Referral created: referrer %d -> referred %d (code: %s)", referrerID, referredID, referralCode)
 
-	// Credit $5 bonus to the new user
-	bonus := decimal.NewFromInt(5)
-	_, err = GlobalDB.Exec(
-		"UPDATE users SET balance_rub = COALESCE(balance_rub, 0) + $1, balance = COALESCE(balance, 0) + $1 WHERE id = $2",
-		bonus, referredID,
-	)
-	if err != nil {
-		log.Printf("Warning: failed to credit referral bonus to user %d: %v", referredID, err)
-	} else {
-		log.Printf("✅ $5 referral bonus credited to new user %d", referredID)
-	}
+	// NOTE: $5 bonus is NO LONGER credited at registration.
+	// The referrer receives their reward only after the referred user completes ALL 3 steps:
+	// 1. Registration (done here)
+	// 2. First wallet top-up
+	// 3. First virtual card purchase
+	// See CheckAndCreditReferralBonus() for the logic.
 
 	// Send Telegram notification to referrer
 	go func() {
@@ -197,6 +192,123 @@ func ProcessReferralRegistration(referredID int, referralCode string) error {
 	}()
 
 	return nil
+}
+
+// CheckAndCreditReferralBonus checks whether the referred user has completed all 3 steps:
+// 1. Registration (referral record exists)
+// 2. First wallet top-up (any DEPOSIT/TOPUP transaction)
+// 3. First virtual card purchase (any card with status != 'CANCELLED')
+// If all conditions are met AND the bonus hasn't been paid yet, credits the referrer.
+func CheckAndCreditReferralBonus(referredUserID int) {
+	if GlobalDB == nil {
+		return
+	}
+
+	// 1. Get referrer
+	referrerID := GetReferrerID(referredUserID)
+	if referrerID == 0 {
+		return // no referrer
+	}
+
+	// Check if bonus already paid (status = 'REWARDED')
+	var refStatus string
+	err := GlobalDB.QueryRow(
+		"SELECT status FROM referrals WHERE referrer_id = $1 AND referred_id = $2 LIMIT 1",
+		referrerID, referredUserID,
+	).Scan(&refStatus)
+	if err != nil || refStatus == "REWARDED" {
+		return // already rewarded or no record
+	}
+
+	// 2. Check: has the referred user ever topped up their wallet?
+	var topupCount int
+	GlobalDB.QueryRow(
+		`SELECT COUNT(*) FROM transactions 
+		 WHERE user_id = $1 AND transaction_type IN ('DEPOSIT', 'TOPUP', 'CARD_TOPUP') AND status = 'APPROVED'`,
+		referredUserID,
+	).Scan(&topupCount)
+	if topupCount == 0 {
+		return // condition 2 not met
+	}
+
+	// 3. Check: has the referred user purchased at least one virtual card?
+	var cardCount int
+	GlobalDB.QueryRow(
+		`SELECT COUNT(*) FROM cards WHERE user_id = $1 AND card_status != 'CANCELLED'`,
+		referredUserID,
+	).Scan(&cardCount)
+	if cardCount == 0 {
+		return // condition 3 not met
+	}
+
+	// All 3 conditions met — credit the referrer
+	bonus := decimal.NewFromInt(5)
+
+	tx, err := GlobalDB.Begin()
+	if err != nil {
+		log.Printf("[REFERRAL-BONUS] ❌ Begin tx error: %v", err)
+		return
+	}
+	defer tx.Rollback()
+
+	// Credit referrer balance
+	_, err = tx.Exec(
+		"UPDATE users SET balance_rub = COALESCE(balance_rub, 0) + $1, balance = COALESCE(balance, 0) + $1 WHERE id = $2",
+		bonus, referrerID,
+	)
+	if err != nil {
+		log.Printf("[REFERRAL-BONUS] ❌ Credit balance error: %v", err)
+		return
+	}
+
+	// Record transaction
+	_, err = tx.Exec(
+		`INSERT INTO transactions (user_id, amount, fee, transaction_type, status, details, executed_at)
+		 VALUES ($1, $2, 0, 'REFERRAL_BONUS', 'APPROVED', $3, NOW())`,
+		referrerID, bonus,
+		fmt.Sprintf("Реферальный бонус $5 за пользователя #%d (все 3 условия выполнены)", referredUserID),
+	)
+	if err != nil {
+		log.Printf("[REFERRAL-BONUS] ❌ Record tx error: %v", err)
+		return
+	}
+
+	// Mark referral as REWARDED
+	_, err = tx.Exec(
+		`UPDATE referrals SET status = 'REWARDED', commission_earned = COALESCE(commission_earned, 0) + $1 
+		 WHERE referrer_id = $2 AND referred_id = $3`,
+		bonus, referrerID, referredUserID,
+	)
+	if err != nil {
+		log.Printf("[REFERRAL-BONUS] ⚠️ Update referral status error: %v", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Printf("[REFERRAL-BONUS] ❌ Commit error: %v", err)
+		return
+	}
+
+	log.Printf("[REFERRAL-BONUS] ✅ $5 bonus credited to referrer %d for referred user %d (all 3 conditions met)", referrerID, referredUserID)
+
+	// Notify referrer via Telegram
+	go func() {
+		referrer, err := GetUserByID(referrerID)
+		if err != nil {
+			return
+		}
+		referred, err := GetUserByID(referredUserID)
+		if err != nil {
+			return
+		}
+		if referrer.TelegramChatID.Valid {
+			msg := fmt.Sprintf("🎁 Реферальный бонус!\n\n"+
+				"Пользователь %s выполнил все условия:\n"+
+				"✅ Регистрация\n✅ Пополнение кошелька\n✅ Покупка карты\n\n"+
+				"Вам начислено: <b>$5.00</b>",
+				referred.Email)
+			notification.SendTelegramMessage(referrer.TelegramChatID.Int64, msg)
+		}
+	}()
 }
 
 // GetReferrerID returns the referrer_id for a user, or 0 if none.

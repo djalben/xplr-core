@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -706,34 +708,57 @@ func AdminEditVPNClientHandler(w http.ResponseWriter, r *http.Request) {
 // Handles extra slashes, URL-encoded chars, and complex query parameters.
 func extractUUIDFromVlessLink(link string) string {
 	link = strings.TrimSpace(link)
-	if !strings.HasPrefix(link, "vless://") {
+	preview := link
+	if len(preview) > 120 {
+		preview = preview[:120]
+	}
+
+	if link == "" {
+		log.Printf("[UUID-PARSE] ❌ Empty activation key")
+		return ""
+	}
+
+	// Case-insensitive prefix check
+	lower := strings.ToLower(link)
+	if !strings.HasPrefix(lower, "vless://") {
+		log.Printf("[UUID-PARSE] ❌ Not a vless:// link: %q", preview)
 		return ""
 	}
 
 	// Strip scheme and any extra leading slashes
-	rest := strings.TrimPrefix(link, "vless://")
+	rest := link[8:] // skip "vless://"
 	rest = strings.TrimLeft(rest, "/")
+
+	// URL-decode the entire user-info part first
+	if decoded, err := url.PathUnescape(rest); err == nil {
+		rest = decoded
+	}
 
 	// The UUID is the part before the first '@'
 	atIdx := strings.Index(rest, "@")
 	if atIdx <= 0 {
+		log.Printf("[UUID-PARSE] ❌ No '@' found after scheme in link: %q", preview)
 		return ""
 	}
-	uuid := rest[:atIdx]
+	uuid := strings.TrimSpace(rest[:atIdx])
 
-	// URL-decode in case the UUID was percent-encoded
-	uuid = strings.ReplaceAll(uuid, "%2D", "-")
-	uuid = strings.ReplaceAll(uuid, "%2d", "-")
-	uuid = strings.TrimSpace(uuid)
+	// Strip any trailing slashes or whitespace from UUID
+	uuid = strings.Trim(uuid, "/ \t\r\n")
 
-	// Basic UUID format validation: 8-4-4-4-12 hex chars
-	if len(uuid) != 36 {
-		log.Printf("[UUID-PARSE] ⚠️ Extracted UUID has unexpected length %d: %q (from link prefix: %q)", len(uuid), uuid, link[:min(80, len(link))])
+	// Validate UUID format: 8-4-4-4-12 hex chars with dashes
+	uuidRegex := regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+	if !uuidRegex.MatchString(uuid) {
+		// Try to recover: strip all non-hex characters and reformat
+		hexOnly := regexp.MustCompile(`[^0-9a-fA-F]`).ReplaceAllString(uuid, "")
+		if len(hexOnly) == 32 {
+			uuid = fmt.Sprintf("%s-%s-%s-%s-%s", hexOnly[:8], hexOnly[8:12], hexOnly[12:16], hexOnly[16:20], hexOnly[20:])
+			log.Printf("[UUID-PARSE] ⚠️ Recovered UUID from raw hex: %s", uuid)
+		} else {
+			log.Printf("[UUID-PARSE] ❌ Invalid UUID format (len=%d, hex=%d): %q from link: %q", len(uuid), len(hexOnly), uuid, preview)
+			return ""
+		}
 	}
-	if uuid == "" {
-		log.Printf("[UUID-PARSE] ❌ Failed to extract UUID from link: %q", link[:min(80, len(link))])
-	} else {
-		log.Printf("[UUID-PARSE] ✅ Extracted UUID: %s", uuid)
-	}
+
+	log.Printf("[UUID-PARSE] ✅ Extracted UUID: %s", uuid)
 	return uuid
 }

@@ -121,7 +121,8 @@ func AdminGetExchangeRatesHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(rates)
 }
 
-// AdminUpdateMarkupHandler - PATCH /api/v1/admin/rates/{id}/markup
+// AdminUpdateRateHandler - PATCH /api/v1/admin/rates/{id}/markup
+// Accepts both base_rate and markup_percent (either or both).
 func AdminUpdateMarkupHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	rateID, err := strconv.Atoi(vars["id"])
@@ -130,20 +131,42 @@ func AdminUpdateMarkupHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		MarkupPercent decimal.Decimal `json:"markup_percent"`
+		BaseRate      *decimal.Decimal `json:"base_rate"`
+		MarkupPercent *decimal.Decimal `json:"markup_percent"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	if req.MarkupPercent.LessThan(decimal.Zero) {
-		http.Error(w, "markup_percent cannot be negative", http.StatusBadRequest)
+	if req.BaseRate == nil && req.MarkupPercent == nil {
+		http.Error(w, "nothing to update", http.StatusBadRequest)
 		return
 	}
-	if err := repository.UpdateMarkupPercent(rateID, req.MarkupPercent); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+
+	// Update base_rate first (if provided)
+	if req.BaseRate != nil {
+		if req.BaseRate.LessThanOrEqual(decimal.Zero) {
+			http.Error(w, "base_rate must be positive", http.StatusBadRequest)
+			return
+		}
+		if err := repository.UpdateBaseRateByID(rateID, *req.BaseRate); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
+
+	// Update markup (if provided) — recalculates final_rate
+	if req.MarkupPercent != nil {
+		if req.MarkupPercent.LessThan(decimal.Zero) {
+			http.Error(w, "markup_percent cannot be negative", http.StatusBadRequest)
+			return
+		}
+		if err := repository.UpdateMarkupPercent(rateID, *req.MarkupPercent); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
 	// Return updated rates
 	rates, _ := repository.GetAllExchangeRates()
 	w.Header().Set("Content-Type", "application/json")

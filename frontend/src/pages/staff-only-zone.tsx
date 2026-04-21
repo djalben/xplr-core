@@ -256,7 +256,7 @@ export const StaffOnlyZone = () => {
   // ── Exchange Rates ──
   const [exchangeRates, setExchangeRates] = useState<{ id: number; currency_from: string; currency_to: string; base_rate: string; markup_percent: string; final_rate: string; updated_at: string }[]>([]);
   const [ratesLoading, setRatesLoading] = useState(false);
-  const [editingRate, setEditingRate] = useState<{ id: number; markup_percent: string } | null>(null);
+  const [editingRate, setEditingRate] = useState<{ id: number; base_rate: string; markup_percent: string } | null>(null);
 
   const fetchExchangeRates = useCallback(async () => {
     setRatesLoading(true);
@@ -267,15 +267,20 @@ export const StaffOnlyZone = () => {
     finally { setRatesLoading(false); }
   }, []);
 
-  const handleSaveMarkup = async () => {
+  const handleSaveRate = async () => {
     if (!editingRate) return;
     setSaving(true);
     try {
-      const res = await apiClient.patch(`/admin/rates/${editingRate.id}/markup`, { markup_percent: parseFloat(editingRate.markup_percent) });
+      const payload: Record<string, number> = {};
+      const br = parseFloat(editingRate.base_rate);
+      const mp = parseFloat(editingRate.markup_percent);
+      if (!isNaN(br) && br > 0) payload.base_rate = br;
+      if (!isNaN(mp) && mp >= 0) payload.markup_percent = mp;
+      const res = await apiClient.patch(`/admin/rates/${editingRate.id}/markup`, payload);
       setExchangeRates(res.data || []);
       setEditingRate(null);
-      showToast('Наценка обновлена');
-    } catch { showToast('Ошибка обновления наценки', 'err'); }
+      showToast('Курс обновлён');
+    } catch { showToast('Ошибка обновления курса', 'err'); }
     finally { setSaving(false); }
   };
 
@@ -2407,7 +2412,18 @@ export const StaffOnlyZone = () => {
                             <span className="text-white font-semibold text-sm">{rate.currency_from} → {rate.currency_to}</span>
                           </td>
                           <td className="px-4 py-3">
-                            <span className="text-emerald-400 font-medium tabular-nums">{parseFloat(rate.base_rate).toFixed(2)} ₽</span>
+                            {editingRate?.id === rate.id ? (
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={editingRate.base_rate}
+                                onChange={e => setEditingRate({ ...editingRate, base_rate: e.target.value })}
+                                className="w-24 px-2 py-1 bg-white/10 border border-emerald-500/50 rounded text-white text-xs outline-none"
+                                autoFocus
+                              />
+                            ) : (
+                              <span className="text-emerald-400 font-medium tabular-nums">{parseFloat(rate.base_rate).toFixed(2)} ₽</span>
+                            )}
                           </td>
                           <td className="px-4 py-3">
                             {editingRate?.id === rate.id ? (
@@ -2417,7 +2433,6 @@ export const StaffOnlyZone = () => {
                                 value={editingRate.markup_percent}
                                 onChange={e => setEditingRate({ ...editingRate, markup_percent: e.target.value })}
                                 className="w-20 px-2 py-1 bg-white/10 border border-blue-500/50 rounded text-white text-xs outline-none"
-                                autoFocus
                               />
                             ) : (
                               <span className="text-orange-400 font-medium tabular-nums">{parseFloat(rate.markup_percent).toFixed(1)}%</span>
@@ -2432,7 +2447,7 @@ export const StaffOnlyZone = () => {
                           <td className="px-4 py-3">
                             {editingRate?.id === rate.id ? (
                               <div className="flex gap-1">
-                                <button onClick={handleSaveMarkup} disabled={saving} className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-xs transition-colors disabled:opacity-50">
+                                <button onClick={handleSaveRate} disabled={saving} className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-xs transition-colors disabled:opacity-50">
                                   {saving ? '...' : 'OK'}
                                 </button>
                                 <button onClick={() => setEditingRate(null)} className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-slate-300 rounded text-xs transition-colors">
@@ -2441,7 +2456,7 @@ export const StaffOnlyZone = () => {
                               </div>
                             ) : (
                               <button
-                                onClick={() => setEditingRate({ id: rate.id, markup_percent: rate.markup_percent })}
+                                onClick={() => setEditingRate({ id: rate.id, base_rate: rate.base_rate, markup_percent: rate.markup_percent })}
                                 className="text-blue-400 hover:text-blue-300 text-xs transition-colors"
                               >
                                 Изменить

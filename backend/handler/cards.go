@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/djalben/xplr-core/backend/middleware"
 	"github.com/djalben/xplr-core/backend/domain"
+	"github.com/djalben/xplr-core/backend/middleware"
 	"github.com/djalben/xplr-core/backend/repository"
 	"github.com/djalben/xplr-core/backend/service"
 	"github.com/gorilla/mux"
@@ -404,6 +404,9 @@ func MassIssueCardsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("[EVENT] User %d performed card_issue (count=%d, category=%s, fee=$%s). Triggering notifications...", userID, req.Count, cat, totalFeeUSD.StringFixed(2))
+
+	// Check referral bonus eligibility (condition 3: first card purchase)
+	go repository.CheckAndCreditReferralBonus(userID)
 
 	// Notify user about card issue (single unified notification — TG + Email)
 	go service.NotifyUser(userID, "Карта выпущена",

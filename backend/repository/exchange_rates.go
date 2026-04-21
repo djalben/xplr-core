@@ -9,13 +9,13 @@ import (
 
 // ExchangeRate represents a currency pair rate with admin markup.
 type ExchangeRate struct {
-	ID             int    `json:"id"`
-	CurrencyFrom   string `json:"currency_from"`
-	CurrencyTo     string `json:"currency_to"`
-	BaseRate       string `json:"base_rate"`
-	MarkupPercent  string `json:"markup_percent"`
-	FinalRate      string `json:"final_rate"`
-	UpdatedAt      string `json:"updated_at"`
+	ID            int    `json:"id"`
+	CurrencyFrom  string `json:"currency_from"`
+	CurrencyTo    string `json:"currency_to"`
+	BaseRate      string `json:"base_rate"`
+	MarkupPercent string `json:"markup_percent"`
+	FinalRate     string `json:"final_rate"`
+	UpdatedAt     string `json:"updated_at"`
 }
 
 // GetAllExchangeRates returns all exchange rates.
@@ -109,6 +109,27 @@ func UpdateBaseRate(from, to string, newBase decimal.Decimal) error {
 		return fmt.Errorf("failed to update base rate")
 	}
 	log.Printf("✅ Exchange rate %s/%s base updated to %s", from, to, newBase.String())
+	return nil
+}
+
+// UpdateBaseRateByID updates the base_rate by exchange_rate ID and recalculates final_rate.
+func UpdateBaseRateByID(id int, newBase decimal.Decimal) error {
+	if GlobalDB == nil {
+		return fmt.Errorf("database connection not initialized")
+	}
+	_, err := GlobalDB.Exec(
+		`UPDATE exchange_rates 
+		 SET base_rate = $1, 
+		     final_rate = $1 * (1 + markup_percent / 100),
+		     updated_at = NOW()
+		 WHERE id = $2`,
+		newBase, id,
+	)
+	if err != nil {
+		log.Printf("UpdateBaseRateByID id=%d: DB error: %v", id, err)
+		return fmt.Errorf("failed to update base rate")
+	}
+	log.Printf("✅ Exchange rate id=%d base updated to %s", id, newBase.String())
 	return nil
 }
 

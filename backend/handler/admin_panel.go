@@ -198,28 +198,16 @@ func AdminUpdateTicketStatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Ownership check for close/resolve: only claimer or super-admin
+	// Any admin can close/resolve/delete any ticket (no ownership restriction)
 	status := strings.ToLower(strings.TrimSpace(req.Status))
-	if status == "resolved" || status == "closed" {
-		claimedBy := repository.GetSupportTicketClaimedBy(ticketID)
-		if claimedBy != 0 && claimedBy != adminID {
-			// Check if super-admin
-			caller, err := repository.GetUserByID(adminID)
-			if err != nil || caller.Email != superAdminEmail {
-				log.Printf("[SECURITY] ⛔ Admin %d tried to %s ticket %d owned by admin %d", adminID, status, ticketID, claimedBy)
-				http.Error(w, "Этот тикет находится в работе у другого администратора", http.StatusForbidden)
-				return
-			}
-		}
-	}
 
-	if err := repository.UpdateSupportTicketStatus(ticketID, req.Status, adminID); err != nil {
+	if err := repository.UpdateSupportTicketStatus(ticketID, status, adminID); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	repository.WriteAdminLog(adminID, fmt.Sprintf("Обновлен статус тикета %d на %s", ticketID, req.Status))
+	repository.WriteAdminLog(adminID, fmt.Sprintf("Обновлен статус тикета %d на %s", ticketID, status))
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"id": ticketID, "status": req.Status})
+	json.NewEncoder(w).Encode(map[string]interface{}{"id": ticketID, "status": status})
 }
 
 // AdminEmergencyFreezeHandler - POST /api/v1/admin/users/{id}/emergency-freeze

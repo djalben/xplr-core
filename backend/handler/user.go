@@ -6,8 +6,8 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/djalben/xplr-core/backend/middleware"
 	"github.com/djalben/xplr-core/backend/domain"
+	"github.com/djalben/xplr-core/backend/middleware"
 	"github.com/djalben/xplr-core/backend/repository"
 	"github.com/djalben/xplr-core/backend/service"
 	"github.com/shopspring/decimal"
@@ -112,6 +112,10 @@ func TopUpBalanceHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("[EVENT] User %d performed topup (amount=%s ₽ → $%s). Triggering notifications...", userID, amountRub.StringFixed(2), amountUsd.StringFixed(2))
+
+	// Check referral bonus eligibility (condition 2: wallet top-up)
+	go repository.CheckAndCreditReferralBonus(userID)
+
 	go service.NotifyUser(userID, "Пополнение баланса",
 		fmt.Sprintf("💰 <b>Баланс пополнен</b>\n\n"+
 			"Сумма: <b>%s ₽</b> → <b>$%s</b>\n\n"+
