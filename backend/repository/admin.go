@@ -23,6 +23,7 @@ type AdminStats struct {
 // AdminUserRow is a simplified user for admin listing.
 type AdminUserRow struct {
 	ID               int    `json:"id"`
+	DisplayName      string `json:"display_name"`
 	Email            string `json:"email"`
 	BalanceRub       string `json:"balance_rub"`
 	Status           string `json:"status"`
@@ -85,7 +86,7 @@ func GetAllUsersForAdmin() ([]AdminUserRow, error) {
 	}
 
 	query := `
-		SELECT u.id, u.email, COALESCE(u.balance_rub, 0), u.status, COALESCE(u.is_admin, FALSE),
+		SELECT u.id, COALESCE(u.display_name, ''), u.email, COALESCE(u.balance_rub, 0), u.status, COALESCE(u.is_admin, FALSE),
 		       COALESCE(u.role, 'user'), COALESCE(u.is_verified, FALSE),
 		       (SELECT COUNT(*) FROM cards c WHERE c.user_id = u.id) as card_count,
 		       COALESCE((SELECT ib.master_balance FROM internal_balances ib WHERE ib.user_id = u.id), 0) as wallet_balance,
@@ -111,7 +112,7 @@ func GetAllUsersForAdmin() ([]AdminUserRow, error) {
 		var walletBal decimal.Decimal
 		var createdAt interface{}
 		var tierExpiresAt sql.NullTime
-		if err := rows.Scan(&u.ID, &u.Email, &bal, &u.Status, &u.IsAdmin, &u.Role, &u.IsVerified, &u.CardCount, &walletBal, &u.IsTelegramLinked, &u.NotificationPref, &createdAt, &u.Tier, &tierExpiresAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.DisplayName, &u.Email, &bal, &u.Status, &u.IsAdmin, &u.Role, &u.IsVerified, &u.CardCount, &walletBal, &u.IsTelegramLinked, &u.NotificationPref, &createdAt, &u.Tier, &tierExpiresAt); err != nil {
 			log.Printf("AdminUsers: error scanning row: %v", err)
 			continue
 		}

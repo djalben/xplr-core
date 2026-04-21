@@ -138,11 +138,14 @@ func AdminUpdateMarkupHandler(w http.ResponseWriter, r *http.Request) {
 		FinalRate     *decimal.Decimal `json:"final_rate"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		log.Printf("[RATE-UPDATE] ❌ JSON decode error for rate %d: %v", rateID, err)
+		http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
 		return
 	}
+	log.Printf("[RATE-UPDATE] 📥 Rate %d: base_rate=%v, markup=%v, final=%v",
+		rateID, req.BaseRate, req.MarkupPercent, req.FinalRate)
 	if req.BaseRate == nil && req.MarkupPercent == nil && req.FinalRate == nil {
-		http.Error(w, "nothing to update", http.StatusBadRequest)
+		http.Error(w, "nothing to update: all fields are null", http.StatusBadRequest)
 		return
 	}
 

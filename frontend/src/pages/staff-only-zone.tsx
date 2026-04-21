@@ -52,6 +52,7 @@ interface DashboardStats {
 
 interface AdminUser {
   id: number;
+  display_name: string;
   email: string;
   balance_rub: string;
   status: string;
@@ -287,7 +288,11 @@ export const StaffOnlyZone = () => {
       setExchangeRates(res.data || []);
       setEditingRate(null);
       showToast('Курс обновлён');
-    } catch { showToast('Ошибка обновления курса', 'err'); }
+    } catch (err: any) {
+      const msg = err?.response?.data || err?.message || 'Ошибка обновления курса';
+      console.error('[RATE-UPDATE]', msg, err);
+      showToast(typeof msg === 'string' ? msg : 'Ошибка обновления курса', 'err');
+    }
     finally { setSaving(false); }
   };
 
@@ -1299,6 +1304,7 @@ export const StaffOnlyZone = () => {
                   <thead>
                     <tr className="border-b border-white/10">
                       <th className="text-left px-4 py-3 text-slate-400 font-medium">ID</th>
+                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Имя</th>
                       <th className="text-left px-4 py-3 text-slate-400 font-medium">Email</th>
                       <th className="text-left px-4 py-3 text-slate-400 font-medium">Кошелёк</th>
                       <th className="text-left px-4 py-3 text-slate-400 font-medium">Статус</th>
@@ -1313,6 +1319,7 @@ export const StaffOnlyZone = () => {
                     {users.map(u => (
                       <tr key={u.id} className={`border-b border-white/5 transition-colors ${u.is_blocked ? 'bg-red-500/[0.06] hover:bg-red-500/[0.1]' : 'hover:bg-white/5'}`}>
                         <td className="px-4 py-3 text-slate-300 font-mono text-xs">{u.id}</td>
+                        <td className="px-4 py-3 text-white/70 text-xs truncate max-w-[120px]" title={u.display_name || ''}>{u.display_name || '—'}</td>
                         <td className="px-4 py-3 text-white">{u.email}</td>
                         <td className="px-4 py-3 text-emerald-400 font-medium">${u.wallet_balance || '0.00'}</td>
                         <td className="px-4 py-3">
@@ -1372,7 +1379,7 @@ export const StaffOnlyZone = () => {
                       </tr>
                     ))}
                     {users.length === 0 && (
-                      <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-500">Нет данных</td></tr>
+                      <tr><td colSpan={10} className="px-4 py-8 text-center text-slate-500">Нет данных</td></tr>
                     )}
                   </tbody>
                 </table>
