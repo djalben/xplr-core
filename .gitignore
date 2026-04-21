@@ -26,6 +26,7 @@ web-build/
 
 # ============ IDE & Editors ============
 .vscode/
+.cursor/
 .idea/
 *.swp
 *.swo
