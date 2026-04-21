@@ -35,7 +35,7 @@ func NewUseCase(
 }
 
 // BuyCard — выпуск новой карты.
-func (uc *UseCase) BuyCard(ctx context.Context, userID domain.UUID, cardType domain.CardType, nickname string) (*domain.Card, error) {
+func (uc *UseCase) BuyCard(ctx context.Context, userID domain.UUID, cardType domain.CardType, nickname string, currency domain.CardCurrency) (*domain.Card, error) {
 	err := uc.gradeRepo.EnsureGrade(ctx, userID)
 	if err != nil {
 		return nil, wrapper.Wrap(err)
@@ -65,7 +65,10 @@ func (uc *UseCase) BuyCard(ctx context.Context, userID domain.UUID, cardType dom
 		return nil, domain.NewInvalidInput("maximum number of active cards of this type for your grade has been reached")
 	}
 
-	card, err := domain.NewCard(userID, cardType, "TEMP_PROVIDER_ID", nickname)
+	if currency == "" {
+		currency = domain.CardCurrencyUSD
+	}
+	card, err := domain.NewCard(userID, cardType, currency, "TEMP_PROVIDER_ID", nickname)
 	if err != nil {
 		return nil, wrapper.Wrap(err)
 	}

@@ -31,6 +31,9 @@ type User struct {
 	NotifyCardOperations   bool       `json:"notifyCardOperations" db:"notify_card_operations"`
 	TelegramLinkCode       *string    `json:"-" db:"telegram_link_code"`
 	TelegramLinkExpiresAt  *time.Time `json:"-" db:"telegram_link_expires_at"`
+
+	LastReadNewsAt           *time.Time `json:"lastReadNewsAt,omitempty" db:"last_read_news_at"`
+	NewsNotificationsEnabled bool       `json:"newsNotificationsEnabled" db:"news_notifications_enabled"`
 }
 
 type (
@@ -64,7 +67,8 @@ func NewUser(email, passwordHash string) (*User, error) {
 		NotifyTransactions:   true,
 		NotifyBalance:        true,
 		NotifySecurity:       true,
-		NotifyCardOperations: true,
-		CreatedAt:            time.Now().UTC(),
+		NotifyCardOperations:     true,
+		NewsNotificationsEnabled: true,
+		CreatedAt:                time.Now().UTC(),
 	}, nil
 }

@@ -22,13 +22,13 @@ func (r *cardRepo) Save(ctx context.Context, card *domain.Card) error {
 		INSERT INTO cards (
 			id, user_id, provider_card_id, bin, last_4_digits, card_status,
 			nickname, daily_spend_limit, failed_auth_count, card_type,
-			balance, expiry_date, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`
+			currency, balance, expiry_date, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`
 
 	_, err := r.store.ExecContext(ctx, query,
 		card.ID, card.UserID, card.ProviderCardID, card.Bin, card.Last4Digits,
 		card.CardStatus, card.Nickname, card.DailySpendLimit, card.FailedAuthCount,
-		card.CardType, card.Balance, card.ExpiryDate, card.CreatedAt,
+		card.CardType, card.Currency, card.Balance, card.ExpiryDate, card.CreatedAt,
 	)
 	if err != nil {
 		return wrapper.Wrap(err)
@@ -42,7 +42,7 @@ func (r *cardRepo) GetByID(ctx context.Context, id domain.UUID) (*domain.Card, e
 		SELECT 
 			id, user_id, provider_card_id, bin, last_4_digits, card_status,
 			nickname, daily_spend_limit, failed_auth_count, card_type,
-			balance, expiry_date, created_at
+			currency, balance, expiry_date, created_at
 		FROM cards 
 		WHERE id = $1`
 
@@ -60,7 +60,7 @@ func (r *cardRepo) ListByUserID(ctx context.Context, userID domain.UUID) ([]*dom
 	const query = `
 		SELECT id, user_id, provider_card_id, bin, last_4_digits, card_status,
 		       nickname, daily_spend_limit, failed_auth_count, card_type,
-		       balance, expiry_date, created_at
+		       currency, balance, expiry_date, created_at
 		FROM cards WHERE user_id = $1 ORDER BY created_at DESC`
 
 	var cards []*domain.Card
@@ -76,11 +76,11 @@ func (r *cardRepo) ListByUserID(ctx context.Context, userID domain.UUID) ([]*dom
 func (r *cardRepo) Update(ctx context.Context, card *domain.Card) error {
 	const query = `
 		UPDATE cards 
-		SET balance = $1, card_status = $2, daily_spend_limit = $3, nickname = $4, failed_auth_count = $5
-		WHERE id = $6`
+		SET balance = $1, card_status = $2, daily_spend_limit = $3, nickname = $4, failed_auth_count = $5, currency = $6
+		WHERE id = $7`
 
 	_, err := r.store.ExecContext(ctx, query,
-		card.Balance, card.CardStatus, card.DailySpendLimit, card.Nickname, card.FailedAuthCount, card.ID)
+		card.Balance, card.CardStatus, card.DailySpendLimit, card.Nickname, card.FailedAuthCount, card.Currency, card.ID)
 	if err != nil {
 		return wrapper.Wrap(err)
 	}

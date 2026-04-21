@@ -59,11 +59,13 @@ CREATE TABLE cards (
     daily_spend_limit NUMERIC(20, 4) DEFAULT 1000.0000,
     failed_auth_count BIGINT DEFAULT 0,
     card_type VARCHAR(20) DEFAULT 'subscriptions',
+    currency VARCHAR(3) NOT NULL DEFAULT 'USD',
     balance NUMERIC(20, 4) DEFAULT 0.0000 NOT NULL,
     expiry_date TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     
-    CHECK (card_type IN ('subscriptions', 'travel', 'premium'))
+    CHECK (card_type IN ('subscriptions', 'travel', 'premium')),
+    CHECK (currency IN ('USD', 'EUR'))
 );
 
 -- 4. Таблица транзакций
@@ -158,15 +160,56 @@ CREATE TABLE commission_config (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Seed дефолтных значений (один раз при создании базы)
-INSERT INTO commission_config (key, value, description)
-VALUES
-    ('fee_standard',     6.70, 'Комиссия для грейда STANDARD (%)'),
-    ('fee_gold',         4.50, 'Комиссия для грейда GOLD (%)'),
-    ('referral_percent', 5.00, 'Реферальная комиссия (%)'),
-    ('card_issue_fee',   2.00, 'Стоимость выпуска виртуальной карты ($)'),
-    ('sbp_topup_enabled', 1.0000, '1 = пополнение через СБП включено, 0 = отключено')
-ON CONFLICT (key) DO NOTHING;
+-- 12. Магазин (категории/товары/заказы)
+CREATE TABLE store_categories (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    slug VARCHAR(50) UNIQUE NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    icon VARCHAR(50) DEFAULT '',
+    image_url TEXT DEFAULT '',
+    sort_order INT DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE store_products (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    category_id UUID NOT NULL REFERENCES store_categories(id) ON DELETE CASCADE,
+    provider VARCHAR(50) NOT NULL,                  -- mobimatter, vless, razer, demo
+    external_id VARCHAR(100) NOT NULL,              -- ID в системе поставщика
+    name VARCHAR(255) NOT NULL,
+    description TEXT DEFAULT '',
+    country VARCHAR(100) DEFAULT '',
+    country_code VARCHAR(2) DEFAULT '',
+    product_type VARCHAR(20) NOT NULL,              -- esim | digital | vpn
+    price_usd NUMERIC(20, 4) NOT NULL DEFAULT 0.0000,
+    cost_price NUMERIC(20, 4) NOT NULL DEFAULT 0.0000,
+    markup_percent NUMERIC(6, 2) NOT NULL DEFAULT 0.00,
+    data_gb VARCHAR(20) DEFAULT '',
+    validity_days INT NOT NULL DEFAULT 0,
+    image_url TEXT DEFAULT '',
+    in_stock BOOLEAN NOT NULL DEFAULT TRUE,
+    meta TEXT NOT NULL DEFAULT '{}',
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT store_products_type_check CHECK (product_type IN ('esim', 'digital', 'vpn'))
+);
+
+CREATE TABLE store_orders (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    product_id UUID REFERENCES store_products(id) ON DELETE SET NULL,
+    product_name VARCHAR(255) NOT NULL,
+    price_usd NUMERIC(20, 4) NOT NULL DEFAULT 0.0000,
+    status VARCHAR(20) NOT NULL DEFAULT 'COMPLETED',
+    activation_key TEXT DEFAULT '',
+    qr_data TEXT DEFAULT '',
+    provider_ref VARCHAR(100) DEFAULT '',
+    meta TEXT NOT NULL DEFAULT '{}',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT store_orders_status_check CHECK (status IN ('PENDING', 'READY', 'FAILED', 'COMPLETED', 'DELETED'))
+);
 
 -- Индексы (все внизу)
 CREATE INDEX idx_users_email ON users(email);
@@ -177,6 +220,7 @@ CREATE INDEX idx_kyc_applications_user_id ON kyc_applications(user_id);
 CREATE INDEX idx_kyc_applications_status ON kyc_applications(status);
 CREATE INDEX idx_cards_user_id ON cards(user_id);
 CREATE INDEX idx_cards_user_status ON cards(user_id, card_status);
+CREATE INDEX idx_cards_currency ON cards(currency);
 CREATE INDEX idx_transactions_user_id ON transactions(user_id);
 CREATE INDEX idx_transactions_card_id ON transactions(card_id);
 CREATE INDEX idx_transactions_executed_at ON transactions(executed_at DESC);
@@ -190,12 +234,21 @@ CREATE INDEX idx_tickets_status ON tickets(status);
 CREATE INDEX idx_wallets_user_id ON wallets(user_id);
 CREATE INDEX idx_cards_card_type ON cards(card_type);
 CREATE INDEX idx_commission_config_key ON commission_config(key);
+CREATE INDEX idx_store_categories_slug ON store_categories(slug);
+CREATE INDEX idx_store_products_category ON store_products(category_id);
+CREATE INDEX idx_store_products_type ON store_products(product_type);
+CREATE INDEX idx_store_products_provider ON store_products(provider);
+CREATE INDEX idx_store_orders_user_created ON store_orders(user_id, created_at DESC);
+CREATE INDEX idx_store_orders_provider_ref ON store_orders(provider_ref) WHERE provider_ref IS NOT NULL AND provider_ref <> '';
 
 -- +goose StatementEnd
 
 -- +goose Down
 -- +goose StatementBegin
 DROP TABLE IF EXISTS commission_config;
+DROP TABLE IF EXISTS store_orders;
+DROP TABLE IF EXISTS store_products;
+DROP TABLE IF EXISTS store_categories;
 DROP TABLE IF EXISTS tickets;
 DROP TABLE IF EXISTS exchange_rates;
 DROP TABLE IF EXISTS referrals;

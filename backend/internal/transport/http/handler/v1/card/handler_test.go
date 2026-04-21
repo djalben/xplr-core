@@ -59,10 +59,10 @@ func TestHandler_BuyCard(t *testing.T) {
 	}{
 		{
 			name: "happy path",
-			body: `{"cardType":"subscriptions","nickname":"n"}`,
+			body: `{"cardType":"subscriptions","nickname":"n","currency":"USD"}`,
 			setup: func(m *mocks.MockCardUseCase) {
 				m.EXPECT().
-					BuyCard(gomock.Any(), uid, domain.CardTypeSubscriptions, "n").
+					BuyCard(gomock.Any(), uid, domain.CardTypeSubscriptions, "n", domain.CardCurrencyUSD).
 					Return(cardEnt, nil)
 			},
 			wantCode:   http.StatusOK,
@@ -70,10 +70,10 @@ func TestHandler_BuyCard(t *testing.T) {
 		},
 		{
 			name: "use case error",
-			body: `{"cardType":"subscriptions","nickname":"n"}`,
+			body: `{"cardType":"subscriptions","nickname":"n","currency":"USD"}`,
 			setup: func(m *mocks.MockCardUseCase) {
 				m.EXPECT().
-					BuyCard(gomock.Any(), uid, domain.CardTypeSubscriptions, "n").
+					BuyCard(gomock.Any(), uid, domain.CardTypeSubscriptions, "n", domain.CardCurrencyUSD).
 					Return(nil, errTestCardUseCaseFail)
 			},
 			wantCode: http.StatusBadRequest,

@@ -145,7 +145,7 @@ func TestCardRepository_SaveGetListUpdate(t *testing.T) {
 
 	ctx := context.Background()
 	u := newTestUser(t, db, uniqueEmail(t))
-	card, err := domain.NewCard(u.ID, domain.CardTypeSubscriptions, "sut-prov", "c1")
+	card, err := domain.NewCard(u.ID, domain.CardTypeSubscriptions, domain.CardCurrencyUSD, "sut-prov", "c1")
 	if err != nil {
 		t.Fatalf("NewCard: %v", err)
 	}
@@ -198,7 +198,7 @@ func TestTransactionRepository_SaveAndQueries(t *testing.T) {
 
 	ctx := context.Background()
 	u := newTestUser(t, db, uniqueEmail(t))
-	card, err := domain.NewCard(u.ID, domain.CardTypeTravel, "p2", "c2")
+	card, err := domain.NewCard(u.ID, domain.CardTypeTravel, domain.CardCurrencyUSD, "p2", "c2")
 	if err != nil {
 		t.Fatalf("NewCard: %v", err)
 	}
@@ -265,12 +265,12 @@ func TestTransactionRepository_SumCardSpend(t *testing.T) {
 	ctx := context.Background()
 	u := newTestUser(t, db, uniqueEmail(t))
 
-	cardSub, err := domain.NewCard(u.ID, domain.CardTypeSubscriptions, "p1", "n1")
+	cardSub, err := domain.NewCard(u.ID, domain.CardTypeSubscriptions, domain.CardCurrencyUSD, "p1", "n1")
 	if err != nil {
 		t.Fatalf("NewCard: %v", err)
 	}
 
-	cardTr, err := domain.NewCard(u.ID, domain.CardTypeTravel, "p2", "n2")
+	cardTr, err := domain.NewCard(u.ID, domain.CardTypeTravel, domain.CardCurrencyUSD, "p2", "n2")
 	if err != nil {
 		t.Fatalf("NewCard: %v", err)
 	}

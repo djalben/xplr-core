@@ -32,6 +32,7 @@ func (h *Handler) BuyCard(w http.ResponseWriter, r *http.Request) {
 	type request struct {
 		CardType string `json:"cardType"`
 		Nickname string `json:"nickname"`
+		Currency string `json:"currency"`
 	}
 
 	var req request
@@ -43,7 +44,11 @@ func (h *Handler) BuyCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	card, err := h.useCase.BuyCard(r.Context(), userID, domain.CardType(req.CardType), req.Nickname)
+	cur := domain.CardCurrency(req.Currency)
+	if cur == "" {
+		cur = domain.CardCurrencyUSD
+	}
+	card, err := h.useCase.BuyCard(r.Context(), userID, domain.CardType(req.CardType), req.Nickname, cur)
 	if err != nil {
 		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
 

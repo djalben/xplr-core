@@ -443,6 +443,7 @@ func (h *Handler) GetCards(w http.ResponseWriter, r *http.Request) {
 			"nickname":          c.Nickname,
 			"daily_spend_limit": c.DailySpendLimit.String(),
 			"card_type":         string(c.CardType),
+			"currency":          string(c.Currency),
 			"balance":           c.Balance.String(),
 			"created_at":        c.CreatedAt,
 		})
@@ -463,6 +464,7 @@ func (h *Handler) IssueCards(w http.ResponseWriter, r *http.Request) {
 		Count       int    `json:"count"`
 		Nickname    string `json:"nickname"`
 		ServiceSlug string `json:"service_slug"`
+		Currency    string `json:"currency"`
 	}
 
 	var body req
@@ -484,10 +486,15 @@ func (h *Handler) IssueCards(w http.ResponseWriter, r *http.Request) {
 		nickname = "Карта"
 	}
 
+	cur := domain.CardCurrency(body.Currency)
+	if cur == "" {
+		cur = domain.CardCurrencyUSD
+	}
+
 	var results []map[string]any
 
 	for range max(1, body.Count) {
-		card, err := h.cardUC.BuyCard(r.Context(), userID, cardType, nickname)
+		card, err := h.cardUC.BuyCard(r.Context(), userID, cardType, nickname, cur)
 		if err != nil {
 			handler.WriteJSON(w, http.StatusOK, map[string]any{
 				"successful_count": 0,

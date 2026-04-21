@@ -8,6 +8,7 @@ import (
 	"github.com/djalben/xplr-core/backend/internal/application/commission"
 	"github.com/djalben/xplr-core/backend/internal/application/grades"
 	"github.com/djalben/xplr-core/backend/internal/application/kyc"
+	"github.com/djalben/xplr-core/backend/internal/application/store"
 	"github.com/djalben/xplr-core/backend/internal/application/ticket"
 	"github.com/djalben/xplr-core/backend/internal/application/transaction"
 	"github.com/djalben/xplr-core/backend/internal/application/user"
@@ -15,6 +16,8 @@ import (
 	"github.com/djalben/xplr-core/backend/internal/config"
 	"github.com/djalben/xplr-core/backend/internal/infrastructure/mailer"
 	"github.com/djalben/xplr-core/backend/internal/infrastructure/persistence/postgres"
+	esimProvider "github.com/djalben/xplr-core/backend/internal/infrastructure/providers/esim"
+	vpnProvider "github.com/djalben/xplr-core/backend/internal/infrastructure/providers/vpn"
 	"github.com/djalben/xplr-core/backend/internal/ports"
 	"github.com/jmoiron/sqlx"
 	"gitlab.com/libs-artifex/wrapper/v2"
@@ -32,6 +35,7 @@ type Container struct {
 	CommissionRepo  ports.CommissionConfigRepository
 	GradeRepo       ports.GradeRepository
 	KYCRepo         ports.KYCApplicationRepository
+	StoreRepo       ports.StoreRepository
 
 	TelegramBotUsername string
 
@@ -44,6 +48,7 @@ type Container struct {
 	CommissionUseCase  *commission.UseCase
 	GradesUseCase      *grades.UseCase
 	KYCUseCase         *kyc.UseCase
+	StoreUseCase       *store.UseCase
 }
 
 func NewContainer(ctx context.Context, cfg *config.ENV) (*Container, error) {
@@ -61,6 +66,7 @@ func NewContainer(ctx context.Context, cfg *config.ENV) (*Container, error) {
 	gradeRepo := postgres.NewGradeRepository(db)
 	referralRepo := postgres.NewReferralRepository(db)
 	kycRepo := postgres.NewKYCApplicationRepository(db)
+	storeRepo := postgres.NewStoreRepository(db)
 
 	var mail ports.Mailer = mailer.Noop{}
 	if cfg.SMTPHost != "" {
@@ -83,6 +89,13 @@ func NewContainer(ctx context.Context, cfg *config.ENV) (*Container, error) {
 	)
 	userUC := user.NewUseCase(userRepo, walletRepo, gradeRepo, referralRepo, commissionRepo)
 	kycUC := kyc.NewUseCase(kycRepo, userRepo)
+	esim := esimProvider.NewMobiMatterProvider(*cfg)
+	vpn := vpnProvider.NewVlessXPanelProvider(*cfg)
+	var vpnPort ports.VPNProvider
+	if vpn.Enabled() {
+		vpnPort = vpn
+	}
+	storeUC := store.NewUseCase(storeRepo, walletRepo, esim, vpnPort)
 
 	return &Container{
 		DB: db,
@@ -96,6 +109,7 @@ func NewContainer(ctx context.Context, cfg *config.ENV) (*Container, error) {
 		CommissionRepo:  commissionRepo,
 		GradeRepo:       gradeRepo,
 		KYCRepo:         kycRepo,
+		StoreRepo:       storeRepo,
 
 		TelegramBotUsername: cfg.TelegramBotUsername,
 
@@ -108,6 +122,7 @@ func NewContainer(ctx context.Context, cfg *config.ENV) (*Container, error) {
 		CommissionUseCase:  commission.NewUseCase(commissionRepo),
 		GradesUseCase:      grades.NewUseCase(gradeRepo),
 		KYCUseCase:         kycUC,
+		StoreUseCase:       storeUC,
 	}, nil
 }
 

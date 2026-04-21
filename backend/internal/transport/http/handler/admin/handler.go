@@ -1,7 +1,11 @@
 package admin
 
 import (
+	"context"
 	"net/http"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/djalben/xplr-core/backend/internal/application/card"
 	"github.com/djalben/xplr-core/backend/internal/application/commission"
@@ -9,6 +13,7 @@ import (
 	"github.com/djalben/xplr-core/backend/internal/application/kyc"
 	"github.com/djalben/xplr-core/backend/internal/application/ticket"
 	"github.com/djalben/xplr-core/backend/internal/domain"
+	"github.com/djalben/xplr-core/backend/internal/ports"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler"
 	"github.com/go-chi/chi/v5"
 	"gitlab.com/libs-artifex/wrapper/v2"
@@ -20,26 +25,46 @@ type Handler struct {
 	ticketUseCase     *ticket.UseCase
 	gradesUseCase     *grades.UseCase
 	kycUseCase        *kyc.UseCase
+	userRepo          ports.UserRepository
+	walletRepo        ports.WalletRepository
 }
 
-func NewHandler(cardUC *card.UseCase, commissionUC *commission.UseCase, ticketUC *ticket.UseCase, gradesUC *grades.UseCase, kycUC *kyc.UseCase) *Handler {
+func NewHandler(
+	cardUC *card.UseCase,
+	commissionUC *commission.UseCase,
+	ticketUC *ticket.UseCase,
+	gradesUC *grades.UseCase,
+	kycUC *kyc.UseCase,
+	userRepo ports.UserRepository,
+	walletRepo ports.WalletRepository,
+) *Handler {
 	return &Handler{
 		cardUseCase:       cardUC,
 		commissionUseCase: commissionUC,
 		ticketUseCase:     ticketUC,
 		gradesUseCase:     gradesUC,
 		kycUseCase:        kycUC,
+		userRepo:          userRepo,
+		walletRepo:        walletRepo,
 	}
 }
 
 func (h *Handler) Register(r chi.Router) {
 	r.Post("/tariffs", h.ChangeTariffs)
 	r.Post("/referrals", h.ChangeReferralBonuses)
+	r.Get("/users/search", h.SearchUsers)
+	r.Get("/users", h.ListUsers)
+	r.Post("/users/{id}/toggle-block", h.ToggleUserBlock)
+	r.Patch("/users/{id}/role", h.ToggleUserAdmin)
+	r.Put("/users/{id}/admin", h.SetUserAdmin)
+	r.Patch("/users/{id}/grade", h.ChangeUserGrade)
+	r.Put("/users/{id}/grade", h.ChangeUserGrade)
+	r.Patch("/users/{id}/status", h.SetUserStatus)
+	r.Put("/users/{id}/status", h.SetUserStatus)
 	r.Put("/cards/{id}/block", h.BlockCard)
 	r.Put("/cards/{id}/unblock", h.UnblockCard)
 	r.Put("/tickets/{id}/take", h.TakeTicket)
 	r.Put("/tickets/{id}/close", h.CloseTicket)
-	r.Put("/users/{id}/grade", h.ChangeUserGrade)
 	r.Get("/kyc-applications", h.ListKYCPending)
 	r.Put("/kyc-applications/{id}/decision", h.DecideKYC)
 }
@@ -203,6 +228,195 @@ func (h *Handler) CloseTicket(w http.ResponseWriter, r *http.Request) {
 	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
+// ListUsers — GET /admin/users?limit=&offset=.
+func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
+	limit := adminQueryInt(r, "limit", 50, 1, 200)
+	offset := adminQueryInt(r, "offset", 0, 0, 1_000_000)
+
+	users, err := h.userRepo.ListUsers(r.Context(), limit, offset)
+	if err != nil {
+		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+
+		return
+	}
+
+	total, err := h.userRepo.CountUsers(r.Context())
+	if err != nil {
+		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+
+		return
+	}
+
+	rows := make([]map[string]any, 0, len(users))
+
+	for _, u := range users {
+		rows = append(rows, h.adminUserRow(r.Context(), u))
+	}
+
+	handler.WriteJSON(w, http.StatusOK, map[string]any{
+		"users":  rows,
+		"total":  total,
+		"limit":  limit,
+		"offset": offset,
+	})
+}
+
+// SearchUsers — GET /admin/users/search?q=&limit=.
+func (h *Handler) SearchUsers(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query().Get("q")
+	if q == "" {
+		http.Error(w, "q is required", http.StatusBadRequest)
+
+		return
+	}
+
+	limit := adminQueryInt(r, "limit", 50, 1, 200)
+
+	users, err := h.userRepo.SearchByEmail(r.Context(), q, limit)
+	if err != nil {
+		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+
+		return
+	}
+
+	rows := make([]map[string]any, 0, len(users))
+
+	for _, u := range users {
+		rows = append(rows, h.adminUserRow(r.Context(), u))
+	}
+
+	handler.WriteJSON(w, http.StatusOK, map[string]any{"users": rows})
+}
+
+// SetUserStatus — PUT /admin/users/{id}/status.
+func (h *Handler) SetUserStatus(w http.ResponseWriter, r *http.Request) {
+	id, ok := adminChiUUID(w, r)
+	if !ok {
+		return
+	}
+
+	var req struct {
+		Status string `json:"status"`
+	}
+
+	if !adminReadJSON(w, r, &req) {
+		return
+	}
+
+	switch req.Status {
+	case string(domain.UserStatusActive):
+		st := domain.UserStatusActive
+
+		err := h.userRepo.SetUserStatus(r.Context(), id, st)
+		if err != nil {
+			http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+
+			return
+		}
+
+		handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+
+		return
+	case string(domain.UserStatusBlocked), "BANNED":
+		st := domain.UserStatusBlocked
+
+		err := h.userRepo.SetUserStatus(r.Context(), id, st)
+		if err != nil {
+			http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+
+			return
+		}
+
+		handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+
+		return
+	default:
+		http.Error(w, "status must be ACTIVE, BLOCKED or BANNED", http.StatusBadRequest)
+
+		return
+	}
+}
+
+// ToggleUserBlock — POST /admin/users/{id}/toggle-block (совместимость со staff UI).
+func (h *Handler) ToggleUserBlock(w http.ResponseWriter, r *http.Request) {
+	id, ok := adminChiUUID(w, r)
+	if !ok {
+		return
+	}
+
+	user, err := h.userRepo.GetByID(r.Context(), id)
+	if err != nil {
+		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+
+		return
+	}
+
+	next := domain.UserStatusBlocked
+	if user.Status == domain.UserStatusBlocked {
+		next = domain.UserStatusActive
+	}
+
+	err = h.userRepo.SetUserStatus(r.Context(), id, next)
+	if err != nil {
+		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+
+		return
+	}
+
+	handler.WriteJSON(w, http.StatusOK, map[string]bool{"is_blocked": next == domain.UserStatusBlocked})
+}
+
+// ToggleUserAdmin — PATCH /admin/users/{id}/role — переключить флаг админа (без тела).
+func (h *Handler) ToggleUserAdmin(w http.ResponseWriter, r *http.Request) {
+	id, ok := adminChiUUID(w, r)
+	if !ok {
+		return
+	}
+
+	user, err := h.userRepo.GetByID(r.Context(), id)
+	if err != nil {
+		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+
+		return
+	}
+
+	next := !user.IsAdmin
+
+	err = h.userRepo.SetIsAdmin(r.Context(), id, next)
+	if err != nil {
+		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+
+		return
+	}
+
+	handler.WriteJSON(w, http.StatusOK, map[string]bool{"is_admin": next})
+}
+
+// SetUserAdmin — PUT /admin/users/{id}/admin.
+func (h *Handler) SetUserAdmin(w http.ResponseWriter, r *http.Request) {
+	id, ok := adminChiUUID(w, r)
+	if !ok {
+		return
+	}
+
+	var req struct {
+		IsAdmin bool `json:"is_admin"`
+	}
+
+	if !adminReadJSON(w, r, &req) {
+		return
+	}
+
+	err := h.userRepo.SetIsAdmin(r.Context(), id, req.IsAdmin)
+	if err != nil {
+		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+
+		return
+	}
+
+	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
 // ChangeUserGrade — PUT /admin/users/{id}/grade.
 func (h *Handler) ChangeUserGrade(w http.ResponseWriter, r *http.Request) {
 	id, ok := adminChiUUID(w, r)
@@ -228,6 +442,47 @@ func (h *Handler) ChangeUserGrade(w http.ResponseWriter, r *http.Request) {
 	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
+func (h *Handler) adminUserRow(ctx context.Context, u *domain.User) map[string]any {
+	balanceStr := "0"
+
+	wal, err := h.walletRepo.GetByUserID(ctx, u.ID)
+	if err == nil && wal != nil {
+		balanceStr = wal.Balance.String()
+	}
+
+	displayName := u.Email
+
+	if at := strings.Index(u.Email, "@"); at > 0 {
+		displayName = u.Email[:at]
+	}
+
+	role := "user"
+	if u.IsAdmin {
+		role = "admin"
+	}
+
+	tgLinked := u.TelegramChatID != nil && *u.TelegramChatID != 0
+
+	return map[string]any{
+		"id":                 u.ID.String(),
+		"display_name":       displayName,
+		"email":              u.Email,
+		"balance_rub":        balanceStr,
+		"status":             string(u.Status),
+		"is_admin":           u.IsAdmin,
+		"role":               role,
+		"is_verified":        u.EmailVerified,
+		"is_blocked":         u.Status == domain.UserStatusBlocked,
+		"card_count":         0,
+		"wallet_balance":     balanceStr,
+		"is_telegram_linked": tgLinked,
+		"notification_pref":  "both",
+		"created_at":         u.CreatedAt.UTC().Format(time.RFC3339),
+		"tier":               "",
+		"tier_expires_at":    "",
+	}
+}
+
 func adminChiUUID(w http.ResponseWriter, r *http.Request) (domain.UUID, bool) {
 	idStr := chi.URLParam(r, "id")
 
@@ -250,6 +505,28 @@ func adminReadJSON(w http.ResponseWriter, r *http.Request, v any) bool {
 	}
 
 	return true
+}
+
+func adminQueryInt(r *http.Request, name string, def, min, max int) int {
+	s := r.URL.Query().Get(name)
+	if s == "" {
+		return def
+	}
+
+	v, err := strconv.Atoi(s)
+	if err != nil {
+		return def
+	}
+
+	if v < min {
+		return min
+	}
+
+	if v > max {
+		return max
+	}
+
+	return v
 }
 
 // ListKYCPending — GET /admin/kyc-applications.

@@ -13,6 +13,7 @@ import (
 	authApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/auth"
 	cardApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/card"
 	settingscompatApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/settingscompat"
+	storeApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/store"
 	ticketApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/ticket"
 	transactionApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/transaction"
 	userApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/user"
@@ -156,6 +157,7 @@ func (s *Server) setupRoutes(jwtSecret []byte) {
 				cardApi.NewHandler(s.container.CardUseCase).Register(r)
 				ticketApi.NewHandler(s.container.TicketUseCase).Register(r)
 				transactionApi.NewHandler(s.container.TransactionUseCase).Register(r)
+				storeApi.NewHandler(s.container.StoreUseCase, s.container.StoreRepo).Register(r)
 				settingscompatApi.NewHandler(
 					s.container.UserUseCase,
 					s.container.AuthUseCase,
@@ -164,15 +166,18 @@ func (s *Server) setupRoutes(jwtSecret []byte) {
 					s.container.TelegramBotUsername,
 				).Register(r)
 			})
-		})
 
-		r.Route("/admin", func(r chi.Router) {
-			r.Group(func(r chi.Router) {
+			// Admin API (JWT + is_admin); пути /api/v1/admin/... совпадают с baseURL фронта.
+			r.Route("/admin", func(r chi.Router) {
 				r.Use(authMiddleware.Auth(jwtSecret))
 				r.Use(authMiddleware.AdminOnly(s.container.UserRepo))
 				adminApi.NewHandler(s.container.CardUseCase, s.container.CommissionUseCase,
-					s.container.TicketUseCase, s.container.GradesUseCase, s.container.KYCUseCase).Register(r)
+					s.container.TicketUseCase, s.container.GradesUseCase, s.container.KYCUseCase,
+					s.container.UserRepo, s.container.WalletRepo).Register(r)
 			})
+
+			// Public: VPN subscription (used by VPN apps)
+			storeApi.NewHandler(s.container.StoreUseCase, s.container.StoreRepo).RegisterPublic(r)
 		})
 	})
 }

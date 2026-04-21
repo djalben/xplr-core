@@ -79,6 +79,14 @@ func (uc *UseCase) Register(ctx context.Context, email, password string) (*domai
 		return nil, err
 	}
 
+	// ReferralCode нужен сразу при INSERT (поле UNIQUE); формируем детерминированно от UUID.
+	// Если позже потребуется более «красивый» код — можно менять формат, но важно сохранять уникальность.
+	idStr := strings.ReplaceAll(user.ID.String(), "-", "")
+	if len(idStr) > 8 {
+		idStr = idStr[:8]
+	}
+	user.ReferralCode = "XPLR" + strings.ToUpper(idStr)
+
 	plain, hashTok, err := utils.RandomTokenHex(32)
 	if err != nil {
 		return nil, err

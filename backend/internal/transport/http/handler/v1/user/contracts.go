@@ -45,7 +45,7 @@ type UserGrades interface {
 
 // UserCards — карты в user BFF.
 type UserCards interface {
-	BuyCard(ctx context.Context, userID domain.UUID, cardType domain.CardType, nickname string) (*domain.Card, error)
+	BuyCard(ctx context.Context, userID domain.UUID, cardType domain.CardType, nickname string, currency domain.CardCurrency) (*domain.Card, error)
 	ListByUserID(ctx context.Context, userID domain.UUID) ([]*domain.Card, error)
 	GetByID(ctx context.Context, cardID domain.UUID) (*domain.Card, error)
 	TopUpCard(ctx context.Context, userID domain.UUID, cardID domain.UUID, amount domain.Numeric) error

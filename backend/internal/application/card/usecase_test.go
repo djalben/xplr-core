@@ -23,7 +23,7 @@ func testCardID() domain.UUID {
 }
 
 func activeCard(uid domain.UUID, ct domain.CardType) *domain.Card {
-	c, err := domain.NewCard(uid, ct, "p", "n")
+	c, err := domain.NewCard(uid, ct, domain.CardCurrencyUSD, "p", "n")
 	if err != nil {
 		panic(err)
 	}
@@ -67,7 +67,7 @@ func TestUseCase_BuyCard_StandardLimitReached(t *testing.T) {
 	list := []*domain.Card{activeCard(uid, ct), activeCard(uid, ct), activeCard(uid, ct)}
 	m.Cards.EXPECT().ListByUserID(gomock.Any(), uid).Return(list, nil)
 
-	_, err := m.UC.BuyCard(ctx, uid, ct, "x")
+	_, err := m.UC.BuyCard(ctx, uid, ct, "x", domain.CardCurrencyUSD)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -94,7 +94,7 @@ func TestUseCase_BuyCard_OK_EmptyList(t *testing.T) {
 	m.Cards.EXPECT().Save(gomock.Any(), gomock.Any()).Return(nil)
 	m.Tx.EXPECT().Save(gomock.Any(), gomock.Any()).Return(nil)
 
-	got, err := m.UC.BuyCard(ctx, uid, ct, "nick")
+	got, err := m.UC.BuyCard(ctx, uid, ct, "nick", domain.CardCurrencyUSD)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func TestUseCase_SpendFromCard_NotActive(t *testing.T) {
 
 	m := newCardUCTest(ctrl)
 
-	c, _ := domain.NewCard(uid, domain.CardTypeSubscriptions, "p", "n")
+	c, _ := domain.NewCard(uid, domain.CardTypeSubscriptions, domain.CardCurrencyUSD, "p", "n")
 	c.ID = cid
 	c.CardStatus = domain.CardStatusBlocked
 
@@ -154,7 +154,7 @@ func TestUseCase_SpendFromCard_WrongUser(t *testing.T) {
 
 	m := newCardUCTest(ctrl)
 
-	c, _ := domain.NewCard(other, domain.CardTypeSubscriptions, "p", "n")
+	c, _ := domain.NewCard(other, domain.CardTypeSubscriptions, domain.CardCurrencyUSD, "p", "n")
 	c.ID = cid
 
 	m.Cards.EXPECT().GetByID(gomock.Any(), cid).Return(c, nil)
@@ -177,7 +177,7 @@ func TestUseCase_SpendFromCard_DailyLimitExceeded(t *testing.T) {
 
 	m := newCardUCTest(ctrl)
 
-	c, _ := domain.NewCard(uid, domain.CardTypeSubscriptions, "p", "n")
+	c, _ := domain.NewCard(uid, domain.CardTypeSubscriptions, domain.CardCurrencyUSD, "p", "n")
 	c.ID = cid
 	c.DailySpendLimit = domain.NewNumeric(100)
 
@@ -202,7 +202,7 @@ func TestUseCase_SpendFromCard_MonthlyLimitExceeded(t *testing.T) {
 
 	m := newCardUCTest(ctrl)
 
-	c, _ := domain.NewCard(uid, domain.CardTypeSubscriptions, "p", "n")
+	c, _ := domain.NewCard(uid, domain.CardTypeSubscriptions, domain.CardCurrencyUSD, "p", "n")
 	c.ID = cid
 	c.Balance = domain.NewNumeric(10000)
 	// subscriptions monthly cap 5000
@@ -229,7 +229,7 @@ func TestUseCase_SpendFromCard_InsufficientBalance(t *testing.T) {
 
 	m := newCardUCTest(ctrl)
 
-	c, _ := domain.NewCard(uid, domain.CardTypeSubscriptions, "p", "n")
+	c, _ := domain.NewCard(uid, domain.CardTypeSubscriptions, domain.CardCurrencyUSD, "p", "n")
 	c.ID = cid
 	c.Balance = domain.NewNumeric(1)
 
@@ -256,7 +256,7 @@ func TestUseCase_SpendFromCard_OK(t *testing.T) {
 
 	m := newCardUCTest(ctrl)
 
-	c, _ := domain.NewCard(uid, domain.CardTypeSubscriptions, "p", "n")
+	c, _ := domain.NewCard(uid, domain.CardTypeSubscriptions, domain.CardCurrencyUSD, "p", "n")
 	c.ID = cid
 	c.Balance = domain.NewNumeric(50)
 	c.DailySpendLimit = domain.NewNumeric(1000)

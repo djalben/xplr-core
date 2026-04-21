@@ -88,7 +88,7 @@ func BenchmarkWallet_Withdraw(b *testing.B) {
 func BenchmarkNewCard(b *testing.B) {
 	uid := domain.NewUUID()
 	for b.Loop() {
-		_, err := domain.NewCard(uid, domain.CardTypeSubscriptions, "prov", "nick")
+		_, err := domain.NewCard(uid, domain.CardTypeSubscriptions, domain.CardCurrencyUSD, "prov", "nick")
 		if err != nil {
 			b.Fatal(err)
 		}

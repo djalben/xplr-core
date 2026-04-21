@@ -44,6 +44,23 @@ type ENV struct {
 	SMTPUser     string `env:"SMTP_USER"`
 	SMTPPassword string `env:"SMTP_PASS"`
 	SMTPFrom     string `env:"SMTP_FROM"`
+
+	// Store providers
+	MobiMatterAPIKey string `env:"MOBIMATTER_API_KEY"`
+	MobiMatterAPIURL string `env:"MOBIMATTER_API_URL" default:"https://api.mobimatter.com/mobimatter/api/v2"`
+
+	// 3X-UI / XPanel (VLESS+Reality)
+	XPanelURL              string `env:"XPANEL_URL"`
+	XPanelBasePath         string `env:"XPANEL_BASE_PATH" default:"/panel"`
+	XPanelUsername         string `env:"XPANEL_USERNAME"`
+	XPanelPassword         string `env:"XPANEL_PASSWORD"`
+	XPanelInboundID        int    `env:"XPANEL_INBOUND_ID" default:"1"`
+	XPanelServerIP         string `env:"XPANEL_SERVER_IP"`
+	XPanelServerPort       string `env:"XPANEL_SERVER_PORT" default:"443"`
+	XPanelSNI              string `env:"XPANEL_SNI" default:"www.microsoft.com"`
+	XPanelRealityPublicKey string `env:"XPANEL_REALITY_PUBLIC_KEY"`
+	XPanelRealityShortID   string `env:"XPANEL_REALITY_SHORT_ID"`
+	XPanelFlow             string `env:"XPANEL_FLOW" default:"xtls-rprx-vision"`
 }
 
 // Parse — загрузка конфига из окружения + .env файла.

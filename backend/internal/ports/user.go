@@ -14,4 +14,10 @@ type UserRepository interface {
 	GetByTelegramChatID(ctx context.Context, chatID int64) (*domain.User, error)
 	Save(ctx context.Context, user *domain.User) error
 	Update(ctx context.Context, user *domain.User) error
+
+	SearchByEmail(ctx context.Context, query string, limit int) ([]*domain.User, error)
+	ListUsers(ctx context.Context, limit, offset int) ([]*domain.User, error)
+	CountUsers(ctx context.Context) (int64, error)
+	SetUserStatus(ctx context.Context, id domain.UUID, status domain.UserStatus) error
+	SetIsAdmin(ctx context.Context, id domain.UUID, isAdmin bool) error
 }

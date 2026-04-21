@@ -24,7 +24,8 @@ const userSelectColumns = `id, email, password_hash, is_admin, kyc_status, statu
 	password_reset_token_hash, password_reset_expires_at,
 	totp_secret, totp_enabled, notify_email, notify_telegram,
 	notify_transactions, notify_balance, notify_security, notify_card_operations,
-	telegram_link_code, telegram_link_expires_at`
+	telegram_link_code, telegram_link_expires_at,
+	last_read_news_at, news_notifications_enabled`
 
 // GetByID — получение пользователя.
 func (r *userRepo) GetByID(ctx context.Context, id domain.UUID) (*domain.User, error) {
@@ -106,11 +107,12 @@ func (r *userRepo) Save(ctx context.Context, user *domain.User) error {
 			password_reset_token_hash, password_reset_expires_at,
 			totp_secret, totp_enabled, notify_email, notify_telegram,
 			notify_transactions, notify_balance, notify_security, notify_card_operations,
-			telegram_link_code, telegram_link_expires_at
+			telegram_link_code, telegram_link_expires_at,
+			last_read_news_at, news_notifications_enabled
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
 			$11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-			$21, $22, $23, $24, $25
+			$21, $22, $23, $24, $25, $26, $27
 		)`
 
 	_, err := r.store.ExecContext(ctx, query,
@@ -122,6 +124,7 @@ func (r *userRepo) Save(ctx context.Context, user *domain.User) error {
 		user.TOTPSecret, user.TOTPEnabled, user.NotifyEmail, user.NotifyTelegram,
 		user.NotifyTransactions, user.NotifyBalance, user.NotifySecurity, user.NotifyCardOperations,
 		user.TelegramLinkCode, user.TelegramLinkExpiresAt,
+		user.LastReadNewsAt, user.NewsNotificationsEnabled,
 	)
 	if err != nil {
 		return wrapper.Wrap(err)
@@ -141,8 +144,9 @@ func (r *userRepo) Update(ctx context.Context, user *domain.User) error {
 			password_reset_token_hash = $10, password_reset_expires_at = $11,
 			totp_secret = $12, totp_enabled = $13, notify_email = $14, notify_telegram = $15,
 			notify_transactions = $16, notify_balance = $17, notify_security = $18, notify_card_operations = $19,
-			telegram_link_code = $20, telegram_link_expires_at = $21
-		WHERE id = $22`
+			telegram_link_code = $20, telegram_link_expires_at = $21,
+			last_read_news_at = $22, news_notifications_enabled = $23
+		WHERE id = $24`
 
 	_, err := r.store.ExecContext(ctx, query,
 		user.PasswordHash, user.KYCStatus, user.Status, user.TelegramChatID,
@@ -152,6 +156,7 @@ func (r *userRepo) Update(ctx context.Context, user *domain.User) error {
 		user.TOTPSecret, user.TOTPEnabled, user.NotifyEmail, user.NotifyTelegram,
 		user.NotifyTransactions, user.NotifyBalance, user.NotifySecurity, user.NotifyCardOperations,
 		user.TelegramLinkCode, user.TelegramLinkExpiresAt,
+		user.LastReadNewsAt, user.NewsNotificationsEnabled,
 		user.ID,
 	)
 	if err != nil {
@@ -159,6 +164,82 @@ func (r *userRepo) Update(ctx context.Context, user *domain.User) error {
 			return wrapper.Wrap(domain.NewAlreadyExists("telegram chat is already linked to another account"))
 		}
 
+		return wrapper.Wrap(err)
+	}
+
+	return nil
+}
+
+// SearchByEmail — поиск по подстроке email (ILIKE), новее первыми.
+func (r *userRepo) SearchByEmail(ctx context.Context, query string, limit int) ([]*domain.User, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+
+	const q = `SELECT ` + userSelectColumns + ` FROM users WHERE email ILIKE $1 ORDER BY created_at DESC LIMIT $2`
+
+	pattern := "%" + query + "%"
+
+	var out []*domain.User
+
+	err := r.store.SelectContext(ctx, &out, q, pattern, limit)
+	if err != nil {
+		return nil, wrapper.Wrap(err)
+	}
+
+	return out, nil
+}
+
+// ListUsers — постраничный список по дате регистрации (новее первыми).
+func (r *userRepo) ListUsers(ctx context.Context, limit, offset int) ([]*domain.User, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+
+	const q = `SELECT ` + userSelectColumns + ` FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2`
+
+	var out []*domain.User
+
+	err := r.store.SelectContext(ctx, &out, q, limit, offset)
+	if err != nil {
+		return nil, wrapper.Wrap(err)
+	}
+
+	return out, nil
+}
+
+// CountUsers — число записей в users.
+func (r *userRepo) CountUsers(ctx context.Context) (int64, error) {
+	const q = `SELECT COUNT(*) FROM users`
+
+	var n int64
+
+	err := r.store.GetContext(ctx, &n, q)
+	if err != nil {
+		return 0, wrapper.Wrap(err)
+	}
+
+	return n, nil
+}
+
+// SetUserStatus — смена статуса аккаунта (ACTIVE/BLOCKED).
+func (r *userRepo) SetUserStatus(ctx context.Context, id domain.UUID, status domain.UserStatus) error {
+	const q = `UPDATE users SET status = $1 WHERE id = $2`
+
+	_, err := r.store.ExecContext(ctx, q, status, id)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	return nil
+}
+
+// SetIsAdmin — выдача/снятие флага администратора.
+func (r *userRepo) SetIsAdmin(ctx context.Context, id domain.UUID, isAdmin bool) error {
+	const q = `UPDATE users SET is_admin = $1 WHERE id = $2`
+
+	_, err := r.store.ExecContext(ctx, q, isAdmin, id)
+	if err != nil {
 		return wrapper.Wrap(err)
 	}
 

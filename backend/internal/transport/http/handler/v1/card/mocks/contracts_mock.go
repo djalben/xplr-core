@@ -36,18 +36,18 @@ func (m *MockCardUseCase) EXPECT() *MockCardUseCaseMockRecorder {
 }
 
 // BuyCard mocks base method.
-func (m *MockCardUseCase) BuyCard(ctx context.Context, userID domain.UUID, cardType domain.CardType, nickname string) (*domain.Card, error) {
+func (m *MockCardUseCase) BuyCard(ctx context.Context, userID domain.UUID, cardType domain.CardType, nickname string, currency domain.CardCurrency) (*domain.Card, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BuyCard", ctx, userID, cardType, nickname)
+	ret := m.ctrl.Call(m, "BuyCard", ctx, userID, cardType, nickname, currency)
 	ret0, _ := ret[0].(*domain.Card)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // BuyCard indicates an expected call of BuyCard.
-func (mr *MockCardUseCaseMockRecorder) BuyCard(ctx, userID, cardType, nickname interface{}) *gomock.Call {
+func (mr *MockCardUseCaseMockRecorder) BuyCard(ctx, userID, cardType, nickname, currency interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuyCard", reflect.TypeOf((*MockCardUseCase)(nil).BuyCard), ctx, userID, cardType, nickname)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuyCard", reflect.TypeOf((*MockCardUseCase)(nil).BuyCard), ctx, userID, cardType, nickname, currency)
 }
 
 // SpendFromCard mocks base method.
