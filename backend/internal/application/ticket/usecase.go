@@ -43,3 +43,12 @@ func (uc *UseCase) Close(ctx context.Context, ticketID domain.UUID, reply string
 
 	return wrapper.Wrap(uc.ticketRepo.Update(ctx, t))
 }
+
+func (uc *UseCase) ListAll(ctx context.Context, limit int) ([]*domain.Ticket, error) {
+	list, err := uc.ticketRepo.ListAll(ctx, limit)
+	if err != nil {
+		return nil, wrapper.Wrap(err)
+	}
+
+	return list, nil
+}

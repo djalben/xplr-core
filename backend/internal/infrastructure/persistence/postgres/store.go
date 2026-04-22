@@ -99,6 +99,83 @@ WHERE p.in_stock = TRUE`
 	return out, nil
 }
 
+func (r *storeRepo) AdminListProducts(ctx context.Context, filter ports.StoreAdminProductFilter) ([]*domain.StoreProduct, error) {
+	q := `SELECT p.id,
+       p.category_id,
+       c.slug AS category_slug,
+       p.provider,
+       p.external_id,
+       p.name,
+       COALESCE(p.description, '') AS description,
+       COALESCE(p.country, '') AS country,
+       COALESCE(p.country_code, '') AS country_code,
+       p.product_type,
+       p.price_usd,
+       p.cost_price,
+       p.markup_percent,
+       COALESCE(p.data_gb, '') AS data_gb,
+       p.validity_days,
+       COALESCE(p.image_url, '') AS image_url,
+       p.in_stock,
+       COALESCE(p.meta, '{}') AS meta,
+       p.sort_order
+FROM store_products p JOIN store_categories c ON c.id = p.category_id
+WHERE 1=1`
+
+	args := []any{}
+	arg := 1
+
+	if filter.ProductType != nil && *filter.ProductType != "" {
+		q += fmt.Sprintf(" AND p.product_type = $%d", arg)
+		args = append(args, string(*filter.ProductType))
+		arg++
+	}
+
+	q += " ORDER BY p.sort_order, p.name"
+
+	var out []*domain.StoreProduct
+	err := r.db.SelectContext(ctx, &out, q, args...)
+	if err != nil {
+		return nil, wrapper.Wrap(err)
+	}
+	if out == nil {
+		out = []*domain.StoreProduct{}
+	}
+
+	return out, nil
+}
+
+func (r *storeRepo) AdminUpdateProduct(ctx context.Context, p *domain.StoreProduct) error {
+	const q = `UPDATE store_products
+SET price_usd = $1, cost_price = $2, markup_percent = $3, image_url = $4, in_stock = $5, meta = $6, sort_order = $7, updated_at = NOW()
+WHERE id = $8`
+
+	_, err := r.db.ExecContext(ctx, q, p.PriceUSD, p.CostPrice, p.MarkupPct, p.ImageURL, p.InStock, p.Meta, p.SortOrder, p.ID)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	return nil
+}
+
+func (r *storeRepo) AdminBulkAddMarkup(ctx context.Context, productType domain.StoreProductType, delta domain.Numeric) (int64, error) {
+	const q = `UPDATE store_products
+SET markup_percent = markup_percent + $1, updated_at = NOW()
+WHERE product_type = $2`
+
+	res, err := r.db.ExecContext(ctx, q, delta, string(productType))
+	if err != nil {
+		return 0, wrapper.Wrap(err)
+	}
+
+	n, err := res.RowsAffected()
+	if err != nil {
+		return 0, wrapper.Wrap(err)
+	}
+
+	return n, nil
+}
+
 func (r *storeRepo) GetProductByID(ctx context.Context, id domain.UUID) (*domain.StoreProduct, error) {
 	const q = `SELECT p.id,
        p.category_id,

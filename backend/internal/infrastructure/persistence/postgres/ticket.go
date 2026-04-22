@@ -71,3 +71,25 @@ func (r *ticketRepo) Update(ctx context.Context, ticket *domain.Ticket) error {
 
 	return nil
 }
+
+func (r *ticketRepo) ListAll(ctx context.Context, limit int) ([]*domain.Ticket, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 200
+	}
+
+	const q = `SELECT id, user_id, admin_id, tg_chat_id, subject, status,
+       user_message, admin_reply, created_at, closed_at
+FROM tickets ORDER BY created_at DESC LIMIT $1`
+
+	var out []*domain.Ticket
+
+	err := r.store.SelectContext(ctx, &out, q, limit)
+	if err != nil {
+		return nil, wrapper.Wrap(err)
+	}
+	if out == nil {
+		out = []*domain.Ticket{}
+	}
+
+	return out, nil
+}

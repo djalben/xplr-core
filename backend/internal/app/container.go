@@ -36,6 +36,9 @@ type Container struct {
 	GradeRepo       ports.GradeRepository
 	KYCRepo         ports.KYCApplicationRepository
 	StoreRepo       ports.StoreRepository
+	NewsRepo        ports.NewsRepository
+	SystemRepo      ports.SystemSettingsRepository
+	AdminLogsRepo   ports.AdminLogsRepository
 
 	TelegramBotUsername string
 
@@ -67,6 +70,9 @@ func NewContainer(ctx context.Context, cfg *config.ENV) (*Container, error) {
 	referralRepo := postgres.NewReferralRepository(db)
 	kycRepo := postgres.NewKYCApplicationRepository(db)
 	storeRepo := postgres.NewStoreRepository(db)
+	newsRepo := postgres.NewNewsRepository(db)
+	systemRepo := postgres.NewSystemSettingsRepository(db)
+	adminLogsRepo := postgres.NewAdminLogsRepository(db)
 
 	var mail ports.Mailer = mailer.Noop{}
 	if cfg.SMTPHost != "" {
@@ -110,6 +116,9 @@ func NewContainer(ctx context.Context, cfg *config.ENV) (*Container, error) {
 		GradeRepo:       gradeRepo,
 		KYCRepo:         kycRepo,
 		StoreRepo:       storeRepo,
+		NewsRepo:        newsRepo,
+		SystemRepo:      systemRepo,
+		AdminLogsRepo:   adminLogsRepo,
 
 		TelegramBotUsername: cfg.TelegramBotUsername,
 

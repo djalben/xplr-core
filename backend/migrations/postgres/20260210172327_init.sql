@@ -31,6 +31,8 @@ CREATE TABLE users (
     notify_card_operations BOOLEAN NOT NULL DEFAULT TRUE,
     telegram_link_code VARCHAR(32),
     telegram_link_expires_at TIMESTAMPTZ,
+    last_read_news_at TIMESTAMPTZ,
+    news_notifications_enabled BOOLEAN NOT NULL DEFAULT TRUE,
     CONSTRAINT users_notify_channel_check CHECK (notify_email OR notify_telegram)
 );
 
@@ -211,6 +213,32 @@ CREATE TABLE store_orders (
     CONSTRAINT store_orders_status_check CHECK (status IN ('PENDING', 'READY', 'FAILED', 'COMPLETED', 'DELETED'))
 );
 
+-- 13. Новости / системные настройки / админ-логи
+CREATE TABLE news (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    title VARCHAR(500) NOT NULL,
+    content TEXT NOT NULL,
+    image_url TEXT NOT NULL DEFAULT '',
+    status VARCHAR(20) NOT NULL DEFAULT 'draft',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT news_status_check CHECK (status IN ('draft', 'published', 'archived'))
+);
+
+CREATE TABLE admin_logs (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    admin_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    action TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE system_settings (
+    setting_key VARCHAR(100) PRIMARY KEY,
+    setting_value TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Индексы (все внизу)
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_referral_code ON users(referral_code);
@@ -240,11 +268,18 @@ CREATE INDEX idx_store_products_type ON store_products(product_type);
 CREATE INDEX idx_store_products_provider ON store_products(provider);
 CREATE INDEX idx_store_orders_user_created ON store_orders(user_id, created_at DESC);
 CREATE INDEX idx_store_orders_provider_ref ON store_orders(provider_ref) WHERE provider_ref IS NOT NULL AND provider_ref <> '';
+CREATE INDEX idx_news_created ON news(created_at DESC);
+CREATE INDEX idx_news_status ON news(status);
+CREATE INDEX idx_admin_logs_admin_id ON admin_logs(admin_id);
+CREATE INDEX idx_admin_logs_created ON admin_logs(created_at DESC);
 
 -- +goose StatementEnd
 
 -- +goose Down
 -- +goose StatementBegin
+DROP TABLE IF EXISTS system_settings;
+DROP TABLE IF EXISTS admin_logs;
+DROP TABLE IF EXISTS news;
 DROP TABLE IF EXISTS commission_config;
 DROP TABLE IF EXISTS store_orders;
 DROP TABLE IF EXISTS store_products;

@@ -27,6 +27,10 @@ type Handler struct {
 	kycUseCase        *kyc.UseCase
 	userRepo          ports.UserRepository
 	walletRepo        ports.WalletRepository
+	newsRepo          ports.NewsRepository
+	systemRepo        ports.SystemSettingsRepository
+	adminLogsRepo     ports.AdminLogsRepository
+	storeRepo         ports.StoreRepository
 }
 
 func NewHandler(
@@ -37,6 +41,10 @@ func NewHandler(
 	kycUC *kyc.UseCase,
 	userRepo ports.UserRepository,
 	walletRepo ports.WalletRepository,
+	newsRepo ports.NewsRepository,
+	systemRepo ports.SystemSettingsRepository,
+	adminLogsRepo ports.AdminLogsRepository,
+	storeRepo ports.StoreRepository,
 ) *Handler {
 	return &Handler{
 		cardUseCase:       cardUC,
@@ -46,12 +54,22 @@ func NewHandler(
 		kycUseCase:        kycUC,
 		userRepo:          userRepo,
 		walletRepo:        walletRepo,
+		newsRepo:          newsRepo,
+		systemRepo:        systemRepo,
+		adminLogsRepo:     adminLogsRepo,
+		storeRepo:         storeRepo,
 	}
 }
 
 func (h *Handler) Register(r chi.Router) {
 	r.Post("/tariffs", h.ChangeTariffs)
 	r.Post("/referrals", h.ChangeReferralBonuses)
+	h.RegisterSBP(r)
+	h.RegisterCommissions(r)
+	h.RegisterTickets(r)
+	h.RegisterSystemSettings(r)
+	h.RegisterLogs(r)
+	h.RegisterStore(r)
 	r.Get("/users/search", h.SearchUsers)
 	r.Get("/users", h.ListUsers)
 	r.Post("/users/{id}/toggle-block", h.ToggleUserBlock)
@@ -67,6 +85,8 @@ func (h *Handler) Register(r chi.Router) {
 	r.Put("/tickets/{id}/close", h.CloseTicket)
 	r.Get("/kyc-applications", h.ListKYCPending)
 	r.Put("/kyc-applications/{id}/decision", h.DecideKYC)
+
+	h.RegisterNews(r)
 }
 
 // ChangeTariffs — POST /admin/tariffs.
@@ -303,41 +323,27 @@ func (h *Handler) SetUserStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	switch req.Status {
-	case string(domain.UserStatusActive):
-		st := domain.UserStatusActive
-
-		err := h.userRepo.SetUserStatus(r.Context(), id, st)
-		if err != nil {
-			http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
-
-			return
-		}
-
-		handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
-
-		return
-	case string(domain.UserStatusBlocked), "BANNED":
-		st := domain.UserStatusBlocked
-
-		err := h.userRepo.SetUserStatus(r.Context(), id, st)
-		if err != nil {
-			http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
-
-			return
-		}
-
-		handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
-
-		return
-	default:
-		http.Error(w, "status must be ACTIVE, BLOCKED or BANNED", http.StatusBadRequest)
+	st := domain.UserStatus(req.Status)
+	if st == "BANNED" {
+		st = domain.UserStatusBlocked
+	}
+	if st != domain.UserStatusActive && st != domain.UserStatusBlocked {
+		http.Error(w, "status must be ACTIVE or BLOCKED", http.StatusBadRequest)
 
 		return
 	}
+
+	err := h.userRepo.SetUserStatus(r.Context(), id, st)
+	if err != nil {
+		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+
+		return
+	}
+
+	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
-// ToggleUserBlock — POST /admin/users/{id}/toggle-block (совместимость со staff UI).
+// ToggleUserBlock — POST /admin/users/{id}/toggle-block.
 func (h *Handler) ToggleUserBlock(w http.ResponseWriter, r *http.Request) {
 	id, ok := adminChiUUID(w, r)
 	if !ok {
@@ -366,7 +372,7 @@ func (h *Handler) ToggleUserBlock(w http.ResponseWriter, r *http.Request) {
 	handler.WriteJSON(w, http.StatusOK, map[string]bool{"is_blocked": next == domain.UserStatusBlocked})
 }
 
-// ToggleUserAdmin — PATCH /admin/users/{id}/role — переключить флаг админа (без тела).
+// ToggleUserAdmin — PATCH /admin/users/{id}/role.
 func (h *Handler) ToggleUserAdmin(w http.ResponseWriter, r *http.Request) {
 	id, ok := adminChiUUID(w, r)
 	if !ok {

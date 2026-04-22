@@ -15,13 +15,13 @@ import { LandingPage } from './pages/landing';
 import { AdminRatesPage } from './pages/admin-rates';
 import { ForgotPasswordPage } from './pages/forgot-password';
 import { ResetPasswordPage } from './pages/reset-password';
-import { StaffOnlyZone } from './pages/staff-only-zone';
 import { NewsPage } from './pages/news';
 import { StorePage } from './pages/store';
 import { PurchasesPage } from './pages/purchases';
 import { PWAInstallPrompt } from './components/pwa-install-prompt';
 import { NeuralBackground } from './components/neural-background';
 import { useAuth } from './store/auth-context';
+import { AdminApp } from './pages/admin';
 
 interface GuardProps {
   children: React.ReactNode;
@@ -34,41 +34,21 @@ const ProtectedRoute: React.FC<GuardProps> = ({ children }) => {
   return <>{children}</>;
 };
 
-/* ── Requires admin role + session secret ── */
+/* ── Requires admin role ── */
 const AdminRoute: React.FC<GuardProps> = ({ children }) => {
   const token = localStorage.getItem('token');
   if (!token) {
-    console.log('[AdminRoute] ❌ No token → redirect to /auth');
     return <Navigate to="/auth" replace />;
   }
   const { isAdmin, authReady, user } = useAuth();
-  const hasAccess = sessionStorage.getItem('_xplr_staff') === 'granted';
 
-  console.log('[AdminRoute] Guard check:', {
-    authReady,
-    isAdmin,
-    hasAccess,
-    userEmail: user?.email,
-    userIsAdmin: user?.isAdmin,
-    serverRole: user?.serverRole,
-  });
-
-  // CRITICAL: wait for /user/me to complete before making any redirect decision
   if (!authReady) {
-    console.log('[AdminRoute] ⏳ Waiting for authReady...');
     return null;
   }
 
   if (!isAdmin) {
-    console.log('[AdminRoute] ❌ User is not admin → redirect to /dashboard');
     return <Navigate to="/dashboard" replace />;
   }
-  if (!hasAccess) {
-    console.log('[AdminRoute] ❌ No staff session key → redirect to /dashboard');
-    return <Navigate to="/dashboard" replace />;
-  }
-
-  console.log('[AdminRoute] ✅ Access granted');
   return <>{children}</>;
 };
 
@@ -107,7 +87,8 @@ function App() {
         <Route path="/store" element={<ProtectedRoute><StorePage /></ProtectedRoute>} />
         <Route path="/purchases" element={<ProtectedRoute><PurchasesPage /></ProtectedRoute>} />
         <Route path="/admin/rates" element={<ProtectedRoute><AdminRatesPage /></ProtectedRoute>} />
-        <Route path="/staff-only-zone" element={<AdminRoute><StaffOnlyZone /></AdminRoute>} />
+        {/* Admin area (separate pages) */}
+        <Route path="/admin/*" element={<AdminRoute><AdminApp /></AdminRoute>} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </RatesProvider>

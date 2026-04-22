@@ -16,10 +16,19 @@ type StoreRepository interface {
 	GetLatestCompletedOrderMetaByProviderRef(ctx context.Context, providerRef string, userID *domain.UUID) (string, error)
 	SoftDeleteOrdersByProviderRef(ctx context.Context, providerRef string) error
 	UpdateOrderMetaByProviderRef(ctx context.Context, providerRef string, meta string) error
+
+	// Admin-only
+	AdminListProducts(ctx context.Context, filter StoreAdminProductFilter) ([]*domain.StoreProduct, error)
+	AdminUpdateProduct(ctx context.Context, p *domain.StoreProduct) error
+	AdminBulkAddMarkup(ctx context.Context, productType domain.StoreProductType, delta domain.Numeric) (affected int64, err error)
 }
 
 type StoreProductFilter struct {
 	CategorySlug string
 	Country      string
 	Search       string
+}
+
+type StoreAdminProductFilter struct {
+	ProductType *domain.StoreProductType
 }

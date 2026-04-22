@@ -12,6 +12,7 @@ import (
 	adminApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/admin"
 	authApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/auth"
 	cardApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/card"
+	newsApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/news"
 	settingscompatApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/settingscompat"
 	storeApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/store"
 	ticketApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/ticket"
@@ -158,6 +159,7 @@ func (s *Server) setupRoutes(jwtSecret []byte) {
 				ticketApi.NewHandler(s.container.TicketUseCase).Register(r)
 				transactionApi.NewHandler(s.container.TransactionUseCase).Register(r)
 				storeApi.NewHandler(s.container.StoreUseCase, s.container.StoreRepo).Register(r)
+				newsApi.NewHandler(s.container.NewsRepo, s.container.UserRepo).Register(r)
 				settingscompatApi.NewHandler(
 					s.container.UserUseCase,
 					s.container.AuthUseCase,
@@ -173,7 +175,8 @@ func (s *Server) setupRoutes(jwtSecret []byte) {
 				r.Use(authMiddleware.AdminOnly(s.container.UserRepo))
 				adminApi.NewHandler(s.container.CardUseCase, s.container.CommissionUseCase,
 					s.container.TicketUseCase, s.container.GradesUseCase, s.container.KYCUseCase,
-					s.container.UserRepo, s.container.WalletRepo).Register(r)
+					s.container.UserRepo, s.container.WalletRepo, s.container.NewsRepo,
+					s.container.SystemRepo, s.container.AdminLogsRepo, s.container.StoreRepo).Register(r)
 			})
 
 			// Public: VPN subscription (used by VPN apps)

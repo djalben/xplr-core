@@ -130,7 +130,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = useCallback(() => {
     localStorage.removeItem('token');
-    sessionStorage.removeItem('_xplr_staff');
     setUserState(prev => ({ ...prev, isAdmin: false, serverRole: 'user' }));
   }, []);
 
