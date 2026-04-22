@@ -40,9 +40,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Adapt old API prefix (/api/v1/...) to new server prefix (/api/v1/... is under /api/v1 in server.go's /api/v1 routes).
-	// The new server mounts routes under /api/v1 (because it uses /api/v1 via /api/v1 in router: /api/v1 is /api/v1).
-	// But internal server.go currently expects /api/v1/* under /api/v1 because it uses /api/v1 via /api/v1? Actually it mounts /api/v1 under /api/v1 by routing /api/v1.
-	// We already match by using same paths; no rewrite is needed.
 	handler.ServeHTTP(w, r)
 }
+
