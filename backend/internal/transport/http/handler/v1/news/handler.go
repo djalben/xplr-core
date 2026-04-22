@@ -23,13 +23,13 @@ func NewHandler(newsRepo ports.NewsRepository, userRepo ports.UserRepository) *H
 }
 
 func (h *Handler) Register(r chi.Router) {
-	r.Route("/user", func(r chi.Router) {
-		r.Get("/news", h.List)
-		r.Get("/news/unread-count", h.UnreadCount)
-		r.Post("/news/mark-as-read", h.MarkAsRead)
-		r.Get("/news-notifications", h.GetNotifications)
-		r.Patch("/news-notifications", h.PatchNotifications)
-	})
+	// NOTE: user handler already mounts `Route("/user", ...)`.
+	// Register news endpoints as absolute paths under `/v1` to avoid double-mounting `/user`.
+	r.Get("/user/news", h.List)
+	r.Get("/user/news/unread-count", h.UnreadCount)
+	r.Post("/user/news/mark-as-read", h.MarkAsRead)
+	r.Get("/user/news-notifications", h.GetNotifications)
+	r.Patch("/user/news-notifications", h.PatchNotifications)
 }
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
