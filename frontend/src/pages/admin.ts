@@ -1,2 +1,2 @@
-export { AdminApp } from './admin';
+export { AdminApp } from './admin/index';
 
