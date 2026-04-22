@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"runtime/debug"
 	"strings"
 	"sync"
 
@@ -31,6 +32,16 @@ func ensureRouter() {
 
 // Handler is the Vercel serverless entry point.
 func Handler(w http.ResponseWriter, r *http.Request) {
+	defer func() {
+		rec := recover()
+		if rec == nil {
+			return
+		}
+
+		log.Printf("panic: %v\n%s", rec, string(debug.Stack()))
+		http.Error(w, "panic: "+logPanicString(rec), http.StatusInternalServerError)
+	}()
+
 	ensureRouter()
 	if initErr != nil {
 		http.Error(w, "init error: "+initErr.Error(), http.StatusInternalServerError)
@@ -53,5 +64,16 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	handler.ServeHTTP(w, r)
+}
+
+func logPanicString(v any) string {
+	switch x := v.(type) {
+	case string:
+		return x
+	case error:
+		return x.Error()
+	default:
+		return "unknown"
+	}
 }
 

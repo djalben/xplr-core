@@ -13,8 +13,10 @@
       "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800" }]
     }
   ],
-  "rewrites": [
-    { "source": "/((?!api/|manifest\\.json|icon-.*\\.svg|assets/).*)", "destination": "/index.html" }
+  "routes": [
+    { "src": "^/api/(.*)$", "dest": "/api/$1" },
+    { "handle": "filesystem" },
+    { "src": "^/(.*)$", "dest": "/index.html" }
   ],
   "crons": [
     {
