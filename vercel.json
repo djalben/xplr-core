@@ -14,7 +14,7 @@
     }
   ],
   "rewrites": [
-    { "source": "/((?!manifest\\.json|icon-.*\\.svg|assets/).*)", "destination": "/index.html" }
+    { "source": "/((?!api/|manifest\\.json|icon-.*\\.svg|assets/).*)", "destination": "/index.html" }
   ],
   "crons": [
     {
