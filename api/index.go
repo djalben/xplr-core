@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"runtime/debug"
@@ -13,15 +14,32 @@ import (
 )
 
 var (
-	handler    http.Handler
-	routerOnce sync.Once
-	initErr    error
+	handler http.Handler
+	initMu  sync.Mutex
+	initErr error
 
 	errNilHTTPHandler = errors.New("http handler is nil")
 )
 
 func ensureRouter() {
-	routerOnce.Do(func() {
+	initMu.Lock()
+	defer initMu.Unlock()
+
+	if handler != nil || initErr != nil {
+		return
+	}
+
+	func() {
+		defer func() {
+			rec := recover()
+			if rec == nil {
+				return
+			}
+
+			initErr = fmt.Errorf("panic during router init: %v\n%s", rec, string(debug.Stack()))
+			log.Printf("router init panic: %v", initErr)
+		}()
+
 		h, err := vercel.NewHTTPHandlerFromEnv(context.Background())
 		if err != nil {
 			initErr = err
@@ -37,7 +55,7 @@ func ensureRouter() {
 		}
 
 		handler = h
-	})
+	}()
 }
 
 // Handler is the Vercel serverless entry point for /api/*.
