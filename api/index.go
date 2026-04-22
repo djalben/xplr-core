@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"runtime/debug"
@@ -15,6 +16,8 @@ var (
 	handler    http.Handler
 	routerOnce sync.Once
 	initErr    error
+
+	errNilHTTPHandler = errors.New("http handler is nil")
 )
 
 func ensureRouter() {
@@ -23,6 +26,12 @@ func ensureRouter() {
 		if err != nil {
 			initErr = err
 			log.Printf("router init error: %v", err)
+
+			return
+		}
+		if h == nil {
+			initErr = errNilHTTPHandler
+			log.Printf("router init error: %v", initErr)
 
 			return
 		}
@@ -50,7 +59,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if handler == nil {
-		http.Error(w, "init error: handler is nil", http.StatusInternalServerError)
+		http.Error(w, "init error: handler is nil (this should not happen; check router init logs)", http.StatusInternalServerError)
 
 		return
 	}
