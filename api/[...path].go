@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/djalben/xplr-core/backend/vercel"
@@ -38,6 +39,17 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if handler == nil {
 		http.Error(w, "init error: handler is nil", http.StatusInternalServerError)
 		return
+	}
+
+	// Vercel can invoke the function with a path that may or may not include the
+	// function mount prefix. Our chi router is mounted under "/api", so we
+	// normalize to always include it.
+	if r.URL != nil && !strings.HasPrefix(r.URL.Path, "/api/") {
+		if strings.HasPrefix(r.URL.Path, "/") {
+			r.URL.Path = "/api" + r.URL.Path
+		} else {
+			r.URL.Path = "/api/" + r.URL.Path
+		}
 	}
 
 	handler.ServeHTTP(w, r)
