@@ -1,12 +1,11 @@
 package middleware
 
 import (
-	"context"
 	"net/http"
 
-	"github.com/djalben/xplr-core/backend/internal/domain"
 	"github.com/djalben/xplr-core/backend/internal/pkg/utils"
 	"github.com/djalben/xplr-core/backend/internal/ports"
+	"github.com/djalben/xplr-core/backend/internal/transport/http/httpctx"
 )
 
 // Auth — проверка JWT токена.
@@ -28,7 +27,7 @@ func Auth(jwtSecret []byte) func(http.Handler) http.Handler {
 			}
 
 			ctx := r.Context()
-			ctx = context.WithValue(ctx, "userID", userID)
+			ctx = httpctx.WithUserID(ctx, userID)
 			r = r.WithContext(ctx)
 
 			next.ServeHTTP(w, r)
@@ -40,7 +39,7 @@ func Auth(jwtSecret []byte) func(http.Handler) http.Handler {
 func AdminOnly(userRepo ports.UserRepository) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			userID, ok := r.Context().Value("userID").(domain.UUID)
+			userID, ok := httpctx.UserID(r.Context())
 			if !ok {
 				http.Error(w, "Forbidden", http.StatusForbidden)
 

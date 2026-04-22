@@ -86,7 +86,8 @@ func (h *Handler) AdminPatchStoreProduct(w http.ResponseWriter, r *http.Request)
 
 	_ = time.Now()
 
-	if err := h.storeRepo.AdminUpdateProduct(r.Context(), p); err != nil {
+	err = h.storeRepo.AdminUpdateProduct(r.Context(), p)
+	if err != nil {
 		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
 
 		return

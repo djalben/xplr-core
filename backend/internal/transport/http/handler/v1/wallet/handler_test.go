@@ -10,6 +10,7 @@ import (
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	handlerwallet "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/wallet"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/wallet/mocks"
+	"github.com/djalben/xplr-core/backend/internal/transport/http/httpctx"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 )
@@ -21,7 +22,7 @@ func reqWallet(uid domain.UUID, method, path string, body *bytes.Buffer) *http.R
 	} else {
 		r = httptest.NewRequestWithContext(context.Background(), method, path, nil)
 	}
-	ctx := context.WithValue(r.Context(), "userID", uid)
+	ctx := httpctx.WithUserID(r.Context(), uid)
 
 	return r.WithContext(ctx)
 }

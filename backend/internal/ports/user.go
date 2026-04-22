@@ -6,6 +6,7 @@ import (
 	"github.com/djalben/xplr-core/backend/internal/domain"
 )
 
+//nolint:interfacebloat // Repository contains both read-model and write operations; splitting requires broad refactor.
 type UserRepository interface {
 	GetByID(ctx context.Context, id domain.UUID) (*domain.User, error)
 	GetByEmail(ctx context.Context, email string) (*domain.User, error)

@@ -37,12 +37,14 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	offset := 0
 
 	if s := r.URL.Query().Get("limit"); s != "" {
-		if v, err := strconv.Atoi(s); err == nil {
+		v, err := strconv.Atoi(s)
+		if err == nil {
 			limit = v
 		}
 	}
 	if s := r.URL.Query().Get("offset"); s != "" {
-		if v, err := strconv.Atoi(s); err == nil {
+		v, err := strconv.Atoi(s)
+		if err == nil {
 			offset = v
 		}
 	}
@@ -152,7 +154,8 @@ func (h *Handler) PatchNotifications(w http.ResponseWriter, r *http.Request) {
 		Enabled bool `json:"enabled"`
 	}
 
-	if err := handler.ReadJSON(r, &req); err != nil {
+	err := handler.ReadJSON(r, &req)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 
 		return
@@ -167,7 +170,8 @@ func (h *Handler) PatchNotifications(w http.ResponseWriter, r *http.Request) {
 
 	u.NewsNotificationsEnabled = req.Enabled
 
-	if err := h.userRepo.Update(r.Context(), u); err != nil {
+	err = h.userRepo.Update(r.Context(), u)
+	if err != nil {
 		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
 
 		return

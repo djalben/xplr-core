@@ -7,7 +7,7 @@ type NewsStatus string
 const (
 	NewsDraft     NewsStatus = "draft"
 	NewsPublished NewsStatus = "published"
-	NewsArchived NewsStatus = "archived"
+	NewsArchived  NewsStatus = "archived"
 )
 
 type NewsArticle struct {

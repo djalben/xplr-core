@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/djalben/xplr-core/backend/internal/domain"
+	"github.com/djalben/xplr-core/backend/internal/transport/http/httpctx"
 	"gitlab.com/libs-artifex/wrapper/v2"
 )
 
@@ -32,7 +33,7 @@ func WriteJSON(w http.ResponseWriter, status int, v any) {
 
 // GetUserIDFromContext — заглушка (потом будет из JWT).
 func GetUserIDFromContext(r *http.Request) domain.UUID {
-	userID, ok := r.Context().Value("userID").(domain.UUID)
+	userID, ok := httpctx.UserID(r.Context())
 	if !ok {
 		return domain.UUID{}
 	}

@@ -68,7 +68,6 @@ linters:
     staticcheck:
       checks:
         - all
-        - '-SA1029'
   exclusions:
     generated: lax
     presets:
@@ -90,6 +89,10 @@ linters:
           - paralleltest
       # BFF: контракт JSON для фронта в snake_case.
       - path: internal/transport/http/handler/v1/user/handler\.go$
+        linters:
+          - tagliatelle
+      # Admin handlers: JSON контракт исторически в snake_case (фронт/админка уже на нём).
+      - path: internal/transport/http/handler/admin/.*\.go$
         linters:
           - tagliatelle
       # Имена интерфейсов для gomock осознанно с префиксом пакета.

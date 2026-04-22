@@ -128,7 +128,6 @@ WHERE 1=1`
 	if filter.ProductType != nil && *filter.ProductType != "" {
 		q += fmt.Sprintf(" AND p.product_type = $%d", arg)
 		args = append(args, string(*filter.ProductType))
-		arg++
 	}
 
 	q += " ORDER BY p.sort_order, p.name"

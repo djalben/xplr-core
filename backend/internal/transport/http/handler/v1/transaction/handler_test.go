@@ -10,6 +10,7 @@ import (
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	handlertr "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/transaction"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/transaction/mocks"
+	"github.com/djalben/xplr-core/backend/internal/transport/http/httpctx"
 	"github.com/go-chi/chi/v5"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
@@ -17,7 +18,7 @@ import (
 
 func reqTx(uid domain.UUID, method, path string) *http.Request {
 	r := httptest.NewRequestWithContext(context.Background(), method, path, nil)
-	ctx := context.WithValue(r.Context(), "userID", uid)
+	ctx := httpctx.WithUserID(r.Context(), uid)
 
 	return r.WithContext(ctx)
 }

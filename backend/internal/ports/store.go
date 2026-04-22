@@ -6,6 +6,7 @@ import (
 	"github.com/djalben/xplr-core/backend/internal/domain"
 )
 
+//nolint:interfacebloat // Repository aggregates user+admin store operations; split is a larger refactor.
 type StoreRepository interface {
 	ListCategories(ctx context.Context) ([]*domain.StoreCategory, error)
 	ListProducts(ctx context.Context, filter StoreProductFilter) ([]*domain.StoreProduct, error)

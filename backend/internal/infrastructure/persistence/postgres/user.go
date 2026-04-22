@@ -2,13 +2,23 @@ package postgres
 
 import (
 	"context"
-	"strings"
+	"errors"
 
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	"github.com/djalben/xplr-core/backend/internal/ports"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jmoiron/sqlx"
 	"gitlab.com/libs-artifex/wrapper/v2"
 )
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) {
+		return false
+	}
+
+	return pgErr.Code == "23505"
+}
 
 type userRepo struct {
 	store *sqlx.DB
@@ -160,7 +170,7 @@ func (r *userRepo) Update(ctx context.Context, user *domain.User) error {
 		user.ID,
 	)
 	if err != nil {
-		if strings.Contains(err.Error(), "23505") || strings.Contains(strings.ToLower(err.Error()), "unique") {
+		if isUniqueViolation(err) {
 			return wrapper.Wrap(domain.NewAlreadyExists("telegram chat is already linked to another account"))
 		}
 

@@ -23,7 +23,8 @@ func (h *Handler) RegisterNews(r chi.Router) {
 func (h *Handler) AdminListNews(w http.ResponseWriter, r *http.Request) {
 	limit := 100
 	if s := r.URL.Query().Get("limit"); s != "" {
-		if v, err := strconv.Atoi(s); err == nil {
+		v, err := strconv.Atoi(s)
+		if err == nil {
 			limit = v
 		}
 	}
@@ -79,7 +80,8 @@ func (h *Handler) AdminCreateNews(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt: now,
 	}
 
-	if err := h.newsRepo.Create(r.Context(), a); err != nil {
+	err := h.newsRepo.Create(r.Context(), a)
+	if err != nil {
 		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
 
 		return
@@ -136,7 +138,8 @@ func (h *Handler) AdminUpdateNews(w http.ResponseWriter, r *http.Request) {
 
 	a.UpdatedAt = time.Now().UTC()
 
-	if err := h.newsRepo.Update(r.Context(), a); err != nil {
+	err = h.newsRepo.Update(r.Context(), a)
+	if err != nil {
 		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
 
 		return
@@ -174,7 +177,8 @@ func (h *Handler) AdminPatchNews(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.newsRepo.SetStatus(r.Context(), id, st); err != nil {
+	err := h.newsRepo.SetStatus(r.Context(), id, st)
+	if err != nil {
 		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
 
 		return
@@ -190,7 +194,8 @@ func (h *Handler) AdminDeleteNews(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.newsRepo.Delete(r.Context(), id); err != nil {
+	err := h.newsRepo.Delete(r.Context(), id)
+	if err != nil {
 		http.Error(w, wrapper.Wrap(err).Error(), http.StatusNotFound)
 
 		return

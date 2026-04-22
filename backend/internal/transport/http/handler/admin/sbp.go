@@ -37,7 +37,8 @@ func (h *Handler) PatchSBPTopup(w http.ResponseWriter, r *http.Request) {
 		cfg.Value = domain.NewNumeric(0.0)
 	}
 
-	if err := h.commissionUseCase.Update(r.Context(), cfg); err != nil {
+	err = h.commissionUseCase.Update(r.Context(), cfg)
+	if err != nil {
 		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
 
 		return

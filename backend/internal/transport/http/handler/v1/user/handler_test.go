@@ -13,6 +13,7 @@ import (
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	handleruser "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/user"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/user/mocks"
+	"github.com/djalben/xplr-core/backend/internal/transport/http/httpctx"
 	"github.com/go-chi/chi/v5"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
@@ -26,7 +27,7 @@ func reqUser(uid domain.UUID, method, path string, body *bytes.Buffer) *http.Req
 		r = httptest.NewRequestWithContext(context.Background(), method, path, nil)
 	}
 	if uid != uuid.Nil {
-		ctx := context.WithValue(r.Context(), "userID", uid)
+		ctx := httpctx.WithUserID(r.Context(), uid)
 		r = r.WithContext(ctx)
 	}
 

@@ -399,13 +399,5 @@ func (uc *UseCase) ResendEmailVerification(ctx context.Context, userID domain.UU
 }
 
 func isNoRows(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return true
-	}
-
-	return strings.Contains(strings.ToLower(err.Error()), "no rows")
+	return errors.Is(err, sql.ErrNoRows)
 }

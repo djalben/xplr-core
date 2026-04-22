@@ -448,47 +448,6 @@ func (h *Handler) ChangeUserGrade(w http.ResponseWriter, r *http.Request) {
 	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
-func (h *Handler) adminUserRow(ctx context.Context, u *domain.User) map[string]any {
-	balanceStr := "0"
-
-	wal, err := h.walletRepo.GetByUserID(ctx, u.ID)
-	if err == nil && wal != nil {
-		balanceStr = wal.Balance.String()
-	}
-
-	displayName := u.Email
-
-	if at := strings.Index(u.Email, "@"); at > 0 {
-		displayName = u.Email[:at]
-	}
-
-	role := "user"
-	if u.IsAdmin {
-		role = "admin"
-	}
-
-	tgLinked := u.TelegramChatID != nil && *u.TelegramChatID != 0
-
-	return map[string]any{
-		"id":                 u.ID.String(),
-		"display_name":       displayName,
-		"email":              u.Email,
-		"balance_rub":        balanceStr,
-		"status":             string(u.Status),
-		"is_admin":           u.IsAdmin,
-		"role":               role,
-		"is_verified":        u.EmailVerified,
-		"is_blocked":         u.Status == domain.UserStatusBlocked,
-		"card_count":         0,
-		"wallet_balance":     balanceStr,
-		"is_telegram_linked": tgLinked,
-		"notification_pref":  "both",
-		"created_at":         u.CreatedAt.UTC().Format(time.RFC3339),
-		"tier":               "",
-		"tier_expires_at":    "",
-	}
-}
-
 func adminChiUUID(w http.ResponseWriter, r *http.Request) (domain.UUID, bool) {
 	idStr := chi.URLParam(r, "id")
 
@@ -513,7 +472,7 @@ func adminReadJSON(w http.ResponseWriter, r *http.Request, v any) bool {
 	return true
 }
 
-func adminQueryInt(r *http.Request, name string, def, min, max int) int {
+func adminQueryInt(r *http.Request, name string, def, minVal, maxVal int) int {
 	s := r.URL.Query().Get(name)
 	if s == "" {
 		return def
@@ -524,12 +483,12 @@ func adminQueryInt(r *http.Request, name string, def, min, max int) int {
 		return def
 	}
 
-	if v < min {
-		return min
+	if v < minVal {
+		return minVal
 	}
 
-	if v > max {
-		return max
+	if v > maxVal {
+		return maxVal
 	}
 
 	return v
@@ -588,4 +547,45 @@ func (h *Handler) DecideKYC(w http.ResponseWriter, r *http.Request) {
 	}
 
 	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+func (h *Handler) adminUserRow(ctx context.Context, u *domain.User) map[string]any {
+	balanceStr := "0"
+
+	wal, err := h.walletRepo.GetByUserID(ctx, u.ID)
+	if err == nil && wal != nil {
+		balanceStr = wal.Balance.String()
+	}
+
+	displayName := u.Email
+
+	if at := strings.Index(u.Email, "@"); at > 0 {
+		displayName = u.Email[:at]
+	}
+
+	role := "user"
+	if u.IsAdmin {
+		role = "admin"
+	}
+
+	tgLinked := u.TelegramChatID != nil && *u.TelegramChatID != 0
+
+	return map[string]any{
+		"id":                 u.ID.String(),
+		"display_name":       displayName,
+		"email":              u.Email,
+		"balance_rub":        balanceStr,
+		"status":             string(u.Status),
+		"is_admin":           u.IsAdmin,
+		"role":               role,
+		"is_verified":        u.EmailVerified,
+		"is_blocked":         u.Status == domain.UserStatusBlocked,
+		"card_count":         0,
+		"wallet_balance":     balanceStr,
+		"is_telegram_linked": tgLinked,
+		"notification_pref":  "both",
+		"created_at":         u.CreatedAt.UTC().Format(time.RFC3339),
+		"tier":               "",
+		"tier_expires_at":    "",
+	}
 }

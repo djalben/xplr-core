@@ -16,7 +16,8 @@ func (h *Handler) RegisterLogs(r chi.Router) {
 func (h *Handler) ListAdminLogs(w http.ResponseWriter, r *http.Request) {
 	limit := 50
 	if s := r.URL.Query().Get("limit"); s != "" {
-		if v, err := strconv.Atoi(s); err == nil {
+		v, err := strconv.Atoi(s)
+		if err == nil {
 			limit = v
 		}
 	}

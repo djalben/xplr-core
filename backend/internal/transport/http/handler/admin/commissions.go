@@ -51,6 +51,7 @@ func (h *Handler) PatchCommission(w http.ResponseWriter, r *http.Request) {
 	for _, c := range list {
 		if c.ID == id {
 			cfg = c
+
 			break
 		}
 	}
@@ -63,7 +64,8 @@ func (h *Handler) PatchCommission(w http.ResponseWriter, r *http.Request) {
 	cfg.Value = domain.NewNumeric(req.Value)
 	cfg.UpdatedAt = time.Now().UTC()
 
-	if err := h.commissionUseCase.Update(r.Context(), cfg); err != nil {
+	err = h.commissionUseCase.Update(r.Context(), cfg)
+	if err != nil {
 		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
 
 		return

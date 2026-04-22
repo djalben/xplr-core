@@ -50,7 +50,8 @@ func (h *Handler) PatchSystemSetting(w http.ResponseWriter, r *http.Request) {
 		s.Description = *req.Description
 	}
 
-	if err := h.systemRepo.Upsert(r.Context(), s); err != nil {
+	err := h.systemRepo.Upsert(r.Context(), s)
+	if err != nil {
 		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
 
 		return

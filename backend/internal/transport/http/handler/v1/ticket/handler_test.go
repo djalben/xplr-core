@@ -12,6 +12,7 @@ import (
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	handlerticket "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/ticket"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/ticket/mocks"
+	"github.com/djalben/xplr-core/backend/internal/transport/http/httpctx"
 	"github.com/go-chi/chi/v5"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
@@ -21,7 +22,7 @@ var errTestTicketCloseFail = errors.New("x")
 
 func reqTicket(uid domain.UUID, method, path string, body *bytes.Buffer) *http.Request {
 	r := httptest.NewRequestWithContext(context.Background(), method, path, body)
-	ctx := context.WithValue(r.Context(), "userID", uid)
+	ctx := httpctx.WithUserID(r.Context(), uid)
 
 	return r.WithContext(ctx)
 }
@@ -79,7 +80,7 @@ func TestHandler_Take(t *testing.T) {
 	h := handlerticket.NewHandler(mockUC)
 	rec := httptest.NewRecorder()
 
-	ctx := context.WithValue(context.Background(), "userID", adminID)
+	ctx := httpctx.WithUserID(context.Background(), adminID)
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", ticketID.String())
 	ctx = context.WithValue(ctx, chi.RouteCtxKey, rctx)

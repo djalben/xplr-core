@@ -2,6 +2,8 @@ package user
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"strings"
 	"time"
 
@@ -267,11 +269,7 @@ func (uc *UseCase) LinkTelegram(ctx context.Context, userID domain.UUID, chatID 
 }
 
 func isNoRowsUser(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	return strings.Contains(strings.ToLower(err.Error()), "no rows")
+	return errors.Is(err, sql.ErrNoRows)
 }
 
 // GetReferralInfo — данные реферальной программы.
