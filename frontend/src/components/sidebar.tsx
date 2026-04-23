@@ -170,6 +170,14 @@ const StaffPinModal = ({ open, onClose }: { open: boolean; onClose: () => void }
     }
 
     const payload = { type: 'xplr_admin_grant' as const };
+    const bc = new BroadcastChannel('xplr_admin');
+    try {
+      bc.postMessage(payload);
+    } catch {
+      // ignore
+    } finally {
+      bc.close();
+    }
 
     // Try immediate postMessage; if the page isn't ready yet, retry a few times.
     let triesLeft = 10;

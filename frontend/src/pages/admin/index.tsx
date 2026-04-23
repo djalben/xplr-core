@@ -1,6 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
-import { DashboardLayout } from '../../components/dashboard-layout';
+import { AdminLayout } from '../../components/admin-layout';
 import { AdminDashboardPage } from './dashboard';
 import { AdminUsersPage } from './users';
 import { AdminTicketsPage } from './tickets';
@@ -34,7 +34,7 @@ const Placeholder = ({ title }: { title: string }) => (
 
 export const AdminApp: React.FC = () => {
   return (
-    <DashboardLayout>
+    <AdminLayout>
       <div className="stagger-fade-in space-y-6">
         <div className="flex flex-wrap gap-2">
           <NavLink to="/admin/dashboard" label="Dashboard" />
@@ -60,7 +60,7 @@ export const AdminApp: React.FC = () => {
           <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
         </Routes>
       </div>
-    </DashboardLayout>
+    </AdminLayout>
   );
 };
 

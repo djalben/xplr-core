@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../store/auth-context';
-import { DashboardLayout } from '../../components/dashboard-layout';
+import { AdminLayout } from '../../components/admin-layout';
 import { Shield, Loader2 } from 'lucide-react';
 
 type GrantMessage = {
@@ -21,23 +21,36 @@ export const AdminEntryPage = () => {
       return;
     }
 
-    const onMessage = (event: MessageEvent) => {
-      if (event.origin !== origin) return;
-      if (event.source !== window.opener) return;
-
-      const data = event.data as Partial<GrantMessage> | null;
-      if (!data || data.type !== 'xplr_admin_grant') return;
-
+    const grant = () => {
       sessionStorage.setItem('_xplr_staff', 'granted');
       navigate('/admin/dashboard', { replace: true });
     };
 
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== origin) return;
+      const data = event.data as Partial<GrantMessage> | null;
+      if (!data || data.type !== 'xplr_admin_grant') return;
+      grant();
+    };
+
+    const bc = new BroadcastChannel('xplr_admin');
+    const onBC = (event: MessageEvent) => {
+      const data = event.data as Partial<GrantMessage> | null;
+      if (!data || data.type !== 'xplr_admin_grant') return;
+      grant();
+    };
+
+    bc.addEventListener('message', onBC);
     window.addEventListener('message', onMessage);
-    return () => window.removeEventListener('message', onMessage);
+    return () => {
+      bc.removeEventListener('message', onBC);
+      bc.close();
+      window.removeEventListener('message', onMessage);
+    };
   }, [authReady, isAdmin, navigate, origin]);
 
   return (
-    <DashboardLayout>
+    <AdminLayout>
       <div className="stagger-fade-in max-w-xl">
         <div className="flex items-center gap-4 mb-6">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/30 flex items-center justify-center">
@@ -54,7 +67,7 @@ export const AdminEntryPage = () => {
           <span className="text-sm">Пожалуйста, не закрывайте вкладку — выполняется вход.</span>
         </div>
       </div>
-    </DashboardLayout>
+    </AdminLayout>
   );
 };
 
