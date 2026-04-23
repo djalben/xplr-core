@@ -38,13 +38,13 @@ export const AdminApp: React.FC = () => {
       <div className="stagger-fade-in space-y-6">
         <div className="flex flex-wrap gap-2">
           <NavLink to="/admin/dashboard" label="Dashboard" />
-          <NavLink to="/admin/news" label="Новости" />
-          <NavLink to="/admin/store" label="Магазин" />
-          <NavLink to="/admin/commissions" label="Комиссии" />
-          <NavLink to="/admin/system-settings" label="System settings" />
-          <NavLink to="/admin/logs" label="Логи" />
-          <NavLink to="/admin/tickets" label="Тикеты" />
           <NavLink to="/admin/users" label="Пользователи" />
+          <NavLink to="/admin/tickets" label="Тикеты" />
+          <NavLink to="/admin/commissions" label="Комиссии" />
+          <NavLink to="/admin/system-settings" label="Системные настройки" />
+          <NavLink to="/admin/store" label="Магазин" />
+          <NavLink to="/admin/news" label="Новости" />
+          <NavLink to="/admin/logs" label="Логи" />
         </div>
 
         <Routes>

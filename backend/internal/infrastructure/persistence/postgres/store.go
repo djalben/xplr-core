@@ -175,6 +175,43 @@ WHERE product_type = $2`
 	return n, nil
 }
 
+func (r *storeRepo) AdminListVPNOrders(ctx context.Context, limit int) ([]*domain.AdminVPNOrderRow, error) {
+	if limit <= 0 || limit > 5000 {
+		limit = 1000
+	}
+
+	const q = `SELECT u.email,
+       o.product_name,
+       o.price_usd::float8 AS price_usd,
+       o.created_at,
+       COALESCE(o.provider_ref, '') AS provider_ref,
+       COALESCE(o.activation_key, '') AS activation_key,
+       COALESCE(o.meta, '{}') AS meta
+FROM store_orders o
+JOIN users u ON u.id = o.user_id
+WHERE o.status = 'COMPLETED'
+  AND o.provider_ref <> ''
+  AND (
+    o.product_name ILIKE '%VPN%'
+    OR o.provider_ref ILIKE 'xplr-%'
+    OR o.provider_ref ILIKE 'vless%'
+  )
+  AND o.status <> 'DELETED'
+ORDER BY o.created_at DESC
+LIMIT $1`
+
+	var out []*domain.AdminVPNOrderRow
+	err := r.db.SelectContext(ctx, &out, q, limit)
+	if err != nil {
+		return nil, wrapper.Wrap(err)
+	}
+	if out == nil {
+		out = []*domain.AdminVPNOrderRow{}
+	}
+
+	return out, nil
+}
+
 func (r *storeRepo) GetProductByID(ctx context.Context, id domain.UUID) (*domain.StoreProduct, error) {
 	const q = `SELECT p.id,
        p.category_id,

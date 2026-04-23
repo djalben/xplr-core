@@ -5,6 +5,7 @@ import "time"
 type SystemSetting struct {
 	Key         string    `json:"key" db:"setting_key"`
 	Value       string    `json:"value" db:"setting_value"`
+	BoolValue   *bool     `json:"boolValue,omitempty" db:"setting_bool"`
 	Description string    `json:"description" db:"description"`
 	UpdatedAt   time.Time `json:"updatedAt" db:"updated_at"`
 }

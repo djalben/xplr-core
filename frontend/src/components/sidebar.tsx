@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import apiClient from '../services/axios';
 import { useRates } from '../store/rates-context';
 import { useAuth } from '../store/auth-context';
 import {
@@ -16,6 +17,7 @@ import {
   Bell,
   DollarSign,
   HelpCircle,
+  Lock,
   Newspaper,
   ShoppingBag
 } from 'lucide-react';
@@ -151,10 +153,108 @@ const BottomNavItem = ({ href, icon, label, isActive, badge }: { href: string; i
   </Link>
 );
 
+// ── Staff PIN Modal ──
+const StaffPinModal = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  if (!open) return null;
+
+  const openAdminInNewTab = () => {
+    const w = window.open('/admin/entry', '_blank', 'noopener,noreferrer');
+    if (!w) {
+      // Popup blocked; fall back to same-tab navigation.
+      window.location.assign('/admin/entry');
+      return;
+    }
+
+    const payload = { type: 'xplr_admin_grant' as const };
+
+    // Try immediate postMessage; if the page isn't ready yet, retry a few times.
+    let triesLeft = 10;
+    const interval = window.setInterval(() => {
+      try {
+        w.postMessage(payload, window.location.origin);
+      } catch {
+        // ignore
+      }
+      triesLeft -= 1;
+      if (triesLeft <= 0) {
+        window.clearInterval(interval);
+      }
+    }, 150);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(false);
+    try {
+      const res = await apiClient.post('/verify-staff-pin', { pin });
+      if (res.data?.access === 'granted') {
+        setPin('');
+        onClose();
+        openAdminInNewTab();
+      } else {
+        setError(true);
+        setPin('');
+      }
+    } catch {
+      setError(true);
+      setPin('');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
+      <form
+        onSubmit={handleSubmit}
+        onClick={e => e.stopPropagation()}
+        className="glass-card p-6 w-full max-w-xs mx-4 space-y-4"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-purple-600 flex items-center justify-center">
+            <Lock className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-white">Staff Access</p>
+            <p className="text-xs text-slate-500">Enter PIN to continue</p>
+          </div>
+        </div>
+        <input
+          type="password"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={4}
+          value={pin}
+          onChange={e => { setPin(e.target.value); setError(false); }}
+          placeholder="PIN"
+          autoFocus
+          className={`w-full px-4 py-3 bg-white/5 border rounded-xl text-white text-center text-lg tracking-[0.3em] font-mono placeholder-slate-600 outline-none transition-colors ${
+            error ? 'border-red-500/60 shake' : 'border-white/10 focus:border-blue-500/50'
+          }`}
+        />
+        {error && <p className="text-xs text-red-400 text-center">Invalid PIN</p>}
+        <button
+          type="submit"
+          disabled={loading || pin.length !== 4}
+          className="w-full py-2.5 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-60"
+        >
+          {loading ? '...' : 'Authenticate'}
+        </button>
+      </form>
+    </div>
+  );
+};
+
 export const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [staffModalOpen, setStaffModalOpen] = useState(false);
   const [unreadNews, setUnreadNews] = useState(0);
   const { isAdmin } = useAuth();
 
@@ -178,8 +278,8 @@ export const Sidebar = () => {
   }, [location.pathname]);
 
   const handleLogoTripleClick = useCallback(() => {
-    if (isAdmin) navigate('/admin/dashboard');
-  }, [isAdmin, navigate]);
+    if (isAdmin) setStaffModalOpen(true);
+  }, [isAdmin]);
 
   const navItems = [
     { href: '/dashboard', icon: <LayoutDashboard className="w-5 h-5" />, label: t('nav.home'), badge: 0 },
@@ -284,6 +384,8 @@ export const Sidebar = () => {
         </div>
       </nav>
 
+      {/* Staff PIN Modal */}
+      <StaffPinModal open={staffModalOpen} onClose={() => setStaffModalOpen(false)} />
     </>
   );
 };

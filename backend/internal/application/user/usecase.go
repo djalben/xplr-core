@@ -19,6 +19,33 @@ type UseCase struct {
 	gradeRepo      ports.GradeRepository
 	referralRepo   ports.ReferralRepository
 	commissionRepo ports.CommissionConfigRepository
+	systemRepo     ports.SystemSettingsRepository
+}
+
+func sbpTopupEnabled(ctx context.Context, repo ports.SystemSettingsRepository) (bool, error) {
+	list, err := repo.ListAll(ctx)
+	if err != nil {
+		return true, wrapper.Wrap(err)
+	}
+
+	for _, row := range list {
+		if row == nil {
+			continue
+		}
+		if row.Key == "sbp_topup_enabled" {
+			if row.BoolValue != nil {
+				return *row.BoolValue, nil
+			}
+			v := strings.TrimSpace(strings.ToLower(row.Value))
+			if v == "0" || v == "false" || v == "off" {
+				return false, nil
+			}
+
+			return true, nil
+		}
+	}
+
+	return true, nil
 }
 
 func NewUseCase(
@@ -27,6 +54,7 @@ func NewUseCase(
 	gradeRepo ports.GradeRepository,
 	referralRepo ports.ReferralRepository,
 	commissionRepo ports.CommissionConfigRepository,
+	systemRepo ports.SystemSettingsRepository,
 ) *UseCase {
 	return &UseCase{
 		userRepo:       userRepo,
@@ -34,6 +62,7 @@ func NewUseCase(
 		gradeRepo:      gradeRepo,
 		referralRepo:   referralRepo,
 		commissionRepo: commissionRepo,
+		systemRepo:     systemRepo,
 	}
 }
 
@@ -68,9 +97,9 @@ func (uc *UseCase) GetMe(ctx context.Context, userID domain.UUID) (map[string]an
 	sbpEnabled := true
 	sbpMessage := ""
 
-	if uc.commissionRepo != nil {
-		cfg, err := uc.commissionRepo.GetByKey(ctx, "sbp_topup_enabled")
-		if err == nil && cfg.Value.LessThan(domain.NewNumeric(0.5)) {
+	if uc.systemRepo != nil {
+		enabled, err := sbpTopupEnabled(ctx, uc.systemRepo)
+		if err == nil && !enabled {
 			sbpEnabled = false
 			sbpMessage = "Пополнение через СБП временно недоступно. Выберите другой способ или попробуйте позже."
 		}

@@ -7,9 +7,36 @@ VALUES
     ('fee_standard',      6.70,   'Комиссия для грейда STANDARD (%)'),
     ('fee_gold',          4.50,   'Комиссия для грейда GOLD (%)'),
     ('referral_percent',  5.00,   'Реферальная комиссия (%)'),
-    ('card_issue_fee',    2.00,   'Стоимость выпуска виртуальной карты ($)'),
-    ('sbp_topup_enabled', 1.0000, '1 = пополнение через СБП включено, 0 = отключено')
+    ('card_issue_fee',    2.00,   'Стоимость выпуска виртуальной карты ($)')
 ON CONFLICT (key) DO NOTHING;
+
+-- Seed: PIN для входа в админку (по умолчанию 0000).
+-- Хранится в system_settings; бэкенд поддерживает как plain (0000), так и bcrypt-хэш.
+INSERT INTO system_settings (setting_key, setting_value, setting_bool, description, updated_at)
+VALUES
+    ('admin_pin', '0000', NULL, 'PIN для входа в админку (4 цифры). Можно хранить как plain или bcrypt-хэш.', NOW()),
+    ('sbp_topup_enabled', '', TRUE, 'Пополнение через СБП включено/отключено (boolean).', NOW())
+ON CONFLICT (setting_key) DO NOTHING;
+
+-- Seed: VPN infra defaults (for Admin Dashboard block; 1:1 with main UI).
+INSERT INTO system_settings (setting_key, setting_value, setting_bool, description, updated_at)
+VALUES
+    ('vpn_server_limit_gb', '30', NULL, 'Лимит трафика VPN-сервера (ГБ).', NOW()),
+    ('vpn_server_cost_eur', '4.94', NULL, 'Стоимость сервера в EUR (для расчёта маржи).', NOW()),
+    ('vpn_server_id', '0', NULL, 'ID сервера у хостера (Aeza). 0 = не настроено.', NOW()),
+    ('vpn_server_name', 'VPN-сервер', NULL, 'Имя VPN-сервера (админка).', NOW()),
+    ('vpn_server_status', 'active', NULL, 'Статус сервера (админка).', NOW()),
+    ('vpn_server_ip', '', NULL, 'IP VPN-сервера.', NOW()),
+    ('vpn_server_expires_at', '', NULL, 'Дата окончания оплаты (RFC3339).', NOW()),
+    ('vpn_server_cpu', '1', NULL, 'vCPU', NOW()),
+    ('vpn_server_ram_mb', '2048', NULL, 'RAM в МБ', NOW()),
+    ('vpn_server_disk_gb', '30', NULL, 'Диск в ГБ', NOW()),
+    ('vpn_server_disk_type', 'SSD', NULL, 'Тип диска', NOW()),
+    ('vpn_server_os', '', NULL, 'OS', NOW()),
+    ('vpn_server_location', '', NULL, 'Локация', NOW()),
+    ('aeza_balance', '0', NULL, 'Баланс Aeza (если интеграция подключена).', NOW()),
+    ('aeza_currency', 'EUR', NULL, 'Валюта баланса Aeza.', NOW())
+ON CONFLICT (setting_key) DO NOTHING;
 
 -- Seed: категории магазина.
 INSERT INTO store_categories (slug, name, description, icon, sort_order)
@@ -68,6 +95,6 @@ DELETE FROM store_categories
 WHERE slug IN ('esim', 'digital', 'vpn');
 
 DELETE FROM commission_config
-WHERE key IN ('fee_standard', 'fee_gold', 'referral_percent', 'card_issue_fee', 'sbp_topup_enabled');
+WHERE key IN ('fee_standard', 'fee_gold', 'referral_percent', 'card_issue_fee');
 
 -- +goose StatementEnd

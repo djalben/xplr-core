@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import apiClient from '../../services/axios';
-import { Loader2, RefreshCw, Save, ToggleLeft, ToggleRight, AlertTriangle } from 'lucide-react';
+import { Loader2, RefreshCw, Save } from 'lucide-react';
 
 type CommissionRow = {
   id: string;
@@ -10,10 +10,18 @@ type CommissionRow = {
   updatedAt?: string;
 };
 
+type ExchangeRateRow = {
+  id: string;
+  currency_from: string;
+  currency_to: string;
+  base_rate: string;
+  markup_percent: string;
+  final_rate: string;
+  updated_at?: string;
+};
+
 const keyLabel = (key: string) => {
   switch (key) {
-    case 'sbp_topup_enabled':
-      return 'СБП пополнение (0/1)';
     case 'fee_standard':
       return 'Комиссия STANDARD (%)';
     case 'fee_gold':
@@ -34,13 +42,14 @@ export const AdminCommissionsPage = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [valueDraft, setValueDraft] = useState('');
   const [saving, setSaving] = useState(false);
-  const [sbpLoading, setSbpLoading] = useState(false);
 
-  const sbp = useMemo(() => rows.find((r) => r.key === 'sbp_topup_enabled') || null, [rows]);
-  const sbpEnabled = useMemo(() => {
-    if (!sbp) return null;
-    return !(parseFloat(sbp.value) < 0.5);
-  }, [sbp]);
+  const [rates, setRates] = useState<ExchangeRateRow[]>([]);
+  const [ratesLoading, setRatesLoading] = useState(false);
+  const [ratesError, setRatesError] = useState('');
+  const [editingPair, setEditingPair] = useState<string | null>(null);
+  const [rateDraft, setRateDraft] = useState({ base: '', markup: '' });
+  const [rateSaving, setRateSaving] = useState(false);
+  const [rateSaved, setRateSaved] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -56,8 +65,23 @@ export const AdminCommissionsPage = () => {
     }
   }, []);
 
+  const loadRates = useCallback(async () => {
+    setRatesLoading(true);
+    setRatesError('');
+    try {
+      const res = await apiClient.get<ExchangeRateRow[]>('/admin/exchange-rates');
+      setRates(res.data || []);
+    } catch {
+      setRatesError('Не удалось загрузить курсы валют');
+      setRates([]);
+    } finally {
+      setRatesLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     load();
+    loadRates();
   }, [load]);
 
   const startEdit = (r: CommissionRow) => {
@@ -92,18 +116,46 @@ export const AdminCommissionsPage = () => {
     }
   };
 
-  const toggleSBP = async () => {
-    if (sbpEnabled === null) return;
-    const next = !sbpEnabled;
-    setSbpLoading(true);
-    setError('');
+  const startEditRate = (r: ExchangeRateRow) => {
+    const key = `${r.currency_from}/${r.currency_to}`;
+    setEditingPair(key);
+    setRateDraft({ base: String(r.base_rate ?? ''), markup: String(r.markup_percent ?? '0') });
+    setRatesError('');
+  };
+
+  const cancelEditRate = () => {
+    setEditingPair(null);
+    setRateDraft({ base: '', markup: '' });
+  };
+
+  const saveRate = async () => {
+    if (!editingPair) return;
+    const [currency_from, currency_to] = editingPair.split('/');
+    const base = parseFloat(rateDraft.base);
+    const markup = parseFloat(rateDraft.markup || '0');
+
+    if (!Number.isFinite(base) || base <= 0) {
+      setRatesError('Введите корректный base rate');
+      return;
+    }
+    if (!Number.isFinite(markup)) {
+      setRatesError('Введите корректный markup');
+      return;
+    }
+
+    setRateSaving(true);
+    setRatesError('');
     try {
-      await apiClient.patch('/admin/sbp-topup', { enabled: next });
-      await load();
+      await apiClient.patch('/admin/exchange-rates', { currency_from, currency_to, base_rate: base, markup_percent: markup });
+      setEditingPair(null);
+      setRateDraft({ base: '', markup: '' });
+      await loadRates();
+      setRateSaved(true);
+      window.setTimeout(() => setRateSaved(false), 2500);
     } catch {
-      setError('Не удалось переключить СБП');
+      setRatesError('Не удалось сохранить курс');
     } finally {
-      setSbpLoading(false);
+      setRateSaving(false);
     }
   };
 
@@ -112,11 +164,11 @@ export const AdminCommissionsPage = () => {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-white">Комиссии</h1>
-          <p className="text-sm text-slate-400 mt-1">Настройки комиссий и сервисных флагов</p>
+          <p className="text-sm text-slate-400 mt-1">Комиссии и внутренние курсы валют</p>
         </div>
         <button
-          onClick={load}
-          disabled={loading}
+          onClick={() => { load(); loadRates(); }}
+          disabled={loading || ratesLoading}
           className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
         >
           <RefreshCw className="w-4 h-4" />
@@ -127,26 +179,109 @@ export const AdminCommissionsPage = () => {
       <div className="glass-card p-6">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <p className="text-white font-semibold">Пополнение через СБП</p>
-            <p className="text-sm text-slate-400 mt-1">
-              Быстрое глобальное включение/выключение. Сейчас:{' '}
-              <span className="text-slate-200">{sbpEnabled === null ? '—' : sbpEnabled ? 'включено' : 'выключено'}</span>
-            </p>
+            <p className="text-white font-semibold">Курсы валют</p>
+            <p className="text-sm text-slate-400 mt-1">Внутренний курс = наша комиссия</p>
           </div>
-          <button
-            onClick={toggleSBP}
-            disabled={sbpEnabled === null || sbpLoading}
-            className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
-          >
-            {sbpEnabled ? <ToggleRight className="w-5 h-5 text-emerald-400" /> : <ToggleLeft className="w-5 h-5 text-slate-400" />}
-            {sbpLoading ? '...' : sbpEnabled ? 'Выключить' : 'Включить'}
-          </button>
+          {rateSaved ? <span className="text-sm text-emerald-400">Сохранено</span> : null}
         </div>
-        <div className="mt-4 flex items-start gap-2 text-xs text-slate-500">
-          <AlertTriangle className="w-4 h-4 shrink-0 text-slate-600" />
-          <p>
-            Это меняет ключ <span className="font-mono">sbp_topup_enabled</span> в <span className="font-mono">commission_config</span> (1/0).
-          </p>
+
+        {ratesError ? <p className="text-sm text-red-400 mt-3">{ratesError}</p> : null}
+
+        <div className="mt-4 overflow-x-auto">
+          <table className="min-w-[920px] w-full text-left">
+            <thead>
+              <tr className="text-xs text-slate-500">
+                <th className="py-3 px-2 font-semibold">Пара</th>
+                <th className="py-3 px-2 font-semibold">Base rate</th>
+                <th className="py-3 px-2 font-semibold">Markup (%)</th>
+                <th className="py-3 px-2 font-semibold">Final rate</th>
+                <th className="py-3 px-2 font-semibold text-right">Действия</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ratesLoading ? (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-slate-400">
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Загрузка...
+                    </span>
+                  </td>
+                </tr>
+              ) : rates.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-10 text-center text-slate-500">Пусто</td>
+                </tr>
+              ) : (
+                rates.map((r) => {
+                  const key = `${r.currency_from}/${r.currency_to}`;
+                  const isEditing = editingPair === key;
+                  return (
+                    <tr key={r.id || key} className="border-t border-white/5 hover:bg-white/[0.03] transition-colors">
+                      <td className="py-3 px-2 text-sm text-slate-200 font-semibold">
+                        <div className="font-mono text-xs text-slate-500">{r.currency_from}→{r.currency_to}</div>
+                        {key}
+                      </td>
+                      <td className="py-3 px-2">
+                        {isEditing ? (
+                          <input
+                            value={rateDraft.base}
+                            onChange={(e) => setRateDraft((x) => ({ ...x, base: e.target.value }))}
+                            className="w-40 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 outline-none focus:border-blue-500/40 font-mono"
+                          />
+                        ) : (
+                          <span className="text-sm text-slate-200 font-mono">{r.base_rate}</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-2">
+                        {isEditing ? (
+                          <input
+                            value={rateDraft.markup}
+                            onChange={(e) => setRateDraft((x) => ({ ...x, markup: e.target.value }))}
+                            className="w-40 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 outline-none focus:border-blue-500/40 font-mono"
+                          />
+                        ) : (
+                          <span className="text-sm text-slate-200 font-mono">{r.markup_percent}</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-2">
+                        <span className="text-sm text-slate-200 font-mono">{r.final_rate}</span>
+                      </td>
+                      <td className="py-3 px-2">
+                        <div className="flex justify-end gap-2">
+                          {isEditing ? (
+                            <>
+                              <button
+                                onClick={saveRate}
+                                disabled={rateSaving}
+                                className="px-3 py-2 rounded-xl bg-blue-500/20 hover:bg-blue-500/25 border border-blue-500/30 text-blue-200 text-xs font-semibold transition-colors disabled:opacity-50 inline-flex items-center gap-2"
+                              >
+                                <Save className="w-4 h-4" />
+                                {rateSaving ? '...' : 'Сохранить'}
+                              </button>
+                              <button
+                                onClick={cancelEditRate}
+                                disabled={rateSaving}
+                                className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-xs font-semibold transition-colors disabled:opacity-50"
+                              >
+                                Отмена
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => startEditRate(r)}
+                              className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-xs font-semibold transition-colors inline-flex items-center gap-2"
+                            >
+                              Редактировать
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 

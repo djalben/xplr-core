@@ -168,6 +168,161 @@ func (v *VlessXPanelProvider) GetClientTraffic(ctx context.Context, providerRef 
 	}, nil
 }
 
+type inboundClient struct {
+	ID         string `json:"id"`
+	Flow       string `json:"flow"`
+	Email      string `json:"email"`
+	LimitIP    int    `json:"limitIp"`
+	Total      int64  `json:"total"`
+	ExpiryTime int64  `json:"expiryTime"`
+	Enable     bool   `json:"enable"`
+	TGID       string `json:"tgId"`
+	SubID      string `json:"subId"`
+}
+
+func (v *VlessXPanelProvider) DeleteClientByEmail(ctx context.Context, email string) error {
+	if !v.Enabled() {
+		return wrapper.Wrap(domain.NewInvalidInput("vpn provider is not configured"))
+	}
+	email = strings.TrimSpace(email)
+	if email == "" {
+		return wrapper.Wrap(domain.NewInvalidInput("email is required"))
+	}
+
+	// 3x-ui: POST /{id}/delClientByEmail/{email}
+	path := fmt.Sprintf("%s/%d/delClientByEmail/%s", v.writeAPI(), v.cfg.InboundID, url.PathEscape(email))
+	resp, err := v.doAPIRequest(ctx, http.MethodPost, path, url.Values{})
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	var result struct {
+		Success bool   `json:"success"`
+		Msg     string `json:"msg"`
+	}
+	err = json.Unmarshal(body, &result)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+	if !result.Success {
+		return wrapper.Wrap(domain.NewInvalidInput("xpanel delClientByEmail failed"))
+	}
+
+	return nil
+}
+
+func (v *VlessXPanelProvider) UpdateClientByEmail(ctx context.Context, email string, totalBytes *int64, expiryMs *int64) error {
+	if !v.Enabled() {
+		return wrapper.Wrap(domain.NewInvalidInput("vpn provider is not configured"))
+	}
+	email = strings.TrimSpace(email)
+	if email == "" {
+		return wrapper.Wrap(domain.NewInvalidInput("email is required"))
+	}
+	if totalBytes == nil && expiryMs == nil {
+		return wrapper.Wrap(domain.NewInvalidInput("nothing to update"))
+	}
+
+	client, err := v.getClientByEmail(ctx, email)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+	if client == nil {
+		return wrapper.Wrap(domain.NewNotFound("vpn client not found"))
+	}
+
+	if totalBytes != nil {
+		client.Total = *totalBytes
+	}
+	if expiryMs != nil {
+		client.ExpiryTime = *expiryMs
+	}
+
+	settingsJSON, err := json.Marshal([]inboundClient{*client})
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	form := url.Values{}
+	form.Set("id", strconv.Itoa(v.cfg.InboundID))
+	form.Set("settings", fmt.Sprintf(`{"clients":%s}`, string(settingsJSON)))
+
+	// 3x-ui: POST /updateClient/{clientId}
+	path := v.writeAPI() + "/updateClient/" + url.PathEscape(client.ID)
+	resp, err := v.doAPIRequest(ctx, http.MethodPost, path, form)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	var result struct {
+		Success bool   `json:"success"`
+		Msg     string `json:"msg"`
+	}
+	err = json.Unmarshal(body, &result)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+	if !result.Success {
+		return wrapper.Wrap(domain.NewInvalidInput("xpanel updateClient failed"))
+	}
+
+	return nil
+}
+
+func (v *VlessXPanelProvider) getClientByEmail(ctx context.Context, email string) (*inboundClient, error) {
+	type inboundObj struct {
+		ID       int    `json:"id"`
+		Settings string `json:"settings"`
+	}
+	var result struct {
+		Success bool        `json:"success"`
+		Obj     *inboundObj `json:"obj"`
+		Msg     string      `json:"msg"`
+	}
+
+	path := fmt.Sprintf("%s/get/%d", v.writeAPI(), v.cfg.InboundID)
+	resp, err := v.doAPIRequest(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, wrapper.Wrap(err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	err = json.Unmarshal(body, &result)
+	if err != nil {
+		return nil, wrapper.Wrap(err)
+	}
+	if !result.Success || result.Obj == nil {
+		return nil, wrapper.Wrap(domain.NewNotFound("xpanel inbound not found"))
+	}
+
+	var settings struct {
+		Clients []inboundClient `json:"clients"`
+	}
+	err = json.Unmarshal([]byte(result.Obj.Settings), &settings)
+	if err != nil {
+		return nil, wrapper.Wrap(err)
+	}
+
+	for i := range settings.Clients {
+		c := settings.Clients[i]
+		if strings.EqualFold(c.Email, email) {
+			// Fill defaults the panel expects.
+			if c.Flow == "" {
+				c.Flow = v.cfg.Flow
+			}
+
+			return &c, nil
+		}
+	}
+
+	return nil, wrapper.Wrap(domain.NewNotFound("vpn client not found"))
+}
+
 func (v *VlessXPanelProvider) addClient(ctx context.Context, clientUUID string, email string, expiryMs int64, totalBytes int64) error {
 	clientSettings := []map[string]any{
 		{

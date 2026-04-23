@@ -12,7 +12,6 @@ import { ReferralsPage } from './pages/referrals';
 import { SettingsPage } from './pages/settings';
 import { SupportPage } from './pages/support';
 import { LandingPage } from './pages/landing';
-import { AdminRatesPage } from './pages/admin-rates';
 import { ForgotPasswordPage } from './pages/forgot-password';
 import { ResetPasswordPage } from './pages/reset-password';
 import { NewsPage } from './pages/news';
@@ -22,6 +21,7 @@ import { PWAInstallPrompt } from './components/pwa-install-prompt';
 import { NeuralBackground } from './components/neural-background';
 import { useAuth } from './store/auth-context';
 import { AdminApp } from './pages/admin';
+import { AdminEntryPage } from './pages/admin/entry';
 
 interface GuardProps {
   children: React.ReactNode;
@@ -41,12 +41,16 @@ const AdminRoute: React.FC<GuardProps> = ({ children }) => {
     return <Navigate to="/auth" replace />;
   }
   const { isAdmin, authReady, user } = useAuth();
+  const hasAccess = sessionStorage.getItem('_xplr_staff') === 'granted';
 
   if (!authReady) {
     return null;
   }
 
   if (!isAdmin) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  if (!hasAccess) {
     return <Navigate to="/dashboard" replace />;
   }
   return <>{children}</>;
@@ -86,7 +90,7 @@ function App() {
         <Route path="/news" element={<ProtectedRoute><NewsPage /></ProtectedRoute>} />
         <Route path="/store" element={<ProtectedRoute><StorePage /></ProtectedRoute>} />
         <Route path="/purchases" element={<ProtectedRoute><PurchasesPage /></ProtectedRoute>} />
-        <Route path="/admin/rates" element={<ProtectedRoute><AdminRatesPage /></ProtectedRoute>} />
+        <Route path="/admin/entry" element={<ProtectedRoute><AdminEntryPage /></ProtectedRoute>} />
         {/* Admin area (separate pages) */}
         <Route path="/admin/*" element={<AdminRoute><AdminApp /></AdminRoute>} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

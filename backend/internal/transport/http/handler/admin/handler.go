@@ -31,6 +31,9 @@ type Handler struct {
 	systemRepo        ports.SystemSettingsRepository
 	adminLogsRepo     ports.AdminLogsRepository
 	storeRepo         ports.StoreRepository
+	adminDashRepo     ports.AdminDashboardRepository
+	exchangeRateRepo  ports.ExchangeRateRepository
+	vpnAdminProvider  ports.VPNAdminProvider
 }
 
 func NewHandler(
@@ -45,6 +48,9 @@ func NewHandler(
 	systemRepo ports.SystemSettingsRepository,
 	adminLogsRepo ports.AdminLogsRepository,
 	storeRepo ports.StoreRepository,
+	adminDashRepo ports.AdminDashboardRepository,
+	exchangeRateRepo ports.ExchangeRateRepository,
+	vpnAdminProvider ports.VPNAdminProvider,
 ) *Handler {
 	return &Handler{
 		cardUseCase:       cardUC,
@@ -58,14 +64,21 @@ func NewHandler(
 		systemRepo:        systemRepo,
 		adminLogsRepo:     adminLogsRepo,
 		storeRepo:         storeRepo,
+		adminDashRepo:     adminDashRepo,
+		exchangeRateRepo:  exchangeRateRepo,
+		vpnAdminProvider:  vpnAdminProvider,
 	}
 }
 
 func (h *Handler) Register(r chi.Router) {
+	r.Get("/dashboard-stats", h.GetDashboardStats)
+	h.RegisterInfra(r)
 	r.Post("/tariffs", h.ChangeTariffs)
 	r.Post("/referrals", h.ChangeReferralBonuses)
+	h.RegisterStaffPIN(r)
 	h.RegisterSBP(r)
 	h.RegisterCommissions(r)
+	h.RegisterExchangeRates(r)
 	h.RegisterTickets(r)
 	h.RegisterSystemSettings(r)
 	h.RegisterLogs(r)
@@ -87,6 +100,17 @@ func (h *Handler) Register(r chi.Router) {
 	r.Put("/kyc-applications/{id}/decision", h.DecideKYC)
 
 	h.RegisterNews(r)
+}
+
+func (h *Handler) GetDashboardStats(w http.ResponseWriter, r *http.Request) {
+	stats, err := h.adminDashRepo.GetStats(r.Context())
+	if err != nil {
+		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+
+		return
+	}
+
+	handler.WriteJSON(w, http.StatusOK, stats)
 }
 
 // ChangeTariffs — POST /admin/tariffs.

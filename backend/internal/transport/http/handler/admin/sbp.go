@@ -14,7 +14,7 @@ func (h *Handler) RegisterSBP(r chi.Router) {
 }
 
 // PatchSBPTopup — PATCH /admin/sbp-topup { enabled: bool }.
-// Управляет commission_config.sbp_topup_enabled: 1.0 (enabled) / 0.0 (disabled).
+// Управляет system_settings.sbp_topup_enabled (setting_bool).
 func (h *Handler) PatchSBPTopup(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Enabled bool `json:"enabled"`
@@ -24,22 +24,16 @@ func (h *Handler) PatchSBPTopup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cfg, err := h.commissionUseCase.GetByKey(r.Context(), "sbp_topup_enabled")
+	row := &domain.SystemSetting{
+		Key:         "sbp_topup_enabled",
+		Value:       "",
+		BoolValue:   &req.Enabled,
+		Description: "Пополнение через СБП включено/отключено (boolean).",
+	}
+
+	err := h.systemRepo.Upsert(r.Context(), row)
 	if err != nil {
 		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
-
-		return
-	}
-
-	if req.Enabled {
-		cfg.Value = domain.NewNumeric(1.0)
-	} else {
-		cfg.Value = domain.NewNumeric(0.0)
-	}
-
-	err = h.commissionUseCase.Update(r.Context(), cfg)
-	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
 
 		return
 	}

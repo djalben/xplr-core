@@ -26,19 +26,21 @@ import (
 type Container struct {
 	DB *sqlx.DB
 
-	WalletRepo      ports.WalletRepository
-	CardRepo        ports.CardRepository
-	TransactionRepo ports.TransactionRepository
-	TicketRepo      ports.TicketRepository
-	UserRepo        ports.UserRepository
-	ReferralRepo    ports.ReferralRepository
-	CommissionRepo  ports.CommissionConfigRepository
-	GradeRepo       ports.GradeRepository
-	KYCRepo         ports.KYCApplicationRepository
-	StoreRepo       ports.StoreRepository
-	NewsRepo        ports.NewsRepository
-	SystemRepo      ports.SystemSettingsRepository
-	AdminLogsRepo   ports.AdminLogsRepository
+	WalletRepo       ports.WalletRepository
+	CardRepo         ports.CardRepository
+	TransactionRepo  ports.TransactionRepository
+	TicketRepo       ports.TicketRepository
+	UserRepo         ports.UserRepository
+	ReferralRepo     ports.ReferralRepository
+	CommissionRepo   ports.CommissionConfigRepository
+	GradeRepo        ports.GradeRepository
+	ExchangeRateRepo ports.ExchangeRateRepository
+	KYCRepo          ports.KYCApplicationRepository
+	StoreRepo        ports.StoreRepository
+	NewsRepo         ports.NewsRepository
+	SystemRepo       ports.SystemSettingsRepository
+	AdminLogsRepo    ports.AdminLogsRepository
+	AdminDashRepo    ports.AdminDashboardRepository
 
 	TelegramBotUsername string
 
@@ -52,6 +54,8 @@ type Container struct {
 	GradesUseCase      *grades.UseCase
 	KYCUseCase         *kyc.UseCase
 	StoreUseCase       *store.UseCase
+
+	VPNAdminProvider ports.VPNAdminProvider
 }
 
 func NewContainer(ctx context.Context, cfg *config.ENV) (*Container, error) {
@@ -67,12 +71,14 @@ func NewContainer(ctx context.Context, cfg *config.ENV) (*Container, error) {
 	userRepo := postgres.NewUserRepository(db)
 	commissionRepo := postgres.NewCommissionConfigRepository(db)
 	gradeRepo := postgres.NewGradeRepository(db)
+	exchangeRateRepo := postgres.NewExchangeRateRepository(db)
 	referralRepo := postgres.NewReferralRepository(db)
 	kycRepo := postgres.NewKYCApplicationRepository(db)
 	storeRepo := postgres.NewStoreRepository(db)
 	newsRepo := postgres.NewNewsRepository(db)
 	systemRepo := postgres.NewSystemSettingsRepository(db)
 	adminLogsRepo := postgres.NewAdminLogsRepository(db)
+	adminDashRepo := postgres.NewAdminDashboardRepository(db)
 
 	var mail ports.Mailer = mailer.Noop{}
 	if cfg.SMTPHost != "" {
@@ -84,7 +90,7 @@ func NewContainer(ctx context.Context, cfg *config.ENV) (*Container, error) {
 	}
 
 	// WalletUseCase создаём первым — он нужен для CardUseCase
-	walletUC := wallet.NewUseCase(walletRepo, transactionRepo, commissionRepo)
+	walletUC := wallet.NewUseCase(walletRepo, transactionRepo, systemRepo)
 	authUC := auth.NewUseCase(
 		userRepo,
 		walletRepo,
@@ -93,32 +99,36 @@ func NewContainer(ctx context.Context, cfg *config.ENV) (*Container, error) {
 		mail,
 		cfg.AppPublicURL,
 	)
-	userUC := user.NewUseCase(userRepo, walletRepo, gradeRepo, referralRepo, commissionRepo)
+	userUC := user.NewUseCase(userRepo, walletRepo, gradeRepo, referralRepo, commissionRepo, systemRepo)
 	kycUC := kyc.NewUseCase(kycRepo, userRepo)
 	esim := esimProvider.NewMobiMatterProvider(*cfg)
 	vpn := vpnProvider.NewVlessXPanelProvider(*cfg)
 	var vpnPort ports.VPNProvider
+	var vpnAdmin ports.VPNAdminProvider
 	if vpn.Enabled() {
 		vpnPort = vpn
+		vpnAdmin = vpn
 	}
 	storeUC := store.NewUseCase(storeRepo, walletRepo, esim, vpnPort)
 
 	return &Container{
 		DB: db,
 
-		WalletRepo:      walletRepo,
-		CardRepo:        cardRepo,
-		TransactionRepo: transactionRepo,
-		TicketRepo:      ticketRepo,
-		UserRepo:        userRepo,
-		ReferralRepo:    referralRepo,
-		CommissionRepo:  commissionRepo,
-		GradeRepo:       gradeRepo,
-		KYCRepo:         kycRepo,
-		StoreRepo:       storeRepo,
-		NewsRepo:        newsRepo,
-		SystemRepo:      systemRepo,
-		AdminLogsRepo:   adminLogsRepo,
+		WalletRepo:       walletRepo,
+		CardRepo:         cardRepo,
+		TransactionRepo:  transactionRepo,
+		TicketRepo:       ticketRepo,
+		UserRepo:         userRepo,
+		ReferralRepo:     referralRepo,
+		CommissionRepo:   commissionRepo,
+		GradeRepo:        gradeRepo,
+		ExchangeRateRepo: exchangeRateRepo,
+		KYCRepo:          kycRepo,
+		StoreRepo:        storeRepo,
+		NewsRepo:         newsRepo,
+		SystemRepo:       systemRepo,
+		AdminLogsRepo:    adminLogsRepo,
+		AdminDashRepo:    adminDashRepo,
 
 		TelegramBotUsername: cfg.TelegramBotUsername,
 
@@ -132,6 +142,7 @@ func NewContainer(ctx context.Context, cfg *config.ENV) (*Container, error) {
 		GradesUseCase:      grades.NewUseCase(gradeRepo),
 		KYCUseCase:         kycUC,
 		StoreUseCase:       storeUC,
+		VPNAdminProvider:   vpnAdmin,
 	}, nil
 }
 

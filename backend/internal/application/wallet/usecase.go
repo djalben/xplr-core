@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"context"
+	"strings"
 
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	"github.com/djalben/xplr-core/backend/internal/ports"
@@ -9,16 +10,16 @@ import (
 )
 
 type UseCase struct {
-	commissionRepo ports.CommissionConfigRepository
-	txRepo         ports.TransactionRepository
-	walletRepo     ports.WalletRepository
+	txRepo     ports.TransactionRepository
+	walletRepo ports.WalletRepository
+	systemRepo ports.SystemSettingsRepository
 }
 
-func NewUseCase(wr ports.WalletRepository, tr ports.TransactionRepository, commissionRepo ports.CommissionConfigRepository) *UseCase {
+func NewUseCase(wr ports.WalletRepository, tr ports.TransactionRepository, systemRepo ports.SystemSettingsRepository) *UseCase {
 	return &UseCase{
-		commissionRepo: commissionRepo,
-		txRepo:         tr,
-		walletRepo:     wr,
+		txRepo:     tr,
+		walletRepo: wr,
+		systemRepo: systemRepo,
 	}
 }
 
@@ -44,9 +45,9 @@ func (uc *UseCase) GetAutoTopUpEnabled(ctx context.Context, userID domain.UUID) 
 
 // TopUpWallet — пополнение кошелька (канал СБП; при отключённом флаге — ошибка).
 func (uc *UseCase) TopUpWallet(ctx context.Context, userID domain.UUID, amount domain.Numeric) error {
-	if uc.commissionRepo != nil {
-		cfg, err := uc.commissionRepo.GetByKey(ctx, "sbp_topup_enabled")
-		if err == nil && cfg.Value.LessThan(domain.NewNumeric(0.5)) {
+	if uc.systemRepo != nil {
+		enabled, err := sbpTopupEnabled(ctx, uc.systemRepo)
+		if err == nil && !enabled {
 			return domain.NewSBPTopUpDisabled()
 		}
 	}
@@ -77,6 +78,33 @@ func (uc *UseCase) TopUpWallet(ctx context.Context, userID domain.UUID, amount d
 	)
 
 	return uc.txRepo.Save(ctx, tx)
+}
+
+func sbpTopupEnabled(ctx context.Context, repo ports.SystemSettingsRepository) (bool, error) {
+	list, err := repo.ListAll(ctx)
+	if err != nil {
+		return true, wrapper.Wrap(err)
+	}
+
+	for _, row := range list {
+		if row == nil {
+			continue
+		}
+		if row.Key == "sbp_topup_enabled" {
+			if row.BoolValue != nil {
+				return *row.BoolValue, nil
+			}
+			// Fallback: text values
+			v := strings.TrimSpace(strings.ToLower(row.Value))
+			if v == "0" || v == "false" || v == "off" {
+				return false, nil
+			}
+
+			return true, nil
+		}
+	}
+
+	return true, nil
 }
 
 // ToggleAutoTopUp — включить/выключить глобальный автотопап.

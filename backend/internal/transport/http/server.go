@@ -14,6 +14,7 @@ import (
 	cardApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/card"
 	newsApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/news"
 	settingscompatApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/settingscompat"
+	staffPinApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/staffpin"
 	storeApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/store"
 	ticketApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/ticket"
 	transactionApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/transaction"
@@ -167,6 +168,12 @@ func (s *Server) setupRoutes(jwtSecret []byte) {
 					s.container.KYCRepo,
 					s.container.TelegramBotUsername,
 				).Register(r)
+
+				// Staff PIN verification (admin-only, but endpoint path matches main frontend).
+				r.Group(func(r chi.Router) {
+					r.Use(authMiddleware.AdminOnly(s.container.UserRepo))
+					staffPinApi.NewHandler(s.container.SystemRepo).Register(r)
+				})
 			})
 
 			// Admin API (JWT + is_admin); пути /api/v1/admin/... совпадают с baseURL фронта.
@@ -176,7 +183,8 @@ func (s *Server) setupRoutes(jwtSecret []byte) {
 				adminApi.NewHandler(s.container.CardUseCase, s.container.CommissionUseCase,
 					s.container.TicketUseCase, s.container.GradesUseCase, s.container.KYCUseCase,
 					s.container.UserRepo, s.container.WalletRepo, s.container.NewsRepo,
-					s.container.SystemRepo, s.container.AdminLogsRepo, s.container.StoreRepo).Register(r)
+					s.container.SystemRepo, s.container.AdminLogsRepo, s.container.StoreRepo, s.container.AdminDashRepo, s.container.ExchangeRateRepo,
+					s.container.VPNAdminProvider).Register(r)
 			})
 
 			// Public: VPN subscription (used by VPN apps)

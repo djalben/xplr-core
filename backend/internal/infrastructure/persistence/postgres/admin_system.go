@@ -18,7 +18,7 @@ func NewSystemSettingsRepository(db *sqlx.DB) ports.SystemSettingsRepository {
 }
 
 func (r *systemSettingsRepo) ListAll(ctx context.Context) ([]*domain.SystemSetting, error) {
-	const q = `SELECT setting_key, setting_value, description, updated_at FROM system_settings ORDER BY setting_key`
+	const q = `SELECT setting_key, setting_value, setting_bool, description, updated_at FROM system_settings ORDER BY setting_key`
 
 	var out []*domain.SystemSetting
 
@@ -34,11 +34,15 @@ func (r *systemSettingsRepo) ListAll(ctx context.Context) ([]*domain.SystemSetti
 }
 
 func (r *systemSettingsRepo) Upsert(ctx context.Context, s *domain.SystemSetting) error {
-	const q = `INSERT INTO system_settings (setting_key, setting_value, description, updated_at)
-VALUES ($1, $2, $3, NOW())
-ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value, description = EXCLUDED.description, updated_at = NOW()`
+	const q = `INSERT INTO system_settings (setting_key, setting_value, setting_bool, description, updated_at)
+VALUES ($1, $2, $3, $4, NOW())
+ON CONFLICT (setting_key) DO UPDATE
+SET setting_value = EXCLUDED.setting_value,
+    setting_bool = EXCLUDED.setting_bool,
+    description = EXCLUDED.description,
+    updated_at = NOW()`
 
-	_, err := r.db.ExecContext(ctx, q, s.Key, s.Value, s.Description)
+	_, err := r.db.ExecContext(ctx, q, s.Key, s.Value, s.BoolValue, s.Description)
 	if err != nil {
 		return wrapper.Wrap(err)
 	}

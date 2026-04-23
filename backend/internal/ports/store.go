@@ -22,6 +22,8 @@ type StoreRepository interface {
 	AdminListProducts(ctx context.Context, filter StoreAdminProductFilter) ([]*domain.StoreProduct, error)
 	AdminUpdateProduct(ctx context.Context, p *domain.StoreProduct) error
 	AdminBulkAddMarkup(ctx context.Context, productType domain.StoreProductType, delta domain.Numeric) (affected int64, err error)
+
+	AdminListVPNOrders(ctx context.Context, limit int) ([]*domain.AdminVPNOrderRow, error)
 }
 
 type StoreProductFilter struct {

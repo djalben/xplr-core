@@ -1,63 +1,187 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import apiClient from '../../services/axios';
-import { Loader2, RefreshCw, Save } from 'lucide-react';
+import { Loader2, ToggleLeft, ToggleRight, Lock, Save } from 'lucide-react';
 
-type SystemSetting = {
+type CommissionRow = {
+  id: string;
+  key: string;
+  value: string;
+  description?: string;
+};
+
+type SystemSettingRow = {
   key: string;
   value: string;
   description: string;
+  boolValue?: boolean | null;
   updatedAt?: string;
 };
 
-export const AdminSystemSettingsPage = () => {
-  const [rows, setRows] = useState<SystemSetting[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [valueDraft, setValueDraft] = useState('');
-  const [saving, setSaving] = useState(false);
+type VPNInfraDraft = {
+  ip: string;
+  cpu: string;
+  ramMb: string;
+  diskGb: string;
+  diskType: string;
+  expiresAt: string;
+  costEur: string;
+  limitGb: string;
+  location: string;
+  os: string;
+};
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
+const VPN_KEYS = {
+  ip: 'vpn_server_ip',
+  cpu: 'vpn_server_cpu',
+  ramMb: 'vpn_server_ram_mb',
+  diskGb: 'vpn_server_disk_gb',
+  diskType: 'vpn_server_disk_type',
+  expiresAt: 'vpn_server_expires_at',
+  costEur: 'vpn_server_cost_eur',
+  limitGb: 'vpn_server_limit_gb',
+  location: 'vpn_server_location',
+  os: 'vpn_server_os',
+} as const;
+
+export const AdminSystemSettingsPage = () => {
+  const [sbpEnabled, setSbpEnabled] = useState<boolean | null>(null);
+  const [sbpLoading, setSbpLoading] = useState(false);
+  const [sbpError, setSbpError] = useState('');
+
+  const [pin, setPin] = useState('');
+  const [pinSaving, setPinSaving] = useState(false);
+  const [pinOk, setPinOk] = useState(false);
+  const [pinError, setPinError] = useState('');
+
+  const [vpnLoading, setVpnLoading] = useState(false);
+  const [vpnSaving, setVpnSaving] = useState(false);
+  const [vpnOk, setVpnOk] = useState(false);
+  const [vpnError, setVpnError] = useState('');
+  const [vpnDraft, setVpnDraft] = useState<VPNInfraDraft>({
+    ip: '',
+    cpu: '',
+    ramMb: '',
+    diskGb: '',
+    diskType: '',
+    expiresAt: '',
+    costEur: '',
+    limitGb: '',
+    location: '',
+    os: '',
+  });
+
+  const sbpLabel = useMemo(() => {
+    if (sbpEnabled === null) return 'загрузка...';
+    return sbpEnabled ? 'включено' : 'выключено';
+  }, [sbpEnabled]);
+
+  const loadSBP = async () => {
+    setSbpError('');
     try {
-      const res = await apiClient.get<SystemSetting[]>('/admin/system-settings');
-      setRows(res.data || []);
+      const res = await apiClient.get<SystemSettingRow[]>('/admin/system-settings');
+      const row = (res.data || []).find((x) => x.key === 'sbp_topup_enabled');
+      const enabled = row?.boolValue ?? !(String(row?.value || '').trim().toLowerCase() === 'false' || String(row?.value || '').trim() === '0');
+      setSbpEnabled(enabled);
     } catch {
-      setError('Не удалось загрузить system settings');
-      setRows([]);
-    } finally {
-      setLoading(false);
+      setSbpEnabled(null);
+      setSbpError('Не удалось загрузить статус СБП');
     }
-  }, []);
+  };
 
   useEffect(() => {
-    load();
-  }, [load]);
+    loadSBP();
+    loadVPNInfra();
+  }, []);
 
-  const startEdit = (s: SystemSetting) => {
-    setEditingKey(s.key);
-    setValueDraft(String(s.value ?? ''));
-  };
-
-  const cancel = () => {
-    setEditingKey(null);
-    setValueDraft('');
-  };
-
-  const save = async () => {
-    if (!editingKey) return;
-    setSaving(true);
-    setError('');
+  const loadVPNInfra = async () => {
+    setVpnLoading(true);
+    setVpnError('');
     try {
-      await apiClient.patch(`/admin/system-settings/${editingKey}`, { value: valueDraft });
-      setEditingKey(null);
-      setValueDraft('');
-      await load();
+      const res = await apiClient.get<SystemSettingRow[]>('/admin/system-settings');
+      const rows = res.data || [];
+      const m = new Map(rows.map((r) => [r.key, String(r.value ?? '')]));
+
+      setVpnDraft({
+        ip: m.get(VPN_KEYS.ip) || '',
+        cpu: m.get(VPN_KEYS.cpu) || '',
+        ramMb: m.get(VPN_KEYS.ramMb) || '',
+        diskGb: m.get(VPN_KEYS.diskGb) || '',
+        diskType: m.get(VPN_KEYS.diskType) || '',
+        expiresAt: m.get(VPN_KEYS.expiresAt) || '',
+        costEur: m.get(VPN_KEYS.costEur) || '',
+        limitGb: m.get(VPN_KEYS.limitGb) || '',
+        location: m.get(VPN_KEYS.location) || '',
+        os: m.get(VPN_KEYS.os) || '',
+      });
     } catch {
-      setError('Не удалось сохранить значение');
+      setVpnError('Не удалось загрузить настройки VPN');
     } finally {
-      setSaving(false);
+      setVpnLoading(false);
+    }
+  };
+
+  const saveVPNInfra = async () => {
+    setVpnSaving(true);
+    setVpnOk(false);
+    setVpnError('');
+    try {
+      const pairs: Array<[string, string]> = [
+        [VPN_KEYS.ip, vpnDraft.ip],
+        [VPN_KEYS.cpu, vpnDraft.cpu],
+        [VPN_KEYS.ramMb, vpnDraft.ramMb],
+        [VPN_KEYS.diskGb, vpnDraft.diskGb],
+        [VPN_KEYS.diskType, vpnDraft.diskType],
+        [VPN_KEYS.expiresAt, vpnDraft.expiresAt],
+        [VPN_KEYS.costEur, vpnDraft.costEur],
+        [VPN_KEYS.limitGb, vpnDraft.limitGb],
+        [VPN_KEYS.location, vpnDraft.location],
+        [VPN_KEYS.os, vpnDraft.os],
+      ];
+
+      // последовательно, чтобы не DDOS'ить admin ручки и проще отлавливать ошибки
+      for (const [key, value] of pairs) {
+        // eslint-disable-next-line no-await-in-loop
+        await apiClient.patch(`/admin/system-settings/${encodeURIComponent(key)}`, { value: String(value ?? '') });
+      }
+
+      setVpnOk(true);
+      window.setTimeout(() => setVpnOk(false), 2500);
+    } catch {
+      setVpnError('Не удалось сохранить настройки VPN');
+    } finally {
+      setVpnSaving(false);
+    }
+  };
+
+  const toggleSBP = async () => {
+    if (sbpEnabled === null) return;
+    const next = !sbpEnabled;
+    setSbpLoading(true);
+    setSbpError('');
+    setSbpEnabled(next);
+    try {
+      await apiClient.patch('/admin/sbp-topup', { enabled: next });
+    } catch {
+      setSbpEnabled(!next);
+      setSbpError('Не удалось переключить СБП');
+    } finally {
+      setSbpLoading(false);
+    }
+  };
+
+  const savePIN = async () => {
+    setPinSaving(true);
+    setPinOk(false);
+    setPinError('');
+    try {
+      await apiClient.patch('/admin/staff-pin', { pin });
+      setPin('');
+      setPinOk(true);
+      window.setTimeout(() => setPinOk(false), 2500);
+    } catch {
+      setPinError('Не удалось изменить PIN');
+    } finally {
+      setPinSaving(false);
     }
   };
 
@@ -65,98 +189,187 @@ export const AdminSystemSettingsPage = () => {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-white">System settings</h1>
-          <p className="text-sm text-slate-400 mt-1">Хранилище ключ-значение для админских параметров</p>
+          <h1 className="text-2xl font-bold text-white">Системные настройки</h1>
+          <p className="text-sm text-slate-400 mt-1">PIN админки и глобальные переключатели</p>
         </div>
-        <button
-          onClick={load}
-          disabled={loading}
-          className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Обновить
-        </button>
       </div>
 
-      {error ? <p className="text-sm text-red-400">{error}</p> : null}
+      {sbpError ? <p className="text-sm text-red-400">{sbpError}</p> : null}
+      {pinError ? <p className="text-sm text-red-400">{pinError}</p> : null}
+      {vpnError ? <p className="text-sm text-red-400">{vpnError}</p> : null}
 
-      <div className="glass-card p-4 sm:p-6 overflow-x-auto">
-        <table className="min-w-[920px] w-full text-left">
-          <thead>
-            <tr className="text-xs text-slate-500">
-              <th className="py-3 px-2 font-semibold">Key</th>
-              <th className="py-3 px-2 font-semibold">Description</th>
-              <th className="py-3 px-2 font-semibold">Value</th>
-              <th className="py-3 px-2 font-semibold text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={4} className="py-8 text-center text-slate-400">
-                  <span className="inline-flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin" /> Загрузка...
-                  </span>
-                </td>
-              </tr>
-            ) : rows.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="py-10 text-center text-slate-500">Пусто</td>
-              </tr>
-            ) : (
-              rows.map((r) => {
-                const isEditing = editingKey === r.key;
-                return (
-                  <tr key={r.key} className="border-t border-white/5 hover:bg-white/[0.03] transition-colors">
-                    <td className="py-3 px-2 text-xs text-slate-500 font-mono">{r.key}</td>
-                    <td className="py-3 px-2 text-sm text-slate-400">{r.description || '—'}</td>
-                    <td className="py-3 px-2">
-                      {isEditing ? (
-                        <input
-                          value={valueDraft}
-                          onChange={(e) => setValueDraft(e.target.value)}
-                          className="w-full max-w-[420px] bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 outline-none focus:border-blue-500/40 font-mono"
-                        />
-                      ) : (
-                        <span className="text-sm text-slate-200 font-mono">{r.value}</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-2">
-                      <div className="flex justify-end gap-2">
-                        {isEditing ? (
-                          <>
-                            <button
-                              onClick={save}
-                              disabled={saving}
-                              className="px-3 py-2 rounded-xl bg-blue-500/20 hover:bg-blue-500/25 border border-blue-500/30 text-blue-200 text-xs font-semibold transition-colors disabled:opacity-50 inline-flex items-center gap-2"
-                            >
-                              <Save className="w-4 h-4" />
-                              {saving ? '...' : 'Сохранить'}
-                            </button>
-                            <button
-                              onClick={cancel}
-                              disabled={saving}
-                              className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-xs font-semibold transition-colors disabled:opacity-50"
-                            >
-                              Отмена
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            onClick={() => startEdit(r)}
-                            className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-xs font-semibold transition-colors"
-                          >
-                            Редактировать
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+      <div className="glass-card p-6">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <p className="text-white font-semibold">Пополнение через СБП</p>
+            <p className="text-sm text-slate-400 mt-1">
+              Глобальное включение/выключение пополнения. Сейчас: <span className="text-slate-200">{sbpLabel}</span>
+            </p>
+          </div>
+
+          <button
+            onClick={toggleSBP}
+            disabled={sbpEnabled === null || sbpLoading}
+            className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+          >
+            {sbpEnabled ? <ToggleRight className="w-5 h-5 text-emerald-400" /> : <ToggleLeft className="w-5 h-5 text-slate-400" />}
+            {sbpLoading ? '...' : sbpEnabled ? 'Выключить' : 'Включить'}
+          </button>
+        </div>
+      </div>
+
+      <div className="glass-card p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-purple-600 flex items-center justify-center">
+            <Lock className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <p className="text-white font-semibold">PIN админки</p>
+            <p className="text-sm text-slate-400">Смена PIN для входа (4 цифры)</p>
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+          <input
+            value={pin}
+            onChange={(e) => { setPin(e.target.value.replace(/[^\d]/g, '').slice(0, 4)); setPinError(''); }}
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={4}
+            placeholder="0000"
+            className="w-full sm:max-w-[240px] bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-center text-lg tracking-[0.3em] font-mono outline-none focus:border-blue-500/40"
+          />
+          <button
+            onClick={savePIN}
+            disabled={pinSaving || pin.length !== 4}
+            className="px-5 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-sm font-semibold transition-colors disabled:opacity-50 inline-flex items-center gap-2"
+          >
+            {pinSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {pinSaving ? '...' : 'Сохранить'}
+          </button>
+          {pinOk ? <span className="text-sm text-emerald-400">Сохранено</span> : null}
+        </div>
+      </div>
+
+      <div className="glass-card p-6">
+        <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
+          <div>
+            <p className="text-white font-semibold">VPN сервер (инфраструктура)</p>
+            <p className="text-sm text-slate-400 mt-1">Оверрайд данных для карточки VPN‑сервера (без Aeza API)</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {vpnOk ? <span className="text-sm text-emerald-400">Сохранено</span> : null}
+            <button
+              onClick={loadVPNInfra}
+              disabled={vpnLoading || vpnSaving}
+              className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-sm font-medium transition-colors disabled:opacity-50 inline-flex items-center gap-2"
+            >
+              {vpnLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              Обновить
+            </button>
+            <button
+              onClick={saveVPNInfra}
+              disabled={vpnSaving || vpnLoading}
+              className="px-4 py-2 rounded-xl bg-blue-500/20 hover:bg-blue-500/25 border border-blue-500/30 text-blue-200 text-sm font-semibold transition-colors disabled:opacity-50 inline-flex items-center gap-2"
+            >
+              {vpnSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              Сохранить
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs text-slate-500">IP</label>
+            <input
+              value={vpnDraft.ip}
+              onChange={(e) => setVpnDraft((p) => ({ ...p, ip: e.target.value }))}
+              placeholder="109.120.157.144"
+              className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 outline-none focus:border-blue-500/40 font-mono"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-slate-500">Оплачен до (RFC3339)</label>
+            <input
+              value={vpnDraft.expiresAt}
+              onChange={(e) => setVpnDraft((p) => ({ ...p, expiresAt: e.target.value }))}
+              placeholder="2026-05-18T00:00:00Z"
+              className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 outline-none focus:border-blue-500/40 font-mono"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-slate-500">CPU (vCPU)</label>
+            <input
+              value={vpnDraft.cpu}
+              onChange={(e) => setVpnDraft((p) => ({ ...p, cpu: e.target.value.replace(/[^\d]/g, '') }))}
+              placeholder="1"
+              className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 outline-none focus:border-blue-500/40 font-mono"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-slate-500">RAM (MB)</label>
+            <input
+              value={vpnDraft.ramMb}
+              onChange={(e) => setVpnDraft((p) => ({ ...p, ramMb: e.target.value.replace(/[^\d]/g, '') }))}
+              placeholder="2048"
+              className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 outline-none focus:border-blue-500/40 font-mono"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-slate-500">Диск (GB)</label>
+            <input
+              value={vpnDraft.diskGb}
+              onChange={(e) => setVpnDraft((p) => ({ ...p, diskGb: e.target.value.replace(/[^\d]/g, '') }))}
+              placeholder="30"
+              className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 outline-none focus:border-blue-500/40 font-mono"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-slate-500">Тип диска</label>
+            <input
+              value={vpnDraft.diskType}
+              onChange={(e) => setVpnDraft((p) => ({ ...p, diskType: e.target.value }))}
+              placeholder="SSD"
+              className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 outline-none focus:border-blue-500/40 font-mono"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-slate-500">Стоимость (EUR/мес)</label>
+            <input
+              value={vpnDraft.costEur}
+              onChange={(e) => setVpnDraft((p) => ({ ...p, costEur: e.target.value.replace(/[^0-9.]/g, '') }))}
+              placeholder="4.94"
+              className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 outline-none focus:border-blue-500/40 font-mono"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-slate-500">Лимит трафика (GB)</label>
+            <input
+              value={vpnDraft.limitGb}
+              onChange={(e) => setVpnDraft((p) => ({ ...p, limitGb: e.target.value.replace(/[^0-9.]/g, '') }))}
+              placeholder="30"
+              className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 outline-none focus:border-blue-500/40 font-mono"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-slate-500">Локация</label>
+            <input
+              value={vpnDraft.location}
+              onChange={(e) => setVpnDraft((p) => ({ ...p, location: e.target.value }))}
+              placeholder="Stockholm"
+              className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 outline-none focus:border-blue-500/40"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-slate-500">OS</label>
+            <input
+              value={vpnDraft.os}
+              onChange={(e) => setVpnDraft((p) => ({ ...p, os: e.target.value }))}
+              placeholder="Ubuntu"
+              className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 outline-none focus:border-blue-500/40"
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

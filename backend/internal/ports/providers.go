@@ -19,3 +19,9 @@ type VPNProvider interface {
 	CreateOrder(ctx context.Context, externalProductID string) (providerRef string, activationKey string, meta string, err error)
 	GetClientTraffic(ctx context.Context, providerRef string) (*domain.VPNClientTraffic, error)
 }
+
+type VPNAdminProvider interface {
+	VPNProvider
+	DeleteClientByEmail(ctx context.Context, email string) error
+	UpdateClientByEmail(ctx context.Context, email string, totalBytes *int64, expiryMs *int64) error
+}
