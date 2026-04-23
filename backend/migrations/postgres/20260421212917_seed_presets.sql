@@ -10,6 +10,17 @@ VALUES
     ('card_issue_fee',    2.00,   'Стоимость выпуска виртуальной карты ($)')
 ON CONFLICT (key) DO NOTHING;
 
+-- Seed: курсы валют (как в main). Внутренний курс = база + наценка.
+INSERT INTO exchange_rates (currency_from, currency_to, base_rate, markup_percent, final_rate, updated_at)
+VALUES
+    ('RUB', 'USD', 75.04, 3.00, 77.29, NOW()),
+    ('RUB', 'EUR', 87.98, 3.00, 90.62, NOW())
+ON CONFLICT (currency_from, currency_to) DO UPDATE SET
+    base_rate = EXCLUDED.base_rate,
+    markup_percent = EXCLUDED.markup_percent,
+    final_rate = EXCLUDED.final_rate,
+    updated_at = EXCLUDED.updated_at;
+
 -- Seed: PIN для входа в админку (по умолчанию 0000).
 -- Хранится в system_settings; бэкенд поддерживает как plain (0000), так и bcrypt-хэш.
 INSERT INTO system_settings (setting_key, setting_value, setting_bool, description, updated_at)

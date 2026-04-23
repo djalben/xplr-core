@@ -12,12 +12,12 @@ type CommissionRow = {
 
 type ExchangeRateRow = {
   id: string;
-  currency_from: string;
-  currency_to: string;
-  base_rate: string;
-  markup_percent: string;
-  final_rate: string;
-  updated_at?: string;
+  currencyFrom: string;
+  currencyTo: string;
+  baseRate: string;
+  markupPercent: string;
+  finalRate: string;
+  updatedAt?: string;
 };
 
 const keyLabel = (key: string) => {
@@ -33,6 +33,15 @@ const keyLabel = (key: string) => {
     default:
       return key;
   }
+};
+
+const isTierKey = (key: string) => ['fee_gold', 'fee_standard', 'card_issue_fee'].includes(key);
+
+const fmtDateTime = (iso?: string) => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString('ru-RU', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 };
 
 export const AdminCommissionsPage = () => {
@@ -117,9 +126,9 @@ export const AdminCommissionsPage = () => {
   };
 
   const startEditRate = (r: ExchangeRateRow) => {
-    const key = `${r.currency_from}/${r.currency_to}`;
+    const key = `${r.currencyFrom}/${r.currencyTo}`;
     setEditingPair(key);
-    setRateDraft({ base: String(r.base_rate ?? ''), markup: String(r.markup_percent ?? '0') });
+    setRateDraft({ base: String(r.baseRate ?? ''), markup: String(r.markupPercent ?? '0') });
     setRatesError('');
   };
 
@@ -159,6 +168,9 @@ export const AdminCommissionsPage = () => {
     }
   };
 
+  const tierRows = useMemo(() => rows.filter((r) => isTierKey(r.key)), [rows]);
+  const otherRows = useMemo(() => rows.filter((r) => !isTierKey(r.key)), [rows]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -180,7 +192,7 @@ export const AdminCommissionsPage = () => {
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
             <p className="text-white font-semibold">Курсы валют</p>
-            <p className="text-sm text-slate-400 mt-1">Внутренний курс = наша комиссия</p>
+            <p className="text-sm text-slate-400 mt-1">Внутренний курс = реальный курс + наша наценка</p>
           </div>
           {rateSaved ? <span className="text-sm text-emerald-400">Сохранено</span> : null}
         </div>
@@ -188,20 +200,21 @@ export const AdminCommissionsPage = () => {
         {ratesError ? <p className="text-sm text-red-400 mt-3">{ratesError}</p> : null}
 
         <div className="mt-4 overflow-x-auto">
-          <table className="min-w-[920px] w-full text-left">
+          <table className="min-w-[980px] w-full text-left">
             <thead>
               <tr className="text-xs text-slate-500">
                 <th className="py-3 px-2 font-semibold">Пара</th>
-                <th className="py-3 px-2 font-semibold">Base rate</th>
-                <th className="py-3 px-2 font-semibold">Markup (%)</th>
-                <th className="py-3 px-2 font-semibold">Final rate</th>
-                <th className="py-3 px-2 font-semibold text-right">Действия</th>
+                <th className="py-3 px-2 font-semibold">Реальный курс (ЦБ)</th>
+                <th className="py-3 px-2 font-semibold">Наценка %</th>
+                <th className="py-3 px-2 font-semibold">Внутренний курс</th>
+                <th className="py-3 px-2 font-semibold">Обновлено</th>
+                <th className="py-3 px-2 font-semibold text-right"> </th>
               </tr>
             </thead>
             <tbody>
               {ratesLoading ? (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-slate-400">
+                  <td colSpan={6} className="py-8 text-center text-slate-400">
                     <span className="inline-flex items-center gap-2">
                       <Loader2 className="w-4 h-4 animate-spin" /> Загрузка...
                     </span>
@@ -209,16 +222,16 @@ export const AdminCommissionsPage = () => {
                 </tr>
               ) : rates.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-10 text-center text-slate-500">Пусто</td>
+                  <td colSpan={6} className="py-10 text-center text-slate-500">Пусто</td>
                 </tr>
               ) : (
                 rates.map((r) => {
-                  const key = `${r.currency_from}/${r.currency_to}`;
+                  const key = `${r.currencyFrom}/${r.currencyTo}`;
                   const isEditing = editingPair === key;
                   return (
                     <tr key={r.id || key} className="border-t border-white/5 hover:bg-white/[0.03] transition-colors">
                       <td className="py-3 px-2 text-sm text-slate-200 font-semibold">
-                        <div className="font-mono text-xs text-slate-500">{r.currency_from}→{r.currency_to}</div>
+                        <div className="font-mono text-xs text-slate-500">{r.currencyFrom} — {r.currencyTo}</div>
                         {key}
                       </td>
                       <td className="py-3 px-2">
@@ -229,7 +242,7 @@ export const AdminCommissionsPage = () => {
                             className="w-40 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 outline-none focus:border-blue-500/40 font-mono"
                           />
                         ) : (
-                          <span className="text-sm text-slate-200 font-mono">{r.base_rate}</span>
+                          <span className="text-sm text-slate-200 font-mono">{r.baseRate}</span>
                         )}
                       </td>
                       <td className="py-3 px-2">
@@ -240,11 +253,14 @@ export const AdminCommissionsPage = () => {
                             className="w-40 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 outline-none focus:border-blue-500/40 font-mono"
                           />
                         ) : (
-                          <span className="text-sm text-slate-200 font-mono">{r.markup_percent}</span>
+                          <span className="text-sm text-amber-300 font-mono">{r.markupPercent}%</span>
                         )}
                       </td>
                       <td className="py-3 px-2">
-                        <span className="text-sm text-slate-200 font-mono">{r.final_rate}</span>
+                        <span className="text-sm text-slate-200 font-mono">{r.finalRate}</span>
+                      </td>
+                      <td className="py-3 px-2">
+                        <span className="text-xs text-slate-500 font-mono">{fmtDateTime(r.updatedAt)}</span>
                       </td>
                       <td className="py-3 px-2">
                         <div className="flex justify-end gap-2">
@@ -269,9 +285,9 @@ export const AdminCommissionsPage = () => {
                           ) : (
                             <button
                               onClick={() => startEditRate(r)}
-                              className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-xs font-semibold transition-colors inline-flex items-center gap-2"
+                              className="text-sm text-blue-300 hover:text-blue-200 transition-colors"
                             >
-                              Редактировать
+                              Изменить
                             </button>
                           )}
                         </div>
@@ -285,16 +301,31 @@ export const AdminCommissionsPage = () => {
         </div>
       </div>
 
+      <div className="glass-card p-6">
+        <p className="text-white font-semibold">Как это работает</p>
+        <div className="mt-3 space-y-1 text-sm text-slate-400">
+          <p>Реальный курс (ЦБ) — базовый курс. Можно обновлять вручную.</p>
+          <p>Наценка % — наша наценка поверх базового курса.</p>
+          <p>
+            Внутренний курс = Реальный × (1 + Наценка / 100). Используется для всех операций: Магазин, Пополнение карт, Кошелёк, Маржа.
+          </p>
+        </div>
+      </div>
+
       <div className="glass-card p-4 sm:p-6 overflow-x-auto">
         {error ? <p className="text-sm text-red-400 mb-4">{error}</p> : null}
+
+        <div className="mb-4">
+          <p className="text-white font-semibold">Настройки тиров и комиссий</p>
+        </div>
 
         <table className="min-w-[920px] w-full text-left">
           <thead>
             <tr className="text-xs text-slate-500">
-              <th className="py-3 px-2 font-semibold">Ключ</th>
+              <th className="py-3 px-2 font-semibold">Параметр</th>
               <th className="py-3 px-2 font-semibold">Описание</th>
               <th className="py-3 px-2 font-semibold">Значение</th>
-              <th className="py-3 px-2 font-semibold text-right">Действия</th>
+              <th className="py-3 px-2 font-semibold text-right"> </th>
             </tr>
           </thead>
           <tbody>
@@ -306,19 +337,18 @@ export const AdminCommissionsPage = () => {
                   </span>
                 </td>
               </tr>
-            ) : rows.length === 0 ? (
+            ) : tierRows.length === 0 ? (
               <tr>
                 <td colSpan={4} className="py-10 text-center text-slate-500">
                   Пусто
                 </td>
               </tr>
             ) : (
-              rows.map((r) => {
+              tierRows.map((r) => {
                 const isEditing = editingId === r.id;
                 return (
                   <tr key={r.id} className="border-t border-white/5 hover:bg-white/[0.03] transition-colors">
                     <td className="py-3 px-2 text-sm text-slate-200">
-                      <div className="font-mono text-xs text-slate-500">{r.key}</div>
                       <div className="font-semibold">{keyLabel(r.key)}</div>
                     </td>
                     <td className="py-3 px-2 text-sm text-slate-400">{r.description || '—'}</td>
@@ -356,9 +386,96 @@ export const AdminCommissionsPage = () => {
                         ) : (
                           <button
                             onClick={() => startEdit(r)}
-                            className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-xs font-semibold transition-colors inline-flex items-center gap-2"
+                            className="text-sm text-blue-300 hover:text-blue-200 transition-colors"
                           >
-                            Редактировать
+                            Изменить
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="glass-card p-4 sm:p-6 overflow-x-auto">
+        <div className="mb-4">
+          <p className="text-white font-semibold">Прочие комиссии</p>
+        </div>
+        <table className="min-w-[920px] w-full text-left">
+          <thead>
+            <tr className="text-xs text-slate-500">
+              <th className="py-3 px-2 font-semibold">Параметр</th>
+              <th className="py-3 px-2 font-semibold">Описание</th>
+              <th className="py-3 px-2 font-semibold">Значение</th>
+              <th className="py-3 px-2 font-semibold text-right"> </th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td colSpan={4} className="py-8 text-center text-slate-400">
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Загрузка...
+                  </span>
+                </td>
+              </tr>
+            ) : otherRows.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="py-10 text-center text-slate-500">
+                  Пусто
+                </td>
+              </tr>
+            ) : (
+              otherRows.map((r) => {
+                const isEditing = editingId === r.id;
+                return (
+                  <tr key={r.id} className="border-t border-white/5 hover:bg-white/[0.03] transition-colors">
+                    <td className="py-3 px-2 text-sm text-slate-200">
+                      <div className="font-semibold">{keyLabel(r.key)}</div>
+                      <div className="font-mono text-xs text-slate-500">{r.key}</div>
+                    </td>
+                    <td className="py-3 px-2 text-sm text-slate-400">{r.description || '—'}</td>
+                    <td className="py-3 px-2">
+                      {isEditing ? (
+                        <input
+                          value={valueDraft}
+                          onChange={(e) => setValueDraft(e.target.value)}
+                          className="w-40 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 outline-none focus:border-blue-500/40"
+                        />
+                      ) : (
+                        <span className="text-sm text-slate-200 font-mono">{r.value}</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-2">
+                      <div className="flex justify-end gap-2">
+                        {isEditing ? (
+                          <>
+                            <button
+                              onClick={saveEdit}
+                              disabled={saving}
+                              className="px-3 py-2 rounded-xl bg-blue-500/20 hover:bg-blue-500/25 border border-blue-500/30 text-blue-200 text-xs font-semibold transition-colors disabled:opacity-50 inline-flex items-center gap-2"
+                            >
+                              <Save className="w-4 h-4" />
+                              {saving ? '...' : 'Сохранить'}
+                            </button>
+                            <button
+                              onClick={cancelEdit}
+                              disabled={saving}
+                              className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-xs font-semibold transition-colors disabled:opacity-50"
+                            >
+                              Отмена
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => startEdit(r)}
+                            className="text-sm text-blue-300 hover:text-blue-200 transition-colors"
+                          >
+                            Изменить
                           </button>
                         )}
                       </div>
