@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/djalben/xplr-core/backend/internal/domain"
@@ -61,6 +62,11 @@ func (h *Handler) DoRegister(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.authUC.Register(r.Context(), req.Email, req.Password)
 	if err != nil {
+		if errors.Is(err, domain.ErrAlreadyExists) {
+			http.Error(w, "email already registered", http.StatusConflict)
+
+			return
+		}
 		http.Error(w, err.Error(), http.StatusBadRequest)
 
 		return

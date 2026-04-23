@@ -61,7 +61,7 @@ func TestHandler_DoRegister(t *testing.T) {
 			},
 		},
 		{
-			name: "register error -> 400",
+			name: "register generic error -> 400",
 			args: args{
 				body: `{"email":"a@example.com","password":"secret"}`,
 				setupMocks: func(authMock *mocks.MockAuthFlow, _ *mocks.MockWalletBalanceProvider, _ *mocks.MockUserByIDReader) {
@@ -70,6 +70,19 @@ func TestHandler_DoRegister(t *testing.T) {
 						Return(nil, errTestRegisterEmailTaken)
 				},
 				wantStatusCode: http.StatusBadRequest,
+				wantOK:         false,
+			},
+		},
+		{
+			name: "email taken -> 409",
+			args: args{
+				body: `{"email":"a@example.com","password":"secret"}`,
+				setupMocks: func(authMock *mocks.MockAuthFlow, _ *mocks.MockWalletBalanceProvider, _ *mocks.MockUserByIDReader) {
+					authMock.EXPECT().
+						Register(gomock.Any(), "a@example.com", "secret").
+						Return(nil, domain.NewAlreadyExists("email already registered"))
+				},
+				wantStatusCode: http.StatusConflict,
 				wantOK:         false,
 			},
 		},

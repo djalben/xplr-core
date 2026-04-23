@@ -62,7 +62,7 @@ func (uc *UseCase) Register(ctx context.Context, email, password string) (*domai
 
 	_, err := uc.userRepo.GetByEmail(ctx, email)
 	if err == nil {
-		return nil, domain.NewInvalidInput("email already registered")
+		return nil, domain.NewAlreadyExists("email already registered")
 	}
 
 	if !isNoRows(err) {

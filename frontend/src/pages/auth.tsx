@@ -23,6 +23,10 @@ const translateError = (raw: string): string => {
     'Invalid request body': 'Неверный формат запроса',
     'email already registered': 'Этот Email уже зарегистрирован',
     'Email already registered': 'Этот Email уже зарегистрирован',
+    'already exists: email already registered': 'Этот Email уже зарегистрирован',
+    'Already exists: email already registered': 'Этот Email уже зарегистрирован',
+    'invalid input: email already registered': 'Этот Email уже зарегистрирован',
+    'Invalid input: email already registered': 'Этот Email уже зарегистрирован',
     'invalid email or password': 'Неверный email или пароль',
     'Invalid email or password': 'Неверный email или пароль',
     'user not found': 'Пользователь не найден',
@@ -43,6 +47,7 @@ export const AuthPage = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [registerOK, setRegisterOK] = useState('');
 
   /* Live password validation (register only) */
   const passwordRules = useMemo(() => getPasswordRules(t), [t]);
@@ -55,6 +60,7 @@ export const AuthPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setRegisterOK('');
 
     if (!email || !password) {
       setError(t('auth.fillAll'));
@@ -79,6 +85,15 @@ export const AuthPage = () => {
 
       const res = mode === 'login' ? await login(payload) : await register(payload);
       console.log('[Auth] Response:', { token: res.token ? 'yes' : 'NO', user: res.user });
+
+      if (mode === 'register') {
+        // Register returns 201 without JWT (email verification flow). Show success and switch to login.
+        setRegisterOK('Регистрация успешна. Подтвердите email по ссылке из письма, затем войдите.');
+        setMode('login');
+        setPassword('');
+        setConfirmPassword('');
+        return;
+      }
 
       // Immediately apply user data to auth context (including is_admin/role)
       if (res.user) {
@@ -202,6 +217,12 @@ export const AuthPage = () => {
                 Забыли пароль?
               </Link>
             )}
+          </div>
+        )}
+
+        {registerOK && (
+          <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-sm text-center">
+            {registerOK}
           </div>
         )}
 

@@ -11,16 +11,19 @@ export interface LoginRequest {
 }
 
 export interface AuthResponse {
-  token: string;
-  user: {
-    id: number;
+  token?: string;
+  user?: {
+    id: number | string;
     email: string;
-    balance: string;
-    status: string;
+    balance?: string;
+    status?: string;
     is_admin?: boolean;
     role?: string;
     is_verified?: boolean;
   };
+  message?: string;
+  email?: string;
+  email_verified?: boolean;
 }
 
 // Регистрация нового пользователя
