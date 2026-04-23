@@ -162,7 +162,9 @@ const StaffPinModal = ({ open, onClose }: { open: boolean; onClose: () => void }
   if (!open) return null;
 
   const openAdminInNewTab = () => {
-    const w = window.open('/admin/entry', '_blank', 'noopener,noreferrer');
+    // Keep `noopener` off so `postMessage` has a reliable target on all browsers.
+    // We still guard by `origin` on the receiving side.
+    const w = window.open('/admin/entry', '_blank');
     if (!w) {
       // Popup blocked; fall back to same-tab navigation.
       window.location.assign('/admin/entry');
@@ -170,28 +172,40 @@ const StaffPinModal = ({ open, onClose }: { open: boolean; onClose: () => void }
     }
 
     const payload = { type: 'xplr_admin_grant' as const };
-    const bc = new BroadcastChannel('xplr_admin');
-    try {
-      bc.postMessage(payload);
-    } catch {
-      // ignore
-    } finally {
-      bc.close();
-    }
 
-    // Try immediate postMessage; if the page isn't ready yet, retry a few times.
-    let triesLeft = 10;
-    const interval = window.setInterval(() => {
+    const bc = new BroadcastChannel('xplr_admin');
+    const sendGrant = () => {
+      try {
+        bc.postMessage(payload);
+      } catch {
+        // ignore
+      }
       try {
         w.postMessage(payload, window.location.origin);
       } catch {
         // ignore
       }
+    };
+
+    // Send immediately, then keep sending for a few seconds to avoid race conditions.
+    sendGrant();
+    let triesLeft = 80; // ~12s @ 150ms
+    const interval = window.setInterval(() => {
+      sendGrant();
       triesLeft -= 1;
       if (triesLeft <= 0) {
         window.clearInterval(interval);
+        bc.close();
       }
     }, 150);
+
+    // Also react to explicit readiness from the new tab.
+    const onReady = (event: MessageEvent) => {
+      const data = event.data as { type?: string } | null;
+      if (!data || data.type !== 'xplr_admin_ready') return;
+      sendGrant();
+    };
+    bc.addEventListener('message', onReady);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

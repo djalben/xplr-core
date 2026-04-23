@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../store/auth-context';
 import { AdminLayout } from '../../components/admin-layout';
@@ -8,22 +8,24 @@ type GrantMessage = {
   type: 'xplr_admin_grant';
 };
 
+type ReadyMessage = {
+  type: 'xplr_admin_ready';
+};
+
 export const AdminEntryPage = () => {
   const navigate = useNavigate();
   const { isAdmin, authReady } = useAuth();
+  const [granted, setGranted] = useState(false);
+  const grantedOnce = useRef(false);
 
   const origin = useMemo(() => window.location.origin, []);
 
   useEffect(() => {
-    if (!authReady) return;
-    if (!isAdmin) {
-      navigate('/dashboard', { replace: true });
-      return;
-    }
-
     const grant = () => {
+      if (grantedOnce.current) return;
+      grantedOnce.current = true;
       sessionStorage.setItem('_xplr_staff', 'granted');
-      navigate('/admin/dashboard', { replace: true });
+      setGranted(true);
     };
 
     const onMessage = (event: MessageEvent) => {
@@ -42,12 +44,30 @@ export const AdminEntryPage = () => {
 
     bc.addEventListener('message', onBC);
     window.addEventListener('message', onMessage);
+
+    // Handshake: tell the opener we're ready to receive the grant.
+    try {
+      bc.postMessage({ type: 'xplr_admin_ready' satisfies ReadyMessage['type'] } as ReadyMessage);
+    } catch {
+      // ignore
+    }
+
     return () => {
       bc.removeEventListener('message', onBC);
       bc.close();
       window.removeEventListener('message', onMessage);
     };
-  }, [authReady, isAdmin, navigate, origin]);
+  }, [origin]);
+
+  useEffect(() => {
+    if (!authReady) return;
+    if (!isAdmin) {
+      navigate('/dashboard', { replace: true });
+      return;
+    }
+    if (!granted) return;
+    navigate('/admin/dashboard', { replace: true });
+  }, [authReady, granted, isAdmin, navigate]);
 
   return (
     <AdminLayout>
