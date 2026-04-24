@@ -167,6 +167,40 @@ func (s *Server) handleSBPStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) handleRates(w http.ResponseWriter, r *http.Request) {
+	rates, err := s.container.ExchangeRateRepo.ListAll(r.Context())
+	if err != nil {
+		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+
+		return
+	}
+
+	out := map[string]float64{
+		"usd": 89.45,
+		"eur": 97.82,
+	}
+
+	for _, rate := range rates {
+		if rate == nil || rate.CurrencyFrom != "RUB" {
+			continue
+		}
+
+		value, ok := rate.FinalRate.Float64()
+		if !ok {
+			continue
+		}
+
+		switch rate.CurrencyTo {
+		case "USD":
+			out["usd"] = value
+		case "EUR":
+			out["eur"] = value
+		}
+	}
+
+	handler.WriteJSON(w, http.StatusOK, out)
+}
+
 func (s *Server) setupRoutes(jwtSecret []byte) {
 	s.router.Route("/api", func(r chi.Router) {
 		r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
@@ -177,13 +211,8 @@ func (s *Server) setupRoutes(jwtSecret []byte) {
 			// Public: auth
 			authApi.NewHandler(s.container.AuthUseCase, s.container.WalletUseCase, s.container.UserRepo, jwtSecret).Register(r)
 
-			// Public: rates (курсы валют)
-			r.Get("/rates", func(w http.ResponseWriter, _ *http.Request) {
-				handler.WriteJSON(w, http.StatusOK, map[string]any{
-					"usd": 89.45,
-					"eur": 97.82,
-				})
-			})
+			// Public: внутренние курсы валют из exchange_rates.
+			r.Get("/rates", s.handleRates)
 
 			// Public: статус пополнения через СБП нужен модалке до попытки платежа.
 			r.Get("/sbp-status", s.handleSBPStatus)

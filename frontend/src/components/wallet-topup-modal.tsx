@@ -69,6 +69,9 @@ export const WalletTopUpModal = ({ onClose, onSuccess }: WalletTopUpModalProps) 
 
   const currentRate = selectedCurrency === 'USD' ? rates.usd : rates.eur;
   const currencySymbol = selectedCurrency === 'USD' ? '$' : '€';
+  const topUpAmountUSD = rubInput && Number.isFinite(parseFloat(rubInput)) && rates.usd > 0
+    ? Number((parseFloat(rubInput) / rates.usd).toFixed(2))
+    : 0;
 
   const rubPresets = [1000, 2000, 5000, 10000, 20000, 50000, 100000];
 
@@ -248,11 +251,11 @@ export const WalletTopUpModal = ({ onClose, onSuccess }: WalletTopUpModalProps) 
             )}
             <button
               onClick={async () => {
-                if (!rubInput || !sbpEnabled) return;
+                if (!rubInput || topUpAmountUSD <= 0 || !sbpEnabled) return;
                 setIsLoading(true);
                 setError('');
                 try {
-                  await topUpWallet(Number(rubInput));
+                  await topUpWallet(topUpAmountUSD);
                   onSuccess?.();
                   onClose();
                 } catch (err: any) {
@@ -267,11 +270,11 @@ export const WalletTopUpModal = ({ onClose, onSuccess }: WalletTopUpModalProps) 
                   setIsLoading(false);
                 }
               }}
-              disabled={!rubInput || parseFloat(rubInput) <= 0 || isLoading || !sbpEnabled || checkingSBP}
+              disabled={!rubInput || topUpAmountUSD <= 0 || isLoading || !sbpEnabled || checkingSBP}
               className="w-full py-4 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2.5 text-base"
             >
               <SbpLogo />
-              <span>{isLoading ? 'Обработка...' : !sbpEnabled ? 'СБП недоступен' : `Пополнить через СБП${rubInput ? ` — ${Number(rubInput).toLocaleString('ru-RU')} ₽` : ''}`}</span>
+              <span>{isLoading ? 'Обработка...' : !sbpEnabled ? 'СБП недоступен' : `Пополнить через СБП${rubInput ? ` — ${Number(rubInput).toLocaleString('ru-RU')} ₽ / $${topUpAmountUSD.toFixed(2)}` : ''}`}</span>
             </button>
             {/* Bank icons row */}
             <div className="flex items-center justify-center gap-3">
