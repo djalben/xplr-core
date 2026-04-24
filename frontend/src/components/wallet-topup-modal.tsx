@@ -76,12 +76,10 @@ export const WalletTopUpModal = ({ onClose, onSuccess }: WalletTopUpModalProps) 
     const checkSBPStatus = async () => {
       try {
         const status = await getSBPStatus();
-        console.log('[WalletTopUpModal] SBP Status from API:', status);
-        console.log('[WalletTopUpModal] SBP Enabled:', status.enabled);
         setSbpEnabled(status.enabled);
       } catch (error) {
-        console.error('[WalletTopUpModal] Failed to check SBP status:', error);
-        setSbpEnabled(true); // Fail open
+        setSbpEnabled(false);
+        setError('Не удалось проверить доступность СБП. Пополнение временно недоступно.');
       } finally {
         setCheckingSBP(false);
       }
@@ -258,7 +256,13 @@ export const WalletTopUpModal = ({ onClose, onSuccess }: WalletTopUpModalProps) 
                   onSuccess?.();
                   onClose();
                 } catch (err: any) {
-                  setError(err?.response?.data || err?.message || 'Ошибка пополнения');
+                  const msg = String(err?.response?.data || err?.message || '');
+                  if (err?.response?.status === 403 || msg.toLowerCase().includes('sbp top-up is disabled')) {
+                    setSbpEnabled(false);
+                    setError('Пополнение через СБП временно недоступно. Попробуйте позже.');
+                    return;
+                  }
+                  setError(msg || 'Ошибка пополнения');
                 } finally {
                   setIsLoading(false);
                 }

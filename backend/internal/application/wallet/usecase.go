@@ -47,7 +47,10 @@ func (uc *UseCase) GetAutoTopUpEnabled(ctx context.Context, userID domain.UUID) 
 func (uc *UseCase) TopUpWallet(ctx context.Context, userID domain.UUID, amount domain.Numeric) error {
 	if uc.systemRepo != nil {
 		enabled, err := sbpTopupEnabled(ctx, uc.systemRepo)
-		if err == nil && !enabled {
+		if err != nil {
+			return wrapper.Wrap(err)
+		}
+		if !enabled {
 			return domain.NewSBPTopUpDisabled()
 		}
 	}

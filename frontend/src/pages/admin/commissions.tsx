@@ -242,7 +242,7 @@ export const AdminCommissionsPage = () => {
                             className="w-40 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 outline-none focus:border-blue-500/40 font-mono"
                           />
                         ) : (
-                          <span className="text-sm text-slate-200 font-mono">{r.baseRate}</span>
+                          <span className="text-emerald-400 font-medium">{r.baseRate}</span>
                         )}
                       </td>
                       <td className="py-3 px-2">
@@ -257,7 +257,7 @@ export const AdminCommissionsPage = () => {
                         )}
                       </td>
                       <td className="py-3 px-2">
-                        <span className="text-sm text-slate-200 font-mono">{r.finalRate}</span>
+                        <span className="text-emerald-400 font-medium">{r.finalRate}</span>
                       </td>
                       <td className="py-3 px-2">
                         <span className="text-xs text-slate-500 font-mono">{fmtDateTime(r.updatedAt)}</span>
@@ -285,9 +285,9 @@ export const AdminCommissionsPage = () => {
                           ) : (
                             <button
                               onClick={() => startEditRate(r)}
-                              className="text-sm text-blue-300 hover:text-blue-200 transition-colors"
+                              className="text-blue-400 hover:text-blue-300 text-xs transition-colors"
                             >
-                              Изменить
+                              Редактировать
                             </button>
                           )}
                         </div>
@@ -360,7 +360,7 @@ export const AdminCommissionsPage = () => {
                           className="w-40 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 outline-none focus:border-blue-500/40"
                         />
                       ) : (
-                        <span className="text-sm text-slate-200 font-mono">{r.value}</span>
+                        <span className="text-emerald-400 font-medium">{r.value}</span>
                       )}
                     </td>
                     <td className="py-3 px-2">
@@ -386,9 +386,9 @@ export const AdminCommissionsPage = () => {
                         ) : (
                           <button
                             onClick={() => startEdit(r)}
-                            className="text-sm text-blue-300 hover:text-blue-200 transition-colors"
+                            className="text-blue-400 hover:text-blue-300 text-xs transition-colors"
                           >
-                            Изменить
+                            Редактировать
                           </button>
                         )}
                       </div>
@@ -447,7 +447,7 @@ export const AdminCommissionsPage = () => {
                           className="w-40 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 outline-none focus:border-blue-500/40"
                         />
                       ) : (
-                        <span className="text-sm text-slate-200 font-mono">{r.value}</span>
+                        <span className="text-emerald-400 font-medium">{r.value}</span>
                       )}
                     </td>
                     <td className="py-3 px-2">
@@ -473,9 +473,9 @@ export const AdminCommissionsPage = () => {
                         ) : (
                           <button
                             onClick={() => startEdit(r)}
-                            className="text-sm text-blue-300 hover:text-blue-200 transition-colors"
+                            className="text-blue-400 hover:text-blue-300 text-xs transition-colors"
                           >
-                            Изменить
+                            Редактировать
                           </button>
                         )}
                       </div>

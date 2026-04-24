@@ -8,7 +8,6 @@ import {
   MessageSquare,
   UserPlus,
   ListOrdered,
-  Lock,
   RefreshCw,
   Pencil,
   Trash2,
@@ -127,11 +126,6 @@ export const AdminDashboardPage = () => {
   const [vpnEditing, setVpnEditing] = useState(false);
   const [copiedRef, setCopiedRef] = useState<string | null>(null);
 
-  const [pin, setPin] = useState('');
-  const [pinSaving, setPinSaving] = useState(false);
-  const [pinOk, setPinOk] = useState(false);
-  const [pinError, setPinError] = useState('');
-
   const load = async () => {
     setLoading(true);
     setError('');
@@ -161,22 +155,6 @@ export const AdminDashboardPage = () => {
     if (Number.isFinite(n)) return `€${n.toLocaleString('ru-RU')}`;
     return `€${stats.totalBalance}`;
   }, [stats]);
-
-  const savePIN = async () => {
-    setPinSaving(true);
-    setPinOk(false);
-    setPinError('');
-    try {
-      await apiClient.patch('/admin/staff-pin', { pin });
-      setPin('');
-      setPinOk(true);
-      window.setTimeout(() => setPinOk(false), 2500);
-    } catch {
-      setPinError('Не удалось изменить PIN');
-    } finally {
-      setPinSaving(false);
-    }
-  };
 
   const fetchAezaBalance = async () => {
     setAezaLoading(true);
@@ -332,39 +310,6 @@ export const AdminDashboardPage = () => {
           value={stats ? stats.totalCards : loading ? '…' : '—'}
           accent="bg-slate-500/20 border border-white/10"
         />
-      </div>
-
-      <div className="glass-card p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-purple-600 flex items-center justify-center">
-            <Lock className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <p className="text-white font-semibold">PIN админки</p>
-            <p className="text-sm text-slate-400">Смена PIN для входа (4 цифры)</p>
-          </div>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-          <input
-            value={pin}
-            onChange={(e) => { setPin(e.target.value.replace(/[^\d]/g, '').slice(0, 4)); setPinError(''); }}
-            inputMode="numeric"
-            pattern="[0-9]*"
-            maxLength={4}
-            placeholder="0000"
-            className="w-full sm:max-w-[240px] bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-center text-lg tracking-[0.3em] font-mono outline-none focus:border-blue-500/40"
-          />
-          <button
-            onClick={savePIN}
-            disabled={pinSaving || pin.length !== 4}
-            className="px-5 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-sm font-semibold transition-colors disabled:opacity-50"
-          >
-            {pinSaving ? '...' : 'Сохранить'}
-          </button>
-          {pinOk ? <span className="text-sm text-emerald-400">Сохранено</span> : null}
-        </div>
-        {pinError ? <p className="text-sm text-red-400 mt-3">{pinError}</p> : null}
       </div>
 
       {/* ── Финансы VPN ── */}

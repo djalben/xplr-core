@@ -27,13 +27,6 @@ const NavLink = ({ to, label, icon }: { to: string; label: string; icon?: React.
   );
 };
 
-const Placeholder = ({ title }: { title: string }) => (
-  <div className="glass-card p-6">
-    <h1 className="text-xl font-bold text-white mb-2">{title}</h1>
-    <p className="text-sm text-slate-400">Страница в разработке. API уже вынесено в отдельные админские ручки.</p>
-  </div>
-);
-
 export const AdminApp: React.FC = () => {
   return (
     <AdminLayout>

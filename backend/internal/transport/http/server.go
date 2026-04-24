@@ -133,6 +133,40 @@ func parseCORSOrigins(s string) []string {
 	return out
 }
 
+func (s *Server) handleSBPStatus(w http.ResponseWriter, r *http.Request) {
+	enabled := true
+
+	list, err := s.container.SystemRepo.ListAll(r.Context())
+	if err != nil {
+		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+
+		return
+	}
+
+	for _, row := range list {
+		if row == nil || row.Key != "sbp_topup_enabled" {
+			continue
+		}
+		if row.BoolValue != nil {
+			enabled = *row.BoolValue
+
+			break
+		}
+
+		value := strings.TrimSpace(strings.ToLower(row.Value))
+		if value == "0" || value == "false" || value == "off" {
+			enabled = false
+		}
+
+		break
+	}
+
+	handler.WriteJSON(w, http.StatusOK, map[string]any{
+		"sbp_enabled": enabled,
+		"enabled":     enabled,
+	})
+}
+
 func (s *Server) setupRoutes(jwtSecret []byte) {
 	s.router.Route("/api", func(r chi.Router) {
 		r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
@@ -150,6 +184,9 @@ func (s *Server) setupRoutes(jwtSecret []byte) {
 					"eur": 97.82,
 				})
 			})
+
+			// Public: статус пополнения через СБП нужен модалке до попытки платежа.
+			r.Get("/sbp-status", s.handleSBPStatus)
 
 			// Protected: user (BFF), wallet, card, transaction, ticket
 			r.Group(func(r chi.Router) {

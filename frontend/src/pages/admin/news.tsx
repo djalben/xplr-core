@@ -139,7 +139,7 @@ export const AdminNewsPage = () => {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-white">Новости</h1>
-          <p className="text-sm text-slate-400 mt-1">Draft/Publish/Archive + редактирование</p>
+          <p className="text-sm text-slate-400 mt-1">Черновики, публикация, архив и редактирование</p>
         </div>
         <button
           onClick={load}
@@ -246,7 +246,7 @@ export const AdminNewsPage = () => {
                       <div className="flex justify-end gap-2">
                         <button
                           onClick={() => openEdit(n)}
-                          className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-xs font-semibold transition-colors"
+                          className="text-blue-400 hover:text-blue-300 text-xs transition-colors"
                         >
                           Редактировать
                         </button>
@@ -258,7 +258,7 @@ export const AdminNewsPage = () => {
                             title="Снять с публикации"
                           >
                             <EyeOff className="w-4 h-4" />
-                            Draft
+                            В черновик
                           </button>
                         ) : (
                           <button
@@ -268,7 +268,7 @@ export const AdminNewsPage = () => {
                             title="Опубликовать"
                           >
                             <Eye className="w-4 h-4" />
-                            Publish
+                            Опубликовать
                           </button>
                         )}
                         <button
@@ -278,7 +278,7 @@ export const AdminNewsPage = () => {
                           title="Удалить"
                         >
                           <Trash2 className="w-4 h-4" />
-                          Del
+                          Удалить
                         </button>
                       </div>
                     </td>

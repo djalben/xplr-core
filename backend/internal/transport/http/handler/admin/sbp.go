@@ -2,6 +2,7 @@ package admin
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler"
@@ -10,7 +11,21 @@ import (
 )
 
 func (h *Handler) RegisterSBP(r chi.Router) {
+	r.Get("/sbp-topup", h.GetSBPTopup)
 	r.Patch("/sbp-topup", h.PatchSBPTopup)
+}
+
+func (h *Handler) GetSBPTopup(w http.ResponseWriter, r *http.Request) {
+	enabled, err := h.sbpTopupEnabled(r)
+	if err != nil {
+		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+
+		return
+	}
+
+	handler.WriteJSON(w, http.StatusOK, map[string]any{
+		"enabled": enabled,
+	})
 }
 
 // PatchSBPTopup — PATCH /admin/sbp-topup { enabled: bool }.
@@ -42,4 +57,28 @@ func (h *Handler) PatchSBPTopup(w http.ResponseWriter, r *http.Request) {
 		"status":  "success",
 		"enabled": req.Enabled,
 	})
+}
+
+func (h *Handler) sbpTopupEnabled(r *http.Request) (bool, error) {
+	list, err := h.systemRepo.ListAll(r.Context())
+	if err != nil {
+		return false, wrapper.Wrap(err)
+	}
+
+	for _, row := range list {
+		if row == nil || row.Key != "sbp_topup_enabled" {
+			continue
+		}
+		if row.BoolValue != nil {
+			return *row.BoolValue, nil
+		}
+		value := strings.TrimSpace(strings.ToLower(row.Value))
+		if value == "0" || value == "false" || value == "off" {
+			return false, nil
+		}
+
+		return true, nil
+	}
+
+	return true, nil
 }

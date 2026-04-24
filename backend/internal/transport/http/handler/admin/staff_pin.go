@@ -15,7 +15,33 @@ import (
 var staffPinRe = regexp.MustCompile(`^\d{4}$`)
 
 func (h *Handler) RegisterStaffPIN(r chi.Router) {
+	r.Get("/staff-pin", h.GetStaffPIN)
 	r.Patch("/staff-pin", h.PatchStaffPIN)
+}
+
+func (h *Handler) GetStaffPIN(w http.ResponseWriter, r *http.Request) {
+	list, err := h.systemRepo.ListAll(r.Context())
+	if err != nil {
+		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+
+		return
+	}
+
+	pin := ""
+	for _, row := range list {
+		if row.Key != "admin_pin" {
+			continue
+		}
+
+		value := strings.TrimSpace(row.Value)
+		if staffPinRe.MatchString(value) {
+			pin = value
+		}
+
+		break
+	}
+
+	handler.WriteJSON(w, http.StatusOK, map[string]string{"pin": pin})
 }
 
 func (h *Handler) PatchStaffPIN(w http.ResponseWriter, r *http.Request) {

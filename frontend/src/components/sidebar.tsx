@@ -252,7 +252,7 @@ const StaffPinModal = ({ open, onClose }: { open: boolean; onClose: () => void }
           pattern="[0-9]*"
           maxLength={4}
           value={pin}
-          onChange={e => { setPin(e.target.value); setError(false); }}
+          onChange={e => { setPin(e.target.value.replace(/[^\d]/g, '').slice(0, 4)); setError(false); }}
           placeholder="PIN"
           autoFocus
           className={`w-full px-4 py-3 bg-white/5 border rounded-xl text-white text-center text-lg tracking-[0.3em] font-mono placeholder-slate-600 outline-none transition-colors ${
