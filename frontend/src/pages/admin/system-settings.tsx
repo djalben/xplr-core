@@ -46,8 +46,6 @@ export const AdminSystemSettingsPage = () => {
   const [pinOk, setPinOk] = useState(false);
   const [pinError, setPinError] = useState('');
   const [pinVisible, setPinVisible] = useState(false);
-  const [currentPin, setCurrentPin] = useState('');
-  const [pinLoading, setPinLoading] = useState(false);
 
   const [vpnLoading, setVpnLoading] = useState(false);
   const [vpnSaving, setVpnSaving] = useState(false);
@@ -84,22 +82,8 @@ export const AdminSystemSettingsPage = () => {
 
   useEffect(() => {
     loadSBP();
-    loadPIN();
     loadVPNInfra();
   }, []);
-
-  const loadPIN = async () => {
-    setPinLoading(true);
-    setPinError('');
-    try {
-      const res = await apiClient.get<{ pin?: string }>('/admin/staff-pin');
-      setCurrentPin(res.data?.pin || '');
-    } catch {
-      setPinError('Не удалось загрузить PIN');
-    } finally {
-      setPinLoading(false);
-    }
-  };
 
   const loadVPNInfra = async () => {
     setVpnLoading(true);
@@ -184,8 +168,8 @@ export const AdminSystemSettingsPage = () => {
     setPinError('');
     try {
       await apiClient.patch('/admin/staff-pin', { pin });
-      setCurrentPin(pin);
       setPin('');
+      setPinVisible(false);
       setPinOk(true);
       window.setTimeout(() => setPinOk(false), 2500);
     } catch {
@@ -235,41 +219,31 @@ export const AdminSystemSettingsPage = () => {
           </div>
           <div>
             <p className="text-white font-semibold">PIN админки</p>
-            <p className="text-sm text-slate-400">Текущий PIN и смена PIN для входа (4 цифры)</p>
+            <p className="text-sm text-slate-400">Задать новый PIN для входа (4 цифры)</p>
           </div>
-        </div>
-
-        <div className="mb-4">
-          <label className="text-xs text-slate-500">Текущий PIN</label>
-          <div className="mt-2 flex items-center gap-2">
-            <div className="w-full sm:max-w-[240px] bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-center text-lg tracking-[0.3em] font-mono">
-              {pinLoading ? '....' : pinVisible ? (currentPin || '****') : '****'}
-            </div>
-            <button
-              type="button"
-              onClick={() => setPinVisible((v) => !v)}
-              className="p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 transition-colors"
-              title={pinVisible ? 'Скрыть PIN' : 'Показать PIN'}
-            >
-              {pinVisible ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-            </button>
-          </div>
-          {!currentPin && !pinLoading ? (
-            <p className="mt-2 text-xs text-slate-500">PIN уже хранится как bcrypt-хэш, поэтому показать исходные цифры нельзя. Задайте новый PIN ниже.</p>
-          ) : null}
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-          <input
-            value={pin}
-            onChange={(e) => { setPin(e.target.value.replace(/[^\d]/g, '').slice(0, 4)); setPinError(''); }}
-            inputMode="numeric"
-            pattern="[0-9]*"
-            type="password"
-            maxLength={4}
-            placeholder="0000"
-            className="w-full sm:max-w-[240px] bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-center text-lg tracking-[0.3em] font-mono outline-none focus:border-blue-500/40"
-          />
+          <div className="relative w-full sm:max-w-[240px]">
+            <input
+              value={pin}
+              onChange={(e) => { setPin(e.target.value.replace(/[^\d]/g, '').slice(0, 4)); setPinError(''); }}
+              inputMode="numeric"
+              pattern="[0-9]*"
+              type={pinVisible ? 'text' : 'password'}
+              maxLength={4}
+              placeholder="0000"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 pr-12 text-white text-center text-lg tracking-[0.3em] font-mono outline-none focus:border-blue-500/40"
+            />
+            <button
+              type="button"
+              onClick={() => setPinVisible((v) => !v)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-colors"
+              title={pinVisible ? 'Скрыть PIN' : 'Показать PIN'}
+            >
+              {pinVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
           <button
             onClick={savePIN}
             disabled={pinSaving || pin.length !== 4}
