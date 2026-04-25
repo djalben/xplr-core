@@ -316,6 +316,10 @@
     "avgResponseTime": "5分钟内",
     "error": "出了点问题，请重试。",
     "sendError": "发送消息失败",
+    "ticketCreated": "请求已发送",
+    "sent": "已发送",
+    "requestSent": "请求已发送。客服将尽快回复。",
+    "createNewRequest": "创建新请求",
     "topics": {
       "cards": "银行卡",
       "cardsDesc": "开卡、冻结、限额",

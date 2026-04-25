@@ -316,6 +316,10 @@
     "avgResponseTime": "5 dakikaya kadar",
     "error": "Bir hata oluştu. Lütfen tekrar deneyin.",
     "sendError": "Mesaj gönderilemedi",
+    "ticketCreated": "Talep gönderildi",
+    "sent": "Gönderildi",
+    "requestSent": "Talep gönderildi. Destek kısa süre içinde yanıt verecek.",
+    "createNewRequest": "Yeni talep oluştur",
     "topics": {
       "cards": "Kartlar",
       "cardsDesc": "Düzenleme, engelleme, limitler",

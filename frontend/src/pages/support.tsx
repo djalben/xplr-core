@@ -29,14 +29,12 @@ interface ChatMessage {
 
 interface Conversation {
   id: number;
-  user_id: number;
+  user_id?: number;
   topic: string;
   status: string;
   created_at: string;
   updated_at: string;
 }
-
-const POLL_INTERVAL = 5000;
 
 export const SupportPage = () => {
   const { t } = useTranslation();
@@ -44,10 +42,9 @@ export const SupportPage = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
     setToast({ msg, type });
@@ -58,55 +55,19 @@ export const SupportPage = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
-  // Try to load existing open conversation on mount
-  useEffect(() => {
-    apiClient.post('/user/chat/start', { topic: '__check__' })
-      .then(res => {
-        if (res.data?.conversation?.status === 'open' && res.data.conversation.topic !== '__check__') {
-          setConversation(res.data.conversation);
-          setMessages(res.data.messages || []);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
-  // Poll for new messages when conversation is active (also poll 'closed' briefly to get final system msg)
-  useEffect(() => {
-    if (!conversation) return;
-
-    const poll = () => {
-      apiClient.get(`/user/chat/messages/${conversation.id}`)
-        .then(res => {
-          const newMsgs: ChatMessage[] = res.data?.messages || [];
-          setMessages(prev => {
-            if (newMsgs.length !== prev.length) return newMsgs;
-            return prev;
-          });
-          // Update conversation status
-          if (res.data?.conversation) setConversation(res.data.conversation);
-        })
-        .catch(() => {});
-    };
-
-    pollRef.current = setInterval(poll, POLL_INTERVAL);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [conversation]);
-
   // Auto-scroll on new messages
   useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
 
-  const startConversation = async (topic: string) => {
-    setLoading(true);
-    try {
-      const res = await apiClient.post('/user/chat/start', { topic });
-      setConversation(res.data.conversation);
-      setMessages(res.data.messages || []);
-    } catch {
-      showToast(t('support.error'), 'err');
-    } finally {
-      setLoading(false);
-    }
+  const startConversation = (topic: string) => {
+    const now = new Date().toISOString();
+    setConversation({
+      id: Date.now(),
+      topic,
+      status: 'open',
+      created_at: now,
+      updated_at: now,
+    });
+    setMessages([]);
   };
 
   const handleSend = async () => {
@@ -115,8 +76,19 @@ export const SupportPage = () => {
     setSending(true);
     setInput('');
     try {
-      const res = await apiClient.post(`/user/chat/send/${conversation.id}`, { message: text });
-      setMessages(prev => [...prev, res.data]);
+      const topic = t(`support.topics.${conversation.topic}`);
+      await apiClient.post('/user/support', { message: `[${topic}]\n\n${text}` });
+      const now = new Date().toISOString();
+      setMessages(prev => [...prev, {
+        id: Date.now(),
+        conversation_id: conversation.id,
+        sender_type: 'user',
+        sender_name: 'You',
+        body: text,
+        created_at: now,
+      }]);
+      setConversation(prev => prev ? { ...prev, status: 'closed', updated_at: now } : prev);
+      showToast(t('support.ticketCreated'), 'ok');
     } catch {
       showToast(t('support.sendError'), 'err');
       setInput(text);
@@ -127,14 +99,9 @@ export const SupportPage = () => {
 
   const handleClose = async () => {
     if (!conversation) return;
-    try {
-      await apiClient.post(`/user/chat/close/${conversation.id}`);
-      setConversation(null);
-      setMessages([]);
-      showToast(t('support.chatClosed'), 'ok');
-    } catch {
-      showToast(t('support.error'), 'err');
-    }
+    setConversation(null);
+    setMessages([]);
+    showToast(t('support.chatClosed'), 'ok');
   };
 
   const topics = [
@@ -232,7 +199,7 @@ export const SupportPage = () => {
                 ) : (
                   <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-500/20 text-slate-400 text-xs font-medium">
                     <Lock className="w-3 h-3" />
-                    Решён
+                    {t('support.sent')}
                   </span>
                 )}
                 {conversation.status === 'open' && (
@@ -298,13 +265,13 @@ export const SupportPage = () => {
               <div className="p-4 border-t border-white/10 text-center">
                 <div className="flex items-center justify-center gap-2 text-slate-400 mb-3">
                   <CheckCircle className="w-5 h-5 text-emerald-400" />
-                  <span className="text-sm font-medium">Вопрос решён</span>
+                  <span className="text-sm font-medium">{t('support.requestSent')}</span>
                 </div>
                 <button
                   onClick={() => { setConversation(null); setMessages([]); }}
                   className="px-6 py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium transition-colors"
                 >
-                  Создать новый запрос
+                  {t('support.createNewRequest')}
                 </button>
               </div>
             )}

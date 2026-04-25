@@ -311,6 +311,10 @@
     "avgResponseTime": "up to 5 minutes",
     "error": "Something went wrong. Please try again.",
     "sendError": "Failed to send message",
+    "ticketCreated": "Request sent",
+    "sent": "Sent",
+    "requestSent": "Request sent. Support will reply shortly.",
+    "createNewRequest": "Create new request",
     "topics": {
       "cards": "Cards",
       "cardsDesc": "Issuance, blocking, limits",

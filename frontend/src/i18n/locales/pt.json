@@ -316,6 +316,10 @@
     "avgResponseTime": "até 5 minutos",
     "error": "Algo deu errado. Tente novamente.",
     "sendError": "Falha ao enviar mensagem",
+    "ticketCreated": "Solicitação enviada",
+    "sent": "Enviada",
+    "requestSent": "Solicitação enviada. O suporte responderá em breve.",
+    "createNewRequest": "Criar nova solicitação",
     "topics": {
       "cards": "Cartões",
       "cardsDesc": "Emissão, bloqueio, limites",
