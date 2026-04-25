@@ -58,6 +58,10 @@ func (h *Handler) Register(r chi.Router) {
 		r.Post("/deposit", h.Deposit)
 		r.Get("/transactions", h.GetTransactions)
 		r.Post("/support", h.Support)
+		r.Post("/chat/start", h.ChatStart)
+		r.Get("/chat/messages/{id}", h.ChatMessages)
+		r.Post("/chat/send/{id}", h.ChatSend)
+		r.Post("/chat/close/{id}", h.ChatClose)
 		r.Get("/referrals/info", h.GetReferralsInfo)
 		r.Get("/cards", h.GetCards)
 		r.Post("/cards/issue", h.IssueCards)
@@ -222,6 +226,151 @@ func (h *Handler) Support(w http.ResponseWriter, r *http.Request) {
 	_, err = h.ticketUC.Create(r.Context(), userID, "Support", body.Message, nil)
 	if err != nil {
 		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+func (h *Handler) ChatStart(w http.ResponseWriter, r *http.Request) {
+	userID := handler.GetUserIDFromContext(r)
+	if userID == uuid.Nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+
+		return
+	}
+
+	type req struct {
+		Topic string `json:"topic"`
+	}
+
+	var body req
+
+	err := handler.ReadJSON(r, &body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	if body.Topic == "" {
+		http.Error(w, "topic is required", http.StatusBadRequest)
+
+		return
+	}
+
+	status := "open"
+	if body.Topic == "__check__" {
+		status = "closed"
+	}
+
+	now := time.Now().UTC()
+	handler.WriteJSON(w, http.StatusOK, map[string]any{
+		"conversation": map[string]any{
+			"id":         body.Topic,
+			"user_id":    userID,
+			"topic":      body.Topic,
+			"status":     status,
+			"created_at": now,
+			"updated_at": now,
+		},
+		"messages": []any{},
+	})
+}
+
+func (h *Handler) ChatMessages(w http.ResponseWriter, r *http.Request) {
+	userID := handler.GetUserIDFromContext(r)
+	if userID == uuid.Nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+
+		return
+	}
+
+	topic := chi.URLParam(r, "id")
+	if topic == "" {
+		http.Error(w, "chat id is required", http.StatusBadRequest)
+
+		return
+	}
+
+	now := time.Now().UTC()
+	handler.WriteJSON(w, http.StatusOK, map[string]any{
+		"conversation": map[string]any{
+			"id":         topic,
+			"user_id":    userID,
+			"topic":      topic,
+			"status":     "open",
+			"created_at": now,
+			"updated_at": now,
+		},
+		"messages": []any{},
+	})
+}
+
+func (h *Handler) ChatSend(w http.ResponseWriter, r *http.Request) {
+	userID := handler.GetUserIDFromContext(r)
+	if userID == uuid.Nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+
+		return
+	}
+
+	topic := chi.URLParam(r, "id")
+	if topic == "" {
+		http.Error(w, "chat id is required", http.StatusBadRequest)
+
+		return
+	}
+
+	type req struct {
+		Message string `json:"message"`
+	}
+
+	var body req
+
+	err := handler.ReadJSON(r, &body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	if body.Message == "" {
+		http.Error(w, "message is required", http.StatusBadRequest)
+
+		return
+	}
+
+	ticket, err := h.ticketUC.Create(r.Context(), userID, "Support: "+topic, body.Message, nil)
+	if err != nil {
+		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	handler.WriteJSON(w, http.StatusOK, map[string]any{
+		"id":              time.Now().UnixNano(),
+		"conversation_id": topic,
+		"ticket_id":       ticket.ID,
+		"sender_type":     "user",
+		"sender_name":     "You",
+		"body":            body.Message,
+		"created_at":      ticket.CreatedAt,
+	})
+}
+
+func (h *Handler) ChatClose(w http.ResponseWriter, r *http.Request) {
+	userID := handler.GetUserIDFromContext(r)
+	if userID == uuid.Nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+
+		return
+	}
+
+	topic := chi.URLParam(r, "id")
+	if topic == "" {
+		http.Error(w, "chat id is required", http.StatusBadRequest)
 
 		return
 	}

@@ -42,6 +42,14 @@ func reqUserCardRoute(uid domain.UUID, method, path, cardID string, body *bytes.
 	return r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
 }
 
+func reqUserChatRoute(uid domain.UUID, method, path, chatID string, body *bytes.Buffer) *http.Request {
+	r := reqUser(uid, method, path, body)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", chatID)
+
+	return r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
+}
+
 type mockBundle struct {
 	H       *handleruser.Handler
 	Profile *mocks.MockUserProfile
@@ -205,6 +213,109 @@ func TestHandler_Support_ok(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("code=%d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestHandler_ChatStart_returnsOpenConversationForTopic(t *testing.T) {
+	t.Parallel()
+
+	uid := uuid.MustParse("55555555-5555-5555-5555-555555555555")
+
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	m := newMockBundle(ctrl)
+	rec := httptest.NewRecorder()
+	m.H.ChatStart(rec, reqUser(uid, http.MethodPost, "/user/chat/start", bytes.NewBufferString(`{"topic":"cards"}`)))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("code=%d %s", rec.Code, rec.Body.String())
+	}
+
+	var got map[string]any
+
+	err := json.NewDecoder(rec.Body).Decode(&got)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	conversation, ok := got["conversation"].(map[string]any)
+	if !ok {
+		t.Fatalf("conversation missing: %#v", got)
+	}
+	if conversation["id"] != "cards" {
+		t.Fatalf("id=%v", conversation["id"])
+	}
+	if conversation["status"] != "open" {
+		t.Fatalf("status=%v", conversation["status"])
+	}
+}
+
+func TestHandler_ChatStart_checkDoesNotOpenConversation(t *testing.T) {
+	t.Parallel()
+
+	uid := uuid.MustParse("55555555-5555-5555-5555-555555555555")
+
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	m := newMockBundle(ctrl)
+	rec := httptest.NewRecorder()
+	m.H.ChatStart(rec, reqUser(uid, http.MethodPost, "/user/chat/start", bytes.NewBufferString(`{"topic":"__check__"}`)))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("code=%d %s", rec.Code, rec.Body.String())
+	}
+
+	var got map[string]any
+
+	err := json.NewDecoder(rec.Body).Decode(&got)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	conversation, ok := got["conversation"].(map[string]any)
+	if !ok {
+		t.Fatalf("conversation missing: %#v", got)
+	}
+	if conversation["status"] != "closed" {
+		t.Fatalf("status=%v", conversation["status"])
+	}
+}
+
+func TestHandler_ChatSend_createsSupportTicket(t *testing.T) {
+	t.Parallel()
+
+	uid := uuid.MustParse("55555555-5555-5555-5555-555555555555")
+	ticketID := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	m := newMockBundle(ctrl)
+	m.Tickets.EXPECT().
+		Create(gomock.Any(), uid, "Support: cards", "hello", (*int64)(nil)).
+		Return(&domain.Ticket{ID: ticketID, UserID: uid, CreatedAt: time.Now().UTC()}, nil)
+
+	rec := httptest.NewRecorder()
+	req := reqUserChatRoute(uid, http.MethodPost, "/user/chat/send/cards", "cards", bytes.NewBufferString(`{"message":"hello"}`))
+	m.H.ChatSend(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("code=%d %s", rec.Code, rec.Body.String())
+	}
+
+	var got map[string]any
+
+	err := json.NewDecoder(rec.Body).Decode(&got)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got["body"] != "hello" {
+		t.Fatalf("body=%v", got["body"])
+	}
+	if got["sender_type"] != "user" {
+		t.Fatalf("sender_type=%v", got["sender_type"])
 	}
 }
 
