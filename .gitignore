@@ -26,7 +26,13 @@ web-build/
 
 # ============ IDE & Editors ============
 .vscode/
-.cursor/
+# Cursor
+# Ignore everything in .cursor by default, but keep project rules/skills tracked.
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
+!.cursor/skills/
+!.cursor/skills/**
 .idea/
 *.swp
 *.swo

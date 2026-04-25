@@ -1,0 +1,38 @@
+---
+description: Ban inline err-handling in if init statements in Go
+globs: **/*.go
+alwaysApply: false
+---
+
+# Go: no inline err handling in `if`
+
+Never write error handling using an `if` init statement (with `;`) such as:
+
+```go
+// ❌ BAD
+if v, err := strconv.Atoi(s); err == nil {
+    limit = v
+}
+
+// ❌ BAD
+if err := repo.Update(ctx, u); err != nil {
+    return err
+}
+```
+
+Always split into separate assignment + `if err != nil` check:
+
+```go
+// ✅ GOOD
+v, err := strconv.Atoi(s)
+if err == nil {
+    limit = v
+}
+
+// ✅ GOOD
+err = repo.Update(ctx, u)
+if err != nil {
+    return err
+}
+```
+
