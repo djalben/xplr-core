@@ -3,7 +3,11 @@ package auth
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	"github.com/djalben/xplr-core/backend/internal/pkg/utils"
@@ -15,20 +19,24 @@ import (
 const (
 	roleUser  = "user"
 	roleAdmin = "admin"
+
+	trustedDeviceCookieName = "xplr_trusted_device"
 )
 
 type Handler struct {
 	authUC    AuthFlow
 	walletUC  WalletBalanceProvider
 	userRepo  UserByIDReader
+	limiter   RateLimiter
 	jwtSecret []byte
 }
 
-func NewHandler(authUC AuthFlow, walletUC WalletBalanceProvider, userRepo UserByIDReader, jwtSecret []byte) *Handler {
+func NewHandler(authUC AuthFlow, walletUC WalletBalanceProvider, userRepo UserByIDReader, limiter RateLimiter, jwtSecret []byte) *Handler {
 	return &Handler{
 		authUC:    authUC,
 		walletUC:  walletUC,
 		userRepo:  userRepo,
+		limiter:   limiter,
 		jwtSecret: jwtSecret,
 	}
 }
@@ -94,11 +102,46 @@ func (h *Handler) DoLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out, err := h.authUC.Login(r.Context(), req.Email, req.Password)
+	now := time.Now().UTC()
+	ip := clientIP(r)
+	ipStr := ""
+	if ip != nil {
+		ipStr = *ip
+	}
+	rlKey := "login:" + ipStr + ":" + strings.ToLower(strings.TrimSpace(req.Email))
+	if h.limiter != nil {
+		allowed, retryAfter, errAllow := h.limiter.Allow(r.Context(), rlKey, now)
+		if errAllow != nil {
+			http.Error(w, wrapper.Wrap(errAllow).Error(), http.StatusInternalServerError)
+
+			return
+		}
+		if !allowed {
+			w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())))
+			http.Error(w, "Too many attempts", http.StatusTooManyRequests)
+
+			return
+		}
+	}
+
+	var trustedToken string
+	c, errCookie := r.Cookie(trustedDeviceCookieName)
+	if errCookie == nil && c != nil {
+		trustedToken = strings.TrimSpace(c.Value)
+	}
+
+	out, err := h.authUC.LoginWithTrustedDevice(r.Context(), req.Email, req.Password, trustedToken, now)
 	if err != nil {
+		if h.limiter != nil {
+			_, _ = h.limiter.Fail(r.Context(), rlKey, now)
+		}
 		http.Error(w, err.Error(), http.StatusBadRequest)
 
 		return
+	}
+
+	if h.limiter != nil {
+		_ = h.limiter.Success(r.Context(), rlKey, now)
 	}
 
 	if out.MFAToken != "" {
@@ -115,8 +158,9 @@ func (h *Handler) DoLogin(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) DoLoginMFA(w http.ResponseWriter, r *http.Request) {
 	type request struct {
-		MFAToken string `json:"mfaToken"`
-		TOTPCode string `json:"totpCode"`
+		MFAToken       string `json:"mfaToken"`
+		TOTPCode       string `json:"totpCode"`
+		RememberDevice bool   `json:"rememberDevice"`
 	}
 
 	var req request
@@ -128,14 +172,87 @@ func (h *Handler) DoLoginMFA(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	now := time.Now().UTC()
+	ip := clientIP(r)
+	ipStr := ""
+	if ip != nil {
+		ipStr = *ip
+	}
+
+	userID, _, errParse := utils.ValidateMFAPendingJWT(h.jwtSecret, req.MFAToken)
+	if errParse != nil {
+		http.Error(w, "invalid or expired mfa token", http.StatusBadRequest)
+
+		return
+	}
+
+	rlKey := "mfa:" + ipStr + ":" + userID.String()
+	if h.limiter != nil {
+		allowed, retryAfter, errAllow := h.limiter.Allow(r.Context(), rlKey, now)
+		if errAllow != nil {
+			http.Error(w, wrapper.Wrap(errAllow).Error(), http.StatusInternalServerError)
+
+			return
+		}
+		if !allowed {
+			w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())))
+			http.Error(w, "Too many attempts", http.StatusTooManyRequests)
+
+			return
+		}
+	}
+
 	user, err := h.authUC.CompleteMFALogin(r.Context(), req.MFAToken, req.TOTPCode)
 	if err != nil {
+		if h.limiter != nil {
+			_, _ = h.limiter.Fail(r.Context(), rlKey, now)
+		}
 		http.Error(w, err.Error(), http.StatusBadRequest)
 
 		return
 	}
 
+	if h.limiter != nil {
+		_ = h.limiter.Success(r.Context(), rlKey, now)
+	}
+
+	if req.RememberDevice {
+		ua := strings.TrimSpace(r.UserAgent())
+		raw, exp, errRemember := h.authUC.RememberTrustedDevice(r.Context(), user.ID, ua, ip, now)
+		if errRemember != nil {
+			http.Error(w, errRemember.Error(), http.StatusBadRequest)
+
+			return
+		}
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     trustedDeviceCookieName,
+			Value:    raw,
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   true,
+			SameSite: http.SameSiteLaxMode,
+			Expires:  exp,
+		})
+	}
+
 	h.issueAuthToken(r.Context(), w, user)
+}
+
+func clientIP(r *http.Request) *string {
+	// chi/middleware.RealIP уже может выставить корректный RemoteAddr, но надёжнее разобрать host:port.
+	addr := strings.TrimSpace(r.RemoteAddr)
+	if addr == "" {
+		return nil
+	}
+
+	host, _, err := net.SplitHostPort(addr)
+	if err == nil && host != "" {
+		return &host
+	}
+
+	// На случай если RemoteAddr уже без порта.
+	return &addr
 }
 
 func (h *Handler) VerifyEmail(w http.ResponseWriter, r *http.Request) {

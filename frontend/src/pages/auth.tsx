@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Wifi, Eye, EyeOff, Lock, Mail, ChevronRight, ArrowLeft, Check, X } from 'lucide-react';
-import { login, register } from '../services/auth';
+import { login, loginMFA, register } from '../services/auth';
 import { useAuth } from '../store/auth-context';
 
 type AuthMode = 'login' | 'register';
@@ -45,6 +45,10 @@ export const AuthPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [mfaRequired, setMfaRequired] = useState(false);
+  const [mfaToken, setMfaToken] = useState('');
+  const [totpCode, setTotpCode] = useState('');
+  const [rememberDevice, setRememberDevice] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [registerOK, setRegisterOK] = useState('');
@@ -80,6 +84,38 @@ export const AuthPage = () => {
 
     setIsLoading(true);
     try {
+      if (mode === 'login' && mfaRequired) {
+        if (totpCode.trim().length !== 6) {
+          setError('Введите 6-значный код из приложения');
+          return;
+        }
+
+        const res = await loginMFA({ mfaToken, totpCode: totpCode.trim(), rememberDevice });
+
+        if (res.user) {
+          const u = res.user;
+          const adminFlag = u.is_admin === true || u.role === 'admin';
+          setUser({
+            id: String(u.id),
+            email: u.email,
+            name: u.email?.split('@')[0] || '',
+            role: 'OWNER',
+            avatar: (u.email || '??').substring(0, 2).toUpperCase(),
+            isAdmin: adminFlag,
+            serverRole: u.role || 'user',
+          });
+        }
+
+        const savedToken = localStorage.getItem('token');
+        if (!savedToken) {
+          setError(t('auth.noToken'));
+          return;
+        }
+
+        navigate('/dashboard');
+        return;
+      }
+
       const payload = { email, password };
       console.log('[Auth] Sending auth request:', { mode, email });
 
@@ -92,6 +128,13 @@ export const AuthPage = () => {
         setMode('login');
         setPassword('');
         setConfirmPassword('');
+        return;
+      }
+
+      if (mode === 'login' && res.mfaRequired && res.mfaToken) {
+        setMfaRequired(true);
+        setMfaToken(res.mfaToken);
+        setTotpCode('');
         return;
       }
 
@@ -171,7 +214,7 @@ export const AuthPage = () => {
           <div className="bg-white/[0.04] border border-white/[0.06] rounded-2xl p-1.5 flex shadow-2xl">
             <button
               type="button"
-              onClick={() => { setMode('login'); setError(''); }}
+              onClick={() => { setMode('login'); setError(''); setMfaRequired(false); setMfaToken(''); setTotpCode(''); }}
               className={`px-8 py-3 text-sm font-semibold rounded-xl transition-all duration-150 ${
                 mode === 'login'
                   ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/25'
@@ -182,7 +225,7 @@ export const AuthPage = () => {
             </button>
             <button
               type="button"
-              onClick={() => { setMode('register'); setError(''); }}
+              onClick={() => { setMode('register'); setError(''); setMfaRequired(false); setMfaToken(''); setTotpCode(''); }}
               className={`px-8 py-3 text-sm font-semibold rounded-xl transition-all duration-150 ${
                 mode === 'register'
                   ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/25'
@@ -254,6 +297,36 @@ export const AuthPage = () => {
 
             {/* ── Card header: logo + chip + NFC ── */}
             <div className="relative z-10">
+              {mode === 'login' && mfaRequired && (
+                <div className="mb-6 p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-slate-200">
+                  <div className="text-sm font-semibold mb-2">Подтвердите вход</div>
+                  <div className="text-xs text-slate-300 mb-4">
+                    Аккаунт защищён 2FA. Введите код из Google Authenticator.
+                  </div>
+
+                  <input
+                    type="text"
+                    value={totpCode}
+                    onChange={(e) => setTotpCode(e.target.value.replace(/\\D/g, '').slice(0, 6))}
+                    placeholder="123456"
+                    className="xplr-input w-full text-center tracking-widest text-lg mb-3"
+                    maxLength={6}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                  />
+
+                  <label className="flex items-center gap-2 text-xs text-slate-300 select-none">
+                    <input
+                      type="checkbox"
+                      checked={rememberDevice}
+                      onChange={(e) => setRememberDevice(e.target.checked)}
+                      className="accent-blue-500"
+                    />
+                    Запомнить это устройство (30 дней)
+                  </label>
+                </div>
+              )}
+
               <div className="flex items-start justify-between mb-8">
                 {/* Left: XPLR branding */}
                 <div className="flex items-center gap-3">

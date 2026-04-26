@@ -28,6 +28,7 @@ type TOTPSettings interface {
 	SetupTOTP(ctx context.Context, userID domain.UUID) (otpauthURL string, secret string, err error)
 	ConfirmTOTP(ctx context.Context, userID domain.UUID, code string) error
 	DisableTOTP(ctx context.Context, userID domain.UUID, password, code string) error
+	RevokeAllTrustedDevices(ctx context.Context, userID domain.UUID) error
 }
 
 // UserWallet — кошелёк в user-хендлере.

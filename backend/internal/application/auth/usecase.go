@@ -28,12 +28,13 @@ type LoginResult struct {
 
 // UseCase — регистрация, вход, email, сброс пароля, TOTP.
 type UseCase struct {
-	userRepo      ports.UserRepository
-	walletRepo    ports.WalletRepository
-	gradeRepo     ports.GradeRepository
-	jwtSecret     []byte
-	mailer        ports.Mailer
-	publicBaseURL string
+	userRepo          ports.UserRepository
+	walletRepo        ports.WalletRepository
+	gradeRepo         ports.GradeRepository
+	trustedDeviceRepo ports.TrustedDeviceRepository
+	jwtSecret         []byte
+	mailer            ports.Mailer
+	publicBaseURL     string
 }
 
 // NewUseCase — publicBaseURL без завершающего «/» (для ссылок в письмах).
@@ -41,17 +42,19 @@ func NewUseCase(
 	userRepo ports.UserRepository,
 	walletRepo ports.WalletRepository,
 	gradeRepo ports.GradeRepository,
+	trustedDeviceRepo ports.TrustedDeviceRepository,
 	jwtSecret []byte,
 	mailer ports.Mailer,
 	publicBaseURL string,
 ) *UseCase {
 	return &UseCase{
-		userRepo:      userRepo,
-		walletRepo:    walletRepo,
-		gradeRepo:     gradeRepo,
-		jwtSecret:     jwtSecret,
-		mailer:        mailer,
-		publicBaseURL: strings.TrimRight(publicBaseURL, "/"),
+		userRepo:          userRepo,
+		walletRepo:        walletRepo,
+		gradeRepo:         gradeRepo,
+		trustedDeviceRepo: trustedDeviceRepo,
+		jwtSecret:         jwtSecret,
+		mailer:            mailer,
+		publicBaseURL:     strings.TrimRight(publicBaseURL, "/"),
 	}
 }
 
@@ -123,8 +126,17 @@ func (uc *UseCase) Register(ctx context.Context, email, password string) (*domai
 }
 
 func (uc *UseCase) Login(ctx context.Context, email, password string) (*LoginResult, error) {
+	return uc.LoginWithTrustedDevice(ctx, email, password, "", time.Time{})
+}
+
+const trustedDeviceTTL = 30 * 24 * time.Hour
+
+func (uc *UseCase) LoginWithTrustedDevice(ctx context.Context, email, password, trustedDeviceToken string, now time.Time) (*LoginResult, error) {
 	if email == "" || password == "" {
 		return nil, domain.NewInvalidInput("email and password are required")
+	}
+	if now.IsZero() {
+		now = time.Now().UTC()
 	}
 
 	user, err := uc.userRepo.GetByEmail(ctx, email)
@@ -148,16 +160,31 @@ func (uc *UseCase) Login(ctx context.Context, email, password string) (*LoginRes
 		return nil, domain.NewInvalidInput("invalid email or password")
 	}
 
-	if user.TOTPEnabled && user.TOTPSecret != nil && *user.TOTPSecret != "" {
-		mfaTok, errJWT := utils.GenerateMFAPendingJWT(uc.jwtSecret, user.ID, user.Email)
-		if errJWT != nil {
-			return nil, wrapper.Wrap(errJWT)
-		}
-
-		return &LoginResult{User: user, MFAToken: mfaTok}, nil
+	totpOn := user.TOTPEnabled && user.TOTPSecret != nil && *user.TOTPSecret != ""
+	if !totpOn {
+		return &LoginResult{User: user}, nil
 	}
 
-	return &LoginResult{User: user}, nil
+	if trustedDeviceToken != "" && uc.trustedDeviceRepo != nil {
+		hash := utils.HashTokenHex(trustedDeviceToken)
+		ok, errTrusted := uc.trustedDeviceRepo.IsTrusted(ctx, user.ID, hash, now)
+		if errTrusted != nil {
+			return nil, wrapper.Wrap(errTrusted)
+		}
+
+		if ok {
+			_ = uc.trustedDeviceRepo.TouchLastUsed(ctx, hash, now)
+
+			return &LoginResult{User: user}, nil
+		}
+	}
+
+	mfaTok, errJWT := utils.GenerateMFAPendingJWT(uc.jwtSecret, user.ID, user.Email)
+	if errJWT != nil {
+		return nil, wrapper.Wrap(errJWT)
+	}
+
+	return &LoginResult{User: user, MFAToken: mfaTok}, nil
 }
 
 // CompleteMFALogin — второй шаг входа с TOTP.
@@ -185,6 +212,52 @@ func (uc *UseCase) CompleteMFALogin(ctx context.Context, mfaToken, totpCode stri
 	}
 
 	return user, nil
+}
+
+func (uc *UseCase) RememberTrustedDevice(ctx context.Context, userID domain.UUID, userAgent string, ip *string, now time.Time) (rawToken string, expiresAt time.Time, err error) {
+	if uc.trustedDeviceRepo == nil {
+		return "", time.Time{}, wrapper.Wrap(domain.NewInvalidInput("trusted device repository is not configured"))
+	}
+	if userID == (domain.UUID{}) {
+		return "", time.Time{}, wrapper.Wrap(domain.NewInvalidInput("user_id is required"))
+	}
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+
+	raw, hash, errTok := utils.RandomTokenHex(32)
+	if errTok != nil {
+		return "", time.Time{}, wrapper.Wrap(errTok)
+	}
+
+	exp := now.Add(trustedDeviceTTL)
+	td := &domain.TrustedDevice{
+		ID:        domain.NewUUID(),
+		UserID:    userID,
+		TokenHash: hash,
+		UserAgent: userAgent,
+		IP:        ip,
+		CreatedAt: now,
+		ExpiresAt: exp,
+	}
+
+	errAdd := uc.trustedDeviceRepo.Add(ctx, td)
+	if errAdd != nil {
+		return "", time.Time{}, wrapper.Wrap(errAdd)
+	}
+
+	return raw, exp, nil
+}
+
+func (uc *UseCase) RevokeAllTrustedDevices(ctx context.Context, userID domain.UUID) error {
+	if uc.trustedDeviceRepo == nil {
+		return wrapper.Wrap(domain.NewInvalidInput("trusted device repository is not configured"))
+	}
+	if userID == (domain.UUID{}) {
+		return wrapper.Wrap(domain.NewInvalidInput("user_id is required"))
+	}
+
+	return uc.trustedDeviceRepo.RevokeAll(ctx, userID)
 }
 
 // VerifyEmail — подтверждение email по одноразовому токену из письма.
@@ -282,7 +355,16 @@ func (uc *UseCase) ResetPassword(ctx context.Context, plainToken, newPassword st
 	user.PasswordResetTokenHash = nil
 	user.PasswordResetExpiresAt = nil
 
-	return uc.userRepo.Update(ctx, user)
+	err = uc.userRepo.Update(ctx, user)
+	if err != nil {
+		return err
+	}
+
+	if uc.trustedDeviceRepo != nil {
+		_ = uc.trustedDeviceRepo.RevokeAll(ctx, user.ID)
+	}
+
+	return nil
 }
 
 // SetupTOTP — генерирует секрет и сохраняет в профиле (ещё без включения 2FA).

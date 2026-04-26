@@ -12,6 +12,8 @@ export interface LoginRequest {
 
 export interface AuthResponse {
   token?: string;
+  mfaRequired?: boolean;
+  mfaToken?: string;
   user?: {
     id: number | string;
     email: string;
@@ -40,6 +42,22 @@ export const register = async (data: RegisterRequest): Promise<AuthResponse> => 
 // Вход в систему
 export const login = async (data: LoginRequest): Promise<AuthResponse> => {
   const response = await apiClient.post<AuthResponse>('/auth/login', data);
+
+  if (response.data.token) {
+    localStorage.setItem('token', response.data.token);
+  }
+
+  return response.data;
+};
+
+export interface LoginMFARequest {
+  mfaToken: string;
+  totpCode: string;
+  rememberDevice?: boolean;
+}
+
+export const loginMFA = async (data: LoginMFARequest): Promise<AuthResponse> => {
+  const response = await apiClient.post<AuthResponse>('/auth/login/mfa', data);
 
   if (response.data.token) {
     localStorage.setItem('token', response.data.token);

@@ -36,6 +36,33 @@ CREATE TABLE users (
     CONSTRAINT users_notify_channel_check CHECK (notify_email OR notify_telegram)
 );
 
+-- 1.1 Доверенные устройства (пропуск TOTP на 14–30 дней через HttpOnly cookie)
+CREATE TABLE trusted_devices (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash CHAR(64) NOT NULL,
+    user_agent TEXT NOT NULL DEFAULT '',
+    ip INET,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_used_at TIMESTAMPTZ,
+    expires_at TIMESTAMPTZ NOT NULL,
+    CONSTRAINT trusted_devices_token_hash_unq UNIQUE(token_hash)
+);
+
+CREATE INDEX idx_trusted_devices_user_id ON trusted_devices(user_id);
+CREATE INDEX idx_trusted_devices_expires_at ON trusted_devices(expires_at);
+
+-- 1.2 Rate limit для auth (анти-брутфорс). Храним блокировки/попытки в БД, чтобы работало в serverless.
+CREATE TABLE auth_rate_limits (
+    key TEXT PRIMARY KEY,
+    attempts INT NOT NULL DEFAULT 0,
+    window_ends_at TIMESTAMPTZ NOT NULL,
+    blocked_until TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_auth_rate_limits_blocked_until ON auth_rate_limits(blocked_until);
+
 -- 2. Заявки KYC
 CREATE TABLE kyc_applications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -26,21 +26,23 @@ import (
 type Container struct {
 	DB *sqlx.DB
 
-	WalletRepo       ports.WalletRepository
-	CardRepo         ports.CardRepository
-	TransactionRepo  ports.TransactionRepository
-	TicketRepo       ports.TicketRepository
-	UserRepo         ports.UserRepository
-	ReferralRepo     ports.ReferralRepository
-	CommissionRepo   ports.CommissionConfigRepository
-	GradeRepo        ports.GradeRepository
-	ExchangeRateRepo ports.ExchangeRateRepository
-	KYCRepo          ports.KYCApplicationRepository
-	StoreRepo        ports.StoreRepository
-	NewsRepo         ports.NewsRepository
-	SystemRepo       ports.SystemSettingsRepository
-	AdminLogsRepo    ports.AdminLogsRepository
-	AdminDashRepo    ports.AdminDashboardRepository
+	WalletRepo        ports.WalletRepository
+	CardRepo          ports.CardRepository
+	TransactionRepo   ports.TransactionRepository
+	TicketRepo        ports.TicketRepository
+	UserRepo          ports.UserRepository
+	TrustedDeviceRepo ports.TrustedDeviceRepository
+	AuthRateLimiter   ports.AuthRateLimiter
+	ReferralRepo      ports.ReferralRepository
+	CommissionRepo    ports.CommissionConfigRepository
+	GradeRepo         ports.GradeRepository
+	ExchangeRateRepo  ports.ExchangeRateRepository
+	KYCRepo           ports.KYCApplicationRepository
+	StoreRepo         ports.StoreRepository
+	NewsRepo          ports.NewsRepository
+	SystemRepo        ports.SystemSettingsRepository
+	AdminLogsRepo     ports.AdminLogsRepository
+	AdminDashRepo     ports.AdminDashboardRepository
 
 	TelegramBotUsername string
 
@@ -69,6 +71,8 @@ func NewContainer(ctx context.Context, cfg *config.ENV) (*Container, error) {
 	transactionRepo := postgres.NewTransactionRepository(db)
 	ticketRepo := postgres.NewTicketRepository(db)
 	userRepo := postgres.NewUserRepository(db)
+	trustedDeviceRepo := postgres.NewTrustedDeviceRepository(db)
+	authLimiter := postgres.NewAuthRateLimiter(db)
 	commissionRepo := postgres.NewCommissionConfigRepository(db)
 	gradeRepo := postgres.NewGradeRepository(db)
 	exchangeRateRepo := postgres.NewExchangeRateRepository(db)
@@ -95,6 +99,7 @@ func NewContainer(ctx context.Context, cfg *config.ENV) (*Container, error) {
 		userRepo,
 		walletRepo,
 		gradeRepo,
+		trustedDeviceRepo,
 		[]byte(cfg.JWTSecret),
 		mail,
 		cfg.AppPublicURL,
@@ -114,21 +119,23 @@ func NewContainer(ctx context.Context, cfg *config.ENV) (*Container, error) {
 	return &Container{
 		DB: db,
 
-		WalletRepo:       walletRepo,
-		CardRepo:         cardRepo,
-		TransactionRepo:  transactionRepo,
-		TicketRepo:       ticketRepo,
-		UserRepo:         userRepo,
-		ReferralRepo:     referralRepo,
-		CommissionRepo:   commissionRepo,
-		GradeRepo:        gradeRepo,
-		ExchangeRateRepo: exchangeRateRepo,
-		KYCRepo:          kycRepo,
-		StoreRepo:        storeRepo,
-		NewsRepo:         newsRepo,
-		SystemRepo:       systemRepo,
-		AdminLogsRepo:    adminLogsRepo,
-		AdminDashRepo:    adminDashRepo,
+		WalletRepo:        walletRepo,
+		CardRepo:          cardRepo,
+		TransactionRepo:   transactionRepo,
+		TicketRepo:        ticketRepo,
+		UserRepo:          userRepo,
+		TrustedDeviceRepo: trustedDeviceRepo,
+		AuthRateLimiter:   authLimiter,
+		ReferralRepo:      referralRepo,
+		CommissionRepo:    commissionRepo,
+		GradeRepo:         gradeRepo,
+		ExchangeRateRepo:  exchangeRateRepo,
+		KYCRepo:           kycRepo,
+		StoreRepo:         storeRepo,
+		NewsRepo:          newsRepo,
+		SystemRepo:        systemRepo,
+		AdminLogsRepo:     adminLogsRepo,
+		AdminDashRepo:     adminDashRepo,
 
 		TelegramBotUsername: cfg.TelegramBotUsername,
 

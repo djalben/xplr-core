@@ -209,7 +209,7 @@ func (s *Server) setupRoutes(jwtSecret []byte) {
 
 		r.Route("/v1", func(r chi.Router) {
 			// Public: auth
-			authApi.NewHandler(s.container.AuthUseCase, s.container.WalletUseCase, s.container.UserRepo, jwtSecret).Register(r)
+			authApi.NewHandler(s.container.AuthUseCase, s.container.WalletUseCase, s.container.UserRepo, s.container.AuthRateLimiter, jwtSecret).Register(r)
 
 			// Public: внутренние курсы валют из exchange_rates.
 			r.Get("/rates", s.handleRates)

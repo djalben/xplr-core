@@ -14,6 +14,8 @@ import (
 	"gitlab.com/libs-artifex/wrapper/v2"
 )
 
+const trustedDeviceCookieName = "xplr_trusted_device"
+
 type Handler struct {
 	userUC   UserProfile
 	walletUC UserWallet
@@ -79,8 +81,38 @@ func (h *Handler) Register(r chi.Router) {
 		r.Post("/me/totp/setup", h.PostTOTPSetup)
 		r.Post("/me/totp/confirm", h.PostTOTPConfirm)
 		r.Post("/me/totp/disable", h.PostTOTPDisable)
+		r.Post("/me/trusted-devices/revoke-all", h.PostRevokeAllTrustedDevices)
 		r.Post("/kyc/application", h.PostKYCApplication)
 	})
+}
+
+func (h *Handler) PostRevokeAllTrustedDevices(w http.ResponseWriter, r *http.Request) {
+	userID := handler.GetUserIDFromContext(r)
+	if userID == uuid.Nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+
+		return
+	}
+
+	err := h.totpUC.RevokeAllTrustedDevices(r.Context(), userID)
+	if err != nil {
+		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+
+		return
+	}
+
+	// Чистим cookie на текущем устройстве (остальные устройства “разлогинятся” при следующем логине).
+	http.SetCookie(w, &http.Cookie{
+		Name:     trustedDeviceCookieName,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "trusted devices revoked"})
 }
 
 func (h *Handler) GetMe(w http.ResponseWriter, r *http.Request) {

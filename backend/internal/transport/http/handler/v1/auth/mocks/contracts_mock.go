@@ -7,6 +7,7 @@ package mocks
 import (
 	context "context"
 	reflect "reflect"
+	time "time"
 
 	auth "github.com/djalben/xplr-core/backend/internal/application/auth"
 	domain "github.com/djalben/xplr-core/backend/internal/domain"
@@ -64,6 +65,37 @@ func (m *MockAuthFlow) Login(ctx context.Context, email, password string) (*auth
 func (mr *MockAuthFlowMockRecorder) Login(ctx, email, password interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Login", reflect.TypeOf((*MockAuthFlow)(nil).Login), ctx, email, password)
+}
+
+// LoginWithTrustedDevice mocks base method.
+func (m *MockAuthFlow) LoginWithTrustedDevice(ctx context.Context, email, password, trustedDeviceToken string, now time.Time) (*auth.LoginResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LoginWithTrustedDevice", ctx, email, password, trustedDeviceToken, now)
+	ret0, _ := ret[0].(*auth.LoginResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LoginWithTrustedDevice indicates an expected call of LoginWithTrustedDevice.
+func (mr *MockAuthFlowMockRecorder) LoginWithTrustedDevice(ctx, email, password, trustedDeviceToken, now interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LoginWithTrustedDevice", reflect.TypeOf((*MockAuthFlow)(nil).LoginWithTrustedDevice), ctx, email, password, trustedDeviceToken, now)
+}
+
+// RememberTrustedDevice mocks base method.
+func (m *MockAuthFlow) RememberTrustedDevice(ctx context.Context, userID domain.UUID, userAgent string, ip *string, now time.Time) (string, time.Time, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RememberTrustedDevice", ctx, userID, userAgent, ip, now)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(time.Time)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// RememberTrustedDevice indicates an expected call of RememberTrustedDevice.
+func (mr *MockAuthFlowMockRecorder) RememberTrustedDevice(ctx, userID, userAgent, ip, now interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RememberTrustedDevice", reflect.TypeOf((*MockAuthFlow)(nil).RememberTrustedDevice), ctx, userID, userAgent, ip, now)
 }
 
 // Register mocks base method.

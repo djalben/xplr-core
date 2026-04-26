@@ -198,6 +198,20 @@ func (mr *MockTOTPSettingsMockRecorder) DisableTOTP(ctx, userID, password, code 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DisableTOTP", reflect.TypeOf((*MockTOTPSettings)(nil).DisableTOTP), ctx, userID, password, code)
 }
 
+// RevokeAllTrustedDevices mocks base method.
+func (m *MockTOTPSettings) RevokeAllTrustedDevices(ctx context.Context, userID domain.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RevokeAllTrustedDevices", ctx, userID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RevokeAllTrustedDevices indicates an expected call of RevokeAllTrustedDevices.
+func (mr *MockTOTPSettingsMockRecorder) RevokeAllTrustedDevices(ctx, userID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RevokeAllTrustedDevices", reflect.TypeOf((*MockTOTPSettings)(nil).RevokeAllTrustedDevices), ctx, userID)
+}
+
 // SetupTOTP mocks base method.
 func (m *MockTOTPSettings) SetupTOTP(ctx context.Context, userID domain.UUID) (string, string, error) {
 	m.ctrl.T.Helper()
