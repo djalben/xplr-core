@@ -248,12 +248,27 @@ func forwardToTelegramAdmins(conv *repository.ChatConversation, msg *repository.
 		return
 	}
 
+	// Build message body with optional attachment indicator
+	bodyText := msg.Body
+	if msg.AttachmentURL != "" {
+		attachLabel := "📎 Файл"
+		if msg.AttachmentType == "image" {
+			attachLabel = "🖼 Изображение"
+		} else if msg.AttachmentType == "document" {
+			attachLabel = "📄 Документ"
+		}
+		if bodyText != "" {
+			bodyText += "\n\n"
+		}
+		bodyText += fmt.Sprintf("%s: <a href=\"%s\">Открыть</a>", attachLabel, msg.AttachmentURL)
+	}
+
 	text := fmt.Sprintf(
 		"💬 <b>Чат #%d</b> | <b>%s</b>\n"+
 			"📋 Тема: <i>%s</i>\n\n"+
 			"%s\n\n"+
 			"<i>↩️ Ответьте Reply на это сообщение, чтобы ответить клиенту</i>",
-		conv.ID, userName, conv.Topic, msg.Body,
+		conv.ID, userName, conv.Topic, bodyText,
 	)
 
 	// Build inline keyboard: Claim button (only if not yet claimed)

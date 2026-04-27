@@ -8,8 +8,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/djalben/xplr-core/backend/repository"
 	"github.com/djalben/xplr-core/backend/pkg/utils"
+	"github.com/djalben/xplr-core/backend/repository"
 )
 
 // Контекстный ключ для хранения ID пользователя после проверки токена
@@ -66,6 +66,14 @@ func JWTAuthMiddleware(next http.Handler) http.Handler {
 			claims, okClaims := token.Claims.(jwt.MapClaims)
 			if !okClaims {
 				http.Error(w, "Invalid token claims", http.StatusUnauthorized)
+				return
+			}
+
+			// SECURITY: Reject half_auth tokens — they must NOT access protected endpoints.
+			// Half-auth tokens are only valid for POST /auth/2fa/verify (parsed separately there).
+			if halfAuth, _ := claims["half_auth"].(bool); halfAuth {
+				log.Printf("[AUTH] ❌ Rejected half_auth token (2FA not completed)")
+				http.Error(w, "2FA verification required", http.StatusUnauthorized)
 				return
 			}
 
