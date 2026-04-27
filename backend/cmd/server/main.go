@@ -250,6 +250,7 @@ func main() {
 	protectedRouter.HandleFunc("/chat/messages/{id}", handler.ChatMessagesHandler).Methods("GET")
 	protectedRouter.HandleFunc("/chat/send/{id}", handler.ChatSendHandler).Methods("POST")
 	protectedRouter.HandleFunc("/chat/close/{id}", handler.ChatCloseHandler).Methods("POST")
+	protectedRouter.HandleFunc("/chat/upload", handler.ChatUploadHandler).Methods("POST")
 
 	// Настройки профиля
 	protectedRouter.HandleFunc("/settings/profile", handler.GetSettingsProfileHandler).Methods("GET")

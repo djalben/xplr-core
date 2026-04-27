@@ -16,6 +16,10 @@ import {
   X,
   Headphones,
   Lock,
+  Paperclip,
+  FileText,
+  Download,
+  Image,
 } from 'lucide-react';
 
 interface ChatMessage {
@@ -24,6 +28,8 @@ interface ChatMessage {
   sender_type: 'user' | 'admin';
   sender_name: string;
   body: string;
+  attachment_url?: string;
+  attachment_type?: string;
   created_at: string;
 }
 
@@ -46,6 +52,10 @@ export const SupportPage = () => {
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -109,17 +119,63 @@ export const SupportPage = () => {
     }
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Файл слишком большой (макс. 5МБ)', 'err');
+      return;
+    }
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (!['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx'].includes(ext || '')) {
+      showToast('Допустимые форматы: jpg, png, pdf, doc', 'err');
+      return;
+    }
+    setSelectedFile(file);
+    if (file.type.startsWith('image/')) {
+      setFilePreview(URL.createObjectURL(file));
+    } else {
+      setFilePreview(null);
+    }
+  };
+
+  const clearFile = () => {
+    setSelectedFile(null);
+    if (filePreview) URL.revokeObjectURL(filePreview);
+    setFilePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const handleSend = async () => {
-    if (!input.trim() || sending || !conversation) return;
+    if ((!input.trim() && !selectedFile) || sending || !conversation) return;
     const text = input.trim();
     setSending(true);
     setInput('');
     try {
-      const res = await apiClient.post(`/user/chat/send/${conversation.id}`, { message: text });
+      let attachmentUrl = '';
+      let attachmentType = '';
+      if (selectedFile) {
+        setUploading(true);
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        const uploadRes = await apiClient.post('/user/chat/upload', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        attachmentUrl = uploadRes.data.url;
+        attachmentType = uploadRes.data.type;
+        setUploading(false);
+        clearFile();
+      }
+      const res = await apiClient.post(`/user/chat/send/${conversation.id}`, {
+        message: text,
+        attachment_url: attachmentUrl,
+        attachment_type: attachmentType,
+      });
       setMessages(prev => [...prev, res.data]);
     } catch {
       showToast(t('support.sendError'), 'err');
       setInput(text);
+      setUploading(false);
     } finally {
       setSending(false);
     }
@@ -262,7 +318,26 @@ export const SupportPage = () => {
                     {msg.sender_type === 'admin' && (
                       <p className="text-xs text-blue-400 font-medium mb-1">{msg.sender_name}</p>
                     )}
-                    <p className="text-sm whitespace-pre-wrap break-words">{msg.body}</p>
+                    {msg.attachment_url && msg.attachment_type === 'image' && (
+                      <a href={msg.attachment_url} target="_blank" rel="noopener noreferrer" className="block mb-2">
+                        <img src={msg.attachment_url} alt="attachment" className="max-w-full max-h-48 rounded-lg object-cover" />
+                      </a>
+                    )}
+                    {msg.attachment_url && msg.attachment_type === 'document' && (
+                      <a
+                        href={msg.attachment_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`flex items-center gap-2 mb-2 px-3 py-2 rounded-lg transition-colors ${
+                          msg.sender_type === 'user' ? 'bg-blue-600/50 hover:bg-blue-600/70' : 'bg-white/10 hover:bg-white/15'
+                        }`}
+                      >
+                        <FileText className="w-5 h-5 shrink-0" />
+                        <span className="text-sm truncate">Документ</span>
+                        <Download className="w-4 h-4 shrink-0 ml-auto" />
+                      </a>
+                    )}
+                    {msg.body && <p className="text-sm whitespace-pre-wrap break-words">{msg.body}</p>}
                     <p className={`text-[10px] mt-1 ${msg.sender_type === 'user' ? 'text-blue-200' : 'text-slate-500'}`}>
                       {fmtTime(msg.created_at)}
                     </p>
@@ -275,7 +350,41 @@ export const SupportPage = () => {
             {/* Input or Closed banner */}
             {conversation.status === 'open' ? (
               <div className="p-3 border-t border-white/10">
+                {/* File preview strip */}
+                {selectedFile && (
+                  <div className="flex items-center gap-3 mb-2 px-3 py-2 bg-white/[0.04] border border-white/10 rounded-xl">
+                    {filePreview ? (
+                      <img src={filePreview} alt="preview" className="w-12 h-12 rounded-lg object-cover" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-lg bg-white/10 flex items-center justify-center">
+                        <FileText className="w-6 h-6 text-slate-400" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white truncate">{selectedFile.name}</p>
+                      <p className="text-xs text-slate-500">{(selectedFile.size / 1024).toFixed(0)} КБ</p>
+                    </div>
+                    <button onClick={clearFile} className="p-1 hover:bg-white/10 rounded-lg transition-colors">
+                      <X className="w-4 h-4 text-slate-400" />
+                    </button>
+                  </div>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.pdf,.doc,.docx"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
                 <div className="flex items-end gap-2">
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={sending || uploading}
+                    className="shrink-0 w-11 h-11 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 hover:text-white transition-colors disabled:opacity-40"
+                    title="Прикрепить файл"
+                  >
+                    <Paperclip className="w-5 h-5" />
+                  </button>
                   <textarea
                     value={input}
                     onChange={e => setInput(e.target.value)}
@@ -287,10 +396,10 @@ export const SupportPage = () => {
                   />
                   <button
                     onClick={handleSend}
-                    disabled={!input.trim() || sending}
+                    disabled={(!input.trim() && !selectedFile) || sending}
                     className="shrink-0 w-11 h-11 flex items-center justify-center rounded-xl bg-blue-500 hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors"
                   >
-                    {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                    {sending || uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                   </button>
                 </div>
               </div>

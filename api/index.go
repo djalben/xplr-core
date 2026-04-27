@@ -701,6 +701,7 @@ func buildRouter() *mux.Router {
 	protected.HandleFunc("/chat/messages/{id}", h.ChatMessagesHandler).Methods("GET")
 	protected.HandleFunc("/chat/send/{id}", h.ChatSendHandler).Methods("POST")
 	protected.HandleFunc("/chat/close/{id}", h.ChatCloseHandler).Methods("POST")
+	protected.HandleFunc("/chat/upload", h.ChatUploadHandler).Methods("POST")
 
 	// Settings — Profile, Password, Sessions, Notifications, 2FA, Email Verify, KYC
 	protected.HandleFunc("/settings/profile", h.GetSettingsProfileHandler).Methods("GET")

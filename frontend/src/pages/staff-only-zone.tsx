@@ -156,6 +156,8 @@ interface ChatMsg {
   sender_type: string;
   sender_name: string;
   body: string;
+  attachment_url?: string;
+  attachment_type?: string;
   created_at: string;
 }
 
@@ -2030,7 +2032,18 @@ export const StaffOnlyZone = () => {
                           {m.sender_type === 'admin' && (
                             <p className="text-xs text-blue-400 font-medium mb-1">{m.sender_name}</p>
                           )}
-                          <p className="text-sm whitespace-pre-wrap break-words">{m.body}</p>
+                          {m.attachment_url && m.attachment_type === 'image' && (
+                            <a href={m.attachment_url} target="_blank" rel="noopener noreferrer" className="block mb-2">
+                              <img src={m.attachment_url} alt="attachment" className="max-w-full max-h-48 rounded-lg object-cover" />
+                            </a>
+                          )}
+                          {m.attachment_url && m.attachment_type === 'document' && (
+                            <a href={m.attachment_url} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2 mb-2 px-3 py-2 rounded-lg ${m.sender_type === 'user' ? 'bg-blue-600/50' : 'bg-white/10'} hover:opacity-80 transition-opacity`}>
+                              <span className="text-sm">📄 Документ</span>
+                              <span className="text-xs ml-auto">⬇️</span>
+                            </a>
+                          )}
+                          {m.body && <p className="text-sm whitespace-pre-wrap break-words">{m.body}</p>}
                           <p className="text-[10px] mt-1 text-slate-400">{m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</p>
                         </div>
                       </div>

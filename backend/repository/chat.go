@@ -26,6 +26,8 @@ type ChatMessage struct {
 	SenderName     string    `json:"sender_name"`
 	Body           string    `json:"body"`
 	TgMessageID    int64     `json:"tg_message_id,omitempty"`
+	AttachmentURL  string    `json:"attachment_url,omitempty"`
+	AttachmentType string    `json:"attachment_type,omitempty"`
 	CreatedAt      time.Time `json:"created_at"`
 }
 
@@ -71,6 +73,12 @@ func EnsureChatTables() error {
 		DO $$ BEGIN
 			IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chat_conversations' AND column_name='claimed_by') THEN
 				ALTER TABLE chat_conversations ADD COLUMN claimed_by INTEGER DEFAULT 0;
+			END IF;
+			IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chat_messages' AND column_name='attachment_url') THEN
+				ALTER TABLE chat_messages ADD COLUMN attachment_url TEXT DEFAULT '';
+			END IF;
+			IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chat_messages' AND column_name='attachment_type') THEN
+				ALTER TABLE chat_messages ADD COLUMN attachment_type TEXT DEFAULT '';
 			END IF;
 		END $$;
 	`)
@@ -356,6 +364,11 @@ func GetLatestTgBridgePerAdmin(convID int) ([]TgBridgeEntry, error) {
 
 // InsertChatMessage adds a message to a conversation.
 func InsertChatMessage(convID int, senderType, senderName, body string, tgMsgID int64) (*ChatMessage, error) {
+	return InsertChatMessageWithAttachment(convID, senderType, senderName, body, tgMsgID, "", "")
+}
+
+// InsertChatMessageWithAttachment adds a message with optional file attachment.
+func InsertChatMessageWithAttachment(convID int, senderType, senderName, body string, tgMsgID int64, attachmentURL, attachmentType string) (*ChatMessage, error) {
 	if GlobalDB == nil {
 		return nil, fmt.Errorf("database connection not initialized")
 	}
@@ -365,11 +378,11 @@ func InsertChatMessage(convID int, senderType, senderName, body string, tgMsgID 
 		tgID = sql.NullInt64{Int64: tgMsgID, Valid: true}
 	}
 	err := GlobalDB.QueryRow(
-		`INSERT INTO chat_messages (conversation_id, sender_type, sender_name, body, tg_message_id)
-		 VALUES ($1, $2, $3, $4, $5)
-		 RETURNING id, conversation_id, sender_type, sender_name, body, COALESCE(tg_message_id, 0), created_at`,
-		convID, senderType, senderName, body, tgID,
-	).Scan(&msg.ID, &msg.ConversationID, &msg.SenderType, &msg.SenderName, &msg.Body, &msg.TgMessageID, &msg.CreatedAt)
+		`INSERT INTO chat_messages (conversation_id, sender_type, sender_name, body, tg_message_id, attachment_url, attachment_type)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)
+		 RETURNING id, conversation_id, sender_type, sender_name, body, COALESCE(tg_message_id, 0), COALESCE(attachment_url, ''), COALESCE(attachment_type, ''), created_at`,
+		convID, senderType, senderName, body, tgID, attachmentURL, attachmentType,
+	).Scan(&msg.ID, &msg.ConversationID, &msg.SenderType, &msg.SenderName, &msg.Body, &msg.TgMessageID, &msg.AttachmentURL, &msg.AttachmentType, &msg.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert chat message: %w", err)
 	}
@@ -385,7 +398,8 @@ func GetChatMessages(convID int) ([]ChatMessage, error) {
 		return nil, fmt.Errorf("database connection not initialized")
 	}
 	rows, err := GlobalDB.Query(
-		`SELECT id, conversation_id, sender_type, sender_name, body, COALESCE(tg_message_id, 0), created_at
+		`SELECT id, conversation_id, sender_type, sender_name, body, COALESCE(tg_message_id, 0),
+		        COALESCE(attachment_url, ''), COALESCE(attachment_type, ''), created_at
 		 FROM chat_messages WHERE conversation_id = $1 ORDER BY created_at ASC`,
 		convID,
 	)
@@ -397,7 +411,7 @@ func GetChatMessages(convID int) ([]ChatMessage, error) {
 	var msgs []ChatMessage
 	for rows.Next() {
 		var m ChatMessage
-		if err := rows.Scan(&m.ID, &m.ConversationID, &m.SenderType, &m.SenderName, &m.Body, &m.TgMessageID, &m.CreatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.ConversationID, &m.SenderType, &m.SenderName, &m.Body, &m.TgMessageID, &m.AttachmentURL, &m.AttachmentType, &m.CreatedAt); err != nil {
 			return nil, err
 		}
 		msgs = append(msgs, m)

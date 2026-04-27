@@ -1,11 +1,17 @@
 package handler
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/djalben/xplr-core/backend/middleware"
 	"github.com/djalben/xplr-core/backend/repository"
@@ -148,19 +154,21 @@ func ChatSendHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		Message string `json:"message"`
+		Message        string `json:"message"`
+		AttachmentURL  string `json:"attachment_url"`
+		AttachmentType string `json:"attachment_type"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Message == "" {
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || (body.Message == "" && body.AttachmentURL == "") {
 		log.Printf("[CHAT-SEND] ❌ Empty or invalid message body (err=%v)", err)
-		http.Error(w, "Message is required", http.StatusBadRequest)
+		http.Error(w, "Message or attachment is required", http.StatusBadRequest)
 		return
 	}
 
 	userName := repository.GetUserDisplayName(userID)
 	userEmail, _ := repository.GetUserEmail(userID)
-	log.Printf("[CHAT-SEND] User %d (%s / %s) sent: %q", userID, userName, userEmail, body.Message)
+	log.Printf("[CHAT-SEND] User %d (%s / %s) sent: %q (attachment=%q)", userID, userName, userEmail, body.Message, body.AttachmentURL)
 
-	msg, err := repository.InsertChatMessage(convID, "user", userName, body.Message, 0)
+	msg, err := repository.InsertChatMessageWithAttachment(convID, "user", userName, body.Message, 0, body.AttachmentURL, body.AttachmentType)
 	if err != nil {
 		log.Printf("[CHAT-SEND] ❌ Failed to insert message for conv %d: %v", convID, err)
 		http.Error(w, "Failed to send message", http.StatusInternalServerError)
@@ -284,4 +292,123 @@ func forwardToTelegramAdmins(conv *repository.ChatConversation, msg *repository.
 	}
 
 	log.Printf("[CHAT-FWD] ✅ Message from [%s] forwarded to [%d/%d] admins via Telegram", userEmail, successCount, len(ids))
+}
+
+// ── POST /api/v1/user/chat/upload ──
+// Uploads a file attachment for support chat (max 5MB, jpg/png/pdf/doc).
+// Returns { "url": "...", "type": "image|document" }.
+func ChatUploadHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	supabaseURL := os.Getenv("SUPABASE_URL")
+	supabaseKey := os.Getenv("SUPABASE_SERVICE_ROLE_KEY")
+	if supabaseURL == "" || supabaseKey == "" {
+		log.Printf("[CHAT-UPLOAD] ❌ Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY")
+		http.Error(w, "Storage not configured", http.StatusInternalServerError)
+		return
+	}
+
+	// 5MB limit
+	if err := r.ParseMultipartForm(5 << 20); err != nil {
+		log.Printf("[CHAT-UPLOAD] ❌ ParseMultipartForm: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "File too large (max 5MB)"})
+		return
+	}
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		log.Printf("[CHAT-UPLOAD] ❌ FormFile: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "File is required"})
+		return
+	}
+	defer file.Close()
+
+	if header.Size > 5<<20 {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "File too large (max 5MB)"})
+		return
+	}
+
+	ext := strings.ToLower(filepath.Ext(header.Filename))
+	var contentType string
+	var attachType string
+	switch ext {
+	case ".jpg", ".jpeg":
+		contentType = "image/jpeg"
+		attachType = "image"
+	case ".png":
+		contentType = "image/png"
+		attachType = "image"
+	case ".pdf":
+		contentType = "application/pdf"
+		attachType = "document"
+	case ".doc":
+		contentType = "application/msword"
+		attachType = "document"
+	case ".docx":
+		contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+		attachType = "document"
+	default:
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("Unsupported file type: %s (allowed: jpg, png, pdf, doc)", ext)})
+		return
+	}
+
+	fileBytes, err := io.ReadAll(file)
+	if err != nil || len(fileBytes) == 0 {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to read file"})
+		return
+	}
+
+	filename := fmt.Sprintf("chat_%d_%d%s", userID, time.Now().UnixMilli(), ext)
+	uploadURL := fmt.Sprintf("%s/storage/v1/object/chat-attachments/%s", supabaseURL, filename)
+
+	req, err := http.NewRequest("POST", uploadURL, bytes.NewReader(fileBytes))
+	if err != nil {
+		http.Error(w, "Upload failed", http.StatusInternalServerError)
+		return
+	}
+	req.Header.Set("Authorization", "Bearer "+supabaseKey)
+	req.Header.Set("apikey", supabaseKey)
+	req.Header.Set("Content-Type", contentType)
+	req.Header.Set("x-upsert", "true")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("[CHAT-UPLOAD] ❌ Supabase HTTP: %v", err)
+		http.Error(w, "Upload failed", http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 400 {
+		log.Printf("[CHAT-UPLOAD] ❌ Supabase %d: %s", resp.StatusCode, string(respBody))
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Storage upload failed"})
+		return
+	}
+
+	publicURL := fmt.Sprintf("%s/storage/v1/object/public/chat-attachments/%s", supabaseURL, filename)
+	log.Printf("[CHAT-UPLOAD] ✅ User %d uploaded %s (%d bytes) → %s", userID, header.Filename, len(fileBytes), publicURL)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"url":  publicURL,
+		"type": attachType,
+	})
 }
