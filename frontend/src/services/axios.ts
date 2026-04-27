@@ -41,13 +41,25 @@ apiClient.interceptors.request.use(
 // Response interceptor - обработка ошибок
 apiClient.interceptors.response.use(
   (response) => {
+    // Detect HTML responses (Vercel security checkpoint, etc.)
+    const data = response.data;
+    if (typeof data === 'string' && (data.includes('<!DOCTYPE') || data.includes('<html') || data.includes('<head'))) {
+      return Promise.reject({
+        response: { status: 503, data: 'Технические работы на стороне сервера. Пожалуйста, обновите страницу через минуту.' },
+        message: 'Технические работы на стороне сервера. Пожалуйста, обновите страницу через минуту.',
+      });
+    }
     return response;
   },
   (error) => {
+    // Also catch HTML in error responses
+    const data = error.response?.data;
+    if (typeof data === 'string' && (data.includes('<!DOCTYPE') || data.includes('<html') || data.includes('<head'))) {
+      error.response.data = 'Технические работы на стороне сервера. Пожалуйста, обновите страницу через минуту.';
+    }
     if (error.response?.status === 401) {
       // Токен невалиден или истек - очищаем хранилище
       localStorage.removeItem('token');
-      // Здесь можно добавить редирект н�� страницу логина
     }
     return Promise.reject(error);
   }

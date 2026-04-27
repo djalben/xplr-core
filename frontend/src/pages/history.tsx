@@ -14,6 +14,7 @@ import {
   Loader2,
   Calendar,
   Filter,
+  X,
 } from 'lucide-react';
 import apiClient from '../services/axios';
 import { API_BASE_URL } from '../services/axios';
@@ -32,10 +33,15 @@ interface HistoryTx {
   description: string;
   amount: number;
   currency: string;
+  currencyCode: string;
   type: 'income' | 'expense';
   date: string;       // ISO or formatted
   time: string;
   cardLast4: string;  // '' = wallet op
+  status: string;
+  sourceType: string;
+  fee: number;
+  executedAt: string; // full ISO
 }
 
 const periodLabels: Record<Period, string> = {
@@ -59,6 +65,7 @@ export const HistoryPage = () => {
   );
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
+  const [selectedTx, setSelectedTx] = useState<HistoryTx | null>(null);
 
   const fmt = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -116,10 +123,15 @@ export const HistoryPage = () => {
           description: desc,
           amount: Math.abs(amt),
           currency: cur,
+          currencyCode: tx.currency || 'USD',
           type: (srcType === 'wallet_topup' || srcType === 'referral_bonus' || srcType === 'refund' || amt > 0) ? 'income' as const : 'expense' as const,
           date: executedAt.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' }),
           time: executedAt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
           cardLast4: tx.card_last_4_digits || '',
+          status: tx.status || 'completed',
+          sourceType: srcType,
+          fee: parseFloat(tx.fee || '0'),
+          executedAt: executedAt.toISOString(),
         };
       });
       setTransactions(mapped);
@@ -288,7 +300,7 @@ export const HistoryPage = () => {
           ) : filtered.length > 0 ? (
             <div className="divide-y divide-white/[0.05]">
               {filtered.map(tx => (
-                <div key={tx.id} className="flex items-center gap-4 px-5 py-4 hover:bg-white/[0.02] transition-colors">
+                <div key={tx.id} onClick={() => setSelectedTx(tx)} className="flex items-center gap-4 px-5 py-4 hover:bg-white/[0.04] transition-colors cursor-pointer">
                   {/* Icon */}
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
                     tx.type === 'income' ? 'bg-emerald-500/15' : 'bg-white/[0.05]'
@@ -346,6 +358,74 @@ export const HistoryPage = () => {
           Показано {filtered.length} операций
         </p>
       </div>
+
+      {/* Transaction Detail Modal */}
+      {selectedTx && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setSelectedTx(null)}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div
+            className="relative w-full max-w-md bg-[#0d1528] border border-white/10 rounded-2xl p-6 shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <button onClick={() => setSelectedTx(null)} className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+
+            <h3 className="text-lg font-bold text-white mb-4">Детали операции</h3>
+
+            <div className="space-y-3">
+              <div className="flex justify-between items-center py-2 border-b border-white/5">
+                <span className="text-sm text-slate-400">ID операции</span>
+                <span className="text-sm text-white font-mono">#{selectedTx.id}</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-white/5">
+                <span className="text-sm text-slate-400">Дата и время</span>
+                <span className="text-sm text-white">
+                  {new Date(selectedTx.executedAt).toLocaleDateString('ru-RU', { day: '2-digit', month: 'long', year: 'numeric' })}, {new Date(selectedTx.executedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-white/5">
+                <span className="text-sm text-slate-400">Тип</span>
+                <span className={`text-sm font-medium ${selectedTx.type === 'income' ? 'text-emerald-400' : 'text-white'}`}>
+                  {selectedTx.type === 'income' ? 'Пополнение' : 'Списание'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-white/5">
+                <span className="text-sm text-slate-400">Статус</span>
+                <span className={`text-xs font-medium px-2 py-1 rounded-lg ${
+                  selectedTx.status === 'completed' || selectedTx.status === 'COMPLETED'
+                    ? 'bg-emerald-500/15 text-emerald-400'
+                    : selectedTx.status === 'pending' || selectedTx.status === 'PENDING'
+                    ? 'bg-amber-500/15 text-amber-400'
+                    : 'bg-red-500/15 text-red-400'
+                }`}>
+                  {selectedTx.status}
+                </span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-white/5">
+                <span className="text-sm text-slate-400">Описание</span>
+                <span className="text-sm text-white text-right max-w-[200px] truncate">{selectedTx.description}</span>
+              </div>
+              {selectedTx.fee > 0 && (
+                <div className="flex justify-between items-center py-2 border-b border-white/5">
+                  <span className="text-sm text-slate-400">Комиссия</span>
+                  <span className="text-sm text-slate-300">{selectedTx.currency}{selectedTx.fee.toLocaleString()}</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center py-2 border-b border-white/5">
+                <span className="text-sm text-slate-400">Валюта</span>
+                <span className="text-sm text-white">{selectedTx.currencyCode}</span>
+              </div>
+              <div className="flex justify-between items-center pt-3">
+                <span className="text-base text-slate-300 font-medium">Итого</span>
+                <span className={`text-xl font-bold ${selectedTx.type === 'income' ? 'text-emerald-400' : 'text-white'}`}>
+                  {selectedTx.type === 'income' ? '+' : '−'}{selectedTx.currency}{selectedTx.amount.toLocaleString()}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 };

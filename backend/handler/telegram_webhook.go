@@ -177,11 +177,11 @@ func TelegramWebhookHandler(w http.ResponseWriter, r *http.Request) {
 
 		// Send welcome message
 		telegram.SendMessageHTML(chatID,
-			"✅ <b>Добро пожаловать в XPLR!</b>\n\n"+
-				"Теперь вы будете получать уведомления здесь:\n\n"+
+			"🎉 <b>Поздравляем! Теперь вы всегда на связи с XPLR.</b>\n\n"+
+				"Ваши транзакции под контролем.\n\n"+
 				"💳 <b>Транзакции</b> — списания и пополнения карт\n"+
 				"💰 <b>Пополнения</b> — зачисления на баланс\n"+
-				"� <b>Безопасность</b> — коды 2FA и оповещения\n"+
+				"🔐 <b>Безопасность</b> — коды 2FA и оповещения\n"+
 				"💬 <b>Поддержка</b> — ответы на ваши тикеты\n\n"+
 				"Управлять уведомлениями: <a href=\"https://xplr.pro/settings\">xplr.pro/settings</a>")
 

@@ -22,7 +22,9 @@ import {
   TableProperties,
   Loader2,
   Clock,
-  Eye
+  Eye,
+  Bell,
+  MessageCircle
 } from 'lucide-react';
 import apiClient, { API_BASE_URL } from '../services/axios';
 import { getUserGrade, type GradeInfo } from '../services/grade';
@@ -113,7 +115,7 @@ const TransactionRow = ({ tx }: { tx: DashboardTx }) => {
       <p className={`text-sm sm:text-base font-semibold balance-display whitespace-nowrap ml-2 sm:ml-3 shrink-0 ${
         isIncome ? 'text-emerald-400' : 'text-white'
       }`}>
-        {isIncome ? '+' : '-'}${Math.abs(amt).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        {isIncome ? '+' : '-'}{tx.currency === 'RUB' ? '₽' : tx.currency === 'EUR' ? '€' : '$'}{Math.abs(amt).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       </p>
     </div>
   );
@@ -364,6 +366,28 @@ export const DashboardPage = () => {
             </div>
           </div>
         </div>
+
+        {/* Telegram banner — shows only if not linked */}
+        {userData && !userData.telegram_linked && (
+          <div className="glass-card p-4 mb-6 border border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-orange-500/10">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-xl bg-amber-500/20 shrink-0">
+                <Bell className="w-6 h-6 text-amber-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-semibold text-sm sm:text-base">Срочно подключите Telegram-уведомления!</p>
+                <p className="text-slate-400 text-xs sm:text-sm mt-0.5">Моментальные оповещения о транзакциях, безопасности и пополнениях</p>
+              </div>
+              <button
+                onClick={() => navigate('/settings')}
+                className="shrink-0 flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium rounded-xl text-sm hover:shadow-lg hover:shadow-blue-500/25 transition-all"
+              >
+                <MessageCircle className="w-4 h-4" />
+                Подключить
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Stats Grid — enhanced widgets */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">

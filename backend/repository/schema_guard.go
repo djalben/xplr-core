@@ -43,6 +43,7 @@ var allRequiredColumns = []requiredColumn{
 	{"transactions", "source_id", "INTEGER"},
 	{"transactions", "currency", "VARCHAR(10) DEFAULT 'USD'"},
 	{"transactions", "provider_tx_id", "VARCHAR(255)"},
+	{"transactions", "original_amount", "NUMERIC(20,4)"},
 	// --- internal_balances ---
 	{"internal_balances", "auto_topup_enabled", "BOOLEAN DEFAULT FALSE"},
 	// --- support_tickets ---
