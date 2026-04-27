@@ -172,6 +172,7 @@ func TestHandler_DoLogin(t *testing.T) {
 		Return(domain.NewNumeric(0), nil)
 
 	limiterMock.EXPECT().Success(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+	userReaderMock.EXPECT().SetLastLogin(gomock.Any(), uid, gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	h := handlerauth.NewHandler(authMock, walletMock, userReaderMock, limiterMock, []byte(testJWTSecret))
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/auth/login", bytes.NewBufferString(`{"email":"b@example.com","password":"x"}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -212,6 +213,7 @@ func TestHandler_DoLogin_WithTrustedDeviceCookie(t *testing.T) {
 		Return(domain.NewNumeric(0), nil)
 
 	limiterMock.EXPECT().Success(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+	userReaderMock.EXPECT().SetLastLogin(gomock.Any(), uid, gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	h := handlerauth.NewHandler(authMock, walletMock, userReaderMock, limiterMock, []byte(testJWTSecret))
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/auth/login", bytes.NewBufferString(`{"email":"b@example.com","password":"x"}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -265,6 +267,7 @@ func TestHandler_DoLoginMFA_RememberDevice_SetsCookie(t *testing.T) {
 		GetBalance(gomock.Any(), uid).
 		Return(domain.NewNumeric(0), nil)
 
+	userReaderMock.EXPECT().SetLastLogin(gomock.Any(), uid, gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	h := handlerauth.NewHandler(authMock, walletMock, userReaderMock, limiterMock, []byte(testJWTSecret))
 	req := httptest.NewRequestWithContext(
 		context.Background(),
@@ -374,6 +377,7 @@ func TestHandler_RefreshToken(t *testing.T) {
 			limiterMock := mocks.NewMockRateLimiter(ctrl)
 
 			tt.args.setupMocks(walletMock, userReaderMock, uid, u)
+			userReaderMock.EXPECT().SetLastLogin(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
 			h := handlerauth.NewHandler(authMock, walletMock, userReaderMock, limiterMock, []byte(testJWTSecret))
 			req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/auth/refresh-token", nil)

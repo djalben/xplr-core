@@ -135,6 +135,7 @@ export const AuthPage = () => {
         setMfaRequired(true);
         setMfaToken(res.mfaToken);
         setTotpCode('');
+        setError('Код из Google Authenticator нужно ввести в течение 5 минут. Если не успеете — потребуется снова ввести пароль.');
         return;
       }
 

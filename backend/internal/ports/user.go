@@ -2,6 +2,7 @@ package ports
 
 import (
 	"context"
+	"time"
 
 	"github.com/djalben/xplr-core/backend/internal/domain"
 )
@@ -21,4 +22,5 @@ type UserRepository interface {
 	CountUsers(ctx context.Context) (int64, error)
 	SetUserStatus(ctx context.Context, id domain.UUID, status domain.UserStatus) error
 	SetIsAdmin(ctx context.Context, id domain.UUID, isAdmin bool) error
+	SetLastLogin(ctx context.Context, id domain.UUID, at time.Time, ip *string, userAgent string) error
 }

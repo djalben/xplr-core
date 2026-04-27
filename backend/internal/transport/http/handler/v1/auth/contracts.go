@@ -30,6 +30,7 @@ type WalletBalanceProvider interface {
 // UserByIDReader — пользователь по id (refresh token).
 type UserByIDReader interface {
 	GetByID(ctx context.Context, id domain.UUID) (*domain.User, error)
+	SetLastLogin(ctx context.Context, id domain.UUID, at time.Time, ip *string, userAgent string) error
 }
 
 // RateLimiter — анти-брутфорс для auth хендлера.

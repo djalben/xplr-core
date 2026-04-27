@@ -31,6 +31,9 @@ CREATE TABLE users (
     notify_card_operations BOOLEAN NOT NULL DEFAULT TRUE,
     telegram_link_code VARCHAR(32),
     telegram_link_expires_at TIMESTAMPTZ,
+    last_login_at TIMESTAMPTZ,
+    last_login_ip INET,
+    last_login_user_agent TEXT NOT NULL DEFAULT '',
     last_read_news_at TIMESTAMPTZ,
     news_notifications_enabled BOOLEAN NOT NULL DEFAULT TRUE,
     CONSTRAINT users_notify_channel_check CHECK (notify_email OR notify_telegram)

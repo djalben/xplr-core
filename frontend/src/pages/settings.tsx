@@ -455,7 +455,15 @@ const SecurityTab = ({ profile, reload, showToast }: { profile: ProfileData | nu
 
   const handleLogoutAll = async () => {
     setLogoutSaving(true);
-    try { await apiClient.post('/user/settings/logout-all'); showToast(t('settings.sessions.logoutAllDone'), 'ok'); loadSessions(); }
+    try {
+      await apiClient.post('/user/settings/logout-all');
+      // JWT у нас stateless (в localStorage). Сервер не может «убить» уже выданный токен,
+      // поэтому для MVP делаем явный logout на клиенте.
+      localStorage.removeItem('token');
+      showToast(t('settings.sessions.logoutAllDone'), 'ok');
+      loadSessions();
+      window.location.href = '/auth';
+    }
     catch { showToast(t('settings.error'), 'err'); }
     finally { setLogoutSaving(false); }
   };

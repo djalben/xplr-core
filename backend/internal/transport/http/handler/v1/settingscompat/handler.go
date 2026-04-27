@@ -210,8 +210,37 @@ func (h *Handler) VerifyEmailConfirm(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-func (h *Handler) GetSessions(w http.ResponseWriter, _ *http.Request) {
-	handler.WriteJSON(w, http.StatusOK, []any{})
+func (h *Handler) GetSessions(w http.ResponseWriter, r *http.Request) {
+	// Сессии как отдельная сущность пока не реализованы. Для MVP отдаём «последний вход» из users.last_login_*.
+	// Это заполняет блок «Последняя активность» на фронте партнёра.
+	uid := handler.GetUserIDFromContext(r)
+
+	u, err := h.userUC.GetByID(r.Context(), uid)
+	if err != nil {
+		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+
+		return
+	}
+
+	if u.LastLoginAt == nil {
+		handler.WriteJSON(w, http.StatusOK, []any{})
+
+		return
+	}
+
+	ip := ""
+	if u.LastLoginIP != nil {
+		ip = *u.LastLoginIP
+	}
+
+	handler.WriteJSON(w, http.StatusOK, []any{
+		map[string]any{
+			"id":          "last_login",
+			"last_active": u.LastLoginAt,
+			"ip":          ip,
+			"device":      u.LastLoginUserAgent,
+		},
+	})
 }
 
 func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
@@ -372,7 +401,27 @@ func (h *Handler) PatchNotifications(w http.ResponseWriter, r *http.Request) {
 	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-func (h *Handler) LogoutAll(w http.ResponseWriter, _ *http.Request) {
+func (h *Handler) LogoutAll(w http.ResponseWriter, r *http.Request) {
+	uid := handler.GetUserIDFromContext(r)
+
+	err := h.authUC.RevokeAllTrustedDevices(r.Context(), uid)
+	if err != nil {
+		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+
+		return
+	}
+
+	// Удаляем trusted-device cookie на текущем устройстве.
+	http.SetCookie(w, &http.Cookie{
+		Name:     "xplr_trusted_device",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
 	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 

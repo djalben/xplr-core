@@ -118,7 +118,7 @@ func (h *Handler) DoLogin(w http.ResponseWriter, r *http.Request) {
 		}
 		if !allowed {
 			w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())))
-			http.Error(w, "Too many attempts", http.StatusTooManyRequests)
+			http.Error(w, "Слишком много попыток. Попробуйте позже.", http.StatusTooManyRequests)
 
 			return
 		}
@@ -135,7 +135,7 @@ func (h *Handler) DoLogin(w http.ResponseWriter, r *http.Request) {
 		if h.limiter != nil {
 			_, _ = h.limiter.Fail(r.Context(), rlKey, now)
 		}
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, authUserMessage(err), http.StatusBadRequest)
 
 		return
 	}
@@ -148,12 +148,13 @@ func (h *Handler) DoLogin(w http.ResponseWriter, r *http.Request) {
 		handler.WriteJSON(w, http.StatusOK, map[string]any{
 			"mfaRequired": true,
 			"mfaToken":    out.MFAToken,
+			"expiresIn":   300, // 5 минут (см. utils.GenerateMFAPendingJWT)
 		})
 
 		return
 	}
 
-	h.issueAuthToken(r.Context(), w, out.User)
+	h.issueAuthToken(r.Context(), w, r, out.User)
 }
 
 func (h *Handler) DoLoginMFA(w http.ResponseWriter, r *http.Request) {
@@ -196,7 +197,7 @@ func (h *Handler) DoLoginMFA(w http.ResponseWriter, r *http.Request) {
 		}
 		if !allowed {
 			w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())))
-			http.Error(w, "Too many attempts", http.StatusTooManyRequests)
+			http.Error(w, "Слишком много попыток. Попробуйте позже.", http.StatusTooManyRequests)
 
 			return
 		}
@@ -207,7 +208,7 @@ func (h *Handler) DoLoginMFA(w http.ResponseWriter, r *http.Request) {
 		if h.limiter != nil {
 			_, _ = h.limiter.Fail(r.Context(), rlKey, now)
 		}
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, authUserMessage(err), http.StatusBadRequest)
 
 		return
 	}
@@ -236,7 +237,7 @@ func (h *Handler) DoLoginMFA(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	h.issueAuthToken(r.Context(), w, user)
+	h.issueAuthToken(r.Context(), w, r, user)
 }
 
 func clientIP(r *http.Request) *string {
@@ -308,6 +309,8 @@ func (h *Handler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	_ = h.userRepo.SetLastLogin(r.Context(), user.ID, time.Now().UTC(), clientIP(r), strings.TrimSpace(r.UserAgent()))
+
 	balance, _ := h.walletUC.GetBalance(r.Context(), userID)
 	balanceStr := balance.String()
 
@@ -361,7 +364,7 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 
 	err = h.authUC.ResetPassword(r.Context(), req.Token, req.NewPassword)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, authUserMessage(err), http.StatusBadRequest)
 
 		return
 	}
@@ -369,13 +372,40 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "password updated"})
 }
 
-func (h *Handler) issueAuthToken(ctx context.Context, w http.ResponseWriter, user *domain.User) {
+func authUserMessage(err error) string {
+	if err == nil {
+		return "Ошибка"
+	}
+
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "invalid email or password"):
+		return "Неверный email или пароль"
+	case strings.Contains(msg, "email not verified"):
+		return "Email не подтверждён. Откройте ссылку из письма и повторите вход."
+	case strings.Contains(msg, "account is blocked"):
+		return "Аккаунт заблокирован"
+	case strings.Contains(msg, "invalid totp code"):
+		return "Неверный код Google Authenticator"
+	case strings.Contains(msg, "invalid or expired mfa token"):
+		return "Время подтверждения истекло. Войдите заново."
+	default:
+		// Не показываем пользователю трассировку/пакеты wrapper.
+		return "Ошибка. Проверьте данные и повторите."
+	}
+}
+
+func (h *Handler) issueAuthToken(ctx context.Context, w http.ResponseWriter, r *http.Request, user *domain.User) {
 	token, err := utils.GenerateJWT(h.jwtSecret, user.ID, user.Email)
 	if err != nil {
 		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
 
 		return
 	}
+
+	ip := clientIP(r)
+	ua := strings.TrimSpace(r.UserAgent())
+	_ = h.userRepo.SetLastLogin(ctx, user.ID, time.Now().UTC(), ip, ua)
 
 	balance, _ := h.walletUC.GetBalance(ctx, user.ID)
 	balanceStr := balance.String()

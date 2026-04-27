@@ -31,6 +31,9 @@ type User struct {
 	NotifyCardOperations   bool       `json:"notifyCardOperations" db:"notify_card_operations"`
 	TelegramLinkCode       *string    `json:"-" db:"telegram_link_code"`
 	TelegramLinkExpiresAt  *time.Time `json:"-" db:"telegram_link_expires_at"`
+	LastLoginAt            *time.Time `json:"lastLoginAt,omitempty" db:"last_login_at"`
+	LastLoginIP            *string    `json:"lastLoginIp,omitempty" db:"last_login_ip"`
+	LastLoginUserAgent     string     `json:"-" db:"last_login_user_agent"`
 
 	LastReadNewsAt           *time.Time `json:"lastReadNewsAt,omitempty" db:"last_read_news_at"`
 	NewsNotificationsEnabled bool       `json:"newsNotificationsEnabled" db:"news_notifications_enabled"`

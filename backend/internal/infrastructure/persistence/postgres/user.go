@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	"github.com/djalben/xplr-core/backend/internal/ports"
@@ -35,6 +36,7 @@ const userSelectColumns = `id, email, password_hash, is_admin, kyc_status, statu
 	totp_secret, totp_enabled, notify_email, notify_telegram,
 	notify_transactions, notify_balance, notify_security, notify_card_operations,
 	telegram_link_code, telegram_link_expires_at,
+	last_login_at, last_login_ip, last_login_user_agent,
 	last_read_news_at, news_notifications_enabled`
 
 // GetByID — получение пользователя.
@@ -118,11 +120,12 @@ func (r *userRepo) Save(ctx context.Context, user *domain.User) error {
 			totp_secret, totp_enabled, notify_email, notify_telegram,
 			notify_transactions, notify_balance, notify_security, notify_card_operations,
 			telegram_link_code, telegram_link_expires_at,
+			last_login_at, last_login_ip, last_login_user_agent,
 			last_read_news_at, news_notifications_enabled
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
 			$11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-			$21, $22, $23, $24, $25, $26, $27
+			$21, $22, $23, $24, $25, $26, $27, $28, $29, $30
 		)`
 
 	_, err := r.store.ExecContext(ctx, query,
@@ -134,6 +137,7 @@ func (r *userRepo) Save(ctx context.Context, user *domain.User) error {
 		user.TOTPSecret, user.TOTPEnabled, user.NotifyEmail, user.NotifyTelegram,
 		user.NotifyTransactions, user.NotifyBalance, user.NotifySecurity, user.NotifyCardOperations,
 		user.TelegramLinkCode, user.TelegramLinkExpiresAt,
+		user.LastLoginAt, user.LastLoginIP, user.LastLoginUserAgent,
 		user.LastReadNewsAt, user.NewsNotificationsEnabled,
 	)
 	if err != nil {
@@ -155,8 +159,9 @@ func (r *userRepo) Update(ctx context.Context, user *domain.User) error {
 			totp_secret = $12, totp_enabled = $13, notify_email = $14, notify_telegram = $15,
 			notify_transactions = $16, notify_balance = $17, notify_security = $18, notify_card_operations = $19,
 			telegram_link_code = $20, telegram_link_expires_at = $21,
-			last_read_news_at = $22, news_notifications_enabled = $23
-		WHERE id = $24`
+			last_login_at = $22, last_login_ip = $23, last_login_user_agent = $24,
+			last_read_news_at = $25, news_notifications_enabled = $26
+		WHERE id = $27`
 
 	_, err := r.store.ExecContext(ctx, query,
 		user.PasswordHash, user.KYCStatus, user.Status, user.TelegramChatID,
@@ -166,6 +171,7 @@ func (r *userRepo) Update(ctx context.Context, user *domain.User) error {
 		user.TOTPSecret, user.TOTPEnabled, user.NotifyEmail, user.NotifyTelegram,
 		user.NotifyTransactions, user.NotifyBalance, user.NotifySecurity, user.NotifyCardOperations,
 		user.TelegramLinkCode, user.TelegramLinkExpiresAt,
+		user.LastLoginAt, user.LastLoginIP, user.LastLoginUserAgent,
 		user.LastReadNewsAt, user.NewsNotificationsEnabled,
 		user.ID,
 	)
@@ -249,6 +255,26 @@ func (r *userRepo) SetIsAdmin(ctx context.Context, id domain.UUID, isAdmin bool)
 	const q = `UPDATE users SET is_admin = $1 WHERE id = $2`
 
 	_, err := r.store.ExecContext(ctx, q, isAdmin, id)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	return nil
+}
+
+func (r *userRepo) SetLastLogin(ctx context.Context, id domain.UUID, at time.Time, ip *string, userAgent string) error {
+	if id == (domain.UUID{}) {
+		return wrapper.Wrap(domain.NewInvalidInput("user_id is required"))
+	}
+	if at.IsZero() {
+		at = time.Now().UTC()
+	}
+	if userAgent == "" {
+		userAgent = ""
+	}
+
+	const q = `UPDATE users SET last_login_at = $1, last_login_ip = $2, last_login_user_agent = $3 WHERE id = $4`
+	_, err := r.store.ExecContext(ctx, q, at, ip, userAgent, id)
 	if err != nil {
 		return wrapper.Wrap(err)
 	}

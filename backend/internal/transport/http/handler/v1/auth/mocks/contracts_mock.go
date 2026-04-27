@@ -230,3 +230,17 @@ func (mr *MockUserByIDReaderMockRecorder) GetByID(ctx, id interface{}) *gomock.C
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockUserByIDReader)(nil).GetByID), ctx, id)
 }
+
+// SetLastLogin mocks base method.
+func (m *MockUserByIDReader) SetLastLogin(ctx context.Context, id domain.UUID, at time.Time, ip *string, userAgent string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetLastLogin", ctx, id, at, ip, userAgent)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetLastLogin indicates an expected call of SetLastLogin.
+func (mr *MockUserByIDReaderMockRecorder) SetLastLogin(ctx, id, at, ip, userAgent interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastLogin", reflect.TypeOf((*MockUserByIDReader)(nil).SetLastLogin), ctx, id, at, ip, userAgent)
+}
