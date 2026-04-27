@@ -33,6 +33,11 @@ type UserByIDReader interface {
 	SetLastLogin(ctx context.Context, id domain.UUID, at time.Time, ip *string, userAgent string) error
 }
 
+type AuthSessions interface {
+	Add(ctx context.Context, s *domain.AuthSession) error
+	DeleteOlderThan(ctx context.Context, userID domain.UUID, keepLast int) error
+}
+
 // RateLimiter — анти-брутфорс для auth хендлера.
 type RateLimiter interface {
 	Allow(ctx context.Context, key string, now time.Time) (allowed bool, retryAfter time.Duration, err error)

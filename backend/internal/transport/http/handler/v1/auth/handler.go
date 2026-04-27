@@ -27,15 +27,17 @@ type Handler struct {
 	authUC    AuthFlow
 	walletUC  WalletBalanceProvider
 	userRepo  UserByIDReader
+	sessions  AuthSessions
 	limiter   RateLimiter
 	jwtSecret []byte
 }
 
-func NewHandler(authUC AuthFlow, walletUC WalletBalanceProvider, userRepo UserByIDReader, limiter RateLimiter, jwtSecret []byte) *Handler {
+func NewHandler(authUC AuthFlow, walletUC WalletBalanceProvider, userRepo UserByIDReader, sessions AuthSessions, limiter RateLimiter, jwtSecret []byte) *Handler {
 	return &Handler{
 		authUC:    authUC,
 		walletUC:  walletUC,
 		userRepo:  userRepo,
+		sessions:  sessions,
 		limiter:   limiter,
 		jwtSecret: jwtSecret,
 	}
@@ -310,6 +312,17 @@ func (h *Handler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = h.userRepo.SetLastLogin(r.Context(), user.ID, time.Now().UTC(), clientIP(r), strings.TrimSpace(r.UserAgent()))
+	if h.sessions != nil {
+		ip := clientIP(r)
+		ua := strings.TrimSpace(r.UserAgent())
+		_ = h.sessions.Add(r.Context(), &domain.AuthSession{
+			UserID:    user.ID,
+			CreatedAt: time.Now().UTC(),
+			IP:        ip,
+			UserAgent: ua,
+		})
+		_ = h.sessions.DeleteOlderThan(r.Context(), user.ID, 50)
+	}
 
 	balance, _ := h.walletUC.GetBalance(r.Context(), userID)
 	balanceStr := balance.String()
@@ -406,6 +419,15 @@ func (h *Handler) issueAuthToken(ctx context.Context, w http.ResponseWriter, r *
 	ip := clientIP(r)
 	ua := strings.TrimSpace(r.UserAgent())
 	_ = h.userRepo.SetLastLogin(ctx, user.ID, time.Now().UTC(), ip, ua)
+	if h.sessions != nil {
+		_ = h.sessions.Add(ctx, &domain.AuthSession{
+			UserID:    user.ID,
+			CreatedAt: time.Now().UTC(),
+			IP:        ip,
+			UserAgent: ua,
+		})
+		_ = h.sessions.DeleteOlderThan(ctx, user.ID, 50)
+	}
 
 	balance, _ := h.walletUC.GetBalance(ctx, user.ID)
 	balanceStr := balance.String()

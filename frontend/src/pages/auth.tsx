@@ -36,6 +36,15 @@ const translateError = (raw: string): string => {
   return map[trimmed] ?? trimmed;
 };
 
+const rateLimitMessage = (retryAfterSec?: number): string => {
+  if (!retryAfterSec || retryAfterSec <= 0) {
+    return 'Слишком много попыток. Попробуйте позже.';
+  }
+
+  const mins = Math.max(1, Math.ceil(retryAfterSec / 60));
+  return `Слишком много попыток. Попробуйте через ${mins} мин.`;
+};
+
 export const AuthPage = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -165,6 +174,13 @@ export const AuthPage = () => {
     } catch (err: any) {
       console.error('[Auth] Registration error details:', err.response);
       console.error('[Auth] Status:', err.response?.status, 'Data:', err.response?.data, 'Msg:', err.message);
+
+      if (err.response?.status === 429) {
+        const raRaw = err.response?.headers?.['retry-after'];
+        const raSec = typeof raRaw === 'string' ? Number.parseInt(raRaw, 10) : undefined;
+        setError(rateLimitMessage(Number.isFinite(raSec as any) ? raSec : undefined));
+        return;
+      }
 
       const data = err.response?.data;
       let msg: string;

@@ -110,10 +110,13 @@ func TestHandler_DoRegister(t *testing.T) {
 			authMock := mocks.NewMockAuthFlow(ctrl)
 			walletMock := mocks.NewMockWalletBalanceProvider(ctrl)
 			userReaderMock := mocks.NewMockUserByIDReader(ctrl)
+			sessionsMock := mocks.NewMockAuthSessions(ctrl)
 			limiterMock := mocks.NewMockRateLimiter(ctrl)
 			tt.args.setupMocks(authMock, walletMock, userReaderMock)
 
-			h := handlerauth.NewHandler(authMock, walletMock, userReaderMock, limiterMock, []byte(testJWTSecret))
+			sessionsMock.EXPECT().Add(gomock.Any(), gomock.Any()).AnyTimes()
+			sessionsMock.EXPECT().DeleteOlderThan(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+			h := handlerauth.NewHandler(authMock, walletMock, userReaderMock, sessionsMock, limiterMock, []byte(testJWTSecret))
 
 			req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/auth/register", bytes.NewBufferString(tt.args.body))
 			req.Header.Set("Content-Type", "application/json")
@@ -161,6 +164,7 @@ func TestHandler_DoLogin(t *testing.T) {
 	authMock := mocks.NewMockAuthFlow(ctrl)
 	walletMock := mocks.NewMockWalletBalanceProvider(ctrl)
 	userReaderMock := mocks.NewMockUserByIDReader(ctrl)
+	sessionsMock := mocks.NewMockAuthSessions(ctrl)
 	limiterMock := mocks.NewMockRateLimiter(ctrl)
 
 	limiterMock.EXPECT().Allow(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, time.Duration(0), nil)
@@ -173,7 +177,9 @@ func TestHandler_DoLogin(t *testing.T) {
 
 	limiterMock.EXPECT().Success(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 	userReaderMock.EXPECT().SetLastLogin(gomock.Any(), uid, gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	h := handlerauth.NewHandler(authMock, walletMock, userReaderMock, limiterMock, []byte(testJWTSecret))
+	sessionsMock.EXPECT().Add(gomock.Any(), gomock.Any()).AnyTimes()
+	sessionsMock.EXPECT().DeleteOlderThan(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	h := handlerauth.NewHandler(authMock, walletMock, userReaderMock, sessionsMock, limiterMock, []byte(testJWTSecret))
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/auth/login", bytes.NewBufferString(`{"email":"b@example.com","password":"x"}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
@@ -202,6 +208,7 @@ func TestHandler_DoLogin_WithTrustedDeviceCookie(t *testing.T) {
 	authMock := mocks.NewMockAuthFlow(ctrl)
 	walletMock := mocks.NewMockWalletBalanceProvider(ctrl)
 	userReaderMock := mocks.NewMockUserByIDReader(ctrl)
+	sessionsMock := mocks.NewMockAuthSessions(ctrl)
 	limiterMock := mocks.NewMockRateLimiter(ctrl)
 
 	limiterMock.EXPECT().Allow(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, time.Duration(0), nil)
@@ -214,7 +221,9 @@ func TestHandler_DoLogin_WithTrustedDeviceCookie(t *testing.T) {
 
 	limiterMock.EXPECT().Success(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 	userReaderMock.EXPECT().SetLastLogin(gomock.Any(), uid, gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	h := handlerauth.NewHandler(authMock, walletMock, userReaderMock, limiterMock, []byte(testJWTSecret))
+	sessionsMock.EXPECT().Add(gomock.Any(), gomock.Any()).AnyTimes()
+	sessionsMock.EXPECT().DeleteOlderThan(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	h := handlerauth.NewHandler(authMock, walletMock, userReaderMock, sessionsMock, limiterMock, []byte(testJWTSecret))
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/auth/login", bytes.NewBufferString(`{"email":"b@example.com","password":"x"}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.AddCookie(&http.Cookie{Name: "xplr_trusted_device", Value: "raw-device-token"})
@@ -249,6 +258,7 @@ func TestHandler_DoLoginMFA_RememberDevice_SetsCookie(t *testing.T) {
 	authMock := mocks.NewMockAuthFlow(ctrl)
 	walletMock := mocks.NewMockWalletBalanceProvider(ctrl)
 	userReaderMock := mocks.NewMockUserByIDReader(ctrl)
+	sessionsMock := mocks.NewMockAuthSessions(ctrl)
 	limiterMock := mocks.NewMockRateLimiter(ctrl)
 
 	authMock.EXPECT().
@@ -268,7 +278,9 @@ func TestHandler_DoLoginMFA_RememberDevice_SetsCookie(t *testing.T) {
 		Return(domain.NewNumeric(0), nil)
 
 	userReaderMock.EXPECT().SetLastLogin(gomock.Any(), uid, gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	h := handlerauth.NewHandler(authMock, walletMock, userReaderMock, limiterMock, []byte(testJWTSecret))
+	sessionsMock.EXPECT().Add(gomock.Any(), gomock.Any()).AnyTimes()
+	sessionsMock.EXPECT().DeleteOlderThan(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	h := handlerauth.NewHandler(authMock, walletMock, userReaderMock, sessionsMock, limiterMock, []byte(testJWTSecret))
 	req := httptest.NewRequestWithContext(
 		context.Background(),
 		http.MethodPost,
@@ -374,12 +386,15 @@ func TestHandler_RefreshToken(t *testing.T) {
 			authMock := mocks.NewMockAuthFlow(ctrl)
 			walletMock := mocks.NewMockWalletBalanceProvider(ctrl)
 			userReaderMock := mocks.NewMockUserByIDReader(ctrl)
+			sessionsMock := mocks.NewMockAuthSessions(ctrl)
 			limiterMock := mocks.NewMockRateLimiter(ctrl)
 
 			tt.args.setupMocks(walletMock, userReaderMock, uid, u)
 			userReaderMock.EXPECT().SetLastLogin(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+			sessionsMock.EXPECT().Add(gomock.Any(), gomock.Any()).AnyTimes()
+			sessionsMock.EXPECT().DeleteOlderThan(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
-			h := handlerauth.NewHandler(authMock, walletMock, userReaderMock, limiterMock, []byte(testJWTSecret))
+			h := handlerauth.NewHandler(authMock, walletMock, userReaderMock, sessionsMock, limiterMock, []byte(testJWTSecret))
 			req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/auth/refresh-token", nil)
 			if tt.args.header != "" {
 				req.Header.Set("Authorization", tt.args.header)

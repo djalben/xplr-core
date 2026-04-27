@@ -66,6 +66,17 @@ CREATE TABLE auth_rate_limits (
 
 CREATE INDEX idx_auth_rate_limits_blocked_until ON auth_rate_limits(blocked_until);
 
+-- 1.3 Сессии/активности входа (для экрана «Последняя активность» как в main).
+CREATE TABLE auth_sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    ip INET,
+    user_agent TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX idx_auth_sessions_user_created ON auth_sessions(user_id, created_at DESC);
+
 -- 2. Заявки KYC
 CREATE TABLE kyc_applications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

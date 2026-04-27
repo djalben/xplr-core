@@ -18,11 +18,12 @@ import (
 
 // Handler — совместимость с epn-killer-web (ветка main).
 type Handler struct {
-	userUC      *user.UseCase
-	authUC      *auth.UseCase
-	kycUC       *kyc.UseCase
-	kycRepo     ports.KYCApplicationRepository
-	botUsername string
+	userUC       *user.UseCase
+	authUC       *auth.UseCase
+	kycUC        *kyc.UseCase
+	kycRepo      ports.KYCApplicationRepository
+	sessionsRepo ports.AuthSessionsRepository
+	botUsername  string
 }
 
 func NewHandler(
@@ -30,16 +31,18 @@ func NewHandler(
 	authUC *auth.UseCase,
 	kycUC *kyc.UseCase,
 	kycRepo ports.KYCApplicationRepository,
+	sessionsRepo ports.AuthSessionsRepository,
 	botUsername string,
 ) *Handler {
 	botUsername = strings.TrimPrefix(strings.TrimSpace(botUsername), "@")
 
 	return &Handler{
-		userUC:      userUC,
-		authUC:      authUC,
-		kycUC:       kycUC,
-		kycRepo:     kycRepo,
-		botUsername: botUsername,
+		userUC:       userUC,
+		authUC:       authUC,
+		kycUC:        kycUC,
+		kycRepo:      kycRepo,
+		sessionsRepo: sessionsRepo,
+		botUsername:  botUsername,
 	}
 }
 
@@ -211,36 +214,33 @@ func (h *Handler) VerifyEmailConfirm(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (h *Handler) GetSessions(w http.ResponseWriter, r *http.Request) {
-	// Сессии как отдельная сущность пока не реализованы. Для MVP отдаём «последний вход» из users.last_login_*.
-	// Это заполняет блок «Последняя активность» на фронте партнёра.
 	uid := handler.GetUserIDFromContext(r)
 
-	u, err := h.userUC.GetByID(r.Context(), uid)
+	list, err := h.sessionsRepo.ListByUserID(r.Context(), uid, 50)
 	if err != nil {
 		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
 
 		return
 	}
 
-	if u.LastLoginAt == nil {
-		handler.WriteJSON(w, http.StatusOK, []any{})
-
-		return
-	}
-
-	ip := ""
-	if u.LastLoginIP != nil {
-		ip = *u.LastLoginIP
-	}
-
-	handler.WriteJSON(w, http.StatusOK, []any{
-		map[string]any{
-			"id":          "last_login",
-			"last_active": u.LastLoginAt,
+	out := make([]any, 0, len(list))
+	for _, s := range list {
+		if s == nil {
+			continue
+		}
+		ip := ""
+		if s.IP != nil {
+			ip = *s.IP
+		}
+		out = append(out, map[string]any{
+			"id":          s.ID.String(),
+			"last_active": s.CreatedAt,
 			"ip":          ip,
-			"device":      u.LastLoginUserAgent,
-		},
-	})
+			"device":      s.UserAgent,
+		})
+	}
+
+	handler.WriteJSON(w, http.StatusOK, out)
 }
 
 func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
@@ -410,6 +410,8 @@ func (h *Handler) LogoutAll(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
+
+	_ = h.sessionsRepo.DeleteByUserID(r.Context(), uid)
 
 	// Удаляем trusted-device cookie на текущем устройстве.
 	http.SetCookie(w, &http.Cookie{

@@ -33,6 +33,7 @@ type Container struct {
 	UserRepo          ports.UserRepository
 	TrustedDeviceRepo ports.TrustedDeviceRepository
 	AuthRateLimiter   ports.AuthRateLimiter
+	AuthSessionsRepo  ports.AuthSessionsRepository
 	ReferralRepo      ports.ReferralRepository
 	CommissionRepo    ports.CommissionConfigRepository
 	GradeRepo         ports.GradeRepository
@@ -73,6 +74,7 @@ func NewContainer(ctx context.Context, cfg *config.ENV) (*Container, error) {
 	userRepo := postgres.NewUserRepository(db)
 	trustedDeviceRepo := postgres.NewTrustedDeviceRepository(db)
 	authLimiter := postgres.NewAuthRateLimiter(db)
+	authSessionsRepo := postgres.NewAuthSessionsRepository(db)
 	commissionRepo := postgres.NewCommissionConfigRepository(db)
 	gradeRepo := postgres.NewGradeRepository(db)
 	exchangeRateRepo := postgres.NewExchangeRateRepository(db)
@@ -126,6 +128,7 @@ func NewContainer(ctx context.Context, cfg *config.ENV) (*Container, error) {
 		UserRepo:          userRepo,
 		TrustedDeviceRepo: trustedDeviceRepo,
 		AuthRateLimiter:   authLimiter,
+		AuthSessionsRepo:  authSessionsRepo,
 		ReferralRepo:      referralRepo,
 		CommissionRepo:    commissionRepo,
 		GradeRepo:         gradeRepo,
