@@ -281,3 +281,45 @@ func GetAdminTransactionReportHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error encoding admin report JSON: %v", err)
 	}
 }
+
+// AdminGet2FAStatusHandler - GET /api/v1/admin/2fa-status?email=...
+func AdminGet2FAStatusHandler(w http.ResponseWriter, r *http.Request) {
+	email := strings.TrimSpace(r.URL.Query().Get("email"))
+	if email == "" {
+		http.Error(w, "email parameter required", http.StatusBadRequest)
+		return
+	}
+	userID, enabled, err := repository.Get2FAStatusByEmail(email)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"user_id":            userID,
+		"email":              email,
+		"two_factor_enabled": enabled,
+	})
+}
+
+// AdminReset2FAHandler - POST /api/v1/admin/users/{id}/reset-2fa
+func AdminReset2FAHandler(w http.ResponseWriter, r *http.Request) {
+	adminID, _ := r.Context().Value(middleware.UserIDKey).(int)
+	vars := mux.Vars(r)
+	targetID, err := strconv.Atoi(vars["id"])
+	if err != nil || targetID <= 0 {
+		http.Error(w, "invalid user id", http.StatusBadRequest)
+		return
+	}
+	if err := repository.AdminResetTwoFactor(targetID); err != nil {
+		http.Error(w, "Failed to reset 2FA", http.StatusInternalServerError)
+		return
+	}
+	repository.WriteAdminLog(adminID, fmt.Sprintf("Сброс 2FA для пользователя %d", targetID))
+	log.Printf("[ADMIN] 2FA reset for user %d by admin %d", targetID, adminID)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":  "ok",
+		"message": "2FA has been reset",
+	})
+}

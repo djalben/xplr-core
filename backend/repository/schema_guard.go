@@ -65,6 +65,10 @@ var allRequiredColumns = []requiredColumn{
 	{"users", "tier", "VARCHAR(20) DEFAULT 'standard'"},
 	{"users", "tier_expires_at", "TIMESTAMP WITH TIME ZONE"},
 
+	// --- 2FA: recovery codes & trusted devices ---
+	{"users", "two_fa_recovery_codes", "JSONB DEFAULT '[]'::jsonb"},
+	{"users", "trusted_devices", "JSONB DEFAULT '[]'::jsonb"},
+
 	// --- support_tickets: admin ownership ---
 	{"support_tickets", "claimed_by", "INTEGER DEFAULT 0"},
 }

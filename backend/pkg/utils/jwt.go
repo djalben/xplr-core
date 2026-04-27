@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -34,6 +35,47 @@ func GenerateJWT(userID int, isAdmin bool, role string) (string, error) {
 		return "", err
 	}
 	return tokenString, nil
+}
+
+// GenerateHalfAuthJWT creates a short-lived (5min) JWT with half_auth:true.
+// Used when user has correct password but still needs 2FA verification.
+func GenerateHalfAuthJWT(userID int) (string, error) {
+	claims := jwt.MapClaims{
+		"user_id":   userID,
+		"half_auth": true,
+		"exp":       time.Now().Add(5 * time.Minute).Unix(),
+		"iat":       time.Now().Unix(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(jwtKey)
+	if err != nil {
+		log.Printf("Error creating half-auth JWT: %v", err)
+		return "", err
+	}
+	return tokenString, nil
+}
+
+// ParseHalfAuthJWT validates a half-auth token and returns user_id.
+func ParseHalfAuthJWT(tokenString string) (int, error) {
+	parsedToken, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		return jwtKey, nil
+	})
+	if err != nil || !parsedToken.Valid {
+		return 0, fmt.Errorf("invalid half-auth token")
+	}
+	claims, ok := parsedToken.Claims.(jwt.MapClaims)
+	if !ok {
+		return 0, fmt.Errorf("invalid claims")
+	}
+	halfAuth, _ := claims["half_auth"].(bool)
+	if !halfAuth {
+		return 0, fmt.Errorf("not a half-auth token")
+	}
+	userIDFloat, ok := claims["user_id"].(float64)
+	if !ok {
+		return 0, fmt.Errorf("invalid user_id in token")
+	}
+	return int(userIDFloat), nil
 }
 
 // GetJWTSecret возвращает секретный ключ для проверки токена

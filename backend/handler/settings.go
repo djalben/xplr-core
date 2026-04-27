@@ -300,11 +300,15 @@ func Setup2FAHandler(w http.ResponseWriter, r *http.Request) {
 	// otpauth URI for Google Authenticator
 	otpURI := "otpauth://totp/XPLR:" + me.Email + "?secret=" + secretB32 + "&issuer=XPLR&digits=6&period=30"
 
+	// Pre-generate recovery codes (will be stored when user confirms with TOTP code)
+	plainCodes, _ := generateRecoveryCodes()
+
 	log.Printf("[2FA] Setup initiated for user %d", userID)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"secret":  secretB32,
-		"otp_uri": otpURI,
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"secret":         secretB32,
+		"otp_uri":        otpURI,
+		"recovery_codes": plainCodes,
 	})
 }
 
@@ -341,6 +345,12 @@ func Verify2FAHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Generate and store hashed recovery codes
+	plainCodes, hashedCodes := generateRecoveryCodes()
+	if err := repository.SetRecoveryCodes(userID, hashedCodes); err != nil {
+		log.Printf("[2FA] Warning: failed to store recovery codes for user %d: %v", userID, err)
+	}
+
 	if err := repository.EnableTwoFactor(userID); err != nil {
 		http.Error(w, "Failed to enable 2FA", http.StatusInternalServerError)
 		return
@@ -348,7 +358,10 @@ func Verify2FAHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[2FA] ✅ Enabled for user %d", userID)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"two_factor_enabled": true})
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"two_factor_enabled": true,
+		"recovery_codes":     plainCodes,
+	})
 }
 
 // ── POST /api/v1/user/settings/2fa/disable ──

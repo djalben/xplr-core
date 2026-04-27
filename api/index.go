@@ -596,6 +596,7 @@ func buildRouter() *mux.Router {
 	r.HandleFunc("/api/v1/auth/reset-password-request", h.ResetPasswordRequestHandler).Methods("POST")
 	r.HandleFunc("/api/v1/auth/reset-password", h.ResetPasswordHandler).Methods("POST")
 	r.HandleFunc("/api/v1/auth/refresh-token", h.RefreshTokenHandler).Methods("POST")
+	r.HandleFunc("/api/v1/auth/2fa/verify", h.LoginVerify2FAHandler).Methods("POST")
 
 	// Webhooks (public)
 	r.HandleFunc("/api/v1/webhooks/wallester", h.WallesterWebhookHandler).Methods("POST")
@@ -742,6 +743,8 @@ func buildRouter() *mux.Router {
 	admin.HandleFunc("/users/{id}/full-details", h.AdminUserFullDetailsHandler).Methods("GET")
 	admin.HandleFunc("/users/{id}/emergency-freeze", h.AdminEmergencyFreezeHandler).Methods("POST")
 	admin.HandleFunc("/users/{id}/toggle-block", h.AdminToggleBlockHandler).Methods("POST")
+	admin.HandleFunc("/users/{id}/reset-2fa", h.AdminReset2FAHandler).Methods("POST")
+	admin.HandleFunc("/2fa-status", h.AdminGet2FAStatusHandler).Methods("GET")
 	admin.HandleFunc("/chats", h.AdminGetChatsHandler).Methods("GET")
 	admin.HandleFunc("/chats/{id}/messages", h.AdminGetChatMessagesHandler).Methods("GET")
 	admin.HandleFunc("/translations", h.AdminGetTranslationsHandler).Methods("GET")

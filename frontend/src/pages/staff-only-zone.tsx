@@ -39,7 +39,7 @@ import {
   Pencil,
 } from 'lucide-react';
 
-type Tab = 'dashboard' | 'users' | 'commissions' | 'tickets' | 'news' | 'logs' | 'store' | 'rates';
+type Tab = 'dashboard' | 'users' | 'commissions' | 'tickets' | 'news' | 'logs' | 'store' | 'rates' | 'security';
 
 interface DashboardStats {
   total_users: number;
@@ -864,6 +864,7 @@ export const StaffOnlyZone = () => {
           <TabBtn id="store" icon={ShoppingBag} label="Магазин" />
           <TabBtn id="rates" icon={DollarSign} label="Курсы валют" />
           <TabBtn id="logs" icon={Clock} label="Логи" />
+          <TabBtn id="security" icon={Shield} label="Безопасность" />
         </div>
 
         {/* ════════════ DASHBOARD TAB ════════════ */}
@@ -2538,6 +2539,123 @@ export const StaffOnlyZone = () => {
                 </tbody>
               </table>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ════════════ SECURITY TAB ════════════ */}
+        {tab === 'security' && (() => {
+          return <SecurityTab showToast={showToast} />;
+        })()}
+      </div>
+    </div>
+  );
+};
+
+/* ── Security Tab Component ── */
+const SecurityTab = ({ showToast }: { showToast: (msg: string, type: 'ok' | 'err') => void }) => {
+  const [searchEmail, setSearchEmail] = useState('');
+  const [result, setResult] = useState<{ user_id: number; email: string; two_factor_enabled: boolean } | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [searchError, setSearchError] = useState('');
+
+  const handleSearch = async () => {
+    const email = searchEmail.trim();
+    if (!email) return;
+    setSearching(true);
+    setSearchError('');
+    setResult(null);
+    try {
+      const res = await apiClient.get(`/admin/2fa-status?email=${encodeURIComponent(email)}`);
+      setResult(res.data);
+    } catch {
+      setSearchError('Пользователь не найден');
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleReset2FA = async () => {
+    if (!result) return;
+    if (!confirm(`Вы уверены, что хотите сбросить 2FA для ${result.email}?`)) return;
+    setResetting(true);
+    try {
+      await apiClient.post(`/admin/users/${result.user_id}/reset-2fa`);
+      showToast(`2FA сброшена для ${result.email}`, 'ok');
+      setResult({ ...result, two_factor_enabled: false });
+    } catch {
+      showToast('Ошибка сброса 2FA', 'err');
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="glass-card p-6">
+        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <Shield className="w-5 h-5 text-blue-400" />
+          Безопасность — управление 2FA
+        </h3>
+        <p className="text-sm text-slate-400 mb-4">Поиск пользователя по email для проверки статуса 2FA и экстренного сброса.</p>
+
+        <div className="flex gap-3 mb-6">
+          <div className="relative flex-1">
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <input
+              type="email"
+              value={searchEmail}
+              onChange={e => setSearchEmail(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSearch()}
+              placeholder="Email пользователя..."
+              className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 text-sm"
+            />
+          </div>
+          <button
+            onClick={handleSearch}
+            disabled={searching || !searchEmail.trim()}
+            className="px-5 py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors flex items-center gap-2"
+          >
+            {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+            Найти
+          </button>
+        </div>
+
+        {searchError && (
+          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+            {searchError}
+          </div>
+        )}
+
+        {result && (
+          <div className="p-5 rounded-xl bg-white/[0.03] border border-white/10">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <p className="text-white font-medium">{result.email}</p>
+                <p className="text-sm text-slate-400">ID: {result.user_id}</p>
+                <div className="flex items-center gap-2 mt-2">
+                  {result.two_factor_enabled ? (
+                    <span className="flex items-center gap-1.5 text-emerald-400 text-sm font-medium">
+                      <ShieldCheck className="w-4 h-4" /> 2FA включена
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1.5 text-slate-500 text-sm">
+                      <Shield className="w-4 h-4" /> 2FA не настроена
+                    </span>
+                  )}
+                </div>
+              </div>
+              {result.two_factor_enabled && (
+                <button
+                  onClick={handleReset2FA}
+                  disabled={resetting}
+                  className="px-5 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-sm font-medium rounded-xl transition-colors flex items-center gap-2"
+                >
+                  {resetting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />}
+                  Сбросить 2FA
+                </button>
+              )}
             </div>
           </div>
         )}

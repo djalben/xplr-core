@@ -409,6 +409,7 @@ const SecurityTab = ({ profile, reload, showToast }: { profile: ProfileData | nu
   const [totpURI, setTotpURI] = useState('');
   const [totpCode, setTotpCode] = useState('');
   const [totpSaving, setTotpSaving] = useState(false);
+  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [sessions, setSessions] = useState<SessionData[]>([]);
   const [logoutSaving, setLogoutSaving] = useState(false);
 
@@ -432,7 +433,7 @@ const SecurityTab = ({ profile, reload, showToast }: { profile: ProfileData | nu
   };
 
   const handleSetup2FA = async () => {
-    try { const res = await apiClient.post('/user/settings/2fa/setup'); setTotpSecret(res.data.secret); setTotpURI(res.data.otp_uri); }
+    try { const res = await apiClient.post('/user/settings/2fa/setup'); setTotpSecret(res.data.secret); setTotpURI(res.data.otp_uri); if (res.data.recovery_codes) setRecoveryCodes(res.data.recovery_codes); }
     catch { showToast(t('settings.twoFa.setupError'), 'err'); }
   };
 
@@ -440,9 +441,11 @@ const SecurityTab = ({ profile, reload, showToast }: { profile: ProfileData | nu
     if (totpCode.length !== 6) { showToast(t('settings.twoFa.enterCode'), 'err'); return; }
     setTotpSaving(true);
     try {
-      await apiClient.post('/user/settings/2fa/verify', { code: totpCode });
+      const res = await apiClient.post('/user/settings/2fa/verify', { code: totpCode });
+      if (res.data.recovery_codes) setRecoveryCodes(res.data.recovery_codes);
       showToast(t('settings.twoFa.enabledToast'), 'ok');
-      setTotpSecret(''); setTotpURI(''); setTotpCode(''); reload();
+      setTotpSecret(''); setTotpURI(''); setTotpCode('');
+      // Don't reload yet — show recovery codes first
     } catch (err: any) {
       showToast(typeof err.response?.data === 'string' ? err.response.data : t('settings.twoFa.invalidCode'), 'err');
     } finally { setTotpSaving(false); }
@@ -518,6 +521,40 @@ const SecurityTab = ({ profile, reload, showToast }: { profile: ProfileData | nu
           </div>
         )}
       </div>
+
+      {/* Recovery Codes Modal */}
+      {recoveryCodes.length > 0 && (
+        <div className="glass-card p-4 sm:p-6 border-2 border-amber-500/30">
+          <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
+            <ShieldAlert className="w-5 h-5 text-amber-400" />
+            Коды восстановления
+          </h3>
+          <p className="text-sm text-amber-300/80 mb-4">
+            ⚠️ Сохраните эти коды в надёжном месте. Они показываются <strong>только один раз</strong> и позволяют войти в аккаунт, если вы потеряете доступ к приложению-аутентификатору.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
+            {recoveryCodes.map((code, i) => (
+              <code key={i} className="block p-3 bg-white/5 rounded-lg text-sm text-emerald-400 font-mono text-center tracking-widest select-all border border-white/10">
+                {code}
+              </code>
+            ))}
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => { navigator.clipboard.writeText(recoveryCodes.join('\n')); showToast('Коды скопированы', 'ok'); }}
+              className="px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white text-sm font-medium rounded-xl transition-colors"
+            >
+              📋 Скопировать все
+            </button>
+            <button
+              onClick={() => { setRecoveryCodes([]); reload(); }}
+              className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-xl transition-colors"
+            >
+              ✅ Я сохранил коды
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Sessions */}
       <div className="glass-card p-4 sm:p-6">

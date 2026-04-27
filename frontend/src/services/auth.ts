@@ -12,6 +12,8 @@ export interface LoginRequest {
 
 export interface AuthResponse {
   token: string;
+  requires_2fa?: boolean;
+  half_auth_token?: string;
   user: {
     id: number;
     email: string;
@@ -21,6 +23,13 @@ export interface AuthResponse {
     role?: string;
     is_verified?: boolean;
   };
+}
+
+export interface Verify2FARequest {
+  half_auth_token: string;
+  code: string;
+  remember_device: boolean;
+  fingerprint?: string;
 }
 
 // Регистрация нового пользователя
@@ -34,9 +43,25 @@ export const register = async (data: RegisterRequest): Promise<AuthResponse> => 
   return response.data;
 };
 
-// Вход в систему
+// Вход в систему (Stage 1 — may return requires_2fa)
 export const login = async (data: LoginRequest): Promise<AuthResponse> => {
   const response = await apiClient.post<AuthResponse>('/auth/login', data);
+
+  // If 2FA required, don't store token yet
+  if (response.data.requires_2fa) {
+    return response.data;
+  }
+
+  if (response.data.token) {
+    localStorage.setItem('token', response.data.token);
+  }
+
+  return response.data;
+};
+
+// Вход Stage 2 — 2FA verification
+export const verify2FA = async (data: Verify2FARequest): Promise<AuthResponse> => {
+  const response = await apiClient.post<AuthResponse>('/auth/2fa/verify', data);
 
   if (response.data.token) {
     localStorage.setItem('token', response.data.token);

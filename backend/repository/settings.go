@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -131,9 +132,103 @@ func DisableTwoFactor(userID int) error {
 		return fmt.Errorf("database connection not initialized")
 	}
 	_, err := GlobalDB.Exec(
-		`UPDATE users SET two_factor_enabled = FALSE, two_factor_secret = NULL WHERE id = $1`, userID,
+		`UPDATE users SET two_factor_enabled = FALSE, two_factor_secret = NULL,
+		 two_fa_recovery_codes = '[]'::jsonb, trusted_devices = '[]'::jsonb
+		 WHERE id = $1`, userID,
 	)
 	return err
+}
+
+// AdminResetTwoFactor fully resets 2FA for a user (emergency admin action).
+func AdminResetTwoFactor(userID int) error {
+	return DisableTwoFactor(userID)
+}
+
+// SetRecoveryCodes stores hashed recovery codes as JSONB array.
+func SetRecoveryCodes(userID int, hashedCodes []string) error {
+	if GlobalDB == nil {
+		return fmt.Errorf("database connection not initialized")
+	}
+	codesJSON, _ := json.Marshal(hashedCodes)
+	_, err := GlobalDB.Exec(
+		`UPDATE users SET two_fa_recovery_codes = $1::jsonb WHERE id = $2`,
+		string(codesJSON), userID,
+	)
+	return err
+}
+
+// GetRecoveryCodes returns the stored hashed recovery codes.
+func GetRecoveryCodes(userID int) ([]string, error) {
+	if GlobalDB == nil {
+		return nil, fmt.Errorf("database connection not initialized")
+	}
+	var raw *string
+	err := GlobalDB.QueryRow(
+		`SELECT two_fa_recovery_codes::text FROM users WHERE id = $1`, userID,
+	).Scan(&raw)
+	if err != nil || raw == nil {
+		return nil, err
+	}
+	var codes []string
+	if err := json.Unmarshal([]byte(*raw), &codes); err != nil {
+		return nil, err
+	}
+	return codes, nil
+}
+
+// BurnRecoveryCode removes a used recovery code from the array.
+func BurnRecoveryCode(userID int, index int) error {
+	if GlobalDB == nil {
+		return fmt.Errorf("database connection not initialized")
+	}
+	codes, err := GetRecoveryCodes(userID)
+	if err != nil {
+		return err
+	}
+	if index < 0 || index >= len(codes) {
+		return fmt.Errorf("invalid recovery code index")
+	}
+	codes = append(codes[:index], codes[index+1:]...)
+	return SetRecoveryCodes(userID, codes)
+}
+
+// AddTrustedDevice adds a device fingerprint hash to the user's trusted_devices JSONB.
+func AddTrustedDevice(userID int, deviceHash string) error {
+	if GlobalDB == nil {
+		return fmt.Errorf("database connection not initialized")
+	}
+	_, err := GlobalDB.Exec(
+		`UPDATE users SET trusted_devices = COALESCE(trusted_devices, '[]'::jsonb) || to_jsonb($1::text) WHERE id = $2`,
+		deviceHash, userID,
+	)
+	return err
+}
+
+// IsTrustedDevice checks if a device fingerprint hash is in the user's trusted_devices.
+func IsTrustedDevice(userID int, deviceHash string) bool {
+	if GlobalDB == nil {
+		return false
+	}
+	var exists bool
+	GlobalDB.QueryRow(
+		`SELECT COALESCE(trusted_devices, '[]'::jsonb) ? $1 FROM users WHERE id = $2`,
+		deviceHash, userID,
+	).Scan(&exists)
+	return exists
+}
+
+// Get2FAStatusByEmail returns 2FA enabled status for admin panel lookup.
+func Get2FAStatusByEmail(email string) (int, bool, error) {
+	if GlobalDB == nil {
+		return 0, false, fmt.Errorf("database connection not initialized")
+	}
+	var userID int
+	var enabled bool
+	err := GlobalDB.QueryRow(
+		`SELECT id, COALESCE(two_factor_enabled, FALSE) FROM users WHERE LOWER(email) = LOWER($1)`,
+		email,
+	).Scan(&userID, &enabled)
+	return userID, enabled, err
 }
 
 func GetTwoFactorSecret(userID int) (string, bool, error) {

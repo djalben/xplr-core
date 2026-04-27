@@ -163,6 +163,7 @@ func main() {
 	router.HandleFunc("/api/v1/auth/reset-password-request", resetLimiter.Limit(handler.ResetPasswordRequestHandler)).Methods("POST")
 	router.HandleFunc("/api/v1/auth/reset-password", handler.ResetPasswordHandler).Methods("POST")
 	router.HandleFunc("/api/v1/auth/refresh-token", handler.RefreshTokenHandler).Methods("POST")
+	router.HandleFunc("/api/v1/auth/2fa/verify", handler.LoginVerify2FAHandler).Methods("POST")
 
 	// REMOVED: Wallester webhook - provider interface will handle callbacks differently
 	// router.HandleFunc("/api/v1/webhooks/wallester", handler.WallesterWebhookHandler).Methods("POST")
@@ -291,6 +292,8 @@ func main() {
 	adminRouter.HandleFunc("/users/{id}/full-details", handler.AdminUserFullDetailsHandler).Methods("GET")
 	adminRouter.HandleFunc("/users/{id}/emergency-freeze", handler.AdminEmergencyFreezeHandler).Methods("POST")
 	adminRouter.HandleFunc("/users/{id}/toggle-block", handler.AdminToggleBlockHandler).Methods("POST")
+	adminRouter.HandleFunc("/users/{id}/reset-2fa", handler.AdminReset2FAHandler).Methods("POST")
+	adminRouter.HandleFunc("/2fa-status", handler.AdminGet2FAStatusHandler).Methods("GET")
 	adminRouter.HandleFunc("/chats", handler.AdminGetChatsHandler).Methods("GET")
 	adminRouter.HandleFunc("/chats/{id}/messages", handler.AdminGetChatMessagesHandler).Methods("GET")
 	adminRouter.HandleFunc("/translations", handler.AdminGetTranslationsHandler).Methods("GET")

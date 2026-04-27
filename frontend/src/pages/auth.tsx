@@ -1,11 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Wifi, Eye, EyeOff, Lock, Mail, ChevronRight, ArrowLeft, Check, X } from 'lucide-react';
-import { login, register } from '../services/auth';
+import { Wifi, Eye, EyeOff, Lock, Mail, ChevronRight, ArrowLeft, Check, X, Shield, Smartphone } from 'lucide-react';
+import { login, register, verify2FA } from '../services/auth';
 import { useAuth } from '../store/auth-context';
 
-type AuthMode = 'login' | 'register';
+type AuthMode = 'login' | 'register' | '2fa';
 
 /* ── Password strength rules ── */
 const getPasswordRules = (t: (k: string) => string) => [
@@ -44,6 +44,11 @@ export const AuthPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // 2FA state
+  const [halfAuthToken, setHalfAuthToken] = useState('');
+  const [twoFACode, setTwoFACode] = useState('');
+  const [rememberDevice, setRememberDevice] = useState(false);
+
   /* Live password validation (register only) */
   const passwordRules = useMemo(() => getPasswordRules(t), [t]);
   const pwChecks = useMemo(
@@ -78,22 +83,19 @@ export const AuthPage = () => {
       console.log('[Auth] Sending auth request:', { mode, email });
 
       const res = mode === 'login' ? await login(payload) : await register(payload);
-      console.log('[Auth] Response:', { token: res.token ? 'yes' : 'NO', user: res.user });
+      console.log('[Auth] Response:', { token: res.token ? 'yes' : 'NO', requires_2fa: res.requires_2fa, user: res.user });
+
+      // 2FA required — transition to 2FA mode
+      if (res.requires_2fa && res.half_auth_token) {
+        setHalfAuthToken(res.half_auth_token);
+        setMode('2fa');
+        setError('');
+        return;
+      }
 
       // Immediately apply user data to auth context (including is_admin/role)
       if (res.user) {
-        const u = res.user;
-        const adminFlag = u.is_admin === true || u.role === 'admin';
-        console.log('[Auth] Setting user context: is_admin=', adminFlag, 'role=', u.role);
-        setUser({
-          id: String(u.id),
-          email: u.email,
-          name: u.email?.split('@')[0] || '',
-          role: 'OWNER',
-          avatar: (u.email || '??').substring(0, 2).toUpperCase(),
-          isAdmin: adminFlag,
-          serverRole: u.role || 'user',
-        });
+        applyUserToContext(res);
       }
 
       const savedToken = localStorage.getItem('token');
@@ -117,6 +119,52 @@ export const AuthPage = () => {
         msg = 'Сервер недоступен. Проверьте подключение к интернету.';
       } else {
         msg = err.message || 'Ошибка авторизации';
+      }
+      setError(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Helper: apply user from auth response to context
+  const applyUserToContext = (res: { user: { id: number; email: string; is_admin?: boolean; role?: string } }) => {
+    const u = res.user;
+    const adminFlag = u.is_admin === true || u.role === 'admin';
+    console.log('[Auth] Setting user context: is_admin=', adminFlag, 'role=', u.role);
+    setUser({
+      id: String(u.id),
+      email: u.email,
+      name: u.email?.split('@')[0] || '',
+      role: 'OWNER',
+      avatar: (u.email || '??').substring(0, 2).toUpperCase(),
+      isAdmin: adminFlag,
+      serverRole: u.role || 'user',
+    });
+  };
+
+  // 2FA Stage 2 submit
+  const handle2FASubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    const code = twoFACode.trim();
+    if (!code) { setError('Введите код'); return; }
+
+    setIsLoading(true);
+    try {
+      const res = await verify2FA({
+        half_auth_token: halfAuthToken,
+        code,
+        remember_device: rememberDevice,
+      });
+      if (res.user) applyUserToContext(res);
+      navigate('/dashboard');
+    } catch (err: any) {
+      const data = err.response?.data;
+      let msg: string;
+      if (typeof data === 'string' && data.trim().length > 0) {
+        msg = translateError(data);
+      } else {
+        msg = 'Неверный код подтверждения';
       }
       setError(msg);
     } finally {
@@ -151,33 +199,46 @@ export const AuthPage = () => {
           </div>
         </div>
 
-        {/* Mode Toggle */}
-        <div className="flex justify-center mb-6">
-          <div className="bg-white/[0.04] border border-white/[0.06] rounded-2xl p-1.5 flex shadow-2xl">
-            <button
-              type="button"
-              onClick={() => { setMode('login'); setError(''); }}
-              className={`px-8 py-3 text-sm font-semibold rounded-xl transition-all duration-150 ${
-                mode === 'login'
-                  ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/25'
-                  : 'text-slate-500 hover:text-slate-300'
-              }`}
-            >
-              {t('auth.login')}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setMode('register'); setError(''); }}
-              className={`px-8 py-3 text-sm font-semibold rounded-xl transition-all duration-150 ${
-                mode === 'register'
-                  ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/25'
-                  : 'text-slate-500 hover:text-slate-300'
-              }`}
-            >
-              {t('auth.register')}
-            </button>
+        {/* Mode Toggle — hidden during 2FA */}
+        {mode !== '2fa' && (
+          <div className="flex justify-center mb-6">
+            <div className="bg-white/[0.04] border border-white/[0.06] rounded-2xl p-1.5 flex shadow-2xl">
+              <button
+                type="button"
+                onClick={() => { setMode('login'); setError(''); }}
+                className={`px-8 py-3 text-sm font-semibold rounded-xl transition-all duration-150 ${
+                  mode === 'login'
+                    ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/25'
+                    : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                {t('auth.login')}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setMode('register'); setError(''); }}
+                className={`px-8 py-3 text-sm font-semibold rounded-xl transition-all duration-150 ${
+                  mode === 'register'
+                    ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/25'
+                    : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                {t('auth.register')}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* 2FA Header */}
+        {mode === '2fa' && (
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 border border-white/[0.08] flex items-center justify-center">
+              <Shield className="w-8 h-8 text-blue-400" />
+            </div>
+            <h2 className="text-xl font-bold text-white mb-1">Двухфакторная аутентификация</h2>
+            <p className="text-sm text-slate-400">Введите 6-значный код из приложения или код восстановления</p>
+          </div>
+        )}
 
         {/* Error message */}
         {error && (
@@ -205,7 +266,95 @@ export const AuthPage = () => {
           </div>
         )}
 
-        {/* ── Bank Card Form (Glassmorphism) ── */}
+        {/* ── 2FA Verification Form ── */}
+        {mode === '2fa' && (
+          <div>
+            <form
+              onSubmit={handle2FASubmit}
+              className="relative rounded-[22px] p-8 overflow-hidden
+                bg-gradient-to-br from-[#0d1528] via-[#0a1025] to-[#0c0f20]
+                shadow-[0_8px_60px_-12px_rgba(30,64,175,0.25)]
+                border border-white/[0.08]"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-white/[0.06] via-transparent to-transparent pointer-events-none rounded-[22px]" />
+              <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-400/30 to-transparent" />
+
+              <div className="relative z-10 space-y-4">
+                {/* Code input */}
+                <div className="relative group">
+                  <Shield className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 group-focus-within:text-blue-400 transition-colors z-10" />
+                  <input
+                    type="text"
+                    placeholder="Код из приложения или код восстановления"
+                    value={twoFACode}
+                    onChange={(e) => setTwoFACode(e.target.value)}
+                    className="w-full bg-white/[0.04] border border-white/[0.10] rounded-xl py-4 pl-12 pr-4
+                      text-white placeholder-slate-600 text-center
+                      focus:outline-none focus:border-blue-400 focus:bg-white/[0.06] focus:ring-2 focus:ring-blue-500/60
+                      transition-colors duration-150 text-xl font-mono tracking-[0.3em]"
+                    autoFocus
+                    autoComplete="one-time-code"
+                    maxLength={20}
+                  />
+                </div>
+
+                {/* Remember device checkbox */}
+                <label className="flex items-center gap-3 px-1 py-2 cursor-pointer group">
+                  <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
+                    rememberDevice
+                      ? 'bg-blue-500 border-blue-500'
+                      : 'border-white/20 bg-white/[0.04] group-hover:border-white/30'
+                  }`}>
+                    {rememberDevice && <Check className="w-3.5 h-3.5 text-white" />}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Smartphone className="w-4 h-4 text-slate-400" />
+                    <span className="text-sm text-slate-300">Запомнить это устройство (30 дней)</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={rememberDevice}
+                    onChange={(e) => setRememberDevice(e.target.checked)}
+                    className="sr-only"
+                  />
+                </label>
+
+                {/* Submit */}
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full mt-4 py-4 rounded-xl font-semibold text-base
+                    bg-gradient-to-r from-blue-500 to-indigo-600 text-white
+                    hover:from-blue-400 hover:to-indigo-500
+                    disabled:opacity-50 disabled:cursor-not-allowed
+                    transition-all duration-150
+                    shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30
+                    flex items-center justify-center gap-2 group
+                    relative overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+                  <span className="relative z-10">
+                    {isLoading ? 'Проверка...' : 'Подтвердить'}
+                  </span>
+                  {!isLoading && <ChevronRight className="w-5 h-5 relative z-10 group-hover:translate-x-1 transition-transform" />}
+                </button>
+
+                {/* Back to login */}
+                <button
+                  type="button"
+                  onClick={() => { setMode('login'); setError(''); setTwoFACode(''); setHalfAuthToken(''); }}
+                  className="w-full mt-2 text-sm text-slate-500 hover:text-slate-300 transition-colors flex items-center justify-center gap-1"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Вернуться к входу
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* ── Bank Card Form (Glassmorphism) — login/register only ── */}
+        {mode !== '2fa' && (
         <div>
           <form
             onSubmit={handleSubmit}
@@ -366,6 +515,7 @@ export const AuthPage = () => {
             </div>
           </form>
         </div>
+        )}
 
         {/* Additional links */}
         <div className="mt-5 text-center">

@@ -8,10 +8,10 @@ import (
 	"strings"
 
 	"github.com/djalben/xplr-core/backend/domain"
+	"github.com/djalben/xplr-core/backend/pkg/utils"
 	"github.com/djalben/xplr-core/backend/repository"
 	"github.com/djalben/xplr-core/backend/service"
 	"github.com/djalben/xplr-core/backend/telegram"
-	"github.com/djalben/xplr-core/backend/pkg/utils"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/shopspring/decimal"
 )
@@ -380,6 +380,32 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		if fullUser, err := repository.GetUserByID(user.ID); err == nil {
 			user = fullUser
 		}
+	}
+
+	// ── Шаг 5b: 2FA gate — if enabled and device not trusted, return half_auth_token ──
+	_, twoFAEnabled, _ := repository.GetTwoFactorSecret(user.ID)
+	if twoFAEnabled {
+		// Check trusted device cookie
+		deviceTrusted := false
+		if cookie, cookieErr := r.Cookie("xplr_trusted_device"); cookieErr == nil && cookie.Value != "" {
+			deviceTrusted = repository.IsTrustedDevice(user.ID, cookie.Value)
+		}
+		if !deviceTrusted {
+			halfToken, htErr := utils.GenerateHalfAuthJWT(user.ID)
+			if htErr != nil {
+				log.Printf("[LOGIN] ❌ Half-auth JWT failed for user %d: %v", user.ID, htErr)
+				http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+				return
+			}
+			log.Printf("[LOGIN] 🔐 2FA required for %s (user_id=%d)", user.Email, user.ID)
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"requires_2fa":    true,
+				"half_auth_token": halfToken,
+			})
+			return
+		}
+		log.Printf("[LOGIN] ✅ 2FA bypassed (trusted device) for %s", user.Email)
 	}
 
 	// ── Шаг 6: генерация JWT с ролевой информацией ──
