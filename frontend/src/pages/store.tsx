@@ -381,17 +381,15 @@ const VpnSuccessModal = ({ productName, priceUsd, vlessKey, onClose }: { product
             </div>
             <p className="text-xs text-white/45 leading-relaxed">
               Вставьте скопированную ссылку в приложение{' '}
-              <span className="text-white/70 font-semibold">v2rayNG</span>{' '}
-              (Android) или{' '}
               <span className="text-white/70 font-semibold">Happ Proxy</span>{' '}
-              (iOS) для активации зашифрованного канала.
+              (Android / iOS) для активации зашифрованного канала.
             </p>
           </div>
         </div>
 
         {/* Platform download buttons */}
         <div className="mt-4 grid grid-cols-2 gap-2.5">
-          <a href="https://github.com/2dust/v2rayNG/releases/download/2.0.18/v2rayNG_2.0.18_universal.apk" target="_blank" rel="noopener noreferrer"
+          <a href="https://play.google.com/store/apps/details?id=com.happproxy" target="_blank" rel="noopener noreferrer"
             className="flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white font-semibold text-sm hover:bg-white/[0.1] transition-all active:scale-[0.98]">
             <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor"><path d="M17.523 2.226a.75.75 0 0 0-1.046 0L14.1 4.602a8.523 8.523 0 0 0-4.2 0L7.523 2.226a.75.75 0 1 0-1.046 1.078L8.3 5.126A8.5 8.5 0 0 0 3.5 12.5V14h17v-1.5a8.5 8.5 0 0 0-4.8-7.374l1.823-1.822a.75.75 0 0 0 0-1.078ZM8.5 11a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm7 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2ZM3.5 15.5h17V19a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3v-3.5Z"/></svg>
             Android
@@ -402,7 +400,7 @@ const VpnSuccessModal = ({ productName, priceUsd, vlessKey, onClose }: { product
             iOS
           </a>
         </div>
-        <p className="text-center mt-1.5 text-[10px] text-white/25">v2rayNG (Android) · Happ Proxy (iOS)</p>
+        <p className="text-center mt-1.5 text-[10px] text-white/25">Happ Proxy (Android · iOS)</p>
 
         <button onClick={onClose} className="w-full py-2.5 mt-3 text-sm text-white/40 hover:text-white/60 transition-colors">Готово</button>
       </div>
@@ -849,7 +847,7 @@ export const StorePage = () => {
                 {/* Platform download buttons */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <a
-                    href="https://github.com/2dust/v2rayNG/releases/download/2.0.18/v2rayNG_2.0.18_universal.apk"
+                    href="https://play.google.com/store/apps/details?id=com.happproxy"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-4 px-5 py-4 rounded-xl bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] hover:border-white/[0.15] transition-all duration-200 active:scale-[0.98] group"
@@ -859,7 +857,7 @@ export const StorePage = () => {
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-bold text-white">Android</p>
-                      <p className="text-[11px] text-white/35 mt-0.5">v2rayNG (прямая загрузка)</p>
+                      <p className="text-[11px] text-white/35 mt-0.5">Happ Proxy (Google Play)</p>
                     </div>
                     <Download className="w-4 h-4 text-white/25 ml-auto shrink-0 group-hover:text-white/50 transition-colors" />
                   </a>
