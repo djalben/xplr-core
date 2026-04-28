@@ -58,7 +58,12 @@ export const ResetPasswordPage = () => {
       } else if (err.code === 'ERR_NETWORK') {
         setError('Сервер недоступен.');
       } else {
-        setError(typeof data === 'string' ? data : 'Ошибка при сбросе пароля.');
+        const s = typeof data === 'string' ? data.trim() : '';
+        if (s.includes('github.com/') || /\b\.go:\d+\b/.test(s)) {
+          setError('Ошибка. Попробуйте позже.');
+        } else {
+          setError(typeof data === 'string' ? data : 'Ошибка при сбросе пароля.');
+        }
       }
     } finally {
       setIsLoading(false);

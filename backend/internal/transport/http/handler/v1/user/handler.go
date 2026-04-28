@@ -96,7 +96,7 @@ func (h *Handler) PostRevokeAllTrustedDevices(w http.ResponseWriter, r *http.Req
 
 	err := h.totpUC.RevokeAllTrustedDevices(r.Context(), userID)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+		handler.WriteInternalServerError(w, err)
 
 		return
 	}
@@ -125,7 +125,7 @@ func (h *Handler) GetMe(w http.ResponseWriter, r *http.Request) {
 
 	data, err := h.userUC.GetMe(r.Context(), userID)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+		handler.WriteInternalServerError(w, err)
 
 		return
 	}
@@ -143,7 +143,7 @@ func (h *Handler) GetGrade(w http.ResponseWriter, r *http.Request) {
 
 	grade, err := h.gradesUC.GetByUserID(r.Context(), userID)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+		handler.WriteInternalServerError(w, err)
 
 		return
 	}
@@ -165,14 +165,14 @@ func (h *Handler) GetWallet(w http.ResponseWriter, r *http.Request) {
 
 	balance, err := h.walletUC.GetBalance(r.Context(), userID)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+		handler.WriteInternalServerError(w, err)
 
 		return
 	}
 
 	autoEnabled, err := h.walletUC.GetAutoTopUpEnabled(r.Context(), userID)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+		handler.WriteInternalServerError(w, err)
 
 		return
 	}
@@ -200,7 +200,7 @@ func (h *Handler) TopUpWallet(w http.ResponseWriter, r *http.Request) {
 
 	err := handler.ReadJSON(r, &body)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Неверный запрос")
 
 		return
 	}
@@ -208,12 +208,12 @@ func (h *Handler) TopUpWallet(w http.ResponseWriter, r *http.Request) {
 	err = h.walletUC.TopUpWallet(r.Context(), userID, domain.NewNumeric(body.Amount))
 	if err != nil {
 		if errors.Is(err, domain.ErrSBPTopUpDisabled) {
-			http.Error(w, err.Error(), http.StatusForbidden)
+			handler.WrapAndWriteError(w, err, http.StatusForbidden, "Пополнение через СБП временно недоступно")
 
 			return
 		}
 
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
+		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Не удалось пополнить кошелёк")
 
 		return
 	}
@@ -244,7 +244,7 @@ func (h *Handler) Support(w http.ResponseWriter, r *http.Request) {
 
 	err := handler.ReadJSON(r, &body)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Неверный запрос")
 
 		return
 	}
@@ -257,7 +257,7 @@ func (h *Handler) Support(w http.ResponseWriter, r *http.Request) {
 
 	_, err = h.ticketUC.Create(r.Context(), userID, "Support", body.Message, nil)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
+		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Не удалось отправить сообщение")
 
 		return
 	}
@@ -281,7 +281,7 @@ func (h *Handler) ChatStart(w http.ResponseWriter, r *http.Request) {
 
 	err := handler.ReadJSON(r, &body)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Неверный запрос")
 
 		return
 	}
@@ -363,7 +363,7 @@ func (h *Handler) ChatSend(w http.ResponseWriter, r *http.Request) {
 
 	err := handler.ReadJSON(r, &body)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Неверный запрос")
 
 		return
 	}
@@ -376,7 +376,7 @@ func (h *Handler) ChatSend(w http.ResponseWriter, r *http.Request) {
 
 	ticket, err := h.ticketUC.Create(r.Context(), userID, "Support: "+topic, body.Message, nil)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
+		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Не удалось отправить сообщение")
 
 		return
 	}
@@ -420,7 +420,7 @@ func (h *Handler) GetReferralsInfo(w http.ResponseWriter, r *http.Request) {
 
 	data, err := h.userUC.GetReferralInfo(r.Context(), userID)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+		handler.WriteInternalServerError(w, err)
 
 		return
 	}
@@ -541,21 +541,21 @@ func (h *Handler) TransferToCard(w http.ResponseWriter, r *http.Request) {
 
 	err := handler.ReadJSON(r, &body)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Неверный запрос")
 
 		return
 	}
 
 	cardID, err := domain.ParseUUID(body.CardID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Неверный id карты")
 
 		return
 	}
 
 	err = h.cardUC.TopUpCard(r.Context(), userID, cardID, domain.NewNumeric(body.Amount))
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
+		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Не удалось перевести на карту")
 
 		return
 	}
@@ -580,14 +580,14 @@ func (h *Handler) SetAutoTopup(w http.ResponseWriter, r *http.Request) {
 
 	err := handler.ReadJSON(r, &body)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Неверный запрос")
 
 		return
 	}
 
 	err = h.walletUC.ToggleAutoTopUp(r.Context(), userID, body.Enabled)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
+		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Не удалось сохранить настройку")
 
 		return
 	}
@@ -605,7 +605,7 @@ func (h *Handler) GetCards(w http.ResponseWriter, r *http.Request) {
 
 	cards, err := h.cardUC.ListByUserID(r.Context(), userID)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+		handler.WriteInternalServerError(w, err)
 
 		return
 	}
@@ -652,7 +652,7 @@ func (h *Handler) IssueCards(w http.ResponseWriter, r *http.Request) {
 
 	err := handler.ReadJSON(r, &body)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Неверный запрос")
 
 		return
 	}

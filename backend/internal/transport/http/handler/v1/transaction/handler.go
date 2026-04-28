@@ -7,7 +7,6 @@ import (
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler"
 	"github.com/go-chi/chi/v5"
-	"gitlab.com/libs-artifex/wrapper/v2"
 )
 
 type Handler struct {
@@ -50,7 +49,7 @@ func (h *Handler) GetWalletTransactions(w http.ResponseWriter, r *http.Request) 
 
 	txs, err := h.useCase.GetWalletTransactions(r.Context(), userID, from, to)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+		handler.WriteInternalServerError(w, err)
 
 		return
 	}
@@ -64,7 +63,7 @@ func (h *Handler) GetCardTransactions(w http.ResponseWriter, r *http.Request) {
 
 	id, err := domain.ParseUUID(idStr)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Неверный id")
 
 		return
 	}
@@ -90,7 +89,7 @@ func (h *Handler) GetCardTransactions(w http.ResponseWriter, r *http.Request) {
 
 	txs, err := h.useCase.GetCardTransactions(r.Context(), id, from, to)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+		handler.WriteInternalServerError(w, err)
 
 		return
 	}

@@ -17,6 +17,12 @@ const getPasswordRules = (t: (k: string) => string) => [
 
 /* ── Translate common backend errors ── */
 const translateError = (raw: string): string => {
+  const trimmed = raw.trim();
+  // Never show technical backend traces/paths to user.
+  if (trimmed.includes('github.com/') || /\b\.go:\d+\b/.test(trimmed)) {
+    return 'Ошибка. Попробуйте позже.';
+  }
+
   const map: Record<string, string> = {
     'Email cannot be empty': 'Email не может быть пустым',
     'Password must be at least 8 characters': 'Пароль должен содержать минимум 8 символов',
@@ -32,7 +38,6 @@ const translateError = (raw: string): string => {
     'user not found': 'Пользователь не найден',
     'User not found': 'Пользователь не найден',
   };
-  const trimmed = raw.trim();
   return map[trimmed] ?? trimmed;
 };
 

@@ -33,7 +33,7 @@ func (h *Handler) VerifyStaffPIN(w http.ResponseWriter, r *http.Request) {
 
 	err := handler.ReadJSON(r, &req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Неверный запрос")
 
 		return
 	}
@@ -47,7 +47,7 @@ func (h *Handler) VerifyStaffPIN(w http.ResponseWriter, r *http.Request) {
 
 	stored, err := h.getAdminPIN(r.Context())
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+		handler.WriteInternalServerError(w, err)
 
 		return
 	}

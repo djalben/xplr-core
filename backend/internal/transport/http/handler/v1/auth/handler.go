@@ -65,7 +65,7 @@ func (h *Handler) DoRegister(w http.ResponseWriter, r *http.Request) {
 
 	err := handler.ReadJSON(r, &req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, "Неверный запрос", http.StatusBadRequest)
 
 		return
 	}
@@ -77,7 +77,7 @@ func (h *Handler) DoRegister(w http.ResponseWriter, r *http.Request) {
 
 			return
 		}
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, authUserMessage(err), http.StatusBadRequest)
 
 		return
 	}
@@ -99,7 +99,7 @@ func (h *Handler) DoLogin(w http.ResponseWriter, r *http.Request) {
 
 	err := handler.ReadJSON(r, &req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, "Неверный запрос", http.StatusBadRequest)
 
 		return
 	}
@@ -114,7 +114,8 @@ func (h *Handler) DoLogin(w http.ResponseWriter, r *http.Request) {
 	if h.limiter != nil {
 		allowed, retryAfter, errAllow := h.limiter.Allow(r.Context(), rlKey, now)
 		if errAllow != nil {
-			http.Error(w, wrapper.Wrap(errAllow).Error(), http.StatusInternalServerError)
+			_ = wrapper.Wrap(errAllow)
+			http.Error(w, "Ошибка сервера. Попробуйте позже.", http.StatusInternalServerError)
 
 			return
 		}
@@ -170,7 +171,7 @@ func (h *Handler) DoLoginMFA(w http.ResponseWriter, r *http.Request) {
 
 	err := handler.ReadJSON(r, &req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, "Неверный запрос", http.StatusBadRequest)
 
 		return
 	}
@@ -193,7 +194,8 @@ func (h *Handler) DoLoginMFA(w http.ResponseWriter, r *http.Request) {
 	if h.limiter != nil {
 		allowed, retryAfter, errAllow := h.limiter.Allow(r.Context(), rlKey, now)
 		if errAllow != nil {
-			http.Error(w, wrapper.Wrap(errAllow).Error(), http.StatusInternalServerError)
+			_ = wrapper.Wrap(errAllow)
+			http.Error(w, "Ошибка сервера. Попробуйте позже.", http.StatusInternalServerError)
 
 			return
 		}
@@ -223,7 +225,7 @@ func (h *Handler) DoLoginMFA(w http.ResponseWriter, r *http.Request) {
 		ua := strings.TrimSpace(r.UserAgent())
 		raw, exp, errRemember := h.authUC.RememberTrustedDevice(r.Context(), user.ID, ua, ip, now)
 		if errRemember != nil {
-			http.Error(w, errRemember.Error(), http.StatusBadRequest)
+			http.Error(w, authUserMessage(errRemember), http.StatusBadRequest)
 
 			return
 		}
@@ -268,7 +270,8 @@ func (h *Handler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 
 	err := h.authUC.VerifyEmail(r.Context(), token)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		_ = wrapper.Wrap(err)
+		http.Error(w, authUserMessage(err), http.StatusBadRequest)
 
 		return
 	}
@@ -306,7 +309,8 @@ func (h *Handler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 
 	newToken, err := utils.GenerateJWT(h.jwtSecret, user.ID, user.Email)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		_ = wrapper.Wrap(err)
+		http.Error(w, "Ошибка сервера. Попробуйте позже.", http.StatusInternalServerError)
 
 		return
 	}
@@ -339,14 +343,16 @@ func (h *Handler) ResetPasswordRequest(w http.ResponseWriter, r *http.Request) {
 
 	err := handler.ReadJSON(r, &req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		_ = wrapper.Wrap(err)
+		http.Error(w, "Неверный запрос", http.StatusBadRequest)
 
 		return
 	}
 
 	err = h.authUC.RequestPasswordReset(r.Context(), req.Email)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+		_ = wrapper.Wrap(err)
+		http.Error(w, "Ошибка сервера. Попробуйте позже.", http.StatusInternalServerError)
 
 		return
 	}
@@ -366,7 +372,8 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 
 	err := handler.ReadJSON(r, &req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		_ = wrapper.Wrap(err)
+		http.Error(w, "Неверный запрос", http.StatusBadRequest)
 
 		return
 	}
@@ -411,7 +418,8 @@ func authUserMessage(err error) string {
 func (h *Handler) issueAuthToken(ctx context.Context, w http.ResponseWriter, r *http.Request, user *domain.User) {
 	token, err := utils.GenerateJWT(h.jwtSecret, user.ID, user.Email)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+		_ = wrapper.Wrap(err)
+		http.Error(w, "Ошибка сервера. Попробуйте позже.", http.StatusInternalServerError)
 
 		return
 	}
