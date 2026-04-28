@@ -217,6 +217,7 @@
       "enabled": "2FA включена",
       "enabledDesc": "Ваш аккаунт защищён двухфакторной аутентификацией",
       "disable": "Отключить",
+      "cancel": "Отмена",
       "disableConfirm": "Подтвердить отключение",
       "disableEnterPasswordAndCode": "Введите пароль и 6‑значный код из Google Authenticator",
       "password": "Пароль",

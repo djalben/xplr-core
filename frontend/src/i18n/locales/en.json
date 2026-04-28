@@ -217,6 +217,7 @@
       "enabled": "2FA enabled",
       "enabledDesc": "Your account is protected with two-factor authentication",
       "disable": "Disable",
+      "cancel": "Cancel",
       "notConfigured": "2FA not configured",
       "notConfiguredDesc": "We recommend enabling it to protect your account",
       "setup": "Set up",

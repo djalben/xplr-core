@@ -452,6 +452,20 @@ const SecurityTab = ({ profile, reload, showToast }: { profile: ProfileData | nu
   const [disable2faPassword, setDisable2faPassword] = useState('');
   const [disable2faCode, setDisable2faCode] = useState('');
   const [disable2faSaving, setDisable2faSaving] = useState(false);
+  const [showDisable2faPassword, setShowDisable2faPassword] = useState(false);
+
+  const toggleDisable2faOpen = () => {
+    setDisable2faOpen(v => {
+      const next = !v;
+      if (!next) {
+        setDisable2faPassword('');
+        setDisable2faCode('');
+        setShowDisable2faPassword(false);
+      }
+
+      return next;
+    });
+  };
 
   const handleDisable2FA = async () => {
     if (!disable2faPassword || disable2faCode.length !== 6) {
@@ -518,20 +532,25 @@ const SecurityTab = ({ profile, reload, showToast }: { profile: ProfileData | nu
                 <ShieldCheck className="w-6 h-6 text-emerald-400 shrink-0" />
                 <div><p className="text-white font-medium">{t('settings.twoFa.enabled')}</p><p className="text-sm text-slate-400">{t('settings.twoFa.enabledDesc')}</p></div>
               </div>
-              <button onClick={() => setDisable2faOpen(v => !v)} className="w-full sm:w-auto px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-sm font-medium rounded-xl transition-colors text-center">
-                {t('settings.twoFa.disable')}
+              <button onClick={toggleDisable2faOpen} className="w-full sm:w-auto px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-sm font-medium rounded-xl transition-colors text-center">
+                {disable2faOpen ? t('settings.twoFa.cancel') : t('settings.twoFa.disable')}
               </button>
             </div>
 
             {disable2faOpen && (
               <div className="mt-4 space-y-3 max-w-md">
-                <input
-                  type="password"
-                  value={disable2faPassword}
-                  onChange={e => setDisable2faPassword(e.target.value)}
-                  placeholder={t('settings.twoFa.password')}
-                  className="xplr-input w-full"
-                />
+                <div className="relative">
+                  <input
+                    type={showDisable2faPassword ? 'text' : 'password'}
+                    value={disable2faPassword}
+                    onChange={e => setDisable2faPassword(e.target.value)}
+                    placeholder={t('settings.twoFa.password')}
+                    className="xplr-input w-full pr-10"
+                  />
+                  <button onClick={() => setShowDisable2faPassword(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
+                    {showDisable2faPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
                 <input
                   type="text"
                   inputMode="numeric"
