@@ -458,9 +458,21 @@ const SecurityTab = ({ profile, reload, showToast }: { profile: ProfileData | nu
 
   const handleLogoutAll = async () => {
     setLogoutSaving(true);
-    try { await apiClient.post('/user/settings/logout-all'); showToast(t('settings.sessions.logoutAllDone'), 'ok'); loadSessions(); }
-    catch { showToast(t('settings.error'), 'err'); }
-    finally { setLogoutSaving(false); }
+    try {
+      await apiClient.post('/user/settings/logout-all');
+      // Clear all local auth state
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('_xplr_staff');
+      // Clear cookies
+      document.cookie.split(';').forEach(c => {
+        document.cookie = c.replace(/^ +/, '').replace(/=.*/, '=;expires=' + new Date(0).toUTCString() + ';path=/');
+      });
+      // Force redirect to login
+      window.location.href = '/auth';
+    } catch {
+      showToast(t('settings.error'), 'err');
+      setLogoutSaving(false);
+    }
   };
 
   return (

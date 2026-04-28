@@ -218,33 +218,38 @@ func GetMeHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 5. Формирование ответа
+	// 5. Check 2FA status
+	_, twoFAEnabled, _ := repository.GetTwoFactorSecret(userID)
+
+	// 6. Формирование ответа
 	response := struct {
-		ID             int    `json:"id"`
-		Email          string `json:"email"`
-		DisplayName    string `json:"display_name"`
-		Balance        string `json:"balance"`
-		Status         string `json:"status"`
-		APIKey         string `json:"api_key"`
-		Grade          string `json:"grade"`
-		FeePercent     string `json:"fee_percent"`
-		Role           string `json:"role"`
-		IsAdmin        bool   `json:"is_admin"`
-		IsVerified     bool   `json:"is_verified"`
-		TelegramLinked bool   `json:"telegram_linked"`
+		ID               int    `json:"id"`
+		Email            string `json:"email"`
+		DisplayName      string `json:"display_name"`
+		Balance          string `json:"balance"`
+		Status           string `json:"status"`
+		APIKey           string `json:"api_key"`
+		Grade            string `json:"grade"`
+		FeePercent       string `json:"fee_percent"`
+		Role             string `json:"role"`
+		IsAdmin          bool   `json:"is_admin"`
+		IsVerified       bool   `json:"is_verified"`
+		TelegramLinked   bool   `json:"telegram_linked"`
+		TwoFactorEnabled bool   `json:"two_factor_enabled"`
 	}{
-		ID:             user.ID,
-		Email:          user.Email,
-		DisplayName:    user.DisplayName,
-		Balance:        user.BalanceRub.String(),
-		Status:         user.Status,
-		APIKey:         apiKey,
-		Grade:          gradeInfo.Grade,
-		FeePercent:     gradeInfo.FeePercent.String(),
-		Role:           user.Role,
-		IsAdmin:        user.IsAdmin || user.Role == "admin",
-		IsVerified:     user.IsVerified,
-		TelegramLinked: user.TelegramChatID.Valid && user.TelegramChatID.Int64 != 0,
+		ID:               user.ID,
+		Email:            user.Email,
+		DisplayName:      user.DisplayName,
+		Balance:          user.BalanceRub.String(),
+		Status:           user.Status,
+		APIKey:           apiKey,
+		Grade:            gradeInfo.Grade,
+		FeePercent:       gradeInfo.FeePercent.String(),
+		Role:             user.Role,
+		IsAdmin:          user.IsAdmin || user.Role == "admin",
+		IsVerified:       user.IsVerified,
+		TelegramLinked:   user.TelegramChatID.Valid && user.TelegramChatID.Int64 != 0,
+		TwoFactorEnabled: twoFAEnabled,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

@@ -83,7 +83,19 @@ func JWTAuthMiddleware(next http.Handler) http.Handler {
 				return
 			}
 
-			userID = int(userIDFloat)
+			uid := int(userIDFloat)
+
+			// SECURITY: Check token_version — reject tokens invalidated by logout-all.
+			if tvClaim, hasTv := claims["tv"].(float64); hasTv {
+				dbVersion, dbErr := repository.GetTokenVersion(uid)
+				if dbErr == nil && int(tvClaim) < dbVersion {
+					log.Printf("[AUTH] ❌ Stale token_version for user %d (token=%d, db=%d)", uid, int(tvClaim), dbVersion)
+					http.Error(w, "Session expired. Please login again.", http.StatusUnauthorized)
+					return
+				}
+			}
+
+			userID = uid
 			ok = true
 		}
 

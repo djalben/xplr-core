@@ -86,7 +86,8 @@ func LoginVerify2FAHandler(w http.ResponseWriter, r *http.Request) {
 		role = "user"
 	}
 
-	token, err := utils.GenerateJWT(user.ID, isAdmin, role)
+	tv, _ := repository.GetTokenVersion(user.ID)
+	token, err := utils.GenerateJWT(user.ID, isAdmin, role, tv)
 	if err != nil {
 		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 		return
@@ -135,13 +136,14 @@ func LoginVerify2FAHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"token": token,
 		"user": map[string]interface{}{
-			"id":          user.ID,
-			"email":       user.Email,
-			"balance":     user.BalanceRub.String(),
-			"status":      user.Status,
-			"is_verified": user.IsVerified,
-			"is_admin":    isAdmin,
-			"role":        role,
+			"id":                 user.ID,
+			"email":              user.Email,
+			"balance":            user.BalanceRub.String(),
+			"status":             user.Status,
+			"is_verified":        user.IsVerified,
+			"is_admin":           isAdmin,
+			"role":               role,
+			"two_factor_enabled": true,
 		},
 	})
 }

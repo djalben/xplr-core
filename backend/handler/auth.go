@@ -469,13 +469,14 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[LOGIN] ✅ 2FA bypassed (trusted device) for %s", user.Email)
 	}
 
-	// ── Шаг 6: генерация JWT с ролевой информацией ──
+	// ── Шаг 6: генерация JWT с ролевой информацией + token_version ──
 	isAdmin := user.IsAdmin || user.Role == "admin"
 	role := user.Role
 	if role == "" {
 		role = "user"
 	}
-	token, err := utils.GenerateJWT(user.ID, isAdmin, role)
+	tv, _ := repository.GetTokenVersion(user.ID)
+	token, err := utils.GenerateJWT(user.ID, isAdmin, role, tv)
 	if err != nil {
 		log.Printf("[LOGIN] ❌ JWT generation failed for user %d: %v", user.ID, err)
 		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
@@ -518,13 +519,14 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	response := map[string]interface{}{
 		"token": token,
 		"user": map[string]interface{}{
-			"id":          user.ID,
-			"email":       user.Email,
-			"balance":     user.BalanceRub.String(),
-			"status":      user.Status,
-			"is_verified": user.IsVerified,
-			"is_admin":    isAdmin,
-			"role":        role,
+			"id":                 user.ID,
+			"email":              user.Email,
+			"balance":            user.BalanceRub.String(),
+			"status":             user.Status,
+			"is_verified":        user.IsVerified,
+			"is_admin":           isAdmin,
+			"role":               role,
+			"two_factor_enabled": twoFAEnabled,
 		},
 	}
 
@@ -585,7 +587,17 @@ func RefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 		role = "user"
 	}
 
-	newToken, err := utils.GenerateJWT(user.ID, isAdmin, role)
+	// Check token_version — reject stale tokens
+	tv, _ := repository.GetTokenVersion(user.ID)
+	if tvClaim, hasTv := claims["tv"].(float64); hasTv {
+		if int(tvClaim) < tv {
+			log.Printf("[REFRESH] ❌ Stale token for user %d (token_tv=%d, db_tv=%d)", userID, int(tvClaim), tv)
+			http.Error(w, "Session expired. Please login again.", http.StatusUnauthorized)
+			return
+		}
+	}
+
+	newToken, err := utils.GenerateJWT(user.ID, isAdmin, role, tv)
 	if err != nil {
 		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 		return

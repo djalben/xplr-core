@@ -66,6 +66,9 @@ var allRequiredColumns = []requiredColumn{
 	{"users", "tier", "VARCHAR(20) DEFAULT 'standard'"},
 	{"users", "tier_expires_at", "TIMESTAMP WITH TIME ZONE"},
 
+	// --- JWT revocation ---
+	{"users", "token_version", "INTEGER DEFAULT 0 NOT NULL"},
+
 	// --- 2FA: recovery codes & trusted devices ---
 	{"users", "two_fa_recovery_codes", "JSONB DEFAULT '[]'::jsonb"},
 	{"users", "trusted_devices", "JSONB DEFAULT '[]'::jsonb"},

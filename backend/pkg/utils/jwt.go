@@ -16,8 +16,8 @@ var jwtKey = func() []byte {
 	return []byte("my_super_secret_jwt_key")
 }()
 
-// GenerateJWT создает JWT с полной информацией о пользователе (id, role, is_admin).
-func GenerateJWT(userID int, isAdmin bool, role string) (string, error) {
+// GenerateJWT создает JWT с полной информацией о пользователе (id, role, is_admin, token_version).
+func GenerateJWT(userID int, isAdmin bool, role string, tokenVersion ...int) (string, error) {
 	expirationTime := time.Now().Add(24 * time.Hour)
 	claims := jwt.MapClaims{
 		"user_id":  userID,
@@ -25,6 +25,9 @@ func GenerateJWT(userID int, isAdmin bool, role string) (string, error) {
 		"role":     role,
 		"exp":      expirationTime.Unix(),
 		"iat":      time.Now().Unix(),
+	}
+	if len(tokenVersion) > 0 {
+		claims["tv"] = tokenVersion[0]
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

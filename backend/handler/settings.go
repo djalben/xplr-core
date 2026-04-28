@@ -138,11 +138,24 @@ func LogoutAllSessionsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
+
+	// 1. Delete all session records
 	if err := repository.DeleteAllUserSessions(userID); err != nil {
 		http.Error(w, "Failed to logout all sessions", http.StatusInternalServerError)
 		return
 	}
-	log.Printf("[SETTINGS] User %d logged out from all devices", userID)
+
+	// 2. Increment token_version → all existing JWTs with old tv become invalid
+	if err := repository.IncrementTokenVersion(userID); err != nil {
+		log.Printf("[SETTINGS] Warning: failed to increment token_version for user %d: %v", userID, err)
+	}
+
+	// 3. Clear trusted devices (force 2FA on next login from any device)
+	if err := repository.ClearTrustedDevices(userID); err != nil {
+		log.Printf("[SETTINGS] Warning: failed to clear trusted devices for user %d: %v", userID, err)
+	}
+
+	log.Printf("[SETTINGS] 🔒 User %d: all sessions terminated, tokens revoked, trusted devices cleared", userID)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"message": "All sessions terminated"})
 }

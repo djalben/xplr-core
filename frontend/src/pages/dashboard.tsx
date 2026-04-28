@@ -368,6 +368,32 @@ export const DashboardPage = () => {
           </div>
         </div>
 
+        {/* 2FA Security Alert — persistent, mandatory for users without 2FA */}
+        {userData && userData.two_factor_enabled === false && (
+          <div
+            onClick={() => navigate('/settings')}
+            className="glass-card p-4 mb-6 border border-amber-500/30 bg-gradient-to-r from-amber-500/5 to-red-500/5 cursor-pointer group hover:border-amber-500/50 transition-all"
+          >
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-xl bg-amber-500/15 shrink-0">
+                <Shield className="w-6 h-6 text-amber-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-semibold text-sm sm:text-base flex items-center gap-2">
+                  <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                  Внимание: Включите 2FA для защиты средств!
+                </p>
+                <p className="text-slate-400 text-xs sm:text-sm mt-0.5">
+                  Двухфакторная аутентификация защищает ваш кошелёк даже при утечке пароля. Настройте Google Authenticator прямо сейчас.
+                </p>
+              </div>
+              <div className="shrink-0 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-medium rounded-xl text-sm group-hover:shadow-lg group-hover:shadow-amber-500/25 transition-all hidden sm:block">
+                Настроить
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Telegram hint — subtle, only if not linked */}
         {userData && !userData.telegram_linked && (
           <div

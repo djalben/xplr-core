@@ -85,6 +85,29 @@ func DeleteAllUserSessions(userID int) error {
 	return err
 }
 
+// ── Token Version (JWT revocation) ──
+
+func GetTokenVersion(userID int) (int, error) {
+	if GlobalDB == nil {
+		return 0, fmt.Errorf("database connection not initialized")
+	}
+	var version int
+	err := GlobalDB.QueryRow(
+		`SELECT COALESCE(token_version, 0) FROM users WHERE id = $1`, userID,
+	).Scan(&version)
+	return version, err
+}
+
+func IncrementTokenVersion(userID int) error {
+	if GlobalDB == nil {
+		return fmt.Errorf("database connection not initialized")
+	}
+	_, err := GlobalDB.Exec(
+		`UPDATE users SET token_version = COALESCE(token_version, 0) + 1 WHERE id = $1`, userID,
+	)
+	return err
+}
+
 // ── Change Password ──
 
 func UpdatePasswordHash(userID int, newHash string) error {
@@ -190,6 +213,17 @@ func BurnRecoveryCode(userID int, index int) error {
 	}
 	codes = append(codes[:index], codes[index+1:]...)
 	return SetRecoveryCodes(userID, codes)
+}
+
+// ClearTrustedDevices removes all trusted device fingerprints (forces 2FA on next login).
+func ClearTrustedDevices(userID int) error {
+	if GlobalDB == nil {
+		return fmt.Errorf("database connection not initialized")
+	}
+	_, err := GlobalDB.Exec(
+		`UPDATE users SET trusted_devices = '[]'::jsonb WHERE id = $1`, userID,
+	)
+	return err
 }
 
 // AddTrustedDevice adds a device fingerprint hash to the user's trusted_devices JSONB.
