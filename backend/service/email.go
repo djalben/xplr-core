@@ -207,7 +207,7 @@ func wrapHTML(title, content string) string {
 // SendVerificationEmail — ссылка подтверждения email.
 func SendVerificationEmail(toEmail, token string) error {
 	cfg := loadSMTPConfig()
-	verifyURL := fmt.Sprintf("%s/verify?token=%s", cfg.Domain, token)
+	verifyURL := fmt.Sprintf("%s/auth/verify-email?token=%s", cfg.Domain, token)
 
 	content := fmt.Sprintf(`
     <p style="color:#cbd5e1;font-size:15px;line-height:1.6;margin:0 0 20px;">Здравствуйте!</p>

@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Wifi, Eye, EyeOff, Lock, Mail, ChevronRight, ArrowLeft, Check, X, Shield, Smartphone } from 'lucide-react';
+import { Wifi, Eye, EyeOff, Lock, Mail, ChevronRight, ArrowLeft, Check, X, Shield, Smartphone, Send } from 'lucide-react';
 import { login, register, verify2FA } from '../services/auth';
 import { useAuth } from '../store/auth-context';
+import { API_BASE_URL } from '../services/axios';
 
 type AuthMode = 'login' | 'register' | '2fa';
 
@@ -27,6 +28,7 @@ const translateError = (raw: string): string => {
     'Invalid email or password': 'Неверный email или пароль',
     'user not found': 'Пользователь не найден',
     'User not found': 'Пользователь не найден',
+    'Please verify your email': 'Пожалуйста, подтвердите ваш email',
   };
   const trimmed = raw.trim();
   return map[trimmed] ?? trimmed;
@@ -36,6 +38,7 @@ export const AuthPage = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { setUser } = useAuth();
+  const [searchParams] = useSearchParams();
   const [mode, setMode] = useState<AuthMode>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
@@ -43,6 +46,18 @@ export const AuthPage = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [verifiedBanner, setVerifiedBanner] = useState(false);
+  const [emailNotVerified, setEmailNotVerified] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendDone, setResendDone] = useState(false);
+
+  // Show success banner if redirected from verification
+  useEffect(() => {
+    if (searchParams.get('verified') === '1') {
+      setVerifiedBanner(true);
+      setTimeout(() => setVerifiedBanner(false), 8000);
+    }
+  }, [searchParams]);
 
   // 2FA state
   const [halfAuthToken, setHalfAuthToken] = useState('');
@@ -110,6 +125,15 @@ export const AuthPage = () => {
       console.error('[Auth] Status:', err.response?.status, 'Data:', err.response?.data, 'Msg:', err.message);
 
       const data = err.response?.data;
+
+      // Handle 403 email_not_verified
+      if (err.response?.status === 403 && (data?.email_not_verified || data?.error === 'email_not_verified')) {
+        setEmailNotVerified(true);
+        setError('Пожалуйста, подтвердите ваш email. Проверьте почту.');
+        setIsLoading(false);
+        return;
+      }
+
       let msg: string;
       if (typeof data === 'string' && data.trim().length > 0) {
         msg = translateError(data);
@@ -120,6 +144,7 @@ export const AuthPage = () => {
       } else {
         msg = err.message || 'Ошибка авторизации';
       }
+      setEmailNotVerified(false);
       setError(msg);
     } finally {
       setIsLoading(false);
@@ -199,6 +224,14 @@ export const AuthPage = () => {
           </div>
         </div>
 
+        {/* Email verified success banner */}
+        {verifiedBanner && (
+          <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm text-center flex items-center justify-center gap-2">
+            <Check className="w-4 h-4" />
+            Email успешно подтверждён! Теперь вы можете войти.
+          </div>
+        )}
+
         {/* Mode Toggle — hidden during 2FA */}
         {mode !== '2fa' && (
           <div className="flex justify-center mb-6">
@@ -258,10 +291,33 @@ export const AuthPage = () => {
                 </Link>
               </div>
             )}
-            {mode === 'login' && (
+            {mode === 'login' && !emailNotVerified && (
               <Link to="/forgot-password" className="block mt-2 text-blue-400 hover:text-blue-300 transition-colors text-xs font-medium">
                 Забыли пароль?
               </Link>
+            )}
+            {emailNotVerified && (
+              <div className="mt-3 flex flex-col gap-2">
+                <button
+                  type="button"
+                  disabled={resending || resendDone}
+                  onClick={async () => {
+                    setResending(true);
+                    try {
+                      await fetch(`${API_BASE_URL}/auth/resend-verification`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email }),
+                      });
+                      setResendDone(true);
+                    } catch {} finally { setResending(false); }
+                  }}
+                  className="text-blue-400 hover:text-blue-300 transition-colors text-xs font-medium flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  <Send className="w-3 h-3" />
+                  {resendDone ? 'Письмо отправлено!' : resending ? 'Отправка...' : 'Отправить письмо подтверждения повторно'}
+                </button>
+              </div>
             )}
           </div>
         )}
@@ -350,6 +406,22 @@ export const AuthPage = () => {
                 </button>
               </div>
             </form>
+
+            {/* Security Info Card */}
+            <div className="mt-4 rounded-2xl bg-[#0d1528]/80 border border-indigo-500/10 p-5 overflow-hidden relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.04] to-transparent pointer-events-none" />
+              <div className="relative flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/15 flex items-center justify-center flex-shrink-0">
+                  <span className="text-lg">🛡️</span>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-white/80 mb-1">Ваш кошелёк — ваша крепость</p>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    2FA защищает средства даже при краже пароля. Используйте <span className="text-white/60 font-medium">Google Authenticator</span> для максимальной защиты.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

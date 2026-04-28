@@ -169,7 +169,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// VerifyEmailHandler — GET /api/v1/auth/verify?token=...
+// VerifyEmailHandler — GET /api/v1/auth/verify-email?token=...
 // Подтверждает email пользователя по токену из письма.
 func VerifyEmailHandler(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
@@ -185,12 +185,60 @@ func VerifyEmailHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("[VERIFY] ✅ Email verified for user %d", userID)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":  "ok",
 		"message": "Email successfully verified",
 		"user_id": userID,
 	})
+}
+
+// ResendVerificationHandler — POST /api/v1/auth/resend-verification
+// Повторно отправляет письмо подтверждения email (публичный, по email).
+func ResendVerificationHandler(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Email string `json:"email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	email := strings.TrimSpace(req.Email)
+	if email == "" {
+		http.Error(w, "Email is required", http.StatusBadRequest)
+		return
+	}
+
+	// Always return 200 (don't leak whether email exists)
+	w.Header().Set("Content-Type", "application/json")
+
+	user, err := repository.GetUserByEmail(email)
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok", "message": "If this email is registered, a verification link has been sent."})
+		return
+	}
+
+	// Already verified — no need to resend
+	if user.IsVerified {
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok", "message": "If this email is registered, a verification link has been sent."})
+		return
+	}
+
+	token, err := repository.CreateVerificationToken(user.ID)
+	if err != nil {
+		log.Printf("[RESEND-VERIFY] Failed to create token for %s: %v", email, err)
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok", "message": "If this email is registered, a verification link has been sent."})
+		return
+	}
+
+	if err := service.SendVerificationEmail(email, token); err != nil {
+		log.Printf("[RESEND-VERIFY] Failed to send email to %s: %v", email, err)
+	}
+
+	log.Printf("[RESEND-VERIFY] Verification email resent to %s", email)
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "message": "If this email is registered, a verification link has been sent."})
 }
 
 // ResetPasswordRequestHandler — POST /api/v1/auth/reset-password-request
@@ -353,6 +401,19 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if !utils.CheckPasswordHash(req.Password, user.PasswordHash) {
 		log.Printf("[LOGIN] Wrong password for %s (user_id=%d)", email, user.ID)
 		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+		return
+	}
+
+	// ── Шаг 2b: Email verification gate ──
+	if !user.IsVerified {
+		log.Printf("[LOGIN] ❌ Email not verified for %s (user_id=%d)", email, user.ID)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error":              "email_not_verified",
+			"message":            "Пожалуйста, подтвердите ваш email. Проверьте почту.",
+			"email_not_verified": true,
+		})
 		return
 	}
 

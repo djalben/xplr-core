@@ -19,6 +19,7 @@ import { StaffOnlyZone } from './pages/staff-only-zone';
 import { NewsPage } from './pages/news';
 import { StorePage } from './pages/store';
 import { PurchasesPage } from './pages/purchases';
+import { VerifyEmailPage } from './pages/verify-email';
 import { PWAInstallPrompt } from './components/pwa-install-prompt';
 import { NeuralBackground } from './components/neural-background';
 import { useAuth } from './store/auth-context';
@@ -92,6 +93,7 @@ function App() {
         {/* Keep old routes working */}
         <Route path="/login" element={<Navigate to="/auth" replace />} />
         <Route path="/register" element={<Navigate to="/auth" replace />} />
+        <Route path="/auth/verify-email" element={<VerifyEmailPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
 

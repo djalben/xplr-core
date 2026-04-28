@@ -157,7 +157,8 @@ func main() {
 	// Настройка публичных маршрутов (Auth)
 	router.HandleFunc("/api/v1/auth/register", handler.RegisterHandler).Methods("POST")
 	router.HandleFunc("/api/v1/auth/login", handler.LoginHandler).Methods("POST")
-	router.HandleFunc("/api/v1/auth/verify", handler.VerifyEmailHandler).Methods("GET")
+	router.HandleFunc("/api/v1/auth/verify-email", handler.VerifyEmailHandler).Methods("GET")
+	router.HandleFunc("/api/v1/auth/resend-verification", handler.ResendVerificationHandler).Methods("POST")
 	// Rate limiter: 5 запросов сброса пароля за 15 минут с одного IP
 	resetLimiter := middleware.NewRateLimiter(5, 15*time.Minute)
 	router.HandleFunc("/api/v1/auth/reset-password-request", resetLimiter.Limit(handler.ResetPasswordRequestHandler)).Methods("POST")
