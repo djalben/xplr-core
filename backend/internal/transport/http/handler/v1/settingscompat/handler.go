@@ -318,13 +318,13 @@ func (h *Handler) TwoFADisable(w http.ResponseWriter, r *http.Request) {
 
 	err := handler.ReadJSON(r, &body)
 	if err != nil {
-		http.Error(w, "password and code are required", http.StatusBadRequest)
+		http.Error(w, "Нужны пароль и код из Google Authenticator", http.StatusBadRequest)
 
 		return
 	}
 
 	if body.Password == "" || body.Code == "" {
-		http.Error(w, "password and code are required", http.StatusBadRequest)
+		http.Error(w, "Нужны пароль и код из Google Authenticator", http.StatusBadRequest)
 
 		return
 	}

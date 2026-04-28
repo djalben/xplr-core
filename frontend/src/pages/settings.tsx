@@ -448,9 +448,28 @@ const SecurityTab = ({ profile, reload, showToast }: { profile: ProfileData | nu
     } finally { setTotpSaving(false); }
   };
 
+  const [disable2faOpen, setDisable2faOpen] = useState(false);
+  const [disable2faPassword, setDisable2faPassword] = useState('');
+  const [disable2faCode, setDisable2faCode] = useState('');
+  const [disable2faSaving, setDisable2faSaving] = useState(false);
+
   const handleDisable2FA = async () => {
-    try { await apiClient.post('/user/settings/2fa/disable'); showToast(t('settings.twoFa.disabledToast'), 'ok'); reload(); }
-    catch { showToast(t('settings.error'), 'err'); }
+    if (!disable2faPassword || disable2faCode.length !== 6) {
+      showToast(t('settings.twoFa.disableEnterPasswordAndCode'), 'err');
+      return;
+    }
+
+    setDisable2faSaving(true);
+    try {
+      await apiClient.post('/user/settings/2fa/disable', { password: disable2faPassword, code: disable2faCode });
+      showToast(t('settings.twoFa.disabledToast'), 'ok');
+      setDisable2faOpen(false);
+      setDisable2faPassword('');
+      setDisable2faCode('');
+      reload();
+    } catch (err: any) {
+      showToast(typeof err.response?.data === 'string' ? err.response.data : t('settings.error'), 'err');
+    } finally { setDisable2faSaving(false); }
   };
 
   const handleLogoutAll = async () => {
@@ -493,13 +512,46 @@ const SecurityTab = ({ profile, reload, showToast }: { profile: ProfileData | nu
       <div className="glass-card p-4 sm:p-6">
         <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><Smartphone className="w-5 h-5 text-emerald-400" />{t('settings.twoFa.title')}</h3>
         {profile?.two_factor_enabled ? (
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <ShieldCheck className="w-6 h-6 text-emerald-400 shrink-0" />
-              <div><p className="text-white font-medium">{t('settings.twoFa.enabled')}</p><p className="text-sm text-slate-400">{t('settings.twoFa.enabledDesc')}</p></div>
+          <>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <ShieldCheck className="w-6 h-6 text-emerald-400 shrink-0" />
+                <div><p className="text-white font-medium">{t('settings.twoFa.enabled')}</p><p className="text-sm text-slate-400">{t('settings.twoFa.enabledDesc')}</p></div>
+              </div>
+              <button onClick={() => setDisable2faOpen(v => !v)} className="w-full sm:w-auto px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-sm font-medium rounded-xl transition-colors text-center">
+                {t('settings.twoFa.disable')}
+              </button>
             </div>
-            <button onClick={handleDisable2FA} className="w-full sm:w-auto px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-sm font-medium rounded-xl transition-colors text-center">{t('settings.twoFa.disable')}</button>
-          </div>
+
+            {disable2faOpen && (
+              <div className="mt-4 space-y-3 max-w-md">
+                <input
+                  type="password"
+                  value={disable2faPassword}
+                  onChange={e => setDisable2faPassword(e.target.value)}
+                  placeholder={t('settings.twoFa.password')}
+                  className="xplr-input w-full"
+                />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={disable2faCode}
+                  onChange={e => setDisable2faCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder={t('settings.twoFa.code')}
+                  className="xplr-input w-full text-center tracking-widest text-lg"
+                  maxLength={6}
+                />
+                <button
+                  onClick={handleDisable2FA}
+                  disabled={disable2faSaving || !disable2faPassword || disable2faCode.length !== 6}
+                  className="w-full px-4 py-3 bg-red-500/10 hover:bg-red-500/20 disabled:opacity-50 border border-red-500/30 text-red-400 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+                >
+                  {disable2faSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  {t('settings.twoFa.disableConfirm')}
+                </button>
+              </div>
+            )}
+          </>
         ) : totpSecret ? (
           <div className="space-y-4">
             <p className="text-sm text-slate-400">{t('settings.twoFa.scanQr')}</p>
