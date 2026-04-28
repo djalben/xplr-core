@@ -3,6 +3,7 @@ package settingscompat
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -293,14 +294,14 @@ func (h *Handler) TwoFAVerify(w http.ResponseWriter, r *http.Request) {
 
 	err := handler.ReadJSON(r, &body)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, "Введите 6‑значный код из Google Authenticator", http.StatusBadRequest)
 
 		return
 	}
 
 	err = h.authUC.ConfirmTOTP(r.Context(), uid, body.Code)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, twoFAUserMessage(err), http.StatusBadRequest)
 
 		return
 	}
@@ -331,12 +332,41 @@ func (h *Handler) TwoFADisable(w http.ResponseWriter, r *http.Request) {
 
 	err = h.authUC.DisableTOTP(r.Context(), uid, body.Password, body.Code)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, twoFAUserMessage(err), http.StatusBadRequest)
 
 		return
 	}
 
 	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func twoFAUserMessage(err error) string {
+	if err == nil {
+		return "Ошибка"
+	}
+
+	// Скрываем внутренности wrapper (пути к файлам и т.д.).
+	if errors.Is(err, domain.ErrInvalidInput) {
+		s := err.Error()
+		switch {
+		case strings.Contains(s, "invalid totp code"):
+			return "Неверный код из Google Authenticator"
+		case strings.Contains(s, "code is required"):
+			return "Введите 6‑значный код из Google Authenticator"
+		case strings.Contains(s, "run totp setup first"):
+			return "Сначала настройте Google Authenticator"
+		case strings.Contains(s, "invalid password"):
+			return "Неверный пароль"
+		case strings.Contains(s, "totp is not enabled"):
+			return "2FA уже отключена"
+		case strings.Contains(s, "password and totp code are required"):
+			return "Нужны пароль и код из Google Authenticator"
+		}
+
+		return "Неверные данные"
+	}
+
+	return "Ошибка. Попробуйте позже."
 }
 
 func (h *Handler) GetNotifications(w http.ResponseWriter, r *http.Request) {
