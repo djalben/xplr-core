@@ -477,7 +477,7 @@ func StoreOrdersHandler(w http.ResponseWriter, r *http.Request) {
 
 func callProvider(product StoreProduct) (activationKey string, qrData string, providerRef string, orderMeta string, err error) {
 	switch product.Provider {
-	case "mobimatter":
+	case "mobimatter", "celitech":
 		a, q, r, e := callMobiMatter(product)
 		return a, q, r, "{}", e
 	case "vless":

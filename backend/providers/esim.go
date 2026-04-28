@@ -322,9 +322,16 @@ var (
 
 func GetESIMProvider() ESIMProvider {
 	esimProviderOnce.Do(func() {
-		esimProvider = NewMobiMatterProvider()
-		log.Printf("[ESIM-PROVIDER] Initialized: %s (configured=%v)",
-			esimProvider.Name(), esimProvider.(*MobiMatterProvider).isConfigured())
+		// Prefer Celitech when configured, fallback to MobiMatter
+		cel := NewCelitechProvider()
+		if cel.isConfigured() {
+			esimProvider = cel
+			log.Printf("[ESIM-PROVIDER] Initialized: celitech (configured=true)")
+		} else {
+			esimProvider = NewMobiMatterProvider()
+			log.Printf("[ESIM-PROVIDER] Initialized: mobimatter (configured=%v)",
+				esimProvider.(*MobiMatterProvider).isConfigured())
+		}
 	})
 	return esimProvider
 }
