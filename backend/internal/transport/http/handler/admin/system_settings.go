@@ -22,7 +22,7 @@ func (h *Handler) ListSystemSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, list)
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, list)
 }
 
 func (h *Handler) PatchSystemSetting(w http.ResponseWriter, r *http.Request) {
@@ -57,5 +57,5 @@ func (h *Handler) PatchSystemSetting(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }

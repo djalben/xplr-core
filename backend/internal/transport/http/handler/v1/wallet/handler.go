@@ -6,7 +6,6 @@ import (
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler"
 	"github.com/go-chi/chi/v5"
-	"gitlab.com/libs-artifex/wrapper/v2"
 )
 
 type Handler struct {
@@ -31,12 +30,12 @@ func (h *Handler) GetBalance(w http.ResponseWriter, r *http.Request) {
 
 	balance, err := h.useCase.GetBalance(r.Context(), userID)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+		_ = handler.WriteInternalServerError(r.Context(), w, err)
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]any{"balance": balance})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]any{"balance": balance})
 }
 
 // TopUp — POST /v1/wallet/topup.
@@ -50,19 +49,19 @@ func (h *Handler) TopUp(w http.ResponseWriter, r *http.Request) {
 	var req request
 	err := handler.ReadJSON(r, &req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный запрос")
 
 		return
 	}
 
 	err = h.useCase.TopUpWallet(r.Context(), userID, domain.NewNumeric(req.Amount))
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Не удалось пополнить кошелёк")
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 // ToggleAutoTopUp — POST /v1/wallet/autotopup.
@@ -76,17 +75,17 @@ func (h *Handler) ToggleAutoTopUp(w http.ResponseWriter, r *http.Request) {
 	var req request
 	err := handler.ReadJSON(r, &req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный запрос")
 
 		return
 	}
 
 	err = h.useCase.ToggleAutoTopUp(r.Context(), userID, req.Enabled)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Не удалось сохранить настройку")
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }

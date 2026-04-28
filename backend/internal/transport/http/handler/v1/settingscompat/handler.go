@@ -99,7 +99,7 @@ func (h *Handler) GetProfile(w http.ResponseWriter, r *http.Request) {
 
 	u, err := h.userUC.GetByID(r.Context(), uid)
 	if err != nil {
-		handler.WriteInternalServerError(w, err)
+		_ = handler.WriteInternalServerError(r.Context(), w, err)
 
 		return
 	}
@@ -134,7 +134,7 @@ func (h *Handler) PatchProfile(w http.ResponseWriter, r *http.Request) {
 
 	err := handler.ReadJSON(r, &body)
 	if err != nil {
-		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Неверный запрос")
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный запрос")
 
 		return
 	}
@@ -149,7 +149,7 @@ func (h *Handler) GetTelegramLink(w http.ResponseWriter, r *http.Request) {
 
 	code, _, err := h.userUC.IssueTelegramLinkCode(r.Context(), uid)
 	if err != nil {
-		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Не удалось создать ссылку")
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Не удалось создать ссылку")
 
 		return
 	}
@@ -172,7 +172,7 @@ func (h *Handler) TelegramCheckStatus(w http.ResponseWriter, r *http.Request) {
 
 	u, err := h.userUC.GetByID(r.Context(), uid)
 	if err != nil {
-		handler.WriteInternalServerError(w, err)
+		_ = handler.WriteInternalServerError(r.Context(), w, err)
 
 		return
 	}
@@ -187,7 +187,7 @@ func (h *Handler) TelegramUnlink(w http.ResponseWriter, r *http.Request) {
 
 	err := h.userUC.UnlinkTelegram(r.Context(), uid)
 	if err != nil {
-		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Не удалось отвязать Telegram")
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Не удалось отвязать Telegram")
 
 		return
 	}
@@ -200,7 +200,7 @@ func (h *Handler) VerifyEmailRequest(w http.ResponseWriter, r *http.Request) {
 
 	err := h.authUC.ResendEmailVerification(r.Context(), uid)
 	if err != nil {
-		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Не удалось отправить письмо")
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Не удалось отправить письмо")
 
 		return
 	}

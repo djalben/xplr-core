@@ -1,10 +1,12 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
 	"github.com/djalben/xplr-core/backend/internal/domain"
+	"github.com/djalben/xplr-core/backend/internal/infrastructure/logger"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/httpctx"
 	"gitlab.com/libs-artifex/wrapper/v2"
 )
@@ -21,13 +23,16 @@ func ReadJSON(r *http.Request, v any) error {
 
 // WriteJSON пишет JSON-ответ.
 func WriteJSON(w http.ResponseWriter, status int, v any) {
+	WriteJSONWithContext(context.Background(), w, status, v)
+}
+
+func WriteJSONWithContext(ctx context.Context, w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 
 	err := json.NewEncoder(w).Encode(v)
 	if err != nil {
-		// игнорируем ошибку записи ответа (стандартная практика для хелперов)
-		_ = err
+		logger.FromContext(ctx).ErrorContext(ctx, "failed to write JSON response", "error", wrapper.Wrap(err))
 	}
 }
 

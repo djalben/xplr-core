@@ -31,12 +31,12 @@ func (h *Handler) AdminListNews(w http.ResponseWriter, r *http.Request) {
 
 	list, err := h.newsRepo.ListAll(r.Context(), limit)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+		_ = handler.WriteInternalServerError(r.Context(), w, err)
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, list)
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, list)
 }
 
 // AdminCreateNews — POST /admin/news.
@@ -82,12 +82,12 @@ func (h *Handler) AdminCreateNews(w http.ResponseWriter, r *http.Request) {
 
 	err := h.newsRepo.Create(r.Context(), a)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+		_ = handler.WriteInternalServerError(r.Context(), w, err)
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, a)
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, a)
 }
 
 // AdminUpdateNews — PUT /admin/news/{id}.
@@ -145,7 +145,7 @@ func (h *Handler) AdminUpdateNews(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, a)
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, a)
 }
 
 // AdminPatchNews — PATCH /admin/news/{id} (MVP: только status).
@@ -184,7 +184,7 @@ func (h *Handler) AdminPatchNews(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 // AdminDeleteNews — DELETE /admin/news/{id}.
@@ -201,5 +201,5 @@ func (h *Handler) AdminDeleteNews(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }

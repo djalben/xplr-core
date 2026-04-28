@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -31,9 +32,10 @@ type Server struct {
 	srv       *http.Server
 	container *app.Container
 	router    *chi.Mux
+	logger    *slog.Logger
 }
 
-func NewServer(container *app.Container, host string, port int, jwtSecret []byte, corsAllowedOrigins string) *Server {
+func NewServer(container *app.Container, host string, port int, jwtSecret []byte, corsAllowedOrigins string, l *slog.Logger) *Server {
 	r := chi.NewRouter()
 
 	s := &Server{
@@ -46,6 +48,7 @@ func NewServer(container *app.Container, host string, port int, jwtSecret []byte
 		},
 		container: container,
 		router:    r,
+		logger:    l,
 	}
 
 	s.setupMiddleware(corsAllowedOrigins)
@@ -81,6 +84,7 @@ func (s *Server) Handler() http.Handler {
 func (s *Server) setupMiddleware(corsAllowedOrigins string) {
 	s.router.Use(middleware.RequestID)
 	s.router.Use(middleware.RealIP)
+	s.router.Use(authMiddleware.WithRequestLogger(s.logger))
 	s.router.Use(middleware.Logger)
 	s.router.Use(middleware.Recoverer)
 	s.router.Use(middleware.Timeout(60 * time.Second))
@@ -161,7 +165,7 @@ func (s *Server) handleSBPStatus(w http.ResponseWriter, r *http.Request) {
 		break
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]any{
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]any{
 		"sbp_enabled": enabled,
 		"enabled":     enabled,
 	})
@@ -198,13 +202,13 @@ func (s *Server) handleRates(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	handler.WriteJSON(w, http.StatusOK, out)
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, out)
 }
 
 func (s *Server) setupRoutes(jwtSecret []byte) {
 	s.router.Route("/api", func(r chi.Router) {
-		r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
-			handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+			handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "ok"})
 		})
 
 		r.Route("/v1", func(r chi.Router) {

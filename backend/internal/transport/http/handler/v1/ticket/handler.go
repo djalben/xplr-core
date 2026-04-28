@@ -6,7 +6,6 @@ import (
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler"
 	"github.com/go-chi/chi/v5"
-	"gitlab.com/libs-artifex/wrapper/v2"
 )
 
 type Handler struct {
@@ -39,19 +38,19 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	err := handler.ReadJSON(r, &req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный запрос")
 
 		return
 	}
 
 	ticket, err := h.useCase.Create(r.Context(), userID, req.Subject, req.Message, req.TGChatID)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Не удалось создать тикет")
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, ticket)
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, ticket)
 }
 
 // Take — PUT /v1/ticket/{id}/take (для админа).
@@ -68,12 +67,12 @@ func (h *Handler) Take(w http.ResponseWriter, r *http.Request) {
 
 	err = h.useCase.Take(r.Context(), id, adminID)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Не удалось взять тикет")
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 // Close — PUT /v1/ticket/{id}/close (для админа).
@@ -101,10 +100,10 @@ func (h *Handler) Close(w http.ResponseWriter, r *http.Request) {
 
 	err = h.useCase.Close(r.Context(), id, req.Reply)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Не удалось закрыть тикет")
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }

@@ -96,7 +96,7 @@ func (h *Handler) PostRevokeAllTrustedDevices(w http.ResponseWriter, r *http.Req
 
 	err := h.totpUC.RevokeAllTrustedDevices(r.Context(), userID)
 	if err != nil {
-		handler.WriteInternalServerError(w, err)
+		_ = handler.WriteInternalServerError(r.Context(), w, err)
 
 		return
 	}
@@ -112,7 +112,7 @@ func (h *Handler) PostRevokeAllTrustedDevices(w http.ResponseWriter, r *http.Req
 		SameSite: http.SameSiteLaxMode,
 	})
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "trusted devices revoked"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "trusted devices revoked"})
 }
 
 func (h *Handler) GetMe(w http.ResponseWriter, r *http.Request) {
@@ -125,12 +125,12 @@ func (h *Handler) GetMe(w http.ResponseWriter, r *http.Request) {
 
 	data, err := h.userUC.GetMe(r.Context(), userID)
 	if err != nil {
-		handler.WriteInternalServerError(w, err)
+		_ = handler.WriteInternalServerError(r.Context(), w, err)
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, data)
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, data)
 }
 
 func (h *Handler) GetGrade(w http.ResponseWriter, r *http.Request) {
@@ -143,12 +143,12 @@ func (h *Handler) GetGrade(w http.ResponseWriter, r *http.Request) {
 
 	grade, err := h.gradesUC.GetByUserID(r.Context(), userID)
 	if err != nil {
-		handler.WriteInternalServerError(w, err)
+		_ = handler.WriteInternalServerError(r.Context(), w, err)
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]any{
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]any{
 		"grade":       grade.Grade,
 		"total_spent": grade.TotalSpent.String(),
 		"fee_percent": grade.FeePercent.String(),
@@ -165,20 +165,20 @@ func (h *Handler) GetWallet(w http.ResponseWriter, r *http.Request) {
 
 	balance, err := h.walletUC.GetBalance(r.Context(), userID)
 	if err != nil {
-		handler.WriteInternalServerError(w, err)
+		_ = handler.WriteInternalServerError(r.Context(), w, err)
 
 		return
 	}
 
 	autoEnabled, err := h.walletUC.GetAutoTopUpEnabled(r.Context(), userID)
 	if err != nil {
-		handler.WriteInternalServerError(w, err)
+		_ = handler.WriteInternalServerError(r.Context(), w, err)
 
 		return
 	}
 
 	// BFF: фронт ожидает master_balance.
-	handler.WriteJSON(w, http.StatusOK, map[string]any{
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]any{
 		"master_balance":     balance.String(),
 		"auto_topup_enabled": autoEnabled,
 	})
@@ -200,7 +200,7 @@ func (h *Handler) TopUpWallet(w http.ResponseWriter, r *http.Request) {
 
 	err := handler.ReadJSON(r, &body)
 	if err != nil {
-		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Неверный запрос")
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный запрос")
 
 		return
 	}
@@ -208,18 +208,18 @@ func (h *Handler) TopUpWallet(w http.ResponseWriter, r *http.Request) {
 	err = h.walletUC.TopUpWallet(r.Context(), userID, domain.NewNumeric(body.Amount))
 	if err != nil {
 		if errors.Is(err, domain.ErrSBPTopUpDisabled) {
-			handler.WrapAndWriteError(w, err, http.StatusForbidden, "Пополнение через СБП временно недоступно")
+			_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusForbidden, "Пополнение через СБП временно недоступно")
 
 			return
 		}
 
-		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Не удалось пополнить кошелёк")
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Не удалось пополнить кошелёк")
 
 		return
 	}
 
 	balance, _ := h.walletUC.GetBalance(r.Context(), userID)
-	handler.WriteJSON(w, http.StatusOK, map[string]any{
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]any{
 		"master_balance": balance.String(),
 	})
 }
@@ -244,7 +244,7 @@ func (h *Handler) Support(w http.ResponseWriter, r *http.Request) {
 
 	err := handler.ReadJSON(r, &body)
 	if err != nil {
-		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Неверный запрос")
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный запрос")
 
 		return
 	}
@@ -257,12 +257,12 @@ func (h *Handler) Support(w http.ResponseWriter, r *http.Request) {
 
 	_, err = h.ticketUC.Create(r.Context(), userID, "Support", body.Message, nil)
 	if err != nil {
-		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Не удалось отправить сообщение")
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Не удалось отправить сообщение")
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 func (h *Handler) ChatStart(w http.ResponseWriter, r *http.Request) {
@@ -281,7 +281,7 @@ func (h *Handler) ChatStart(w http.ResponseWriter, r *http.Request) {
 
 	err := handler.ReadJSON(r, &body)
 	if err != nil {
-		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Неверный запрос")
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный запрос")
 
 		return
 	}
@@ -298,7 +298,7 @@ func (h *Handler) ChatStart(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now().UTC()
-	handler.WriteJSON(w, http.StatusOK, map[string]any{
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]any{
 		"conversation": map[string]any{
 			"id":         body.Topic,
 			"user_id":    userID,
@@ -327,7 +327,7 @@ func (h *Handler) ChatMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now().UTC()
-	handler.WriteJSON(w, http.StatusOK, map[string]any{
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]any{
 		"conversation": map[string]any{
 			"id":         topic,
 			"user_id":    userID,
@@ -363,7 +363,7 @@ func (h *Handler) ChatSend(w http.ResponseWriter, r *http.Request) {
 
 	err := handler.ReadJSON(r, &body)
 	if err != nil {
-		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Неверный запрос")
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный запрос")
 
 		return
 	}
@@ -376,12 +376,12 @@ func (h *Handler) ChatSend(w http.ResponseWriter, r *http.Request) {
 
 	ticket, err := h.ticketUC.Create(r.Context(), userID, "Support: "+topic, body.Message, nil)
 	if err != nil {
-		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Не удалось отправить сообщение")
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Не удалось отправить сообщение")
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]any{
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]any{
 		"id":              time.Now().UnixNano(),
 		"conversation_id": topic,
 		"ticket_id":       ticket.ID,
@@ -407,7 +407,7 @@ func (h *Handler) ChatClose(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 func (h *Handler) GetReferralsInfo(w http.ResponseWriter, r *http.Request) {
@@ -420,12 +420,12 @@ func (h *Handler) GetReferralsInfo(w http.ResponseWriter, r *http.Request) {
 
 	data, err := h.userUC.GetReferralInfo(r.Context(), userID)
 	if err != nil {
-		handler.WriteInternalServerError(w, err)
+		_ = handler.WriteInternalServerError(r.Context(), w, err)
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, data)
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, data)
 }
 
 func (h *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
@@ -520,7 +520,7 @@ func (h *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]any{"transactions": out})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]any{"transactions": out})
 }
 
 func (h *Handler) TransferToCard(w http.ResponseWriter, r *http.Request) {
@@ -541,27 +541,27 @@ func (h *Handler) TransferToCard(w http.ResponseWriter, r *http.Request) {
 
 	err := handler.ReadJSON(r, &body)
 	if err != nil {
-		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Неверный запрос")
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный запрос")
 
 		return
 	}
 
 	cardID, err := domain.ParseUUID(body.CardID)
 	if err != nil {
-		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Неверный id карты")
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный id карты")
 
 		return
 	}
 
 	err = h.cardUC.TopUpCard(r.Context(), userID, cardID, domain.NewNumeric(body.Amount))
 	if err != nil {
-		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Не удалось перевести на карту")
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Не удалось перевести на карту")
 
 		return
 	}
 
 	balance, _ := h.walletUC.GetBalance(r.Context(), userID)
-	handler.WriteJSON(w, http.StatusOK, map[string]any{"master_balance": balance.String()})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]any{"master_balance": balance.String()})
 }
 
 func (h *Handler) SetAutoTopup(w http.ResponseWriter, r *http.Request) {
@@ -580,19 +580,19 @@ func (h *Handler) SetAutoTopup(w http.ResponseWriter, r *http.Request) {
 
 	err := handler.ReadJSON(r, &body)
 	if err != nil {
-		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Неверный запрос")
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный запрос")
 
 		return
 	}
 
 	err = h.walletUC.ToggleAutoTopUp(r.Context(), userID, body.Enabled)
 	if err != nil {
-		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Не удалось сохранить настройку")
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Не удалось сохранить настройку")
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 func (h *Handler) GetCards(w http.ResponseWriter, r *http.Request) {
@@ -605,7 +605,7 @@ func (h *Handler) GetCards(w http.ResponseWriter, r *http.Request) {
 
 	cards, err := h.cardUC.ListByUserID(r.Context(), userID)
 	if err != nil {
-		handler.WriteInternalServerError(w, err)
+		_ = handler.WriteInternalServerError(r.Context(), w, err)
 
 		return
 	}
@@ -630,7 +630,7 @@ func (h *Handler) GetCards(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	handler.WriteJSON(w, http.StatusOK, out)
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, out)
 }
 
 func (h *Handler) IssueCards(w http.ResponseWriter, r *http.Request) {
@@ -652,7 +652,7 @@ func (h *Handler) IssueCards(w http.ResponseWriter, r *http.Request) {
 
 	err := handler.ReadJSON(r, &body)
 	if err != nil {
-		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Неверный запрос")
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный запрос")
 
 		return
 	}
@@ -677,11 +677,11 @@ func (h *Handler) IssueCards(w http.ResponseWriter, r *http.Request) {
 	for range max(1, body.Count) {
 		card, err := h.cardUC.BuyCard(r.Context(), userID, cardType, nickname, cur)
 		if err != nil {
-			handler.WriteJSON(w, http.StatusOK, map[string]any{
+			handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]any{
 				"successful_count": 0,
 				"failed_count":     1,
 				"results": []map[string]any{{
-					"success": false, "message": err.Error(),
+					"success": false, "message": "Не удалось выпустить карту",
 				}},
 			})
 
@@ -700,7 +700,7 @@ func (h *Handler) IssueCards(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]any{
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]any{
 		"successful_count": len(results),
 		"failed_count":     0,
 		"results":          results,
@@ -736,7 +736,7 @@ func (h *Handler) GetCardDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]any{
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]any{
 		"card_id":     card.ID.String(),
 		"full_number": "424242******" + card.Last4Digits,
 		"cvv":         "***",
@@ -783,7 +783,7 @@ func (h *Handler) UpdateCardStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 func (h *Handler) SetCardSpendingLimit(w http.ResponseWriter, r *http.Request) {
@@ -822,7 +822,7 @@ func (h *Handler) SetCardSpendingLimit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 // SpendFromCard — POST /user/cards/{id}/spend (списание с карты: лимиты день/месяц по типу).
@@ -862,7 +862,7 @@ func (h *Handler) SpendFromCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 func (h *Handler) SetCardAutoReplenishment(w http.ResponseWriter, r *http.Request) {
@@ -895,7 +895,7 @@ func (h *Handler) SetCardAutoReplenishment(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 func (h *Handler) UnsetCardAutoReplenishment(w http.ResponseWriter, r *http.Request) {
@@ -913,7 +913,7 @@ func (h *Handler) UnsetCardAutoReplenishment(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 // RecordCardFailedAuth — POST /user/cards/{id}/failed-auth (неудачная авторизация у провайдера; антифрод).
@@ -940,7 +940,7 @@ func (h *Handler) RecordCardFailedAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "recorded"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "recorded"})
 }
 
 func (h *Handler) PatchNotifications(w http.ResponseWriter, r *http.Request) {
@@ -970,7 +970,7 @@ func (h *Handler) PatchNotifications(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 func (h *Handler) PostTelegramLinkCode(w http.ResponseWriter, r *http.Request) {
@@ -988,7 +988,7 @@ func (h *Handler) PostTelegramLinkCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]any{
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]any{
 		"link_code":  code,
 		"expires_at": exp.Format(time.RFC3339),
 	})
@@ -1021,7 +1021,7 @@ func (h *Handler) PostTelegramLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 func (h *Handler) PostTOTPSetup(w http.ResponseWriter, r *http.Request) {
@@ -1039,7 +1039,7 @@ func (h *Handler) PostTOTPSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"otpauth_url": url, "secret": sec})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"otpauth_url": url, "secret": sec})
 }
 
 func (h *Handler) PostTOTPConfirm(w http.ResponseWriter, r *http.Request) {
@@ -1068,7 +1068,7 @@ func (h *Handler) PostTOTPConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "totp enabled"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "totp enabled"})
 }
 
 func (h *Handler) PostTOTPDisable(w http.ResponseWriter, r *http.Request) {
@@ -1098,7 +1098,7 @@ func (h *Handler) PostTOTPDisable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "totp disabled"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "totp disabled"})
 }
 
 func (h *Handler) PostKYCApplication(w http.ResponseWriter, r *http.Request) {
@@ -1139,5 +1139,5 @@ func (h *Handler) PostKYCApplication(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusCreated, map[string]string{"status": "submitted"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusCreated, map[string]string{"status": "submitted"})
 }

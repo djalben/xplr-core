@@ -6,7 +6,6 @@ import (
 
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler"
 	"github.com/go-chi/chi/v5"
-	"gitlab.com/libs-artifex/wrapper/v2"
 )
 
 func (h *Handler) RegisterLogs(r chi.Router) {
@@ -24,10 +23,10 @@ func (h *Handler) ListAdminLogs(w http.ResponseWriter, r *http.Request) {
 
 	list, err := h.adminLogsRepo.List(r.Context(), limit)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+		_ = handler.WriteInternalServerError(r.Context(), w, err)
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, list)
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, list)
 }

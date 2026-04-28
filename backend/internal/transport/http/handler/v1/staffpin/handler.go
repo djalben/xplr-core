@@ -33,21 +33,21 @@ func (h *Handler) VerifyStaffPIN(w http.ResponseWriter, r *http.Request) {
 
 	err := handler.ReadJSON(r, &req)
 	if err != nil {
-		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Неверный запрос")
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный запрос")
 
 		return
 	}
 
 	pin := strings.TrimSpace(req.PIN)
 	if pin == "" {
-		handler.WriteJSON(w, http.StatusOK, map[string]any{"access": "denied"})
+		handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]any{"access": "denied"})
 
 		return
 	}
 
 	stored, err := h.getAdminPIN(r.Context())
 	if err != nil {
-		handler.WriteInternalServerError(w, err)
+		_ = handler.WriteInternalServerError(r.Context(), w, err)
 
 		return
 	}
@@ -57,7 +57,7 @@ func (h *Handler) VerifyStaffPIN(w http.ResponseWriter, r *http.Request) {
 		access = "granted"
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]any{"access": access})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]any{"access": access})
 }
 
 func (h *Handler) getAdminPIN(ctx context.Context) (string, error) {

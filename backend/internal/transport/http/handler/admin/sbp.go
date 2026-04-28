@@ -18,12 +18,12 @@ func (h *Handler) RegisterSBP(r chi.Router) {
 func (h *Handler) GetSBPTopup(w http.ResponseWriter, r *http.Request) {
 	enabled, err := h.sbpTopupEnabled(r)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+		_ = handler.WriteInternalServerError(r.Context(), w, err)
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]any{
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]any{
 		"enabled": enabled,
 	})
 }
@@ -48,12 +48,12 @@ func (h *Handler) PatchSBPTopup(w http.ResponseWriter, r *http.Request) {
 
 	err := h.systemRepo.Upsert(r.Context(), row)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+		_ = handler.WriteInternalServerError(r.Context(), w, err)
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]any{
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]any{
 		"status":  "success",
 		"enabled": req.Enabled,
 	})

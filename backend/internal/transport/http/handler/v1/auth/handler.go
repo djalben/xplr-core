@@ -82,7 +82,7 @@ func (h *Handler) DoRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusCreated, map[string]any{
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusCreated, map[string]any{
 		"message":        "Регистрация успешна. Подтвердите email по ссылке из письма.",
 		"email":          user.Email,
 		"email_verified": user.EmailVerified,
@@ -148,7 +148,7 @@ func (h *Handler) DoLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if out.MFAToken != "" {
-		handler.WriteJSON(w, http.StatusOK, map[string]any{
+		handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]any{
 			"mfaRequired": true,
 			"mfaToken":    out.MFAToken,
 			"expiresIn":   300, // 5 минут (см. utils.GenerateMFAPendingJWT)
@@ -276,7 +276,7 @@ func (h *Handler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "email verified"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "email verified"})
 }
 
 func (h *Handler) RefreshToken(w http.ResponseWriter, r *http.Request) {
@@ -331,7 +331,7 @@ func (h *Handler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	balance, _ := h.walletUC.GetBalance(r.Context(), userID)
 	balanceStr := balance.String()
 
-	h.writeAuthSuccess(w, newToken, user, balanceStr)
+	h.writeAuthSuccess(r.Context(), w, newToken, user, balanceStr)
 }
 
 func (h *Handler) ResetPasswordRequest(w http.ResponseWriter, r *http.Request) {
@@ -357,7 +357,7 @@ func (h *Handler) ResetPasswordRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{
 		"status": "Если email зарегистрирован, мы отправили инструкции.",
 	})
 }
@@ -389,7 +389,7 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "password updated"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "password updated"})
 }
 
 func authUserMessage(err error) string {
@@ -440,16 +440,16 @@ func (h *Handler) issueAuthToken(ctx context.Context, w http.ResponseWriter, r *
 	balance, _ := h.walletUC.GetBalance(ctx, user.ID)
 	balanceStr := balance.String()
 
-	h.writeAuthSuccess(w, token, user, balanceStr)
+	h.writeAuthSuccess(ctx, w, token, user, balanceStr)
 }
 
-func (h *Handler) writeAuthSuccess(w http.ResponseWriter, token string, user *domain.User, balanceStr string) {
+func (h *Handler) writeAuthSuccess(ctx context.Context, w http.ResponseWriter, token string, user *domain.User, balanceStr string) {
 	role := roleUser
 	if user.IsAdmin {
 		role = roleAdmin
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]any{
+	handler.WriteJSONWithContext(ctx, w, http.StatusOK, map[string]any{
 		"token": token,
 		"user": map[string]any{
 			"id":             user.ID.String(),

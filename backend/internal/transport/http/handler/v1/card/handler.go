@@ -6,7 +6,6 @@ import (
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler"
 	"github.com/go-chi/chi/v5"
-	"gitlab.com/libs-artifex/wrapper/v2"
 )
 
 type Handler struct {
@@ -39,7 +38,7 @@ func (h *Handler) BuyCard(w http.ResponseWriter, r *http.Request) {
 
 	err := handler.ReadJSON(r, &req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный запрос")
 
 		return
 	}
@@ -50,12 +49,12 @@ func (h *Handler) BuyCard(w http.ResponseWriter, r *http.Request) {
 	}
 	card, err := h.useCase.BuyCard(r.Context(), userID, domain.CardType(req.CardType), req.Nickname, cur)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Не удалось выпустить карту")
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, card)
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, card)
 }
 
 // TopUpCard — POST /v1/card/{id}/topup.
@@ -66,7 +65,7 @@ func (h *Handler) TopUpCard(w http.ResponseWriter, r *http.Request) {
 
 	cardID, err := domain.ParseUUID(cardIDStr)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный id карты")
 
 		return
 	}
@@ -79,19 +78,19 @@ func (h *Handler) TopUpCard(w http.ResponseWriter, r *http.Request) {
 
 	err = handler.ReadJSON(r, &req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный запрос")
 
 		return
 	}
 
 	err = h.useCase.TopUpCard(r.Context(), userID, cardID, domain.NewNumeric(req.Amount))
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Не удалось пополнить карту")
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 // SpendFromCard — POST /v1/card/{id}/spend.
@@ -102,7 +101,7 @@ func (h *Handler) SpendFromCard(w http.ResponseWriter, r *http.Request) {
 
 	cardID, err := domain.ParseUUID(cardIDStr)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный id карты")
 
 		return
 	}
@@ -115,17 +114,17 @@ func (h *Handler) SpendFromCard(w http.ResponseWriter, r *http.Request) {
 
 	err = handler.ReadJSON(r, &req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный запрос")
 
 		return
 	}
 
 	err = h.useCase.SpendFromCard(r.Context(), userID, cardID, domain.NewNumeric(req.Amount))
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Операция отклонена")
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }

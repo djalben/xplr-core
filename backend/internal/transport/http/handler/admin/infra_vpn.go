@@ -60,7 +60,7 @@ func (h *Handler) InfraBalance(w http.ResponseWriter, r *http.Request) {
 		cur = "EUR"
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]any{
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]any{
 		"balance":    bal,
 		"currency":   cur,
 		"updated_at": time.Now().UTC().Format(time.RFC3339),
@@ -106,7 +106,7 @@ func (h *Handler) InfraServerInfo(w http.ResponseWriter, r *http.Request) {
 		out["api_status"] = "error"
 	}
 
-	handler.WriteJSON(w, http.StatusOK, out)
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, out)
 }
 
 func (h *Handler) InfraActiveKeys(w http.ResponseWriter, r *http.Request) {
@@ -124,7 +124,7 @@ func (h *Handler) InfraActiveKeys(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]any{"active_keys": active})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]any{"active_keys": active})
 }
 
 func (h *Handler) InfraVPNActiveClients(w http.ResponseWriter, r *http.Request) {
@@ -135,7 +135,7 @@ func (h *Handler) InfraVPNActiveClients(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]any{"clients": clients})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]any{"clients": clients})
 }
 
 type vpnClientRow struct {
@@ -287,7 +287,7 @@ func (h *Handler) InfraVPNServerStatus(w http.ResponseWriter, r *http.Request) {
 	serverCost, _ := strconv.ParseFloat(strings.TrimSpace(m["vpn_server_cost_eur"]), 64)
 	margin := monthlyRevenue - serverCost
 
-	handler.WriteJSON(w, http.StatusOK, map[string]any{
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]any{
 		"active_clients":        activeCount,
 		"total_upload":          totalUp,
 		"total_download":        totalDown,
@@ -329,7 +329,7 @@ func (h *Handler) DeleteVPNClient(w http.ResponseWriter, r *http.Request) {
 	// Also mark related orders as deleted in our DB.
 	_ = h.storeRepo.SoftDeleteOrdersByProviderRef(r.Context(), providerRef)
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 func (h *Handler) PatchVPNClient(w http.ResponseWriter, r *http.Request) {
@@ -379,5 +379,5 @@ func (h *Handler) PatchVPNClient(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }

@@ -105,12 +105,12 @@ func (h *Handler) Register(r chi.Router) {
 func (h *Handler) GetDashboardStats(w http.ResponseWriter, r *http.Request) {
 	stats, err := h.adminDashRepo.GetStats(r.Context())
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+		_ = handler.WriteInternalServerError(r.Context(), w, err)
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, stats)
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, stats)
 }
 
 // ChangeTariffs — POST /admin/tariffs.
@@ -124,14 +124,14 @@ func (h *Handler) ChangeTariffs(w http.ResponseWriter, r *http.Request) {
 
 	err := handler.ReadJSON(r, &req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный запрос")
 
 		return
 	}
 
 	cfg, err := h.commissionUseCase.GetByKey(r.Context(), req.Key)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+		_ = handler.WriteInternalServerError(r.Context(), w, err)
 
 		return
 	}
@@ -140,12 +140,12 @@ func (h *Handler) ChangeTariffs(w http.ResponseWriter, r *http.Request) {
 
 	err = h.commissionUseCase.Update(r.Context(), cfg)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверные данные")
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 // ChangeReferralBonuses — POST /admin/referrals.
@@ -158,14 +158,14 @@ func (h *Handler) ChangeReferralBonuses(w http.ResponseWriter, r *http.Request) 
 
 	err := handler.ReadJSON(r, &req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный запрос")
 
 		return
 	}
 
 	cfg, err := h.commissionUseCase.GetByKey(r.Context(), "referral_percent")
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+		_ = handler.WriteInternalServerError(r.Context(), w, err)
 
 		return
 	}
@@ -174,12 +174,12 @@ func (h *Handler) ChangeReferralBonuses(w http.ResponseWriter, r *http.Request) 
 
 	err = h.commissionUseCase.Update(r.Context(), cfg)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверные данные")
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 // BlockCard — PUT /admin/cards/{id}/block.
@@ -188,19 +188,19 @@ func (h *Handler) BlockCard(w http.ResponseWriter, r *http.Request) {
 
 	id, err := domain.ParseUUID(idStr)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный id")
 
 		return
 	}
 
 	err = h.cardUseCase.BlockCard(r.Context(), id)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Не удалось заблокировать карту")
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 // UnblockCard — PUT /admin/cards/{id}/unblock.
@@ -209,19 +209,19 @@ func (h *Handler) UnblockCard(w http.ResponseWriter, r *http.Request) {
 
 	id, err := domain.ParseUUID(idStr)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный id")
 
 		return
 	}
 
 	err = h.cardUseCase.UnblockCard(r.Context(), id)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Не удалось разблокировать карту")
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 // TakeTicket — PUT /admin/tickets/{id}/take.
@@ -232,19 +232,19 @@ func (h *Handler) TakeTicket(w http.ResponseWriter, r *http.Request) {
 
 	id, err := domain.ParseUUID(idStr)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный id")
 
 		return
 	}
 
 	err = h.ticketUseCase.Take(r.Context(), id, adminID)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Не удалось взять тикет")
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 // CloseTicket — PUT /admin/tickets/{id}/close.
@@ -264,12 +264,12 @@ func (h *Handler) CloseTicket(w http.ResponseWriter, r *http.Request) {
 
 	err := h.ticketUseCase.Close(r.Context(), id, req.Reply)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Не удалось закрыть тикет")
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 // ListUsers — GET /admin/users?limit=&offset=.
@@ -279,14 +279,14 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 
 	users, err := h.userRepo.ListUsers(r.Context(), limit, offset)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+		_ = handler.WriteInternalServerError(r.Context(), w, err)
 
 		return
 	}
 
 	total, err := h.userRepo.CountUsers(r.Context())
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+		_ = handler.WriteInternalServerError(r.Context(), w, err)
 
 		return
 	}
@@ -297,7 +297,7 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		rows = append(rows, h.adminUserRow(r.Context(), u))
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]any{
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]any{
 		"users":  rows,
 		"total":  total,
 		"limit":  limit,
@@ -329,7 +329,7 @@ func (h *Handler) SearchUsers(w http.ResponseWriter, r *http.Request) {
 		rows = append(rows, h.adminUserRow(r.Context(), u))
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]any{"users": rows})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]any{"users": rows})
 }
 
 // SetUserStatus — PUT /admin/users/{id}/status.
@@ -364,7 +364,7 @@ func (h *Handler) SetUserStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 // ToggleUserBlock — POST /admin/users/{id}/toggle-block.
@@ -393,7 +393,7 @@ func (h *Handler) ToggleUserBlock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]bool{"is_blocked": next == domain.UserStatusBlocked})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]bool{"is_blocked": next == domain.UserStatusBlocked})
 }
 
 // ToggleUserAdmin — PATCH /admin/users/{id}/role.
@@ -414,12 +414,12 @@ func (h *Handler) ToggleUserAdmin(w http.ResponseWriter, r *http.Request) {
 
 	err = h.userRepo.SetIsAdmin(r.Context(), id, next)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+		_ = handler.WriteInternalServerError(r.Context(), w, err)
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]bool{"is_admin": next})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]bool{"is_admin": next})
 }
 
 // SetUserAdmin — PUT /admin/users/{id}/admin.
@@ -439,12 +439,12 @@ func (h *Handler) SetUserAdmin(w http.ResponseWriter, r *http.Request) {
 
 	err := h.userRepo.SetIsAdmin(r.Context(), id, req.IsAdmin)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+		_ = handler.WriteInternalServerError(r.Context(), w, err)
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 // ChangeUserGrade — PUT /admin/users/{id}/grade.
@@ -464,12 +464,12 @@ func (h *Handler) ChangeUserGrade(w http.ResponseWriter, r *http.Request) {
 
 	err := h.gradesUseCase.ChangeGrade(r.Context(), id, req.Grade)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверные данные")
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 func adminChiUUID(w http.ResponseWriter, r *http.Request) (domain.UUID, bool) {
@@ -539,7 +539,7 @@ func (h *Handler) ListKYCPending(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]any{"applications": out})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]any{"applications": out})
 }
 
 // DecideKYC — PUT /admin/kyc-applications/{id}/decision.
@@ -570,7 +570,7 @@ func (h *Handler) DecideKYC(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 func (h *Handler) adminUserRow(ctx context.Context, u *domain.User) map[string]any {

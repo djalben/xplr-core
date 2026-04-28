@@ -20,5 +20,5 @@ func (h *Handler) ListTickets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, list)
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, list)
 }

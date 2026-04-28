@@ -2,10 +2,12 @@ package vercel
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 
 	"github.com/djalben/xplr-core/backend/internal/app"
 	"github.com/djalben/xplr-core/backend/internal/config"
+	logHandler "github.com/djalben/xplr-core/backend/internal/infrastructure/logger/handler"
 	httpServer "github.com/djalben/xplr-core/backend/internal/transport/http"
 	"gitlab.com/libs-artifex/wrapper/v2"
 )
@@ -23,7 +25,11 @@ func NewHTTPHandlerFromEnv(ctx context.Context) (http.Handler, error) {
 		return nil, wrapper.Wrap(err)
 	}
 
-	s := httpServer.NewServer(container, cfg.ServerHost, cfg.ServerPort, []byte(cfg.JWTSecret), cfg.CORSAllowedOrigins)
+	// Logger for serverless runtime.
+	handler := logHandler.Create(cfg.LogPlain, cfg.LogLevel)
+	logger := slog.New(handler)
+
+	s := httpServer.NewServer(container, cfg.ServerHost, cfg.ServerPort, []byte(cfg.JWTSecret), cfg.CORSAllowedOrigins, logger)
 
 	return s.Handler(), nil
 }

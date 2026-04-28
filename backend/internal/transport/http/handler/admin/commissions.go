@@ -7,7 +7,6 @@ import (
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	"github.com/djalben/xplr-core/backend/internal/transport/http/handler"
 	"github.com/go-chi/chi/v5"
-	"gitlab.com/libs-artifex/wrapper/v2"
 )
 
 func (h *Handler) RegisterCommissions(r chi.Router) {
@@ -18,12 +17,12 @@ func (h *Handler) RegisterCommissions(r chi.Router) {
 func (h *Handler) ListCommissions(w http.ResponseWriter, r *http.Request) {
 	list, err := h.commissionUseCase.ListAll(r.Context())
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+		_ = handler.WriteInternalServerError(r.Context(), w, err)
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, list)
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, list)
 }
 
 func (h *Handler) PatchCommission(w http.ResponseWriter, r *http.Request) {
@@ -42,7 +41,7 @@ func (h *Handler) PatchCommission(w http.ResponseWriter, r *http.Request) {
 
 	list, err := h.commissionUseCase.ListAll(r.Context())
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusInternalServerError)
+		_ = handler.WriteInternalServerError(r.Context(), w, err)
 
 		return
 	}
@@ -66,10 +65,10 @@ func (h *Handler) PatchCommission(w http.ResponseWriter, r *http.Request) {
 
 	err = h.commissionUseCase.Update(r.Context(), cfg)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверные данные")
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }

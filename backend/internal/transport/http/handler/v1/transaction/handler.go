@@ -49,12 +49,12 @@ func (h *Handler) GetWalletTransactions(w http.ResponseWriter, r *http.Request) 
 
 	txs, err := h.useCase.GetWalletTransactions(r.Context(), userID, from, to)
 	if err != nil {
-		handler.WriteInternalServerError(w, err)
+		_ = handler.WriteInternalServerError(r.Context(), w, err)
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, txs)
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, txs)
 }
 
 // GetCardTransactions — GET /v1/transaction/card/{id}?from=&to=.
@@ -63,7 +63,7 @@ func (h *Handler) GetCardTransactions(w http.ResponseWriter, r *http.Request) {
 
 	id, err := domain.ParseUUID(idStr)
 	if err != nil {
-		handler.WrapAndWriteError(w, err, http.StatusBadRequest, "Неверный id")
+		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный id")
 
 		return
 	}
@@ -89,10 +89,10 @@ func (h *Handler) GetCardTransactions(w http.ResponseWriter, r *http.Request) {
 
 	txs, err := h.useCase.GetCardTransactions(r.Context(), id, from, to)
 	if err != nil {
-		handler.WriteInternalServerError(w, err)
+		_ = handler.WriteInternalServerError(r.Context(), w, err)
 
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, txs)
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, txs)
 }

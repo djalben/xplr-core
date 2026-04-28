@@ -32,7 +32,7 @@ func (h *Handler) AdminStoreProducts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, list)
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, list)
 }
 
 func (h *Handler) AdminPatchStoreProduct(w http.ResponseWriter, r *http.Request) {
@@ -93,7 +93,7 @@ func (h *Handler) AdminPatchStoreProduct(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 func (h *Handler) AdminBulkMarkup(w http.ResponseWriter, r *http.Request) {
@@ -122,5 +122,5 @@ func (h *Handler) AdminBulkMarkup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]any{"affected": affected})
+	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]any{"affected": affected})
 }
