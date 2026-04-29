@@ -163,6 +163,12 @@ export const toggleSubscription = async (cardId: number, subId: number, isAllowe
   await apiClient.patch(`/user/cards/${cardId}/subscriptions/${subId}`, { is_allowed: isAllowed });
 };
 
+// Freeze/unfreeze all subscriptions for a card
+export const freezeAllSubscriptions = async (cardId: number, freeze: boolean): Promise<{ is_allowed: boolean }> => {
+  const response = await apiClient.post(`/user/cards/${cardId}/freeze-all-subscriptions`, { freeze });
+  return response.data;
+};
+
 // Check Telegram link status
 export const getTelegramStatus = async (): Promise<{ telegram_linked: boolean }> => {
   const response = await apiClient.get('/user/telegram-status');

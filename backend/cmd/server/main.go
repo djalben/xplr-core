@@ -212,6 +212,7 @@ func main() {
 	verifiedCards.HandleFunc("/{id}/auto-pay", handler.ToggleAutoPayHandler).Methods("PATCH")
 	verifiedCards.HandleFunc("/{id}/subscriptions", handler.CardSubscriptionsHandler).Methods("GET")
 	verifiedCards.HandleFunc("/{id}/subscriptions/{subId}", handler.ToggleSubscriptionHandler).Methods("PATCH")
+	verifiedCards.HandleFunc("/{id}/freeze-all-subscriptions", handler.FreezeAllSubscriptionsHandler).Methods("POST")
 	verifiedCards.HandleFunc("/{id}/sync-balance", handler.SyncCardBalanceHandler).Methods("POST")
 	verifiedCards.HandleFunc("/{id}/spending-limit", handler.SetSpendingLimitHandler).Methods("PATCH")
 

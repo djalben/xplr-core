@@ -258,6 +258,73 @@ func ToggleSubscriptionHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
+// POST /api/v1/user/cards/{id}/freeze-all-subscriptions — mass freeze/unfreeze all subs
+func FreezeAllSubscriptionsHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok || userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	vars := mux.Vars(r)
+	cardID, _ := strconv.Atoi(vars["id"])
+	if cardID <= 0 {
+		http.Error(w, "invalid card id", http.StatusBadRequest)
+		return
+	}
+
+	card, err := repository.GetCardByID(cardID)
+	if err != nil || card.UserID != userID {
+		http.Error(w, "Card not found", http.StatusNotFound)
+		return
+	}
+
+	var req struct {
+		Freeze bool `json:"freeze"` // true = freeze all (is_allowed=false), false = unfreeze all
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	newAllowed := !req.Freeze
+
+	// Mass update all subscriptions for this card
+	_, err = GlobalDB.Exec(
+		`UPDATE card_subscriptions SET is_allowed = $1 WHERE card_id = $2`,
+		newAllowed, cardID,
+	)
+	if err != nil {
+		http.Error(w, "Failed to update subscriptions", http.StatusInternalServerError)
+		return
+	}
+
+	// Sync merchant_blocks
+	if req.Freeze {
+		// Block all merchants for this card
+		GlobalDB.Exec(`
+			INSERT INTO merchant_blocks (card_id, merchant_name, is_blocked)
+			SELECT $1, merchant_name, TRUE FROM card_subscriptions WHERE card_id = $1
+			ON CONFLICT (card_id, merchant_name) DO UPDATE SET is_blocked = TRUE
+		`, cardID)
+	} else {
+		// Unblock all merchants for this card
+		GlobalDB.Exec(`DELETE FROM merchant_blocks WHERE card_id = $1`, cardID)
+	}
+
+	action := "frozen"
+	if !req.Freeze {
+		action = "unfrozen"
+	}
+	log.Printf("[SUBSCRIPTION] Card %d all subscriptions %s (user %d)", cardID, action, userID)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":     "ok",
+		"is_allowed": newAllowed,
+	})
+}
+
 // ══════════════════════════════════════════════════════════════
 // 3. 3DS/SMS Notification Hub
 // ══════════════════════════════════════════════════════════════

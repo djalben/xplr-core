@@ -247,20 +247,21 @@ func CheckAezaBalanceAndNotify() {
 
 // AezaServerInfo holds data about a specific Aeza VPS.
 type AezaServerInfo struct {
-	ID        int     `json:"id"`
-	Name      string  `json:"name"`
-	Status    string  `json:"status"` // "active", "stopped", etc.
-	IP        string  `json:"ip"`
-	CostEUR   float64 `json:"cost_eur"`
-	ExpiresAt string  `json:"expires_at"` // ISO date
-	CPU       int     `json:"cpu"`
-	RAMMB     int     `json:"ram_mb"`
-	DiskGB    int     `json:"disk_gb"`
-	DiskType  string  `json:"disk_type"` // "SSD", "NVMe", etc.
-	OS        string  `json:"os"`
-	Location  string  `json:"location"`
-	UpdatedAt string  `json:"updated_at"`
-	APIStatus string  `json:"api_status"` // "ok", "error", "maintenance"
+	ID          int     `json:"id"`
+	Name        string  `json:"name"`
+	Status      string  `json:"status"` // "active", "stopped", etc.
+	IP          string  `json:"ip"`
+	CostEUR     float64 `json:"cost_eur"`
+	ExpiresAt   string  `json:"expires_at"` // ISO date
+	CPU         int     `json:"cpu"`
+	RAMMB       int     `json:"ram_mb"`
+	DiskGB      int     `json:"disk_gb"`
+	BandwidthGB int     `json:"bandwidth_gb"` // monthly traffic limit from Aeza plan
+	DiskType    string  `json:"disk_type"`    // "SSD", "NVMe", etc.
+	OS          string  `json:"os"`
+	Location    string  `json:"location"`
+	UpdatedAt   string  `json:"updated_at"`
+	APIStatus   string  `json:"api_status"` // "ok", "error", "maintenance"
 }
 
 // GetAezaServerInfo fetches info about a specific server from the Aeza API.
@@ -314,9 +315,11 @@ func GetAezaServerInfo() (*AezaServerInfo, error) {
 			Cost     any    `json:"cost"` // may be string or float
 			EndDate  string `json:"endDate"`
 			Products struct {
-				CPU  any `json:"cpu"`  // may be int or string
-				RAM  any `json:"ram"`  // MB, may be int or string
-				Disk any `json:"disk"` // GB, may be int or string
+				CPU       any `json:"cpu"`       // may be int or string
+				RAM       any `json:"ram"`       // MB, may be int or string
+				Disk      any `json:"disk"`      // GB, may be int or string
+				Bandwidth any `json:"bandwidth"` // GB, monthly traffic limit
+				Traffic   any `json:"traffic"`   // GB, alternative field name
 			} `json:"products"`
 			DiskType     string `json:"diskType"`
 			OsName       string `json:"osName"`
@@ -329,21 +332,28 @@ func GetAezaServerInfo() (*AezaServerInfo, error) {
 	}
 
 	d := raw.Data
+	// Parse bandwidth: try "bandwidth" first, then "traffic"
+	bwGB := int(parseAnyFloat(d.Products.Bandwidth))
+	if bwGB == 0 {
+		bwGB = int(parseAnyFloat(d.Products.Traffic))
+	}
+
 	info := &AezaServerInfo{
-		ID:        d.ID,
-		Name:      d.Name,
-		Status:    d.Status,
-		IP:        d.IP,
-		CostEUR:   parseAnyFloat(d.Cost),
-		ExpiresAt: d.EndDate,
-		CPU:       int(parseAnyFloat(d.Products.CPU)),
-		RAMMB:     int(parseAnyFloat(d.Products.RAM)),
-		DiskGB:    int(parseAnyFloat(d.Products.Disk)),
-		DiskType:  d.DiskType,
-		OS:        d.OsName,
-		Location:  d.LocationName,
-		UpdatedAt: time.Now().Format(time.RFC3339),
-		APIStatus: "ok",
+		ID:          d.ID,
+		Name:        d.Name,
+		Status:      d.Status,
+		IP:          d.IP,
+		CostEUR:     parseAnyFloat(d.Cost),
+		ExpiresAt:   d.EndDate,
+		CPU:         int(parseAnyFloat(d.Products.CPU)),
+		RAMMB:       int(parseAnyFloat(d.Products.RAM)),
+		DiskGB:      int(parseAnyFloat(d.Products.Disk)),
+		BandwidthGB: bwGB,
+		DiskType:    d.DiskType,
+		OS:          d.OsName,
+		Location:    d.LocationName,
+		UpdatedAt:   time.Now().Format(time.RFC3339),
+		APIStatus:   "ok",
 	}
 
 	// Fallback defaults if API returned zero values
@@ -369,8 +379,8 @@ func GetAezaServerInfo() (*AezaServerInfo, error) {
 		info.Status = "active"
 	}
 
-	log.Printf("[AEZA-SERVER] ✅ Server %d: status=%s, cost=€%.2f, expires=%s, %dCPU/%dMB/%dGB %s",
-		info.ID, info.Status, info.CostEUR, info.ExpiresAt, info.CPU, info.RAMMB, info.DiskGB, info.DiskType)
+	log.Printf("[AEZA-SERVER] ✅ Server %d: status=%s, cost=€%.2f, expires=%s, %dCPU/%dMB/%dGB %s, bandwidth=%dGB",
+		info.ID, info.Status, info.CostEUR, info.ExpiresAt, info.CPU, info.RAMMB, info.DiskGB, info.DiskType, info.BandwidthGB)
 	return info, nil
 }
 

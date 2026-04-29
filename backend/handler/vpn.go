@@ -15,6 +15,7 @@ import (
 
 	"github.com/djalben/xplr-core/backend/middleware"
 	"github.com/djalben/xplr-core/backend/providers/vless"
+	"github.com/djalben/xplr-core/backend/service" // Added service import
 	"github.com/djalben/xplr-core/backend/shop"
 	"github.com/djalben/xplr-core/backend/telegram"
 	"github.com/gorilla/mux"
@@ -218,9 +219,12 @@ func AdminVPNServerStatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Server traffic limit from env (in GB, default 30 GB — real Aeza plan)
+	// Pull live bandwidth limit from Aeza API; fall back to env/default
 	serverLimitGB := 30
-	if envLimit := os.Getenv("VPN_SERVER_TRAFFIC_LIMIT_GB"); envLimit != "" {
+	if aezaInfo, aezaErr := service.GetAezaServerInfo(); aezaErr == nil && aezaInfo.BandwidthGB > 0 {
+		serverLimitGB = aezaInfo.BandwidthGB
+		log.Printf("[VPN-SERVER-STATUS] Aeza bandwidth_limit refreshed: %d GB", serverLimitGB)
+	} else if envLimit := os.Getenv("VPN_SERVER_TRAFFIC_LIMIT_GB"); envLimit != "" {
 		if v, err := strconv.Atoi(envLimit); err == nil && v > 0 {
 			serverLimitGB = v
 		}
@@ -287,16 +291,16 @@ func AdminVPNServerStatusHandler(w http.ResponseWriter, r *http.Request) {
 
 	margin := monthlyRevenue - serverCostEUR
 
-	// ── Traffic alert: critical when remaining < 10 GB ──
+	// ── Traffic alert: critical when remaining <= 5 GB ──
 	remainingBytes := serverLimitBytes - stats.TotalTraffic
 	if remainingBytes < 0 {
 		remainingBytes = 0
 	}
 	remainingGB := float64(remainingBytes) / (1024 * 1024 * 1024)
 	trafficAlert := false
-	if remainingGB < 10 {
+	if remainingGB <= 5.0 {
 		trafficAlert = true
-		go notifyTrafficCritical(usedPercent, stats.TotalTraffic, serverLimitBytes)
+		go notifyTrafficCritical(stats.TotalTraffic, serverLimitBytes)
 	}
 
 	json.NewEncoder(w).Encode(map[string]any{
@@ -439,18 +443,18 @@ func AdminVPNActiveClientsHandler(w http.ResponseWriter, r *http.Request) {
 // when server traffic exceeds 90%.
 // ══════════════════════════════════════════════════════════════
 
-func notifyTrafficCritical(usedPct float64, totalTraffic, limitBytes int64) {
+func notifyTrafficCritical(totalTraffic, limitBytes int64) {
 	usedGB := float64(totalTraffic) / (1024 * 1024 * 1024)
 	limitGB := float64(limitBytes) / (1024 * 1024 * 1024)
 	remainingGB := limitGB - usedGB
 	if remainingGB < 0 {
 		remainingGB = 0
 	}
-	msg := fmt.Sprintf("🚨 <b>Внимание! Критический остаток трафика на сервере</b>\n\n"+
+	msg := fmt.Sprintf("🚨 <b>Осталось менее 5 ГБ трафика на VPN-сервере!</b>\n\n"+
 		"Остаток: <b>%.1f ГБ</b> из %.0f ГБ\n"+
-		"Использовано: <b>%.1f%%</b> (%.1f ГБ)\n\n"+
+		"Использовано: <b>%.1f ГБ</b>\n\n"+
 		"⚠️ Рекомендуется увеличить лимит или ограничить новые подключения.",
-		remainingGB, limitGB, usedPct, usedGB)
+		remainingGB, limitGB, usedGB)
 	telegram.NotifyAdmins(msg, "Открыть админку", "https://xplr.pro/staff-only-zone")
 }
 

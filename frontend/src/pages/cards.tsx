@@ -5,7 +5,7 @@ import { DashboardLayout } from '../components/dashboard-layout';
 import { ModalPortal } from '../components/modal-portal';
 import { BackButton } from '../components/back-button';
 import { getWallet, transferWalletToCard } from '../services/wallet';
-import { getUserCards, issuePersonalCard, getCardDetails, updateCardStatus, toggleAutoPay, getCardSubscriptions, toggleSubscription, getTelegramStatus, type Card as BackendCard, type CardSubscription } from '../services/cards';
+import { getUserCards, issuePersonalCard, getCardDetails, updateCardStatus, toggleAutoPay, getCardSubscriptions, toggleSubscription, freezeAllSubscriptions, getTelegramStatus, type Card as BackendCard, type CardSubscription } from '../services/cards';
 import { getTierInfo, type TierInfo } from '../services/tier';
 import { 
   Plus, 
@@ -30,7 +30,8 @@ import {
   ToggleLeft,
   ToggleRight,
   Store,
-  AlertTriangle
+  AlertTriangle,
+  Snowflake
 } from 'lucide-react';
 
 interface PersonalCard {
@@ -1139,21 +1140,18 @@ const RealisticCreditCard = ({
   onClose, 
   onTopUp,
   onApplePay,
-  onGooglePay,
-  onToggleAutoPay
+  onGooglePay
 }: { 
   card: PersonalCard; 
   onClose: () => void;
   onTopUp: () => void;
   onApplePay: () => void;
   onGooglePay: () => void;
-  onToggleAutoPay: (cardId: string, enabled: boolean) => void;
 }) => {
   const { t } = useTranslation();
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   
   const canAddToWallet = card.type === 'travel' || card.type === 'premium';
-  const showSubProtection = card.type === 'subscriptions' || card.type === 'premium';
 
   return (
     <>
@@ -1219,32 +1217,6 @@ const RealisticCreditCard = ({
         </div>
       )}
 
-      {/* Subscription Protection Toggle — only for subscriptions/premium, hidden for travel */}
-      {showSubProtection && (
-        <div className="mt-2 px-3 py-2 bg-white/[0.03] border border-white/[0.06] rounded-xl">
-          <button
-            onClick={() => onToggleAutoPay(card.id, !card.isAutoPayEnabled)}
-            className="w-full flex items-center gap-2.5 group/toggle"
-          >
-            <div className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
-              card.isAutoPayEnabled ? 'bg-amber-500/20 border border-amber-500/40' : 'bg-emerald-500/20 border border-emerald-500/40'
-            }`}>
-              <Shield className={`w-3.5 h-3.5 transition-colors ${card.isAutoPayEnabled ? 'text-amber-400' : 'text-emerald-400'}`} />
-            </div>
-            <div className="flex-1 text-left min-w-0">
-              <span className="text-xs font-medium text-white block leading-tight">Защита от автоподписок</span>
-              <span className="text-[10px] text-slate-500 leading-tight block">Блокирует рекуррентные списания (Netflix, Figma и др.)</span>
-            </div>
-            <div className={`shrink-0 w-9 h-5 rounded-full transition-colors relative ${
-              !card.isAutoPayEnabled ? 'bg-emerald-500' : 'bg-white/20'
-            }`}>
-              <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
-                !card.isAutoPayEnabled ? 'translate-x-4' : 'translate-x-0.5'
-              }`} />
-            </div>
-          </button>
-        </div>
-      )}
       </div>
     </>
   );
@@ -1491,23 +1463,6 @@ export const CardsPage = () => {
     }
   };
 
-  // Handle auto-pay toggle with optimistic UI
-  const handleToggleAutoPay = async (cardId: string, enabled: boolean) => {
-    // Optimistic: flip immediately
-    setPersonalCards(prev =>
-      prev.map(c => c.id === cardId ? { ...c, isAutoPayEnabled: enabled } : c)
-    );
-    try {
-      await toggleAutoPay(parseInt(cardId), enabled);
-    } catch (err) {
-      // Revert on error
-      setPersonalCards(prev =>
-        prev.map(c => c.id === cardId ? { ...c, isAutoPayEnabled: !enabled } : c)
-      );
-      console.error('Failed to toggle auto-pay:', err);
-    }
-  };
-
   // Handle wallet-to-card transfer with optimistic UI
   const handleTransfer = async (card: PersonalCard, amountInCurrency: number) => {
     // walletBalance is in USD; convert transfer amount to USD equivalent for optimistic deduction
@@ -1676,7 +1631,6 @@ export const CardsPage = () => {
                     }}
                     onApplePay={() => setPaymentModal({ type: 'apple' })}
                     onGooglePay={() => setPaymentModal({ type: 'google' })}
-                    onToggleAutoPay={handleToggleAutoPay}
                   />
                 ))}
               </div>
@@ -1691,10 +1645,10 @@ export const CardsPage = () => {
               </div>
             )}
 
-            {/* Subscription Hub — below card grid */}
+            {/* Subscription Hub — below card grid, grouped by card */}
             {personalCards.length > 0 && (
               <div className="mt-8 p-5 bg-white/[0.03] border border-white/[0.06] rounded-2xl">
-                <div className="flex items-center gap-3 mb-3">
+                <div className="flex items-center gap-3 mb-4">
                   <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center">
                     <Shield className="w-4.5 h-4.5 text-amber-400" />
                   </div>
@@ -1709,42 +1663,95 @@ export const CardsPage = () => {
                     <div className="w-5 h-5 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
                   </div>
                 ) : allSubscriptions.length > 0 ? (
-                  <div className="space-y-1.5 mt-3">
-                    {allSubscriptions.map(sub => (
-                      <div key={`${sub.card_id}-${sub.id}`} className="flex items-center gap-3 px-3 py-2.5 bg-white/[0.03] rounded-xl hover:bg-white/[0.05] transition-colors">
-                        <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
-                          <Store className="w-3.5 h-3.5 text-slate-400" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <span className="text-xs font-medium text-white block truncate">{sub.merchant_name}</span>
-                          <span className="text-[10px] text-slate-500">Карта **** {sub.card_last4} · {sub.charge_count} списан{sub.charge_count === 1 ? 'ие' : 'ий'}</span>
-                        </div>
-                        <button
-                          onClick={async () => {
-                            const newAllowed = !sub.is_allowed;
-                            setAllSubscriptions(prev => prev.map(s =>
-                              s.id === sub.id && s.card_id === sub.card_id ? { ...s, is_allowed: newAllowed } : s
-                            ));
-                            try {
-                              await toggleSubscription(sub.card_id, sub.id, newAllowed);
-                            } catch {
-                              setAllSubscriptions(prev => prev.map(s =>
-                                s.id === sub.id && s.card_id === sub.card_id ? { ...s, is_allowed: !newAllowed } : s
-                              ));
-                            }
-                          }}
-                          className="shrink-0"
-                        >
-                          <div className={`w-9 h-5 rounded-full transition-colors relative ${
-                            sub.is_allowed ? 'bg-emerald-500' : 'bg-red-500/60'
-                          }`}>
-                            <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
-                              sub.is_allowed ? 'translate-x-4' : 'translate-x-0.5'
-                            }`} />
+                  <div className="space-y-4 mt-3">
+                    {/* Group subscriptions by card_id */}
+                    {(() => {
+                      const grouped = new Map<number, { last4: string; subs: typeof allSubscriptions }>();
+                      allSubscriptions.forEach(sub => {
+                        if (!grouped.has(sub.card_id)) {
+                          grouped.set(sub.card_id, { last4: sub.card_last4, subs: [] });
+                        }
+                        grouped.get(sub.card_id)!.subs.push(sub);
+                      });
+                      return Array.from(grouped.entries()).map(([cardId, { last4, subs }]) => {
+                        const allFrozen = subs.every(s => !s.is_allowed);
+                        return (
+                          <div key={cardId} className="bg-white/[0.02] border border-white/[0.05] rounded-xl p-3">
+                            {/* Card group header */}
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <CardIcon className="w-4 h-4 text-slate-400" />
+                                <span className="text-xs font-semibold text-white">Карта **** {last4}</span>
+                                <span className="text-[10px] text-slate-500">{subs.length} подпис{subs.length === 1 ? 'ка' : subs.length < 5 ? 'ки' : 'ок'}</span>
+                              </div>
+                              <button
+                                onClick={async () => {
+                                  const shouldFreeze = !allFrozen;
+                                  // Optimistic: flip all subs for this card
+                                  setAllSubscriptions(prev => prev.map(s =>
+                                    s.card_id === cardId ? { ...s, is_allowed: !shouldFreeze } : s
+                                  ));
+                                  try {
+                                    await freezeAllSubscriptions(cardId, shouldFreeze);
+                                  } catch {
+                                    // Revert on error
+                                    setAllSubscriptions(prev => prev.map(s =>
+                                      s.card_id === cardId ? { ...s, is_allowed: shouldFreeze } : s
+                                    ));
+                                  }
+                                }}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
+                                  allFrozen
+                                    ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/30'
+                                    : 'bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 border border-blue-500/30'
+                                }`}
+                              >
+                                <Snowflake className="w-3 h-3" />
+                                {allFrozen ? 'Разморозить всё' : 'Заморозить все подписки'}
+                              </button>
+                            </div>
+                            {/* Subscriptions list */}
+                            <div className="space-y-1">
+                              {subs.map(sub => (
+                                <div key={sub.id} className="flex items-center gap-3 px-3 py-2 bg-white/[0.03] rounded-lg hover:bg-white/[0.05] transition-colors">
+                                  <div className="w-6 h-6 rounded-md bg-white/10 flex items-center justify-center shrink-0">
+                                    <Store className="w-3 h-3 text-slate-400" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <span className="text-xs font-medium text-white block truncate">{sub.merchant_name}</span>
+                                    <span className="text-[10px] text-slate-500">{sub.charge_count} списан{sub.charge_count === 1 ? 'ие' : 'ий'}</span>
+                                  </div>
+                                  <button
+                                    onClick={async () => {
+                                      const newAllowed = !sub.is_allowed;
+                                      setAllSubscriptions(prev => prev.map(s =>
+                                        s.id === sub.id && s.card_id === sub.card_id ? { ...s, is_allowed: newAllowed } : s
+                                      ));
+                                      try {
+                                        await toggleSubscription(sub.card_id, sub.id, newAllowed);
+                                      } catch {
+                                        setAllSubscriptions(prev => prev.map(s =>
+                                          s.id === sub.id && s.card_id === sub.card_id ? { ...s, is_allowed: !newAllowed } : s
+                                        ));
+                                      }
+                                    }}
+                                    className="shrink-0"
+                                  >
+                                    <div className={`w-9 h-5 rounded-full transition-colors relative ${
+                                      sub.is_allowed ? 'bg-emerald-500' : 'bg-red-500/60'
+                                    }`}>
+                                      <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
+                                        sub.is_allowed ? 'translate-x-4' : 'translate-x-0.5'
+                                      }`} />
+                                    </div>
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                        </button>
-                      </div>
-                    ))}
+                        );
+                      });
+                    })()}
                   </div>
                 ) : (
                   <p className="text-xs text-slate-500 text-center py-4">Подписки пока не обнаружены. Они появятся автоматически после первого рекуррентного списания.</p>
