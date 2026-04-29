@@ -32,14 +32,15 @@ func GetCardByID(id int) (domain.Card, error) {
 		       COALESCE(auto_replenish_threshold, 0) as auto_replenish_threshold,
 		       COALESCE(auto_replenish_amount, 0) as auto_replenish_amount,
 		       COALESCE(card_balance, 0) as card_balance,
-		       team_id, created_at
+		       team_id, created_at,
+		       COALESCE(is_auto_pay_enabled, TRUE) as is_auto_pay_enabled
 		FROM cards WHERE id = $1
 	`
 	err := GlobalDB.QueryRow(query, id).Scan(
 		&card.ID, &card.UserID, &card.ProviderCardID, &card.BIN, &card.Last4Digits,
 		&card.CardStatus, &card.Nickname, &card.ServiceSlug, &card.DailySpendLimit, &card.SpendLimit, &card.FailedAuthCount,
 		&card.CardType, &card.Category, &card.Currency, &card.AutoReplenishEnabled, &card.AutoReplenishThreshold,
-		&card.AutoReplenishAmount, &card.CardBalance, &teamID, &card.CreatedAt,
+		&card.AutoReplenishAmount, &card.CardBalance, &teamID, &card.CreatedAt, &card.IsAutoPayEnabled,
 	)
 	if teamID.Valid {
 		teamIDVal := int(teamID.Int64)
@@ -65,7 +66,8 @@ func GetUserCards(userID int) ([]domain.Card, error) {
 		       COALESCE(auto_replenish_threshold, 0) as auto_replenish_threshold,
 		       COALESCE(auto_replenish_amount, 0) as auto_replenish_amount,
 		       COALESCE(card_balance, 0) as card_balance,
-		       team_id, created_at
+		       team_id, created_at,
+		       COALESCE(is_auto_pay_enabled, TRUE) as is_auto_pay_enabled
 		FROM cards 
 		WHERE user_id = $1 
 		ORDER BY created_at DESC
@@ -102,6 +104,7 @@ func GetUserCards(userID int) ([]domain.Card, error) {
 			&card.CardBalance,
 			&teamID,
 			&card.CreatedAt,
+			&card.IsAutoPayEnabled,
 		)
 		if teamID.Valid {
 			teamIDVal := int(teamID.Int64)

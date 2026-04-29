@@ -461,3 +461,55 @@ BEGIN
         ALTER TABLE support_tickets ADD COLUMN message TEXT;
     END IF;
 END $$;
+
+-- 26. Миграция: Smart Subscription Filter (Anti-Drain)
+DO $$
+BEGIN
+    -- Глобальный переключатель автосписаний на карте (по умолчанию включён)
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cards' AND column_name = 'is_auto_pay_enabled') THEN
+        ALTER TABLE cards ADD COLUMN is_auto_pay_enabled BOOLEAN DEFAULT TRUE;
+    END IF;
+END $$;
+
+-- 27. Таблица блокировки мерчантов (по карте)
+CREATE TABLE IF NOT EXISTS merchant_blocks (
+    id SERIAL PRIMARY KEY,
+    card_id INTEGER REFERENCES cards(id) ON DELETE CASCADE,
+    merchant_name VARCHAR(500) NOT NULL,
+    is_blocked BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_merchant_blocks_card_merchant ON merchant_blocks(card_id, merchant_name);
+ALTER TABLE merchant_blocks DISABLE ROW LEVEL SECURITY;
+
+-- 28. Таблица подписок (автоматически отслеживаемые мерчанты)
+CREATE TABLE IF NOT EXISTS card_subscriptions (
+    id SERIAL PRIMARY KEY,
+    card_id INTEGER REFERENCES cards(id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    merchant_name VARCHAR(500) NOT NULL,
+    last_amount NUMERIC(20, 4),
+    last_currency VARCHAR(10) DEFAULT 'USD',
+    charge_count INTEGER DEFAULT 1,
+    is_allowed BOOLEAN DEFAULT TRUE,
+    first_seen_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_card_subs_card_merchant ON card_subscriptions(card_id, merchant_name);
+CREATE INDEX IF NOT EXISTS idx_card_subs_user ON card_subscriptions(user_id);
+ALTER TABLE card_subscriptions DISABLE ROW LEVEL SECURITY;
+
+-- 29. Таблица SMS/3DS кодов (для Hub)
+CREATE TABLE IF NOT EXISTS sms_codes (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    card_id INTEGER,
+    code VARCHAR(10) NOT NULL,
+    merchant_name VARCHAR(500),
+    raw_message TEXT,
+    delivered_ws BOOLEAN DEFAULT FALSE,
+    delivered_tg BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_sms_codes_user_created ON sms_codes(user_id, created_at DESC);
+ALTER TABLE sms_codes DISABLE ROW LEVEL SECURITY;

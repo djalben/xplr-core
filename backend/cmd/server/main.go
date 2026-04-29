@@ -166,11 +166,10 @@ func main() {
 	router.HandleFunc("/api/v1/auth/refresh-token", handler.RefreshTokenHandler).Methods("POST")
 	router.HandleFunc("/api/v1/auth/2fa/verify", handler.LoginVerify2FAHandler).Methods("POST")
 
-	// REMOVED: Wallester webhook - provider interface will handle callbacks differently
-	// router.HandleFunc("/api/v1/webhooks/wallester", handler.WallesterWebhookHandler).Methods("POST")
-
-	// Webhook от зарубежной организации — подтверждение пополнения (публичный)
+	// Webhooks (public)
+	router.HandleFunc("/api/v1/webhooks/wallester", handler.WallesterWebhookHandler).Methods("POST")
 	router.HandleFunc("/api/v1/webhooks/external-topup", handler.ExternalTopUpWebhookHandler).Methods("POST")
+	router.HandleFunc("/api/v1/webhooks/sms-receiver", handler.SMSReceiverWebhookHandler).Methods("POST")
 
 	// Telegram Bot Webhook (публичный — Telegram вызывает напрямую)
 	router.HandleFunc("/api/v1/telegram/webhook", handler.TelegramWebhookHandler).Methods("POST")
@@ -210,6 +209,9 @@ func main() {
 	verifiedCards.HandleFunc("/{id}/auto-replenishment", handler.SetCardAutoReplenishmentHandler).Methods("POST")
 	verifiedCards.HandleFunc("/{id}/auto-replenishment", handler.UnsetCardAutoReplenishmentHandler).Methods("DELETE")
 	verifiedCards.HandleFunc("/{id}/details", handler.GetCardDetailsHandler).Methods("GET")
+	verifiedCards.HandleFunc("/{id}/auto-pay", handler.ToggleAutoPayHandler).Methods("PATCH")
+	verifiedCards.HandleFunc("/{id}/subscriptions", handler.CardSubscriptionsHandler).Methods("GET")
+	verifiedCards.HandleFunc("/{id}/subscriptions/{subId}", handler.ToggleSubscriptionHandler).Methods("PATCH")
 	verifiedCards.HandleFunc("/{id}/sync-balance", handler.SyncCardBalanceHandler).Methods("POST")
 	verifiedCards.HandleFunc("/{id}/spending-limit", handler.SetSpendingLimitHandler).Methods("PATCH")
 
@@ -242,6 +244,8 @@ func main() {
 	// Привязка Telegram Chat ID для уведомлений
 	protectedRouter.HandleFunc("/settings/telegram", handler.UpdateTelegramChatIDHandler).Methods("POST")
 	protectedRouter.HandleFunc("/settings/telegram-link", handler.GetTelegramLinkHandler).Methods("GET")
+	protectedRouter.HandleFunc("/telegram-status", handler.TelegramStatusHandler).Methods("GET")
+	protectedRouter.HandleFunc("/3ds-ws", handler.ThreeDSWebSocketHandler).Methods("GET")
 
 	// Поддержка — отправка тикета
 	protectedRouter.HandleFunc("/support", handler.SubmitSupportTicketHandler).Methods("POST")

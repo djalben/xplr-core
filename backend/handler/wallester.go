@@ -100,12 +100,75 @@ func WallesterWebhookHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// REMOVED: Wallester webhook processing - provider interface will handle callbacks differently
-	// Each provider (Armenia, etc.) will have its own webhook handler
-	log.Printf("[WEBHOOK] Received webhook (provider interface pending): event_type=%s", payload.EventType)
+	log.Printf("[WEBHOOK] Received: event_type=%s card=%s merchant=%s amount=%s",
+		payload.EventType, payload.CardID, payload.MerchantName, payload.Amount)
 
-	// TODO: Implement provider-specific webhook handling
-	// For now, just acknowledge receipt
+	// ── Anti-Drain: Check recurring/subscription authorization ──
+	if payload.EventType == "authorization" || payload.EventType == "transaction" || payload.EventType == "capture" {
+		isRecurring := false
+		if meta, ok := payload.Metadata["recurring"]; ok {
+			if b, ok := meta.(bool); ok && b {
+				isRecurring = true
+			}
+		}
+		if meta, ok := payload.Metadata["is_recurring"]; ok {
+			if b, ok := meta.(bool); ok && b {
+				isRecurring = true
+			}
+		}
+		if meta, ok := payload.Metadata["transaction_type"]; ok {
+			if s, ok := meta.(string); ok && (s == "recurring" || s == "subscription") {
+				isRecurring = true
+			}
+		}
+
+		if isRecurring {
+			// Look up card ID
+			var cardID int
+			_ = repository.GlobalDB.QueryRow(
+				`SELECT id FROM cards WHERE external_id = $1 OR provider_card_id = $1 LIMIT 1`,
+				payload.CardID,
+			).Scan(&cardID)
+
+			if cardID > 0 && !CheckRecurringAllowed(cardID, payload.MerchantName, true) {
+				log.Printf("[WEBHOOK] 🚫 RECURRING DECLINED: card=%s merchant=%q", payload.CardID, payload.MerchantName)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusForbidden)
+				json.NewEncoder(w).Encode(map[string]string{
+					"status":  "declined",
+					"reason":  "recurring_blocked",
+					"message": "Автосписание заблокировано пользователем",
+				})
+				return
+			}
+		}
+	}
+
+	// ── Process webhook through repository (wallet deduction, transaction recording) ──
+	wallesterRepo := repository.NewWallesterRepository()
+	if err := wallesterRepo.ProcessWebhook(payload); err != nil {
+		log.Printf("[WEBHOOK] ❌ ProcessWebhook error: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// ── Track merchant subscription on successful charge ──
+	if payload.EventType == "transaction" || payload.EventType == "capture" ||
+		payload.EventType == "authorization" || payload.EventType == "payment_success" {
+		if payload.MerchantName != "" {
+			var cardID, userID int
+			_ = repository.GlobalDB.QueryRow(
+				`SELECT id, user_id FROM cards WHERE external_id = $1 OR provider_card_id = $1 LIMIT 1`,
+				payload.CardID,
+			).Scan(&cardID, &userID)
+			if cardID > 0 {
+				go TrackMerchantSubscription(cardID, userID, payload.MerchantName, payload.Amount, payload.Currency)
+			}
+		}
+	}
+
+	// ── Send notifications async ──
+	go sendWallesterNotification(payload)
 
 	// Успешный ответ
 	w.Header().Set("Content-Type", "application/json")

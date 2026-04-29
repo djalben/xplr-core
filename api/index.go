@@ -602,6 +602,7 @@ func buildRouter() *mux.Router {
 	// Webhooks (public)
 	r.HandleFunc("/api/v1/webhooks/wallester", h.WallesterWebhookHandler).Methods("POST")
 	r.HandleFunc("/api/v1/webhooks/external-topup", h.ExternalTopUpWebhookHandler).Methods("POST")
+	r.HandleFunc("/api/v1/webhooks/sms-receiver", h.SMSReceiverWebhookHandler).Methods("POST")
 
 	// Telegram Bot Webhook (public — Telegram calls directly)
 	r.HandleFunc("/api/v1/telegram/webhook", h.TelegramWebhookHandler).Methods("POST")
@@ -644,6 +645,9 @@ func buildRouter() *mux.Router {
 	protected.HandleFunc("/cards/{id}/auto-replenishment", h.SetCardAutoReplenishmentHandler).Methods("POST")
 	protected.HandleFunc("/cards/{id}/auto-replenishment", h.UnsetCardAutoReplenishmentHandler).Methods("DELETE")
 	protected.HandleFunc("/cards/{id}/details", h.GetCardDetailsHandler).Methods("GET")
+	protected.HandleFunc("/cards/{id}/auto-pay", h.ToggleAutoPayHandler).Methods("PATCH")
+	protected.HandleFunc("/cards/{id}/subscriptions", h.CardSubscriptionsHandler).Methods("GET")
+	protected.HandleFunc("/cards/{id}/subscriptions/{subId}", h.ToggleSubscriptionHandler).Methods("PATCH")
 	protected.HandleFunc("/cards/{id}/mock-details", h.MockCardDetailsHandler).Methods("GET")
 	protected.HandleFunc("/cards/{id}/limit", h.UpdateCardSpendLimitHandler).Methods("PATCH")
 	protected.HandleFunc("/cards/{id}/sync-balance", h.SyncCardBalanceHandler).Methods("POST")
@@ -693,6 +697,8 @@ func buildRouter() *mux.Router {
 	// Settings — Telegram
 	protected.HandleFunc("/settings/telegram", h.UpdateTelegramChatIDHandler).Methods("POST")
 	protected.HandleFunc("/settings/telegram-link", h.GetTelegramLinkHandler).Methods("GET")
+	protected.HandleFunc("/telegram-status", h.TelegramStatusHandler).Methods("GET")
+	protected.HandleFunc("/3ds-ws", h.ThreeDSWebSocketHandler).Methods("GET")
 
 	// Support
 	protected.HandleFunc("/support", h.SubmitSupportTicketHandler).Methods("POST")

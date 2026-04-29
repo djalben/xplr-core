@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useRates } from '../store/rates-context';
 import { DashboardLayout } from '../components/dashboard-layout';
 import { ModalPortal } from '../components/modal-portal';
 import { BackButton } from '../components/back-button';
 import { getWallet, transferWalletToCard } from '../services/wallet';
-import { getUserCards, issuePersonalCard, getCardDetails, updateCardStatus, type Card as BackendCard } from '../services/cards';
+import { getUserCards, issuePersonalCard, getCardDetails, updateCardStatus, toggleAutoPay, getCardSubscriptions, toggleSubscription, getTelegramStatus, type Card as BackendCard, type CardSubscription } from '../services/cards';
 import { getTierInfo, type TierInfo } from '../services/tier';
 import { 
   Plus, 
@@ -23,7 +23,14 @@ import {
   ArrowUpDown,
   ShoppingBag,
   CreditCard,
-  ChevronDown
+  ChevronDown,
+  Shield,
+  Bell,
+  MessageSquare,
+  ToggleLeft,
+  ToggleRight,
+  Store,
+  AlertTriangle
 } from 'lucide-react';
 
 interface PersonalCard {
@@ -730,6 +737,239 @@ const WalletTopUpModal = ({ card, walletBalance, onClose, onTransfer }: {
   );
 };
 
+// ══════════════════════════════════════════════════════════════
+// Subscription Dashboard — auto-pay toggle + tracked merchants
+// ══════════════════════════════════════════════════════════════
+const SubscriptionDashboard = ({ cardId }: { cardId: number }) => {
+  const [subs, setSubs] = useState<CardSubscription[]>([]);
+  const [autoPayEnabled, setAutoPayEnabled] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [toggling, setToggling] = useState<number | null>(null);
+
+  const fetchSubs = useCallback(async () => {
+    try {
+      const data = await getCardSubscriptions(cardId);
+      setSubs(data.subscriptions || []);
+      setAutoPayEnabled(data.is_auto_pay_enabled);
+    } catch { /* ignore */ }
+    setLoading(false);
+  }, [cardId]);
+
+  useEffect(() => { fetchSubs(); }, [fetchSubs]);
+
+  const handleToggleAutoPay = async () => {
+    const next = !autoPayEnabled;
+    setAutoPayEnabled(next);
+    try {
+      await toggleAutoPay(cardId, next);
+    } catch {
+      setAutoPayEnabled(!next);
+    }
+  };
+
+  const handleToggleSub = async (sub: CardSubscription) => {
+    setToggling(sub.id);
+    const next = !sub.is_allowed;
+    setSubs(prev => prev.map(s => s.id === sub.id ? { ...s, is_allowed: next } : s));
+    try {
+      await toggleSubscription(cardId, sub.id, next);
+    } catch {
+      setSubs(prev => prev.map(s => s.id === sub.id ? { ...s, is_allowed: !next } : s));
+    }
+    setToggling(null);
+  };
+
+  if (loading) return null;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 mb-1">
+        <Shield className="w-4 h-4 text-blue-400" />
+        <h3 className="text-white font-semibold text-sm">Контроль подписок</h3>
+      </div>
+
+      {/* Global auto-pay toggle */}
+      <div className="p-3 bg-white/5 rounded-xl border border-white/10 flex items-center justify-between">
+        <div>
+          <p className="text-white text-sm font-medium">Автосписания</p>
+          <p className="text-xs text-slate-400">Разрешить recurring-платежи</p>
+        </div>
+        <button onClick={handleToggleAutoPay} className="transition-colors">
+          {autoPayEnabled ? (
+            <ToggleRight className="w-8 h-8 text-emerald-400" />
+          ) : (
+            <ToggleLeft className="w-8 h-8 text-red-400" />
+          )}
+        </button>
+      </div>
+
+      {!autoPayEnabled && (
+        <div className="p-2.5 bg-red-500/10 rounded-lg border border-red-500/30">
+          <p className="text-xs text-red-300">⛔ Все автосписания заблокированы. Подписки не смогут снимать средства с этой карты.</p>
+        </div>
+      )}
+
+      {/* Tracked merchant subscriptions */}
+      {subs.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs text-slate-400 font-medium">Активные подписки</p>
+          {subs.map(sub => (
+            <div key={sub.id} className="p-2.5 bg-white/5 rounded-xl border border-white/10 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <Store className="w-4 h-4 text-slate-400 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-white text-sm truncate">{sub.merchant_name}</p>
+                  <p className="text-xs text-slate-500">
+                    {sub.last_currency === 'USD' ? '$' : sub.last_currency}{sub.last_amount} · {sub.charge_count}x
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => handleToggleSub(sub)}
+                disabled={toggling === sub.id}
+                className="shrink-0 transition-colors"
+              >
+                {sub.is_allowed ? (
+                  <ToggleRight className="w-7 h-7 text-emerald-400" />
+                ) : (
+                  <ToggleLeft className="w-7 h-7 text-red-400" />
+                )}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {subs.length === 0 && (
+        <p className="text-xs text-slate-500 text-center py-2">Подписки появятся автоматически после первого списания</p>
+      )}
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════
+// 3DS Code Display — WebSocket real-time delivery
+// ══════════════════════════════════════════════════════════════
+const ThreeDSCodeDisplay = () => {
+  const [code, setCode] = useState<{ code: string; merchant: string; ts: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const host = import.meta.env.VITE_API_URL?.replace(/^https?:\/\//, '') || window.location.host;
+    const wsUrl = `${proto}://${host}/api/v1/user/3ds-ws?token=${encodeURIComponent(token)}`;
+
+    try {
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === '3ds_code' && msg.data?.code) {
+            setCode({
+              code: msg.data.code,
+              merchant: msg.data.merchant_name || '',
+              ts: new Date().toLocaleTimeString(),
+            });
+            setCopied(false);
+          }
+        } catch { /* ignore parse errors */ }
+      };
+
+      ws.onerror = () => { /* silent */ };
+      ws.onclose = () => { wsRef.current = null; };
+    } catch { /* WebSocket not supported or blocked */ }
+
+    return () => { wsRef.current?.close(); };
+  }, []);
+
+  const handleCopy = () => {
+    if (!code) return;
+    navigator.clipboard.writeText(code.code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  if (!code) return null;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <Bell className="w-4 h-4 text-amber-400 animate-pulse" />
+        <h3 className="text-white font-semibold text-sm">3DS Код</h3>
+      </div>
+      <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/30">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-amber-300 font-mono text-2xl font-bold tracking-widest">{code.code}</p>
+            {code.merchant && <p className="text-xs text-amber-400/70 mt-1">{code.merchant}</p>}
+            <p className="text-xs text-slate-500 mt-0.5">{code.ts}</p>
+          </div>
+          <button
+            onClick={handleCopy}
+            className="p-2 bg-amber-500/20 hover:bg-amber-500/30 rounded-lg transition-colors"
+          >
+            {copied ? <Check className="w-5 h-5 text-emerald-400" /> : <Copy className="w-5 h-5 text-amber-400" />}
+          </button>
+        </div>
+        <p className="text-xs text-amber-400/60 mt-2">⚠️ Не сообщайте код третьим лицам</p>
+      </div>
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════
+// Mandatory Telegram Modal — blocks payment if TG not linked
+// ══════════════════════════════════════════════════════════════
+const TelegramRequiredModal = ({ onClose, onActivate }: { onClose: () => void; onActivate: () => void }) => (
+  <ModalPortal>
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
+      <div className="relative bg-[#050507]/95 backdrop-blur-3xl border border-white/10 p-6 rounded-2xl w-full max-w-[420px] animate-scale-in shadow-2xl shadow-black/60">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-12 h-12 rounded-xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
+            <MessageSquare className="w-6 h-6 text-blue-400" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-white">Telegram не привязан</h3>
+            <p className="text-xs text-slate-400">Требуется для 3DS кодов</p>
+          </div>
+        </div>
+
+        <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/30 mb-4">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <p className="text-sm text-amber-200">
+              Для получения 3DS кодов безопасности необходимо привязать Telegram. Без этого оплата может быть невозможна.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-3 bg-white/10 hover:bg-white/15 text-slate-300 font-medium rounded-xl transition-colors"
+          >
+            Позже
+          </button>
+          <button
+            onClick={onActivate}
+            className="flex-1 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+          >
+            <MessageSquare className="w-4 h-4" />
+            Привязать
+          </button>
+        </div>
+      </div>
+    </div>
+  </ModalPortal>
+);
+
 // Card Details Modal with Billing Address
 const CardDetailsModal = ({ 
   card, 
@@ -869,6 +1109,12 @@ const CardDetailsModal = ({
               </div>
               <p className="text-xs text-slate-400 mt-2 text-center">Use this address for billing when making online payments</p>
             </div>
+
+            {/* Subscription Dashboard + Anti-Drain */}
+            <SubscriptionDashboard cardId={Number(card.id)} />
+
+            {/* 3DS Code Display */}
+            <ThreeDSCodeDisplay />
           </div>
 
           {/* Footer */}
@@ -1054,6 +1300,9 @@ export const CardsPage = () => {
   const [isLoadingCards, setIsLoadingCards] = useState(true);
   const [isIssuing, setIsIssuing] = useState(false);
   const [tierInfo, setTierInfo] = useState<TierInfo | null>(null);
+  const [telegramLinked, setTelegramLinked] = useState<boolean | null>(null);
+  const [showTgModal, setShowTgModal] = useState(false);
+  const [pendingTopUpCard, setPendingTopUpCard] = useState<PersonalCard | null>(null);
 
   // Map backend card type to PersonalCard color
   const typeColorMap: Record<string, 'blue' | 'purple' | 'gold'> = {
@@ -1123,6 +1372,7 @@ export const CardsPage = () => {
   useEffect(() => {
     fetchCards();
     getTierInfo().then(setTierInfo).catch(() => {});
+    getTelegramStatus().then(d => setTelegramLinked(d.telegram_linked)).catch(() => setTelegramLinked(false));
     const refreshWallet = () => {
       getWallet()
         .then((v) => setWalletBalance(Number(v.master_balance) || 0))
@@ -1335,7 +1585,14 @@ export const CardsPage = () => {
                     key={card.id} 
                     card={card}
                     onClose={() => setCloseCardModal(card)}
-                    onTopUp={() => setTopUpModal(card)}
+                    onTopUp={() => {
+                      if (telegramLinked === false) {
+                        setPendingTopUpCard(card);
+                        setShowTgModal(true);
+                      } else {
+                        setTopUpModal(card);
+                      }
+                    }}
                     onApplePay={() => setPaymentModal({ type: 'apple' })}
                     onGooglePay={() => setPaymentModal({ type: 'google' })}
                   />
@@ -1378,6 +1635,12 @@ export const CardsPage = () => {
         {topUpModal && <WalletTopUpModal card={topUpModal} walletBalance={walletBalance} onClose={() => setTopUpModal(null)} onTransfer={(amt) => handleTransfer(topUpModal, amt)} />}
         {paymentModal && <PaymentMethodModal type={paymentModal.type} onClose={() => setPaymentModal(null)} />}
         {issueModal && <CardIssueModal card={issueModal} onClose={() => setIssueModal(null)} onIssue={handleIssueCard} isIssuing={isIssuing} walletBalance={walletBalance} />}
+        {showTgModal && (
+          <TelegramRequiredModal
+            onClose={() => { setShowTgModal(false); setPendingTopUpCard(null); }}
+            onActivate={() => { setShowTgModal(false); window.location.href = '/settings'; }}
+          />
+        )}
       </div>
 
       <style>{`

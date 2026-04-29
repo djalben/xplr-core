@@ -24,7 +24,19 @@ export interface Card {
   spending_limit?: string;
   spent_from_wallet?: string;
   expiry_date?: string;
+  is_auto_pay_enabled?: boolean;
   created_at: string;
+}
+
+export interface CardSubscription {
+  id: number;
+  merchant_name: string;
+  last_amount: string;
+  last_currency: string;
+  charge_count: number;
+  is_allowed: boolean;
+  first_seen_at: string;
+  last_seen_at: string;
 }
 
 export interface MassIssueRequest {
@@ -130,4 +142,29 @@ export const unsetCardAutoReplenishment = async (cardId: number) => {
 // Изменить статус карты
 export const updateCardStatus = async (cardId: number, status: string): Promise<void> => {
   await apiClient.patch(`/user/cards/${cardId}/status`, { status });
+};
+
+// Toggle auto-pay (recurring/subscription filter)
+export const toggleAutoPay = async (cardId: number, enabled: boolean): Promise<void> => {
+  await apiClient.patch(`/user/cards/${cardId}/auto-pay`, { enabled });
+};
+
+// Get card subscriptions (tracked merchants)
+export const getCardSubscriptions = async (cardId: number): Promise<{
+  subscriptions: CardSubscription[];
+  is_auto_pay_enabled: boolean;
+}> => {
+  const response = await apiClient.get(`/user/cards/${cardId}/subscriptions`);
+  return response.data;
+};
+
+// Toggle individual subscription allow/block
+export const toggleSubscription = async (cardId: number, subId: number, isAllowed: boolean): Promise<void> => {
+  await apiClient.patch(`/user/cards/${cardId}/subscriptions/${subId}`, { is_allowed: isAllowed });
+};
+
+// Check Telegram link status
+export const getTelegramStatus = async (): Promise<{ telegram_linked: boolean }> => {
+  const response = await apiClient.get('/user/telegram-status');
+  return response.data;
 };

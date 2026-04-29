@@ -146,6 +146,7 @@ type Card struct {
 	SpendingLimit          decimal.Decimal `json:"spending_limit"`        // Макс. сумма, которую карта может потратить из Кошелька
 	SpentFromWallet        decimal.Decimal `json:"spent_from_wallet"`     // Сколько карта реально потратила из Кошелька
 	ExpiryDate             *time.Time      `json:"expiry_date,omitempty"` // Дата истечения срока карты
+	IsAutoPayEnabled       bool            `json:"is_auto_pay_enabled"`   // Разрешить recurring/подписки
 	CreatedAt              time.Time       `json:"created_at"`
 }
 
