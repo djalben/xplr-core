@@ -48,6 +48,7 @@ interface PersonalCard {
   price: string;
   bin: string;
   last4: string;
+  isAutoPayEnabled: boolean;
 }
 
 // Professional Visa Logo
@@ -1138,18 +1139,21 @@ const RealisticCreditCard = ({
   onClose, 
   onTopUp,
   onApplePay,
-  onGooglePay
+  onGooglePay,
+  onToggleAutoPay
 }: { 
   card: PersonalCard; 
   onClose: () => void;
   onTopUp: () => void;
   onApplePay: () => void;
   onGooglePay: () => void;
+  onToggleAutoPay: (cardId: string, enabled: boolean) => void;
 }) => {
   const { t } = useTranslation();
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   
   const canAddToWallet = card.type === 'travel' || card.type === 'premium';
+  const showSubProtection = card.type === 'subscriptions' || card.type === 'premium';
 
   return (
     <>
@@ -1211,6 +1215,33 @@ const RealisticCreditCard = ({
           <button onClick={onGooglePay} className="flex-1 flex items-center justify-center gap-1 px-3 py-2 glass-card hover:bg-white/10 text-white rounded-lg transition-colors text-xs">
             <Smartphone className="w-3 h-3" />
             Google Pay
+          </button>
+        </div>
+      )}
+
+      {/* Subscription Protection Toggle — only for subscriptions/premium, hidden for travel */}
+      {showSubProtection && (
+        <div className="mt-2 px-3 py-2 bg-white/[0.03] border border-white/[0.06] rounded-xl">
+          <button
+            onClick={() => onToggleAutoPay(card.id, !card.isAutoPayEnabled)}
+            className="w-full flex items-center gap-2.5 group/toggle"
+          >
+            <div className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
+              card.isAutoPayEnabled ? 'bg-amber-500/20 border border-amber-500/40' : 'bg-emerald-500/20 border border-emerald-500/40'
+            }`}>
+              <Shield className={`w-3.5 h-3.5 transition-colors ${card.isAutoPayEnabled ? 'text-amber-400' : 'text-emerald-400'}`} />
+            </div>
+            <div className="flex-1 text-left min-w-0">
+              <span className="text-xs font-medium text-white block leading-tight">Защита от автоподписок</span>
+              <span className="text-[10px] text-slate-500 leading-tight block">Блокирует рекуррентные списания (Netflix, Figma и др.)</span>
+            </div>
+            <div className={`shrink-0 w-9 h-5 rounded-full transition-colors relative ${
+              !card.isAutoPayEnabled ? 'bg-emerald-500' : 'bg-white/20'
+            }`}>
+              <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
+                !card.isAutoPayEnabled ? 'translate-x-4' : 'translate-x-0.5'
+              }`} />
+            </div>
           </button>
         </div>
       )}
@@ -1337,6 +1368,7 @@ export const CardsPage = () => {
       price: '',
       bin: bc.bin || '',
       last4: bc.last_4_digits || '',
+      isAutoPayEnabled: bc.is_auto_pay_enabled !== false,
     };
   };
 
@@ -1424,6 +1456,23 @@ export const CardsPage = () => {
     } catch (err) {
       console.error('Failed to close card:', err);
       setCloseCardModal(null);
+    }
+  };
+
+  // Handle auto-pay toggle with optimistic UI
+  const handleToggleAutoPay = async (cardId: string, enabled: boolean) => {
+    // Optimistic: flip immediately
+    setPersonalCards(prev =>
+      prev.map(c => c.id === cardId ? { ...c, isAutoPayEnabled: enabled } : c)
+    );
+    try {
+      await toggleAutoPay(parseInt(cardId), enabled);
+    } catch (err) {
+      // Revert on error
+      setPersonalCards(prev =>
+        prev.map(c => c.id === cardId ? { ...c, isAutoPayEnabled: !enabled } : c)
+      );
+      console.error('Failed to toggle auto-pay:', err);
     }
   };
 
@@ -1595,6 +1644,7 @@ export const CardsPage = () => {
                     }}
                     onApplePay={() => setPaymentModal({ type: 'apple' })}
                     onGooglePay={() => setPaymentModal({ type: 'google' })}
+                    onToggleAutoPay={handleToggleAutoPay}
                   />
                 ))}
               </div>
