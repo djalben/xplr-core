@@ -219,11 +219,27 @@ func AdminVPNServerStatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Pull live bandwidth limit from Aeza API; fall back to env/default
+	// Pull live bandwidth limit from Aeza API; fall back to DB cache / env / default
 	serverLimitGB := 30
 	if aezaInfo, aezaErr := service.GetAezaServerInfo(); aezaErr == nil && aezaInfo.BandwidthGB > 0 {
 		serverLimitGB = aezaInfo.BandwidthGB
 		log.Printf("[VPN-SERVER-STATUS] Aeza bandwidth_limit refreshed: %d GB", serverLimitGB)
+		// Persist to system_settings so background monitor and future calls use the fresh value
+		if GlobalDB != nil {
+			GlobalDB.Exec(`INSERT INTO system_settings (setting_key, setting_value, description)
+				VALUES ('vpn_bandwidth_limit_gb', $1, 'VPN server traffic limit from Aeza plan (GB)')
+				ON CONFLICT (setting_key) DO UPDATE SET setting_value = $1, updated_at = NOW()`,
+				strconv.Itoa(serverLimitGB))
+		}
+	} else if GlobalDB != nil {
+		// Try DB-cached value from background monitor
+		var cached string
+		if dbErr := GlobalDB.QueryRow(`SELECT setting_value FROM system_settings WHERE setting_key = 'vpn_bandwidth_limit_gb'`).Scan(&cached); dbErr == nil {
+			if v, _ := strconv.Atoi(cached); v > 0 {
+				serverLimitGB = v
+				log.Printf("[VPN-SERVER-STATUS] Using cached bandwidth_limit from DB: %d GB", serverLimitGB)
+			}
+		}
 	} else if envLimit := os.Getenv("VPN_SERVER_TRAFFIC_LIMIT_GB"); envLimit != "" {
 		if v, err := strconv.Atoi(envLimit); err == nil && v > 0 {
 			serverLimitGB = v
@@ -440,7 +456,7 @@ func AdminVPNActiveClientsHandler(w http.ResponseWriter, r *http.Request) {
 
 // ══════════════════════════════════════════════════════════════
 // Traffic critical alert — sends TG notification to all admins
-// when server traffic exceeds 90%.
+// when remaining server traffic <= 5 GB.
 // ══════════════════════════════════════════════════════════════
 
 func notifyTrafficCritical(totalTraffic, limitBytes int64) {

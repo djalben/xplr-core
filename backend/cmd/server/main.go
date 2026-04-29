@@ -68,6 +68,10 @@ func main() {
 	// Start Aeza hosting balance monitor (alerts admins when balance < threshold)
 	service.StartAezaBalanceMonitor()
 
+	// Start VPN traffic monitor (every 30 min: sync Aeza bandwidth + 3X-UI traffic, alert if remaining <= 5GB)
+	service.MonitorDB = DB
+	service.StartVPNTrafficMonitor()
+
 	// Тест "Дыхания" — проверка таблицы services в Supabase
 	log.Println("Testing Supabase connection: SELECT slug FROM services...")
 	rows, err := DB.Query("SELECT slug FROM services")
