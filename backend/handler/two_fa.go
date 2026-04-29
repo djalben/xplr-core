@@ -25,7 +25,7 @@ func LoginVerify2FAHandler(w http.ResponseWriter, r *http.Request) {
 		Fingerprint    string `json:"fingerprint"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		http.Error(w, "Неверный формат запроса", http.StatusBadRequest)
 		return
 	}
 
@@ -33,20 +33,20 @@ func LoginVerify2FAHandler(w http.ResponseWriter, r *http.Request) {
 	userID, err := utils.ParseHalfAuthJWT(req.HalfAuthToken)
 	if err != nil {
 		log.Printf("[2FA-VERIFY] Invalid half-auth token: %v", err)
-		http.Error(w, "Invalid or expired verification session", http.StatusUnauthorized)
+		http.Error(w, "Срок действия сессии истёк", http.StatusUnauthorized)
 		return
 	}
 
 	code := strings.TrimSpace(req.Code)
 	if code == "" {
-		http.Error(w, "Code is required", http.StatusBadRequest)
+		http.Error(w, "Введите код", http.StatusBadRequest)
 		return
 	}
 
 	// Get 2FA secret
 	secret, enabled, err := repository.GetTwoFactorSecret(userID)
 	if err != nil || !enabled || secret == "" {
-		http.Error(w, "2FA not enabled for this account", http.StatusBadRequest)
+		http.Error(w, "2FA не включена для этого аккаунта", http.StatusBadRequest)
 		return
 	}
 
@@ -69,14 +69,14 @@ func LoginVerify2FAHandler(w http.ResponseWriter, r *http.Request) {
 
 	if !verified {
 		log.Printf("[2FA-VERIFY] ❌ Invalid code for user %d", userID)
-		http.Error(w, "Invalid verification code", http.StatusForbidden)
+		http.Error(w, "Неверный код", http.StatusForbidden)
 		return
 	}
 
 	// Fetch full user for JWT generation
 	user, err := repository.GetUserByID(userID)
 	if err != nil {
-		http.Error(w, "User not found", http.StatusInternalServerError)
+		http.Error(w, "Пользователь не найден", http.StatusInternalServerError)
 		return
 	}
 
@@ -89,7 +89,7 @@ func LoginVerify2FAHandler(w http.ResponseWriter, r *http.Request) {
 	tv, _ := repository.GetTokenVersion(user.ID)
 	token, err := utils.GenerateJWT(user.ID, isAdmin, role, tv)
 	if err != nil {
-		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+		http.Error(w, "Ошибка генерации токена", http.StatusInternalServerError)
 		return
 	}
 

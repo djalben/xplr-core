@@ -250,16 +250,56 @@ func UnlinkTelegramHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // ── POST /api/v1/user/settings/2fa/unlink ──
+// Requires current_password + otp_code for security.
 func Unlink2FAHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
 	if !ok || userID == 0 {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		http.Error(w, "Необходима авторизация", http.StatusUnauthorized)
 		return
 	}
+	var req struct {
+		Password string `json:"current_password"`
+		OTPCode  string `json:"otp_code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Неверный формат запроса", http.StatusBadRequest)
+		return
+	}
+
+	if strings.TrimSpace(req.Password) == "" {
+		http.Error(w, "Введите текущий пароль", http.StatusBadRequest)
+		return
+	}
+	user, err := repository.GetUserByID(userID)
+	if err != nil {
+		http.Error(w, "Пользователь не найден", http.StatusInternalServerError)
+		return
+	}
+	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)) != nil {
+		http.Error(w, "Неверный пароль", http.StatusForbidden)
+		return
+	}
+
+	otpCode := strings.TrimSpace(req.OTPCode)
+	if len(otpCode) != 6 {
+		http.Error(w, "Код должен содержать 6 цифр", http.StatusBadRequest)
+		return
+	}
+	secret, enabled, _ := repository.GetTwoFactorSecret(userID)
+	if !enabled || secret == "" {
+		http.Error(w, "2FA не включена", http.StatusBadRequest)
+		return
+	}
+	if !verifyTOTP(secret, otpCode) {
+		http.Error(w, "Неверный код", http.StatusForbidden)
+		return
+	}
+
 	if err := repository.DisableTwoFactor(userID); err != nil {
-		http.Error(w, "Failed to disable 2FA", http.StatusInternalServerError)
+		http.Error(w, "Не удалось отключить 2FA", http.StatusInternalServerError)
 		return
 	}
+	log.Printf("[2FA] Unlinked for user %d (verified with password+OTP)", userID)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "message": "2FA отключена"})
 }
@@ -285,43 +325,39 @@ func CheckTelegramStatusHandler(w http.ResponseWriter, r *http.Request) {
 func Setup2FAHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
 	if !ok || userID == 0 {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		http.Error(w, "Необходима авторизация", http.StatusUnauthorized)
 		return
 	}
 
 	// Generate random secret
 	secret := make([]byte, 20)
 	if _, err := rand.Read(secret); err != nil {
-		http.Error(w, "Failed to generate secret", http.StatusInternalServerError)
+		http.Error(w, "Не удалось сгенерировать секрет", http.StatusInternalServerError)
 		return
 	}
 	secretB32 := base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(secret)
 
 	// Store secret (not yet enabled)
 	if err := repository.SetTwoFactorSecret(userID, secretB32); err != nil {
-		http.Error(w, "Failed to save secret", http.StatusInternalServerError)
+		http.Error(w, "Не удалось сохранить секрет", http.StatusInternalServerError)
 		return
 	}
 
 	// Get user email for the TOTP URI
 	me, err := repository.GetMeExtended(userID)
 	if err != nil {
-		http.Error(w, "Failed to fetch user", http.StatusInternalServerError)
+		http.Error(w, "Не удалось получить данные пользователя", http.StatusInternalServerError)
 		return
 	}
 
 	// otpauth URI for Google Authenticator
 	otpURI := "otpauth://totp/XPLR:" + me.Email + "?secret=" + secretB32 + "&issuer=XPLR&digits=6&period=30"
 
-	// Pre-generate recovery codes (will be stored when user confirms with TOTP code)
-	plainCodes, _ := generateRecoveryCodes()
-
 	log.Printf("[2FA] Setup initiated for user %d", userID)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"secret":         secretB32,
-		"otp_uri":        otpURI,
-		"recovery_codes": plainCodes,
+		"secret":  secretB32,
+		"otp_uri": otpURI,
 	})
 }
 
@@ -329,43 +365,43 @@ func Setup2FAHandler(w http.ResponseWriter, r *http.Request) {
 func Verify2FAHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
 	if !ok || userID == 0 {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		http.Error(w, "Необходима авторизация", http.StatusUnauthorized)
 		return
 	}
 	var req struct {
 		Code string `json:"code"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid body", http.StatusBadRequest)
+		http.Error(w, "Неверный формат запроса", http.StatusBadRequest)
 		return
 	}
 
 	code := strings.TrimSpace(req.Code)
 	if len(code) != 6 {
-		http.Error(w, "Code must be 6 digits", http.StatusBadRequest)
+		http.Error(w, "Код должен содержать 6 цифр", http.StatusBadRequest)
 		return
 	}
 
 	secret, _, err := repository.GetTwoFactorSecret(userID)
 	if err != nil || secret == "" {
-		http.Error(w, "2FA not set up", http.StatusBadRequest)
+		http.Error(w, "2FA не настроена", http.StatusBadRequest)
 		return
 	}
 
 	// Verify TOTP code
 	if !verifyTOTP(secret, code) {
-		http.Error(w, "Invalid code", http.StatusForbidden)
+		http.Error(w, "Неверный код", http.StatusForbidden)
 		return
 	}
 
-	// Generate and store hashed recovery codes
+	// Generate and store hashed recovery codes — shown ONLY here, after successful OTP
 	plainCodes, hashedCodes := generateRecoveryCodes()
 	if err := repository.SetRecoveryCodes(userID, hashedCodes); err != nil {
 		log.Printf("[2FA] Warning: failed to store recovery codes for user %d: %v", userID, err)
 	}
 
 	if err := repository.EnableTwoFactor(userID); err != nil {
-		http.Error(w, "Failed to enable 2FA", http.StatusInternalServerError)
+		http.Error(w, "Не удалось включить 2FA", http.StatusInternalServerError)
 		return
 	}
 
@@ -381,14 +417,54 @@ func Verify2FAHandler(w http.ResponseWriter, r *http.Request) {
 func Disable2FAHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
 	if !ok || userID == 0 {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		http.Error(w, "Необходима авторизация", http.StatusUnauthorized)
 		return
 	}
+	var req struct {
+		Password string `json:"current_password"`
+		OTPCode  string `json:"otp_code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Неверный формат запроса", http.StatusBadRequest)
+		return
+	}
+
+	// Require password
+	if strings.TrimSpace(req.Password) == "" {
+		http.Error(w, "Введите текущий пароль", http.StatusBadRequest)
+		return
+	}
+	user, err := repository.GetUserByID(userID)
+	if err != nil {
+		http.Error(w, "Пользователь не найден", http.StatusInternalServerError)
+		return
+	}
+	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)) != nil {
+		http.Error(w, "Неверный пароль", http.StatusForbidden)
+		return
+	}
+
+	// Require OTP code
+	otpCode := strings.TrimSpace(req.OTPCode)
+	if len(otpCode) != 6 {
+		http.Error(w, "Код должен содержать 6 цифр", http.StatusBadRequest)
+		return
+	}
+	secret, enabled, _ := repository.GetTwoFactorSecret(userID)
+	if !enabled || secret == "" {
+		http.Error(w, "2FA не включена", http.StatusBadRequest)
+		return
+	}
+	if !verifyTOTP(secret, otpCode) {
+		http.Error(w, "Неверный код", http.StatusForbidden)
+		return
+	}
+
 	if err := repository.DisableTwoFactor(userID); err != nil {
-		http.Error(w, "Failed to disable 2FA", http.StatusInternalServerError)
+		http.Error(w, "Не удалось отключить 2FA", http.StatusInternalServerError)
 		return
 	}
-	log.Printf("[2FA] Disabled for user %d", userID)
+	log.Printf("[2FA] Disabled for user %d (verified with password+OTP)", userID)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{"two_factor_enabled": false})
 }

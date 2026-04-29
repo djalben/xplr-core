@@ -1334,6 +1334,8 @@ export const CardsPage = () => {
   const [telegramLinked, setTelegramLinked] = useState<boolean | null>(null);
   const [showTgModal, setShowTgModal] = useState(false);
   const [pendingTopUpCard, setPendingTopUpCard] = useState<PersonalCard | null>(null);
+  const [allSubscriptions, setAllSubscriptions] = useState<Array<CardSubscription & { card_id: number; card_last4: string }>>([]);
+  const [isLoadingSubs, setIsLoadingSubs] = useState(false);
 
   // Map backend card type to PersonalCard color
   const typeColorMap: Record<string, 'blue' | 'purple' | 'gold'> = {
@@ -1393,10 +1395,40 @@ export const CardsPage = () => {
       const typeOrder: Record<string, number> = { subscriptions: 0, travel: 1, premium: 2 };
       mapped.sort((a, b) => (typeOrder[a.type] ?? 9) - (typeOrder[b.type] ?? 9));
       setPersonalCards(mapped);
+      // Fetch subscriptions after cards are loaded
+      fetchAllSubscriptions(mapped);
     } catch (err) {
       console.error('Failed to fetch cards:', err);
     } finally {
       setIsLoadingCards(false);
+    }
+  };
+
+  // Fetch all subscriptions across all cards
+  const fetchAllSubscriptions = async (cards: PersonalCard[]) => {
+    setIsLoadingSubs(true);
+    try {
+      const results = await Promise.all(
+        cards
+          .filter(c => c.type === 'subscriptions' || c.type === 'premium')
+          .map(async (card) => {
+            try {
+              const data = await getCardSubscriptions(parseInt(card.id));
+              return (data.subscriptions || []).map(sub => ({
+                ...sub,
+                card_id: parseInt(card.id),
+                card_last4: card.last4,
+              }));
+            } catch {
+              return [];
+            }
+          })
+      );
+      setAllSubscriptions(results.flat());
+    } catch {
+      setAllSubscriptions([]);
+    } finally {
+      setIsLoadingSubs(false);
     }
   };
 
@@ -1656,6 +1688,67 @@ export const CardsPage = () => {
                 <button onClick={() => setActiveTab('new-card')} className="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium rounded-xl text-sm">
                   Выпустить карту
                 </button>
+              </div>
+            )}
+
+            {/* Subscription Hub — below card grid */}
+            {personalCards.length > 0 && (
+              <div className="mt-8 p-5 bg-white/[0.03] border border-white/[0.06] rounded-2xl">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center">
+                    <Shield className="w-4.5 h-4.5 text-amber-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-white font-semibold text-sm">Защита от автоподписок</h3>
+                    <p className="text-[11px] text-slate-500 leading-snug">Управляйте списаниями каждого сервиса индивидуально. Отключайте ненужные подписки, не блокируя карту целиком.</p>
+                  </div>
+                </div>
+
+                {isLoadingSubs ? (
+                  <div className="flex items-center justify-center py-6">
+                    <div className="w-5 h-5 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
+                  </div>
+                ) : allSubscriptions.length > 0 ? (
+                  <div className="space-y-1.5 mt-3">
+                    {allSubscriptions.map(sub => (
+                      <div key={`${sub.card_id}-${sub.id}`} className="flex items-center gap-3 px-3 py-2.5 bg-white/[0.03] rounded-xl hover:bg-white/[0.05] transition-colors">
+                        <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
+                          <Store className="w-3.5 h-3.5 text-slate-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-xs font-medium text-white block truncate">{sub.merchant_name}</span>
+                          <span className="text-[10px] text-slate-500">Карта **** {sub.card_last4} · {sub.charge_count} списан{sub.charge_count === 1 ? 'ие' : 'ий'}</span>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            const newAllowed = !sub.is_allowed;
+                            setAllSubscriptions(prev => prev.map(s =>
+                              s.id === sub.id && s.card_id === sub.card_id ? { ...s, is_allowed: newAllowed } : s
+                            ));
+                            try {
+                              await toggleSubscription(sub.card_id, sub.id, newAllowed);
+                            } catch {
+                              setAllSubscriptions(prev => prev.map(s =>
+                                s.id === sub.id && s.card_id === sub.card_id ? { ...s, is_allowed: !newAllowed } : s
+                              ));
+                            }
+                          }}
+                          className="shrink-0"
+                        >
+                          <div className={`w-9 h-5 rounded-full transition-colors relative ${
+                            sub.is_allowed ? 'bg-emerald-500' : 'bg-red-500/60'
+                          }`}>
+                            <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
+                              sub.is_allowed ? 'translate-x-4' : 'translate-x-0.5'
+                            }`} />
+                          </div>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500 text-center py-4">Подписки пока не обнаружены. Они появятся автоматически после первого рекуррентного списания.</p>
+                )}
               </div>
             )}
           </div>
