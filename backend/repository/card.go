@@ -22,31 +22,66 @@ func GetCardByID(id int) (domain.Card, error) {
 	}
 	var card domain.Card
 	var teamID sql.NullInt64
-	query := `
-		SELECT id, user_id, provider_card_id, bin, last_4_digits, card_status, 
-		       COALESCE(nickname, '') as nickname, COALESCE(service_slug, 'arbitrage'), daily_spend_limit, COALESCE(spend_limit, 0) as spend_limit, failed_auth_count,
-		       COALESCE(card_type, 'VISA') as card_type,
-		       COALESCE(category, 'arbitrage') as category,
-		       COALESCE(currency, 'USD') as currency,
-		       COALESCE(auto_replenish_enabled, FALSE) as auto_replenish_enabled,
-		       COALESCE(auto_replenish_threshold, 0) as auto_replenish_threshold,
-		       COALESCE(auto_replenish_amount, 0) as auto_replenish_amount,
-		       COALESCE(card_balance, 0) as card_balance,
-		       team_id, created_at,
-		       COALESCE(is_auto_pay_enabled, TRUE) as is_auto_pay_enabled
-		FROM cards WHERE id = $1
-	`
-	err := GlobalDB.QueryRow(query, id).Scan(
-		&card.ID, &card.UserID, &card.ProviderCardID, &card.BIN, &card.Last4Digits,
-		&card.CardStatus, &card.Nickname, &card.ServiceSlug, &card.DailySpendLimit, &card.SpendLimit, &card.FailedAuthCount,
-		&card.CardType, &card.Category, &card.Currency, &card.AutoReplenishEnabled, &card.AutoReplenishThreshold,
-		&card.AutoReplenishAmount, &card.CardBalance, &teamID, &card.CreatedAt, &card.IsAutoPayEnabled,
-	)
+
+	hasAutoPayCol, _ := columnExists("cards", "is_auto_pay_enabled")
+
+	var query string
+	if hasAutoPayCol {
+		query = `
+			SELECT id, user_id, provider_card_id, bin, last_4_digits, card_status, 
+			       COALESCE(nickname, '') as nickname, COALESCE(service_slug, 'arbitrage'), daily_spend_limit, COALESCE(spend_limit, 0) as spend_limit, failed_auth_count,
+			       COALESCE(card_type, 'VISA') as card_type,
+			       COALESCE(category, 'arbitrage') as category,
+			       COALESCE(currency, 'USD') as currency,
+			       COALESCE(auto_replenish_enabled, FALSE) as auto_replenish_enabled,
+			       COALESCE(auto_replenish_threshold, 0) as auto_replenish_threshold,
+			       COALESCE(auto_replenish_amount, 0) as auto_replenish_amount,
+			       COALESCE(card_balance, 0) as card_balance,
+			       team_id, created_at,
+			       COALESCE(is_auto_pay_enabled, TRUE) as is_auto_pay_enabled
+			FROM cards WHERE id = $1
+		`
+	} else {
+		query = `
+			SELECT id, user_id, provider_card_id, bin, last_4_digits, card_status, 
+			       COALESCE(nickname, '') as nickname, COALESCE(service_slug, 'arbitrage'), daily_spend_limit, COALESCE(spend_limit, 0) as spend_limit, failed_auth_count,
+			       COALESCE(card_type, 'VISA') as card_type,
+			       COALESCE(category, 'arbitrage') as category,
+			       COALESCE(currency, 'USD') as currency,
+			       COALESCE(auto_replenish_enabled, FALSE) as auto_replenish_enabled,
+			       COALESCE(auto_replenish_threshold, 0) as auto_replenish_threshold,
+			       COALESCE(auto_replenish_amount, 0) as auto_replenish_amount,
+			       COALESCE(card_balance, 0) as card_balance,
+			       team_id, created_at
+			FROM cards WHERE id = $1
+		`
+	}
+
+	var err error
+	if hasAutoPayCol {
+		err = GlobalDB.QueryRow(query, id).Scan(
+			&card.ID, &card.UserID, &card.ProviderCardID, &card.BIN, &card.Last4Digits,
+			&card.CardStatus, &card.Nickname, &card.ServiceSlug, &card.DailySpendLimit, &card.SpendLimit, &card.FailedAuthCount,
+			&card.CardType, &card.Category, &card.Currency, &card.AutoReplenishEnabled, &card.AutoReplenishThreshold,
+			&card.AutoReplenishAmount, &card.CardBalance, &teamID, &card.CreatedAt, &card.IsAutoPayEnabled,
+		)
+	} else {
+		err = GlobalDB.QueryRow(query, id).Scan(
+			&card.ID, &card.UserID, &card.ProviderCardID, &card.BIN, &card.Last4Digits,
+			&card.CardStatus, &card.Nickname, &card.ServiceSlug, &card.DailySpendLimit, &card.SpendLimit, &card.FailedAuthCount,
+			&card.CardType, &card.Category, &card.Currency, &card.AutoReplenishEnabled, &card.AutoReplenishThreshold,
+			&card.AutoReplenishAmount, &card.CardBalance, &teamID, &card.CreatedAt,
+		)
+		card.IsAutoPayEnabled = true
+	}
+	if err != nil {
+		return card, err
+	}
 	if teamID.Valid {
 		teamIDVal := int(teamID.Int64)
 		card.TeamID = &teamIDVal
 	}
-	return card, err
+	return card, nil
 }
 
 // GetUserCards извлекает все карты пользователя. По архитектуре XPLR баланс каждой карты
@@ -56,22 +91,45 @@ func GetUserCards(userID int) ([]domain.Card, error) {
 		return nil, fmt.Errorf("database connection not initialized")
 	}
 
-	query := `
-		SELECT id, user_id, provider_card_id, bin, last_4_digits, card_status, 
-		       COALESCE(nickname, '') as nickname, COALESCE(service_slug, 'arbitrage'), daily_spend_limit, COALESCE(spend_limit, 0) as spend_limit, failed_auth_count,
-		       COALESCE(card_type, 'VISA') as card_type,
-		       COALESCE(category, 'arbitrage') as category,
-		       COALESCE(currency, 'USD') as currency,
-		       COALESCE(auto_replenish_enabled, FALSE) as auto_replenish_enabled,
-		       COALESCE(auto_replenish_threshold, 0) as auto_replenish_threshold,
-		       COALESCE(auto_replenish_amount, 0) as auto_replenish_amount,
-		       COALESCE(card_balance, 0) as card_balance,
-		       team_id, created_at,
-		       COALESCE(is_auto_pay_enabled, TRUE) as is_auto_pay_enabled
-		FROM cards 
-		WHERE user_id = $1 
-		ORDER BY created_at DESC
-	`
+	// Check if is_auto_pay_enabled column exists (migration may not have run yet)
+	hasAutoPayCol, _ := columnExists("cards", "is_auto_pay_enabled")
+
+	var query string
+	if hasAutoPayCol {
+		query = `
+			SELECT id, user_id, provider_card_id, bin, last_4_digits, card_status, 
+			       COALESCE(nickname, '') as nickname, COALESCE(service_slug, 'arbitrage'), daily_spend_limit, COALESCE(spend_limit, 0) as spend_limit, failed_auth_count,
+			       COALESCE(card_type, 'VISA') as card_type,
+			       COALESCE(category, 'arbitrage') as category,
+			       COALESCE(currency, 'USD') as currency,
+			       COALESCE(auto_replenish_enabled, FALSE) as auto_replenish_enabled,
+			       COALESCE(auto_replenish_threshold, 0) as auto_replenish_threshold,
+			       COALESCE(auto_replenish_amount, 0) as auto_replenish_amount,
+			       COALESCE(card_balance, 0) as card_balance,
+			       team_id, created_at,
+			       COALESCE(is_auto_pay_enabled, TRUE) as is_auto_pay_enabled
+			FROM cards 
+			WHERE user_id = $1 
+			ORDER BY created_at DESC
+		`
+	} else {
+		log.Printf("WARNING: is_auto_pay_enabled column missing from cards table — using fallback query")
+		query = `
+			SELECT id, user_id, provider_card_id, bin, last_4_digits, card_status, 
+			       COALESCE(nickname, '') as nickname, COALESCE(service_slug, 'arbitrage'), daily_spend_limit, COALESCE(spend_limit, 0) as spend_limit, failed_auth_count,
+			       COALESCE(card_type, 'VISA') as card_type,
+			       COALESCE(category, 'arbitrage') as category,
+			       COALESCE(currency, 'USD') as currency,
+			       COALESCE(auto_replenish_enabled, FALSE) as auto_replenish_enabled,
+			       COALESCE(auto_replenish_threshold, 0) as auto_replenish_threshold,
+			       COALESCE(auto_replenish_amount, 0) as auto_replenish_amount,
+			       COALESCE(card_balance, 0) as card_balance,
+			       team_id, created_at
+			FROM cards 
+			WHERE user_id = $1 
+			ORDER BY created_at DESC
+		`
+	}
 	rows, err := GlobalDB.Query(query, userID)
 	if err != nil {
 		log.Printf("DB Error fetching cards for user %d: %v", userID, err)
@@ -83,36 +141,63 @@ func GetUserCards(userID int) ([]domain.Card, error) {
 	for rows.Next() {
 		var card domain.Card
 		var teamID sql.NullInt64
-		err := rows.Scan(
-			&card.ID,
-			&card.UserID,
-			&card.ProviderCardID,
-			&card.BIN,
-			&card.Last4Digits,
-			&card.CardStatus,
-			&card.Nickname,
-			&card.ServiceSlug,
-			&card.DailySpendLimit,
-			&card.SpendLimit,
-			&card.FailedAuthCount,
-			&card.CardType,
-			&card.Category,
-			&card.Currency,
-			&card.AutoReplenishEnabled,
-			&card.AutoReplenishThreshold,
-			&card.AutoReplenishAmount,
-			&card.CardBalance,
-			&teamID,
-			&card.CreatedAt,
-			&card.IsAutoPayEnabled,
-		)
+		var scanErr error
+		if hasAutoPayCol {
+			scanErr = rows.Scan(
+				&card.ID,
+				&card.UserID,
+				&card.ProviderCardID,
+				&card.BIN,
+				&card.Last4Digits,
+				&card.CardStatus,
+				&card.Nickname,
+				&card.ServiceSlug,
+				&card.DailySpendLimit,
+				&card.SpendLimit,
+				&card.FailedAuthCount,
+				&card.CardType,
+				&card.Category,
+				&card.Currency,
+				&card.AutoReplenishEnabled,
+				&card.AutoReplenishThreshold,
+				&card.AutoReplenishAmount,
+				&card.CardBalance,
+				&teamID,
+				&card.CreatedAt,
+				&card.IsAutoPayEnabled,
+			)
+		} else {
+			scanErr = rows.Scan(
+				&card.ID,
+				&card.UserID,
+				&card.ProviderCardID,
+				&card.BIN,
+				&card.Last4Digits,
+				&card.CardStatus,
+				&card.Nickname,
+				&card.ServiceSlug,
+				&card.DailySpendLimit,
+				&card.SpendLimit,
+				&card.FailedAuthCount,
+				&card.CardType,
+				&card.Category,
+				&card.Currency,
+				&card.AutoReplenishEnabled,
+				&card.AutoReplenishThreshold,
+				&card.AutoReplenishAmount,
+				&card.CardBalance,
+				&teamID,
+				&card.CreatedAt,
+			)
+			card.IsAutoPayEnabled = true // safe default when column missing
+		}
+		if scanErr != nil {
+			log.Printf("DB Error scanning card: %v", scanErr)
+			continue
+		}
 		if teamID.Valid {
 			teamIDVal := int(teamID.Int64)
 			card.TeamID = &teamIDVal
-		}
-		if err != nil {
-			log.Printf("DB Error scanning card: %v", err)
-			continue
 		}
 		cards = append(cards, card)
 	}
