@@ -400,7 +400,10 @@ export const StaffOnlyZone = () => {
   const fetchVPNServerStatus = useCallback(async () => {
     setVpnServerLoading(true);
     try {
-      const res = await apiClient.get('/admin/infra/vpn-server-status');
+      const res = await apiClient.get('/admin/infra/vpn-server-status', {
+        params: { _t: Date.now() },
+        headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+      });
       if (!res.data?.error) setVpnServerStatus(res.data);
     } catch { /* ignore */ }
     finally { setVpnServerLoading(false); }

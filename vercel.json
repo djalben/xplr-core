@@ -20,6 +20,10 @@
     {
       "path": "/api/cron/sync",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/v1/cron/vpn-traffic",
+      "schedule": "*/30 * * * *"
     }
   ]
 }

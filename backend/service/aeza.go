@@ -308,23 +308,19 @@ func GetAezaServerInfo() (*AezaServerInfo, error) {
 	// Parse Aeza response — structure: { "data": { ... } }
 	var raw struct {
 		Data struct {
-			ID       int    `json:"id"`
-			Name     string `json:"name"`
-			Status   string `json:"status"`
-			IP       string `json:"ip"`
-			Cost     any    `json:"cost"` // may be string or float
-			EndDate  string `json:"endDate"`
-			Products struct {
-				CPU       any `json:"cpu"`       // may be int or string
-				RAM       any `json:"ram"`       // MB, may be int or string
-				Disk      any `json:"disk"`      // GB, may be int or string
-				Bandwidth any `json:"bandwidth"` // GB, monthly traffic limit
-				Traffic   any `json:"traffic"`   // GB, alternative field name
-			} `json:"products"`
-			DiskType     string `json:"diskType"`
-			OsName       string `json:"osName"`
-			LocationKey  string `json:"locationKey"`
-			LocationName string `json:"locationName"`
+			ID           int            `json:"id"`
+			Name         string         `json:"name"`
+			Status       string         `json:"status"`
+			IP           string         `json:"ip"`
+			Cost         any            `json:"cost"` // may be string or float
+			EndDate      string         `json:"endDate"`
+			Products     map[string]any `json:"products"`     // dynamic map to catch ALL field names
+			TrafficLimit any            `json:"trafficLimit"` // some plans put limit at top level
+			Traffic      any            `json:"traffic"`      // alternative top-level field
+			DiskType     string         `json:"diskType"`
+			OsName       string         `json:"osName"`
+			LocationKey  string         `json:"locationKey"`
+			LocationName string         `json:"locationName"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &raw); err != nil {
@@ -332,11 +328,109 @@ func GetAezaServerInfo() (*AezaServerInfo, error) {
 	}
 
 	d := raw.Data
-	// Parse bandwidth: try "bandwidth" first, then "traffic"
-	bwGB := int(parseAnyFloat(d.Products.Bandwidth))
-	if bwGB == 0 {
-		bwGB = int(parseAnyFloat(d.Products.Traffic))
+
+	// Nil-safety: if products map is nil, initialize empty map
+	if d.Products == nil {
+		d.Products = make(map[string]any)
+		log.Printf("[AEZA-SERVER] ⚠️ Products field is nil/missing in API response!")
 	}
+
+	// Log ALL products fields for diagnostics (critical for debugging SWEs-2 plan changes)
+	log.Printf("[AEZA-SERVER] Raw products map (%d keys): %+v", len(d.Products), d.Products)
+	if d.TrafficLimit != nil {
+		log.Printf("[AEZA-SERVER] Top-level trafficLimit: %v (type: %T)", d.TrafficLimit, d.TrafficLimit)
+	}
+	if d.Traffic != nil {
+		log.Printf("[AEZA-SERVER] Top-level traffic: %v (type: %T)", d.Traffic, d.Traffic)
+	}
+
+	// Parse bandwidth from products map — try ALL known field names
+	bwGB := 0
+	bandwidthKeys := []string{"bandwidth", "traffic", "trafficLimit", "traffic_limit", "bw", "monthlyTraffic", "monthly_traffic", "limit", "Bandwidth", "Traffic", "TrafficLimit"}
+	for _, key := range bandwidthKeys {
+		if val, ok := d.Products[key]; ok && val != nil {
+			parsed := int(parseAnyFloat(val))
+			if parsed > 0 {
+				bwGB = parsed
+				log.Printf("[AEZA-SERVER] ✅ Found bandwidth in products.%s = %d GB", key, bwGB)
+				break
+			}
+		}
+	}
+	// Also try case-insensitive match on all products keys
+	if bwGB == 0 {
+		for key, val := range d.Products {
+			keyLower := strings.ToLower(key)
+			if strings.Contains(keyLower, "traffic") || strings.Contains(keyLower, "bandwidth") || strings.Contains(keyLower, "bw") {
+				parsed := int(parseAnyFloat(val))
+				if parsed > 0 {
+					bwGB = parsed
+					log.Printf("[AEZA-SERVER] ✅ Found bandwidth via fuzzy match: products.%s = %d GB", key, bwGB)
+					break
+				}
+			}
+		}
+	}
+	// Try top-level trafficLimit / traffic fields
+	if bwGB == 0 && d.TrafficLimit != nil {
+		bwGB = int(parseAnyFloat(d.TrafficLimit))
+		if bwGB > 0 {
+			log.Printf("[AEZA-SERVER] ✅ Found bandwidth in top-level trafficLimit = %d GB", bwGB)
+		}
+	}
+	if bwGB == 0 && d.Traffic != nil {
+		bwGB = int(parseAnyFloat(d.Traffic))
+		if bwGB > 0 {
+			log.Printf("[AEZA-SERVER] ✅ Found bandwidth in top-level traffic = %d GB", bwGB)
+		}
+	}
+
+	// Normalize units: if bwGB > 1000, it's likely in MB; if > 1000000, likely bytes
+	if bwGB > 1000000 {
+		bwGB = bwGB / (1024 * 1024 * 1024)
+		log.Printf("[AEZA-SERVER] Converted bandwidth from bytes to GB: %d GB", bwGB)
+	} else if bwGB > 1000 {
+		bwGB = bwGB / 1024
+		log.Printf("[AEZA-SERVER] Converted bandwidth from MB to GB: %d GB", bwGB)
+	}
+
+	// Last resort: scan ALL products values — pick the largest numeric value >= 30 (likely bandwidth)
+	if bwGB == 0 {
+		var largestVal int
+		var largestKey string
+		for key, val := range d.Products {
+			parsed := int(parseAnyFloat(val))
+			if parsed >= 30 && parsed > largestVal {
+				largestVal = parsed
+				largestKey = key
+			}
+		}
+		if largestVal > 0 {
+			bwGB = largestVal
+			// Also normalize the guessed value
+			if bwGB > 1000000 {
+				bwGB = bwGB / (1024 * 1024 * 1024)
+			} else if bwGB > 1000 {
+				bwGB = bwGB / 1024
+			}
+			log.Printf("[AEZA-SERVER] ⚠️ Guessed bandwidth from largest products value: products.%s = %d GB", largestKey, bwGB)
+		}
+	}
+
+	if bwGB == 0 {
+		log.Printf("[AEZA-SERVER] ❌ CRITICAL: Could not find bandwidth in any field! Products keys: %v", func() []string {
+			keys := make([]string, 0, len(d.Products))
+			for k := range d.Products {
+				keys = append(keys, fmt.Sprintf("%s=%v", k, d.Products[k]))
+			}
+			return keys
+		}())
+	}
+
+	// Parse CPU/RAM/Disk from products map
+	cpuVal := int(parseAnyFloat(d.Products["cpu"]))
+	ramVal := int(parseAnyFloat(d.Products["ram"]))
+	diskVal := int(parseAnyFloat(d.Products["disk"]))
 
 	info := &AezaServerInfo{
 		ID:          d.ID,
@@ -345,9 +439,9 @@ func GetAezaServerInfo() (*AezaServerInfo, error) {
 		IP:          d.IP,
 		CostEUR:     parseAnyFloat(d.Cost),
 		ExpiresAt:   d.EndDate,
-		CPU:         int(parseAnyFloat(d.Products.CPU)),
-		RAMMB:       int(parseAnyFloat(d.Products.RAM)),
-		DiskGB:      int(parseAnyFloat(d.Products.Disk)),
+		CPU:         cpuVal,
+		RAMMB:       ramVal,
+		DiskGB:      diskVal,
 		BandwidthGB: bwGB,
 		DiskType:    d.DiskType,
 		OS:          d.OsName,

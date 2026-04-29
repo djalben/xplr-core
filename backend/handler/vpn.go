@@ -199,6 +199,9 @@ func safePercent(used, total int64) float64 {
 
 func AdminVPNServerStatusHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
 
 	provider := shop.GetRegistry().Get("vless")
 	if provider == nil {
@@ -219,32 +222,64 @@ func AdminVPNServerStatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Pull live bandwidth limit from Aeza API; fall back to DB cache / env / default
+	// ── FORCE bandwidth sync from Aeza API ──
+	// Priority: 1) Live Aeza API → 2) DB cache → 3) Env var → 4) Default 30
 	serverLimitGB := 30
-	if aezaInfo, aezaErr := service.GetAezaServerInfo(); aezaErr == nil && aezaInfo.BandwidthGB > 0 {
+	aezaInfo, aezaErr := service.GetAezaServerInfo()
+	if aezaErr != nil {
+		log.Printf("[VPN-SERVER-STATUS] ⚠️ Aeza API error: %v — trying DB cache", aezaErr)
+	}
+
+	if aezaErr == nil && aezaInfo != nil && aezaInfo.BandwidthGB > 0 {
 		serverLimitGB = aezaInfo.BandwidthGB
-		log.Printf("[VPN-SERVER-STATUS] Aeza bandwidth_limit refreshed: %d GB", serverLimitGB)
-		// Persist to system_settings so background monitor and future calls use the fresh value
+		log.Printf("[VPN-SERVER-STATUS] ✅ Aeza live bandwidth: %d GB", serverLimitGB)
+		// FORCE WRITE to system_settings — unconditional overwrite
 		if GlobalDB != nil {
-			GlobalDB.Exec(`INSERT INTO system_settings (setting_key, setting_value, description)
+			result, dbErr := GlobalDB.Exec(`
+				INSERT INTO system_settings (setting_key, setting_value, description)
 				VALUES ('vpn_bandwidth_limit_gb', $1, 'VPN server traffic limit from Aeza plan (GB)')
 				ON CONFLICT (setting_key) DO UPDATE SET setting_value = $1, updated_at = NOW()`,
 				strconv.Itoa(serverLimitGB))
-		}
-	} else if GlobalDB != nil {
-		// Try DB-cached value from background monitor
-		var cached string
-		if dbErr := GlobalDB.QueryRow(`SELECT setting_value FROM system_settings WHERE setting_key = 'vpn_bandwidth_limit_gb'`).Scan(&cached); dbErr == nil {
-			if v, _ := strconv.Atoi(cached); v > 0 {
-				serverLimitGB = v
-				log.Printf("[VPN-SERVER-STATUS] Using cached bandwidth_limit from DB: %d GB", serverLimitGB)
+			if dbErr != nil {
+				log.Printf("[VPN-SERVER-STATUS] ❌ DB WRITE FAILED for vpn_bandwidth_limit_gb=%d: %v", serverLimitGB, dbErr)
+			} else {
+				rows, _ := result.RowsAffected()
+				log.Printf("[VPN-SERVER-STATUS] ✅ DB WRITE OK: vpn_bandwidth_limit_gb=%d (rows affected: %d)", serverLimitGB, rows)
 			}
 		}
-	} else if envLimit := os.Getenv("VPN_SERVER_TRAFFIC_LIMIT_GB"); envLimit != "" {
-		if v, err := strconv.Atoi(envLimit); err == nil && v > 0 {
-			serverLimitGB = v
+	} else if aezaErr == nil && aezaInfo != nil && aezaInfo.BandwidthGB == 0 {
+		// Aeza responded OK but bandwidth parsed as 0 — parser issue
+		log.Printf("[VPN-SERVER-STATUS] ⚠️ Aeza returned OK but BandwidthGB=0! Check [AEZA-SERVER] logs for raw products map.")
+		// Still try DB cache
+		if GlobalDB != nil {
+			var cached string
+			if dbErr := GlobalDB.QueryRow(`SELECT setting_value FROM system_settings WHERE setting_key = 'vpn_bandwidth_limit_gb'`).Scan(&cached); dbErr == nil {
+				if v, _ := strconv.Atoi(cached); v > 0 {
+					serverLimitGB = v
+					log.Printf("[VPN-SERVER-STATUS] Using DB cached value: %d GB", serverLimitGB)
+				}
+			}
+		}
+	} else {
+		// Aeza API error — fall back to DB cache → env → default
+		if GlobalDB != nil {
+			var cached string
+			if dbErr := GlobalDB.QueryRow(`SELECT setting_value FROM system_settings WHERE setting_key = 'vpn_bandwidth_limit_gb'`).Scan(&cached); dbErr == nil {
+				if v, _ := strconv.Atoi(cached); v > 0 {
+					serverLimitGB = v
+					log.Printf("[VPN-SERVER-STATUS] Using DB cached value: %d GB", serverLimitGB)
+				}
+			}
+		}
+		if serverLimitGB == 30 {
+			if envLimit := os.Getenv("VPN_SERVER_TRAFFIC_LIMIT_GB"); envLimit != "" {
+				if v, err := strconv.Atoi(envLimit); err == nil && v > 0 {
+					serverLimitGB = v
+				}
+			}
 		}
 	}
+	log.Printf("[VPN-SERVER-STATUS] Final serverLimitGB=%d (source: aeza=%v, apiErr=%v)", serverLimitGB, aezaInfo != nil && aezaInfo.BandwidthGB > 0, aezaErr)
 	serverLimitBytes := int64(serverLimitGB) * 1024 * 1024 * 1024
 
 	usedPercent := float64(0)

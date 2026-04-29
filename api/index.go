@@ -648,6 +648,7 @@ func buildRouter() *mux.Router {
 	protected.HandleFunc("/cards/{id}/auto-pay", h.ToggleAutoPayHandler).Methods("PATCH")
 	protected.HandleFunc("/cards/{id}/subscriptions", h.CardSubscriptionsHandler).Methods("GET")
 	protected.HandleFunc("/cards/{id}/subscriptions/{subId}", h.ToggleSubscriptionHandler).Methods("PATCH")
+	protected.HandleFunc("/cards/{id}/freeze-all-subscriptions", h.FreezeAllSubscriptionsHandler).Methods("POST")
 	protected.HandleFunc("/cards/{id}/mock-details", h.MockCardDetailsHandler).Methods("GET")
 	protected.HandleFunc("/cards/{id}/limit", h.UpdateCardSpendLimitHandler).Methods("PATCH")
 	protected.HandleFunc("/cards/{id}/sync-balance", h.SyncCardBalanceHandler).Methods("POST")
@@ -778,6 +779,11 @@ func buildRouter() *mux.Router {
 	admin.HandleFunc("/infra/vpn-active-clients", h.AdminVPNActiveClientsHandler).Methods("GET")
 	admin.HandleFunc("/vpn/client/{email}", h.AdminDeleteVPNClientHandler).Methods("DELETE")
 	admin.HandleFunc("/vpn/client/{email}", h.AdminEditVPNClientHandler).Methods("PATCH")
+
+	// VPN traffic cron (called by Vercel cron every 30 min, protected by CRON_SECRET)
+	r.HandleFunc("/api/v1/cron/vpn-traffic", h.VPNTrafficCronHandler).Methods("GET")
+	// Also allow admin to trigger manually
+	admin.HandleFunc("/cron/vpn-traffic", h.VPNTrafficCronHandler).Methods("GET", "POST")
 
 	log.Println("✅ [ROUTER] All routes registered successfully")
 	return r
