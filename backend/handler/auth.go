@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/djalben/xplr-core/backend/domain"
@@ -184,12 +185,12 @@ func VerifyEmailHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("[VERIFY] ✅ Email verified for user %d", userID)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":  "ok",
-		"message": "Email successfully verified",
-		"user_id": userID,
-	})
+	// Redirect to /auth with verified flag — user must log in manually (no auto-session)
+	appDomain := os.Getenv("APP_DOMAIN")
+	if appDomain == "" {
+		appDomain = "https://xplr.pro"
+	}
+	http.Redirect(w, r, appDomain+"/auth?verified=true", http.StatusFound)
 }
 
 // ResendVerificationHandler — POST /api/v1/auth/resend-verification
@@ -403,11 +404,18 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ── Шаг 2b: Email verification gate ──
-	// TEMPORARY BYPASS: email delivery is broken (Vercel blocks SMTP, Resend not yet configured).
-	// Users are locked out. Allow login without verified email until Resend is set up.
-	// TODO: Re-enable this gate once RESEND_API_KEY is configured and emails are flowing.
+	// Only blocks users who have NOT confirmed their email.
+	// Existing confirmed users pass through normally.
 	if !user.IsVerified {
-		log.Printf("[LOGIN] ⚠️ Email not verified for %s (user_id=%d) — BYPASS ACTIVE, allowing login", email, user.ID)
+		log.Printf("[LOGIN] ❌ Email not verified for %s (user_id=%d)", email, user.ID)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error":              "email_not_verified",
+			"message":            "Пожалуйста, подтвердите ваш email. Проверьте почту.",
+			"email_not_verified": true,
+		})
+		return
 	}
 
 	// ── Шаг 3: Авто-создание Grade если отсутствует ──

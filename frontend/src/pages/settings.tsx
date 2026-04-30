@@ -412,6 +412,10 @@ const SecurityTab = ({ profile, reload, showToast }: { profile: ProfileData | nu
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [sessions, setSessions] = useState<SessionData[]>([]);
   const [logoutSaving, setLogoutSaving] = useState(false);
+  const [disabling2FA, setDisabling2FA] = useState(false);
+  const [disable2faPw, setDisable2faPw] = useState('');
+  const [disable2faOtp, setDisable2faOtp] = useState('');
+  const [disable2faSaving, setDisable2faSaving] = useState(false);
 
   const loadSessions = useCallback(async () => {
     try { const res = await apiClient.get('/user/settings/sessions'); setSessions(res.data || []); } catch { /* ignore */ }
@@ -452,8 +456,18 @@ const SecurityTab = ({ profile, reload, showToast }: { profile: ProfileData | nu
   };
 
   const handleDisable2FA = async () => {
-    try { await apiClient.post('/user/settings/2fa/disable'); showToast(t('settings.twoFa.disabledToast'), 'ok'); reload(); }
-    catch { showToast(t('settings.error'), 'err'); }
+    if (!disable2faPw.trim()) { showToast('Введите текущий пароль', 'err'); return; }
+    if (disable2faOtp.length !== 6) { showToast('Введите 6-значный код из приложения', 'err'); return; }
+    setDisable2faSaving(true);
+    try {
+      await apiClient.post('/user/settings/2fa/disable', { current_password: disable2faPw, otp_code: disable2faOtp });
+      showToast(t('settings.twoFa.disabledToast'), 'ok');
+      setDisabling2FA(false); setDisable2faPw(''); setDisable2faOtp('');
+      reload();
+    } catch (err: any) {
+      const msg = typeof err.response?.data === 'string' ? err.response.data : t('settings.error');
+      showToast(msg, 'err');
+    } finally { setDisable2faSaving(false); }
   };
 
   const handleLogoutAll = async () => {
@@ -500,12 +514,29 @@ const SecurityTab = ({ profile, reload, showToast }: { profile: ProfileData | nu
       <div className="glass-card p-4 sm:p-6">
         <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><Smartphone className="w-5 h-5 text-emerald-400" />{t('settings.twoFa.title')}</h3>
         {profile?.two_factor_enabled ? (
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <ShieldCheck className="w-6 h-6 text-emerald-400 shrink-0" />
-              <div><p className="text-white font-medium">{t('settings.twoFa.enabled')}</p><p className="text-sm text-slate-400">{t('settings.twoFa.enabledDesc')}</p></div>
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <ShieldCheck className="w-6 h-6 text-emerald-400 shrink-0" />
+                <div><p className="text-white font-medium">{t('settings.twoFa.enabled')}</p><p className="text-sm text-slate-400">{t('settings.twoFa.enabledDesc')}</p></div>
+              </div>
+              {!disabling2FA && (
+                <button onClick={() => setDisabling2FA(true)} className="w-full sm:w-auto px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-sm font-medium rounded-xl transition-colors text-center">{t('settings.twoFa.disable')}</button>
+              )}
             </div>
-            <button onClick={handleDisable2FA} className="w-full sm:w-auto px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-sm font-medium rounded-xl transition-colors text-center">{t('settings.twoFa.disable')}</button>
+            {disabling2FA && (
+              <div className="p-4 bg-red-500/5 border border-red-500/20 rounded-xl space-y-3 max-w-md">
+                <p className="text-sm text-red-400 font-medium">Для отключения 2FA введите пароль и код из приложения</p>
+                <input type="password" value={disable2faPw} onChange={e => setDisable2faPw(e.target.value)} placeholder="Текущий пароль" className="xplr-input w-full" />
+                <input type="text" value={disable2faOtp} onChange={e => setDisable2faOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6-значный код" className="xplr-input w-full text-center tracking-widest text-lg" maxLength={6} />
+                <div className="flex gap-2">
+                  <button onClick={handleDisable2FA} disabled={disable2faSaving || !disable2faPw || disable2faOtp.length !== 6} className="flex-1 px-4 py-2.5 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors flex items-center justify-center gap-2">
+                    {disable2faSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldAlert className="w-4 h-4" />} Отключить 2FA
+                  </button>
+                  <button onClick={() => { setDisabling2FA(false); setDisable2faPw(''); setDisable2faOtp(''); }} className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-slate-400 text-sm font-medium rounded-xl transition-colors">Отмена</button>
+                </div>
+              </div>
+            )}
           </div>
         ) : totpSecret ? (
           <div className="space-y-4">
