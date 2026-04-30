@@ -290,6 +290,32 @@ func AdminVPNServerStatusHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// ── Sync store_orders meta.traffic_bytes for active VPN orders ──
+	// Existing orders may have stale limits (e.g. 30GB instead of 60GB after plan upgrade).
+	if GlobalDB != nil {
+		trafficQuotas := map[int]int64{
+			7:   15 * 1024 * 1024 * 1024,
+			30:  60 * 1024 * 1024 * 1024,
+			180: 300 * 1024 * 1024 * 1024,
+			365: 600 * 1024 * 1024 * 1024,
+		}
+		for days, correctBytes := range trafficQuotas {
+			res, err := GlobalDB.Exec(`
+				UPDATE store_orders
+				SET meta = jsonb_set(meta, '{traffic_bytes}', to_jsonb($1::bigint))
+				WHERE status = 'completed'
+				  AND (product_name ILIKE '%vpn%' OR product_name ILIKE '%vless%' OR product_name ILIKE '%безопасный%')
+				  AND (meta->>'duration_days')::int = $2
+				  AND (meta->>'traffic_bytes')::bigint <> $1`,
+				correctBytes, days)
+			if err != nil {
+				log.Printf("[VPN-SYNC] ❌ Failed to sync traffic_bytes for %d-day orders: %v", days, err)
+			} else if n, _ := res.RowsAffected(); n > 0 {
+				log.Printf("[VPN-SYNC] ✅ Updated %d orders (%d-day): traffic_bytes → %d GB", n, days, correctBytes/(1024*1024*1024))
+			}
+		}
+	}
+
 	// ── Financial metrics ──
 	serverCostEUR := 4.94
 	if envCost := os.Getenv("VPN_SERVER_MONTHLY_COST"); envCost != "" {
