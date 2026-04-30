@@ -23,7 +23,7 @@
     },
     {
       "path": "/api/v1/cron/vpn-traffic",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
