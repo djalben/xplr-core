@@ -57,6 +57,35 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error creating user: %v", err)
 		// Проверка на дубликат email
 		if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "unique") {
+			// Check if existing user is unverified — allow re-registration
+			existing, lookupErr := repository.GetUserByEmail(req.Email)
+			if lookupErr == nil && !existing.IsVerified {
+				log.Printf("[REGISTER] Unverified user %d re-registering — updating password & resending OTP", existing.ID)
+				// Update password
+				if upErr := repository.UpdateUserPassword(existing.ID, hashedPassword); upErr != nil {
+					log.Printf("[REGISTER] Failed to update password for user %d: %v", existing.ID, upErr)
+					http.Error(w, "Internal server error", http.StatusInternalServerError)
+					return
+				}
+				// Generate new OTP
+				otpCode, otpErr := repository.CreateOTPCode(existing.ID)
+				if otpErr != nil {
+					log.Printf("[REGISTER] Failed to create OTP for user %d: %v", existing.ID, otpErr)
+					http.Error(w, "Failed to generate verification code", http.StatusInternalServerError)
+					return
+				}
+				if sendErr := service.SendOTPEmail(existing.Email, otpCode); sendErr != nil {
+					log.Printf("[REGISTER] Failed to send OTP to %s: %v", existing.Email, sendErr)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				json.NewEncoder(w).Encode(map[string]interface{}{
+					"requires_otp": true,
+					"email":        existing.Email,
+					"message":      "Новый код подтверждения отправлен на вашу почту.",
+				})
+				return
+			}
 			http.Error(w, "Email already registered", http.StatusConflict)
 			return
 		}

@@ -133,6 +133,20 @@ func VPNKeyStatusHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	json.Unmarshal([]byte(metaStr), &meta)
 
+	// Auto-correct stale traffic_bytes based on current plan quotas
+	planQuotas := map[int]int64{
+		7: 15 * 1024 * 1024 * 1024, 30: 60 * 1024 * 1024 * 1024,
+		180: 300 * 1024 * 1024 * 1024, 365: 600 * 1024 * 1024 * 1024,
+	}
+	if correct, ok := planQuotas[meta.DurationDays]; ok && meta.TrafficBytes != correct {
+		log.Printf("[VPN-KEY] Auto-correcting traffic_bytes for ref=%s: %d → %d", ref, meta.TrafficBytes, correct)
+		meta.TrafficBytes = correct
+		if updMeta, err := json.Marshal(meta); err == nil {
+			GlobalDB.Exec(`UPDATE store_orders SET meta = $1 WHERE provider_ref = $2 AND user_id = $3 AND status = 'completed'`,
+				string(updMeta), ref, userID)
+		}
+	}
+
 	// Query live traffic from panel
 	var upload, download int64
 	var enabled bool = true
