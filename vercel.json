@@ -15,15 +15,5 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/((?!manifest\\.json|icon-.*\\.svg|assets/).*)", "destination": "/index.html" }
-  ],
-  "crons": [
-    {
-      "path": "/api/cron/sync",
-      "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/v1/cron/vpn-traffic",
-      "schedule": "0 0 * * *"
-    }
   ]
 }
