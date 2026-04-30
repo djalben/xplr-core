@@ -102,12 +102,10 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Отправка приветственного письма (async)
-	go func(email string) {
-		if err := service.SendWelcomeEmail(email); err != nil {
-			log.Printf("Warning: Failed to send welcome email to %s: %v", email, err)
-		}
-	}(createdUser.Email)
+	// Отправка приветственного письма (synchronous — go func() dies in Vercel serverless)
+	if err := service.SendWelcomeEmail(createdUser.Email); err != nil {
+		log.Printf("Warning: Failed to send welcome email to %s: %v", createdUser.Email, err)
+	}
 
 	// Уведомление админам о новом пользователе (async)
 	go func(email string) {

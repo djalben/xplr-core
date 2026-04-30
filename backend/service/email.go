@@ -1,10 +1,14 @@
 package service
 
 import (
+	"bytes"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net"
+	nethttp "net/http"
 	"net/smtp"
 	"os"
 	"strings"
@@ -48,9 +52,72 @@ func loadSMTPConfig() *smtpConfig {
 	return c
 }
 
-// sendMail — unified sender via admin@xplr.pro. Uses implicit TLS for port 465, STARTTLS for 587.
+// sendMail — unified sender. Auto-detects transport:
+// 1) RESEND_API_KEY set → Resend HTTP API (works on Vercel serverless)
+// 2) Otherwise → SMTP (local dev, self-hosted)
 func sendMail(to, subject, htmlBody string) error {
+	resendKey := os.Getenv("RESEND_API_KEY")
+	if resendKey != "" {
+		return sendViaResend(resendKey, to, subject, htmlBody)
+	}
 	return sendMailWith(loadSMTPConfig(), to, subject, htmlBody)
+}
+
+// ═══════════════════════════════════════════════════
+// Resend HTTP API transport (for Vercel / serverless)
+// Env: RESEND_API_KEY, RESEND_FROM (optional, defaults to SMTP_FROM → admin@xplr.pro)
+// ═══════════════════════════════════════════════════
+
+func sendViaResend(apiKey, to, subject, htmlBody string) error {
+	fromAddr := os.Getenv("RESEND_FROM")
+	if fromAddr == "" {
+		fromAddr = os.Getenv("SMTP_FROM")
+	}
+	if fromAddr == "" {
+		fromAddr = "XPLR <admin@xplr.pro>"
+	}
+	// Ensure From has display name
+	if !strings.Contains(fromAddr, "<") {
+		fromAddr = fmt.Sprintf("XPLR <%s>", fromAddr)
+	}
+
+	log.Printf("[EMAIL-RESEND] 📤 Sending: to=%s, from=%s, subject=%q", to, fromAddr, subject)
+
+	payload := map[string]interface{}{
+		"from":    fromAddr,
+		"to":      []string{to},
+		"subject": subject,
+		"html":    htmlBody,
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("resend marshal: %w", err)
+	}
+
+	req, err := nethttp.NewRequest("POST", "https://api.resend.com/emails", bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("resend request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &nethttp.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("[EMAIL-RESEND] ❌ HTTP error: %v", err)
+		return fmt.Errorf("resend http: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode >= 400 {
+		log.Printf("[EMAIL-RESEND] ❌ API error %d: %s", resp.StatusCode, string(respBody))
+		return fmt.Errorf("resend API %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	log.Printf("[EMAIL-RESEND] ✅ Sent to %s (status=%d, resp=%s)", to, resp.StatusCode, string(respBody))
+	return nil
 }
 
 func sendMailWith(cfg *smtpConfig, to, subject, htmlBody string) error {

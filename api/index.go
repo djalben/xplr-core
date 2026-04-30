@@ -552,16 +552,28 @@ func ensureDB() {
 	repository.SeedDefaultExchangeRates()
 	go service.StartExchangeRateFetcher()
 
-	// 10. SMTP diagnostics (log config status, never log passwords)
+	// 10. Email transport diagnostics
+	resendKey := os.Getenv("RESEND_API_KEY")
+	if resendKey != "" {
+		log.Printf("[EMAIL] ✅ Resend API key set (%d chars) — using HTTP API transport (Vercel-compatible)", len(resendKey))
+		resendFrom := os.Getenv("RESEND_FROM")
+		if resendFrom != "" {
+			log.Printf("[EMAIL] ✅ RESEND_FROM=%s", resendFrom)
+		} else {
+			log.Printf("[EMAIL] ℹ️  RESEND_FROM not set — will use SMTP_FROM or default admin@xplr.pro")
+		}
+	} else {
+		log.Printf("[EMAIL] ⚠️  RESEND_API_KEY not set — falling back to SMTP (WILL FAIL on Vercel!)")
+	}
 	smtpHost := os.Getenv("SMTP_HOST")
 	smtpPort := os.Getenv("SMTP_PORT")
 	smtpUser := os.Getenv("SMTP_USER")
 	smtpPass := os.Getenv("SMTP_PASS")
 	smtpSupportUser := os.Getenv("SMTP_SUPPORT_USER")
 	if smtpHost != "" && smtpUser != "" && smtpPass != "" {
-		log.Printf("[SMTP] ✅ Configured: host=%s, port=%s, user=%s", smtpHost, smtpPort, smtpUser)
+		log.Printf("[SMTP] ✅ Configured: host=%s, port=%s, user=%s (fallback if Resend unavailable)", smtpHost, smtpPort, smtpUser)
 	} else {
-		log.Printf("[SMTP] ⚠️  NOT configured! host=%q, port=%q, user=%q, pass_len=%d — emails will FAIL",
+		log.Printf("[SMTP] ⚠️  NOT configured! host=%q, port=%q, user=%q, pass_len=%d",
 			smtpHost, smtpPort, smtpUser, len(smtpPass))
 	}
 	if smtpSupportUser != "" {
