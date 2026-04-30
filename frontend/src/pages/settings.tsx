@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LANG_KEY } from '../i18n';
 import { DashboardLayout } from '../components/dashboard-layout';
@@ -907,7 +908,9 @@ const LanguageTab = () => {
 // ══════════════════════════════════════
 export const SettingsPage = () => {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
+  const [searchParams] = useSearchParams();
+  const initialTab = (searchParams.get('tab') as SettingsTab) || 'profile';
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
 

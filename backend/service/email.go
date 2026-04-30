@@ -271,6 +271,26 @@ func wrapHTML(title, content string) string {
 // Email functions
 // ═══════════════════════════════════════════════════
 
+// SendOTPEmail — sends a 6-digit OTP code for email verification.
+func SendOTPEmail(toEmail, code string) error {
+	content := fmt.Sprintf(`
+    <p style="color:#cbd5e1;font-size:15px;line-height:1.6;margin:0 0 20px;">Здравствуйте!</p>
+    <p style="color:#94a3b8;font-size:14px;line-height:1.6;margin:0 0 16px;">Ваш код подтверждения email:</p>
+    <div style="text-align:center;margin:0 0 24px;">
+      <div style="display:inline-block;padding:16px 48px;background:linear-gradient(135deg,#1e293b,#0f172a);border:2px solid #3b82f6;border-radius:16px;font-size:32px;font-weight:700;letter-spacing:12px;color:#fff;font-family:monospace;">%s</div>
+    </div>
+    <p style="color:#64748b;font-size:12px;line-height:1.5;margin:0;">Код действителен 10 минут. Если вы не регистрировались на XPLR — проигнорируйте это письмо.</p>`, code)
+
+	html := wrapHTML("Код подтверждения", content)
+
+	if err := sendMail(toEmail, "XPLR — Код подтверждения", html); err != nil {
+		log.Printf("[EMAIL] Failed to send OTP to %s: %v", toEmail, err)
+		return err
+	}
+	log.Printf("[EMAIL] ✅ OTP sent to %s", toEmail)
+	return nil
+}
+
 // SendVerificationEmail — ссылка подтверждения email.
 func SendVerificationEmail(toEmail, token string) error {
 	cfg := loadSMTPConfig()

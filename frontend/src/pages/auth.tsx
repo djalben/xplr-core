@@ -2,11 +2,11 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Wifi, Eye, EyeOff, Lock, Mail, ChevronRight, ArrowLeft, Check, X, Shield, Smartphone, Send } from 'lucide-react';
-import { login, register, verify2FA } from '../services/auth';
+import { login, register, verify2FA, verifyOTP, resendOTP } from '../services/auth';
 import { useAuth } from '../store/auth-context';
 import { API_BASE_URL } from '../services/axios';
 
-type AuthMode = 'login' | 'register' | '2fa';
+type AuthMode = 'login' | 'register' | '2fa' | 'otp';
 
 /* ── Password strength rules ── */
 const getPasswordRules = (t: (k: string) => string) => [
@@ -50,6 +50,11 @@ export const AuthPage = () => {
   const [emailNotVerified, setEmailNotVerified] = useState(false);
   const [resending, setResending] = useState(false);
   const [resendDone, setResendDone] = useState(false);
+
+  // OTP state
+  const [otpEmail, setOtpEmail] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpResending, setOtpResending] = useState(false);
 
   // Show success banner if redirected from verification
   useEffect(() => {
@@ -98,7 +103,15 @@ export const AuthPage = () => {
       console.log('[Auth] Sending auth request:', { mode, email });
 
       const res = mode === 'login' ? await login(payload) : await register(payload);
-      console.log('[Auth] Response:', { token: res.token ? 'yes' : 'NO', requires_2fa: res.requires_2fa, user: res.user });
+      console.log('[Auth] Response:', { token: res.token ? 'yes' : 'NO', requires_2fa: res.requires_2fa, requires_otp: res.requires_otp });
+
+      // OTP required after registration — switch to OTP input
+      if (res.requires_otp) {
+        setOtpEmail(res.email || email);
+        setMode('otp');
+        setError('');
+        return;
+      }
 
       // 2FA required — transition to 2FA mode
       if (res.requires_2fa && res.half_auth_token) {
@@ -232,8 +245,8 @@ export const AuthPage = () => {
           </div>
         )}
 
-        {/* Mode Toggle — hidden during 2FA */}
-        {mode !== '2fa' && (
+        {/* Mode Toggle — hidden during 2FA and OTP */}
+        {mode !== '2fa' && mode !== 'otp' && (
           <div className="flex justify-center mb-6">
             <div className="bg-white/[0.04] border border-white/[0.06] rounded-2xl p-1.5 flex shadow-2xl">
               <button
@@ -425,8 +438,107 @@ export const AuthPage = () => {
           </div>
         )}
 
+        {/* ── OTP Verification Form ── */}
+        {mode === 'otp' && (
+          <div>
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 border border-white/[0.08] flex items-center justify-center">
+                <Mail className="w-8 h-8 text-blue-400" />
+              </div>
+              <h2 className="text-xl font-bold text-white mb-1">Подтверждение email</h2>
+              <p className="text-sm text-slate-400">Код отправлен на <span className="text-white font-medium">{otpEmail}</span></p>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (otpCode.length !== 6) { setError('Введите 6-значный код'); return; }
+                setIsLoading(true);
+                setError('');
+                try {
+                  await verifyOTP(otpEmail, otpCode);
+                  setMode('login');
+                  setOtpCode('');
+                  setVerifiedBanner(true);
+                  setTimeout(() => setVerifiedBanner(false), 8000);
+                } catch (err: any) {
+                  const msg = typeof err.response?.data === 'string' ? err.response.data : 'Неверный или просроченный код';
+                  setError(msg);
+                } finally { setIsLoading(false); }
+              }}
+              className="relative rounded-[22px] p-8 overflow-hidden
+                bg-gradient-to-br from-[#0d1528] via-[#0a1025] to-[#0c0f20]
+                shadow-[0_8px_60px_-12px_rgba(30,64,175,0.25)]
+                border border-white/[0.08]"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-white/[0.06] via-transparent to-transparent pointer-events-none rounded-[22px]" />
+              <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-400/30 to-transparent" />
+
+              <div className="relative z-10 space-y-4">
+                <div className="relative group">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 group-focus-within:text-blue-400 transition-colors z-10" />
+                  <input
+                    type="text"
+                    placeholder="000000"
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    className="w-full bg-white/[0.04] border border-white/[0.10] rounded-xl py-4 pl-12 pr-4
+                      text-white placeholder-slate-600 text-center
+                      focus:outline-none focus:border-blue-400 focus:bg-white/[0.06] focus:ring-2 focus:ring-blue-500/60
+                      transition-colors duration-150 text-2xl font-mono tracking-[0.5em]"
+                    autoFocus
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isLoading || otpCode.length !== 6}
+                  className="w-full mt-2 py-4 rounded-xl font-semibold text-base
+                    bg-gradient-to-r from-blue-500 to-indigo-600 text-white
+                    hover:from-blue-400 hover:to-indigo-500
+                    disabled:opacity-50 disabled:cursor-not-allowed
+                    transition-all duration-150
+                    shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30
+                    flex items-center justify-center gap-2 group relative overflow-hidden"
+                >
+                  <span className="relative z-10">
+                    {isLoading ? 'Проверка...' : 'Подтвердить'}
+                  </span>
+                  {!isLoading && <ChevronRight className="w-5 h-5 relative z-10" />}
+                </button>
+
+                <div className="flex items-center justify-between pt-2">
+                  <button
+                    type="button"
+                    disabled={otpResending}
+                    onClick={async () => {
+                      setOtpResending(true);
+                      try { await resendOTP(otpEmail); setError(''); }
+                      catch {} finally { setTimeout(() => setOtpResending(false), 30000); }
+                    }}
+                    className="text-sm text-blue-400 hover:text-blue-300 transition-colors disabled:opacity-50 flex items-center gap-1"
+                  >
+                    <Send className="w-3 h-3" />
+                    {otpResending ? 'Отправлено (30с)' : 'Отправить код повторно'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setMode('login'); setError(''); setOtpCode(''); }}
+                    className="text-sm text-slate-500 hover:text-slate-300 transition-colors flex items-center gap-1"
+                  >
+                    <ArrowLeft className="w-3 h-3" />
+                    Войти
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        )}
+
         {/* ── Bank Card Form (Glassmorphism) — login/register only ── */}
-        {mode !== '2fa' && (
+        {mode !== '2fa' && mode !== 'otp' && (
         <div>
           <form
             onSubmit={handleSubmit}

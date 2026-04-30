@@ -605,6 +605,8 @@ func buildRouter() *mux.Router {
 	r.HandleFunc("/api/v1/auth/register", h.RegisterHandler).Methods("POST")
 	r.HandleFunc("/api/v1/auth/login", h.LoginHandler).Methods("POST")
 	r.HandleFunc("/api/v1/auth/verify-email", h.VerifyEmailHandler).Methods("GET")
+	r.HandleFunc("/api/v1/auth/verify-otp", h.VerifyOTPHandler).Methods("POST")
+	r.HandleFunc("/api/v1/auth/resend-otp", h.ResendOTPHandler).Methods("POST")
 	r.HandleFunc("/api/v1/auth/resend-verification", h.ResendVerificationHandler).Methods("POST")
 	r.HandleFunc("/api/v1/auth/reset-password-request", h.ResetPasswordRequestHandler).Methods("POST")
 	r.HandleFunc("/api/v1/auth/reset-password", h.ResetPasswordHandler).Methods("POST")

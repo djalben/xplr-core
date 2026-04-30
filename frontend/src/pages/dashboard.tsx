@@ -371,7 +371,7 @@ export const DashboardPage = () => {
         {/* 2FA Security Alert — persistent, mandatory for users without 2FA */}
         {userData && userData.two_factor_enabled === false && (
           <div
-            onClick={() => navigate('/settings')}
+            onClick={() => navigate('/settings?tab=security')}
             className="glass-card p-4 mb-6 border border-amber-500/30 bg-gradient-to-r from-amber-500/5 to-red-500/5 cursor-pointer group hover:border-amber-500/50 transition-all"
           >
             <div className="flex items-center gap-4">

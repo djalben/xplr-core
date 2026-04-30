@@ -93,19 +93,25 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		// Не блокируем регистрацию
 	}
 
-	// Генерация токена подтверждения email и отправка письма
-	verifyToken, err := repository.CreateVerificationToken(createdUser.ID)
+	// Generate 6-digit OTP and send via email (Zoho SMTP or Resend)
+	otpCode, err := repository.CreateOTPCode(createdUser.ID)
 	if err != nil {
-		log.Printf("Warning: Failed to create verification token for user %d: %v", createdUser.ID, err)
-	} else {
-		if err := service.SendVerificationEmail(createdUser.Email, verifyToken); err != nil {
-			log.Printf("Warning: Failed to send verification email to %s: %v", createdUser.Email, err)
-		}
+		log.Printf("[REGISTER] Failed to create OTP for user %d: %v", createdUser.ID, err)
+		http.Error(w, "Failed to generate verification code", http.StatusInternalServerError)
+		return
 	}
 
-	// Отправка приветственного письма (synchronous — go func() dies in Vercel serverless)
-	if err := service.SendWelcomeEmail(createdUser.Email); err != nil {
-		log.Printf("Warning: Failed to send welcome email to %s: %v", createdUser.Email, err)
+	if err := service.SendOTPEmail(createdUser.Email, otpCode); err != nil {
+		log.Printf("[REGISTER] Failed to send OTP to %s: %v", createdUser.Email, err)
+		// Don't block registration — user can resend later
+	}
+
+	// Admin bootstrap: если в системе нет ни одного админа, первый пользователь становится админом
+	if !repository.HasAnyAdmin() {
+		log.Printf("[BOOTSTRAP] 🚀 No admins found — promoting first user %d (%s) to admin", createdUser.ID, createdUser.Email)
+		if err := repository.PromoteToAdmin(createdUser.ID); err != nil {
+			log.Printf("[BOOTSTRAP] Warning: failed to auto-promote: %v", err)
+		}
 	}
 
 	// Уведомление админам о новом пользователе (async)
@@ -126,46 +132,14 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		telegram.NotifyAdmins(msg, "👤 Открыть в админке", "https://xplr.pro/admin/users")
 	}(createdUser.Email)
 
-	// Admin bootstrap: если в системе нет ни одного админа, первый пользователь становится админом
-	isAdmin := false
-	userRole := "user"
-	if !repository.HasAnyAdmin() {
-		log.Printf("[BOOTSTRAP] 🚀 No admins found — promoting first user %d (%s) to admin", createdUser.ID, createdUser.Email)
-		if err := repository.PromoteToAdmin(createdUser.ID); err != nil {
-			log.Printf("[BOOTSTRAP] Warning: failed to auto-promote: %v", err)
-		} else {
-			isAdmin = true
-			userRole = "admin"
-		}
-	}
-
-	// Генерация JWT токена (авто-логин после регистрации)
-	token, err := utils.GenerateJWT(createdUser.ID, isAdmin, userRole)
-	if err != nil {
-		log.Printf("Error generating JWT: %v", err)
-		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
-		return
-	}
-
-	// Успешный ответ
-	response := map[string]interface{}{
-		"token": token,
-		"user": map[string]interface{}{
-			"id":          createdUser.ID,
-			"email":       createdUser.Email,
-			"balance":     createdUser.BalanceRub.String(),
-			"status":      "ACTIVE",
-			"is_verified": false,
-			"is_admin":    isAdmin,
-			"role":        userRole,
-			"created_at":  createdUser.CreatedAt,
-		},
-		"message": "Регистрация успешна! ВНИМАНИЕ: Подключите Telegram в настройках для получения уведомлений о безопасности и транзакциях. Без этого важные оповещения могут быть пропущены.",
-	}
-
+	// NO TOKEN, NO AUTO-LOGIN — user must verify OTP first, then login manually
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"requires_otp": true,
+		"email":        createdUser.Email,
+		"message":      "Код подтверждения отправлен на вашу почту. Введите 6-значный код.",
+	})
 }
 
 // VerifyEmailHandler — GET /api/v1/auth/verify-email?token=...
@@ -191,6 +165,90 @@ func VerifyEmailHandler(w http.ResponseWriter, r *http.Request) {
 		appDomain = "https://xplr.pro"
 	}
 	http.Redirect(w, r, appDomain+"/auth?verified=true", http.StatusFound)
+}
+
+// VerifyOTPHandler — POST /api/v1/auth/verify-otp
+// Verifies 6-digit OTP code. Sets is_verified=true. No auto-login.
+func VerifyOTPHandler(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Email string `json:"email"`
+		Code  string `json:"code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	email := strings.TrimSpace(strings.ToLower(req.Email))
+	code := strings.TrimSpace(req.Code)
+
+	if email == "" || len(code) != 6 {
+		http.Error(w, "Email and 6-digit code are required", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := repository.VerifyOTPCode(email, code)
+	if err != nil {
+		log.Printf("[OTP-VERIFY] ❌ Failed for %s: %v", email, err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Send welcome email after successful verification
+	go service.SendWelcomeEmail(email)
+
+	log.Printf("[OTP-VERIFY] ✅ User %d (%s) verified", userID, email)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":  "verified",
+		"message": "Email подтверждён. Теперь войдите в аккаунт.",
+	})
+}
+
+// ResendOTPHandler — POST /api/v1/auth/resend-otp
+// Generates new 6-digit OTP and sends via email.
+func ResendOTPHandler(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Email string `json:"email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	email := strings.TrimSpace(strings.ToLower(req.Email))
+	if email == "" {
+		http.Error(w, "Email is required", http.StatusBadRequest)
+		return
+	}
+
+	user, err := repository.GetUserByEmail(email)
+	if err != nil {
+		// Don't reveal if email exists
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok", "message": "Если аккаунт существует, код отправлен."})
+		return
+	}
+
+	if user.IsVerified {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok", "message": "Email уже подтверждён."})
+		return
+	}
+
+	code, err := repository.CreateOTPCode(user.ID)
+	if err != nil {
+		log.Printf("[RESEND-OTP] Failed to create OTP for %s: %v", email, err)
+		http.Error(w, "Failed to generate code", http.StatusInternalServerError)
+		return
+	}
+
+	if err := service.SendOTPEmail(email, code); err != nil {
+		log.Printf("[RESEND-OTP] Failed to send OTP to %s: %v", email, err)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "message": "Новый код отправлен на вашу почту."})
 }
 
 // ResendVerificationHandler — POST /api/v1/auth/resend-verification

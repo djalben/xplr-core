@@ -14,6 +14,8 @@ export interface AuthResponse {
   token: string;
   requires_2fa?: boolean;
   half_auth_token?: string;
+  requires_otp?: boolean;
+  email?: string;
   user: {
     id: number;
     email: string;
@@ -32,14 +34,22 @@ export interface Verify2FARequest {
   fingerprint?: string;
 }
 
-// Регистрация нового пользователя
+// Регистрация нового пользователя (returns requires_otp, NO token)
 export const register = async (data: RegisterRequest): Promise<AuthResponse> => {
   const response = await apiClient.post<AuthResponse>('/auth/register', data);
+  // No token stored — user must verify OTP first
+  return response.data;
+};
 
-  if (response.data.token) {
-    localStorage.setItem('token', response.data.token);
-  }
+// Verify 6-digit OTP code after registration
+export const verifyOTP = async (email: string, code: string): Promise<{ status: string; message: string }> => {
+  const response = await apiClient.post('/auth/verify-otp', { email, code });
+  return response.data;
+};
 
+// Resend OTP code
+export const resendOTP = async (email: string): Promise<{ status: string; message: string }> => {
+  const response = await apiClient.post('/auth/resend-otp', { email });
   return response.data;
 };
 
