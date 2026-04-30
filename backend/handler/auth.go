@@ -403,16 +403,11 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ── Шаг 2b: Email verification gate ──
+	// TEMPORARY BYPASS: email delivery is broken (Vercel blocks SMTP, Resend not yet configured).
+	// Users are locked out. Allow login without verified email until Resend is set up.
+	// TODO: Re-enable this gate once RESEND_API_KEY is configured and emails are flowing.
 	if !user.IsVerified {
-		log.Printf("[LOGIN] ❌ Email not verified for %s (user_id=%d)", email, user.ID)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusForbidden)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"error":              "email_not_verified",
-			"message":            "Пожалуйста, подтвердите ваш email. Проверьте почту.",
-			"email_not_verified": true,
-		})
-		return
+		log.Printf("[LOGIN] ⚠️ Email not verified for %s (user_id=%d) — BYPASS ACTIVE, allowing login", email, user.ID)
 	}
 
 	// ── Шаг 3: Авто-создание Grade если отсутствует ──
