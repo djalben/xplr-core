@@ -119,7 +119,7 @@ export const AuthPage = () => {
 
       // Immediately apply user data to auth context (including is_admin/role)
       if (res.user) {
-        applyUserToContext(res);
+        applyUserToContext(res.user);
       }
 
       const savedToken = localStorage.getItem('token');
@@ -160,9 +160,8 @@ export const AuthPage = () => {
     }
   };
 
-  // Helper: apply user from auth response to context
-  const applyUserToContext = (res: { user: { id: number; email: string; is_admin?: boolean; role?: string } }) => {
-    const u = res.user;
+  // Helper: apply user to auth context
+  const applyUserToContext = (u: { id: number; email: string; is_admin?: boolean; role?: string }) => {
     const adminFlag = u.is_admin === true || u.role === 'admin';
     console.log('[Auth] Setting user context: is_admin=', adminFlag, 'role=', u.role);
     setUser({
@@ -190,7 +189,7 @@ export const AuthPage = () => {
         code,
         remember_device: rememberDevice,
       });
-      if (res.user) applyUserToContext(res);
+      if (res.user) applyUserToContext(res.user);
       navigate('/dashboard');
     } catch (err: any) {
       const data = err.response?.data;
