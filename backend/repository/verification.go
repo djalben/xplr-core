@@ -62,7 +62,14 @@ func VerifyToken(token string) (int, error) {
 	}
 
 	if used {
-		return 0, fmt.Errorf("token already used")
+		// Idempotency: token may be "pre-opened" by email clients / scanners.
+		// If it's already used, treat as success (email should already be verified).
+		_, _ = tx.Exec(`UPDATE users SET is_verified = TRUE WHERE id = $1`, userID)
+		if err := tx.Commit(); err != nil {
+			return 0, fmt.Errorf("failed to commit: %w", err)
+		}
+		log.Printf("✅ User %d email verified successfully (token already used)", userID)
+		return userID, nil
 	}
 
 	if time.Now().After(expiresAt) {
