@@ -60,29 +60,32 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 			// Check if existing user is unverified — allow re-registration
 			existing, lookupErr := repository.GetUserByEmail(req.Email)
 			if lookupErr == nil && !existing.IsVerified {
-				log.Printf("[REGISTER] Unverified user %d re-registering — updating password & resending OTP", existing.ID)
+				log.Printf("[REGISTER] Unverified user %d re-registering — updating password & resending verification link", existing.ID)
 				// Update password
 				if upErr := repository.UpdateUserPassword(existing.ID, hashedPassword); upErr != nil {
 					log.Printf("[REGISTER] Failed to update password for user %d: %v", existing.ID, upErr)
 					http.Error(w, "Internal server error", http.StatusInternalServerError)
 					return
 				}
-				// Generate new OTP
-				otpCode, otpErr := repository.CreateOTPCode(existing.ID)
-				if otpErr != nil {
-					log.Printf("[REGISTER] Failed to create OTP for user %d: %v", existing.ID, otpErr)
-					http.Error(w, "Failed to generate verification code", http.StatusInternalServerError)
+				// Ensure tables exist (prod may have missed migrations)
+				repository.RunSchemaGuard()
+
+				// Create verification token + send email link
+				token, tokErr := repository.CreateVerificationToken(existing.ID)
+				if tokErr != nil {
+					log.Printf("[REGISTER] Failed to create verification token for user %d: %v", existing.ID, tokErr)
+					http.Error(w, "Failed to generate verification link", http.StatusInternalServerError)
 					return
 				}
-				if sendErr := service.SendOTPEmail(existing.Email, otpCode); sendErr != nil {
-					log.Printf("[REGISTER] Failed to send OTP to %s: %v", existing.Email, sendErr)
+				if sendErr := service.SendVerificationEmail(existing.Email, token); sendErr != nil {
+					log.Printf("[REGISTER] Failed to send verification email to %s: %v", existing.Email, sendErr)
 				}
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
 				json.NewEncoder(w).Encode(map[string]interface{}{
-					"requires_otp": true,
 					"email":        existing.Email,
-					"message":      "Новый код подтверждения отправлен на вашу почту.",
+					"message":      "Письмо подтверждения отправлено повторно. Откройте ссылку из письма.",
+					"is_verified":  false,
 				})
 				return
 			}
@@ -122,16 +125,19 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		// Не блокируем регистрацию
 	}
 
-	// Generate 6-digit OTP and send via email (Zoho SMTP or Resend)
-	otpCode, err := repository.CreateOTPCode(createdUser.ID)
+	// Ensure tables exist (prod may have missed migrations)
+	repository.RunSchemaGuard()
+
+	// Create verification token + send email link
+	token, err := repository.CreateVerificationToken(createdUser.ID)
 	if err != nil {
-		log.Printf("[REGISTER] Failed to create OTP for user %d: %v", createdUser.ID, err)
-		http.Error(w, "Failed to generate verification code", http.StatusInternalServerError)
+		log.Printf("[REGISTER] Failed to create verification token for user %d: %v", createdUser.ID, err)
+		http.Error(w, "Failed to generate verification link", http.StatusInternalServerError)
 		return
 	}
 
-	if err := service.SendOTPEmail(createdUser.Email, otpCode); err != nil {
-		log.Printf("[REGISTER] Failed to send OTP to %s: %v", createdUser.Email, err)
+	if err := service.SendVerificationEmail(createdUser.Email, token); err != nil {
+		log.Printf("[REGISTER] Failed to send verification email to %s: %v", createdUser.Email, err)
 		// Don't block registration — user can resend later
 	}
 
@@ -161,13 +167,13 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		telegram.NotifyAdmins(msg, "👤 Открыть в админке", "https://xplr.pro/admin/users")
 	}(createdUser.Email)
 
-	// NO TOKEN, NO AUTO-LOGIN — user must verify OTP first, then login manually
+	// NO TOKEN, NO AUTO-LOGIN — user must verify email by link, then login manually
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"requires_otp": true,
 		"email":        createdUser.Email,
-		"message":      "Код подтверждения отправлен на вашу почту. Введите 6-значный код.",
+		"is_verified":  false,
+		"message":      "Регистрация успешна. Подтвердите email по ссылке из письма.",
 	})
 }
 
@@ -193,91 +199,7 @@ func VerifyEmailHandler(w http.ResponseWriter, r *http.Request) {
 	if appDomain == "" {
 		appDomain = "https://xplr.pro"
 	}
-	http.Redirect(w, r, appDomain+"/auth?verified=true", http.StatusFound)
-}
-
-// VerifyOTPHandler — POST /api/v1/auth/verify-otp
-// Verifies 6-digit OTP code. Sets is_verified=true. No auto-login.
-func VerifyOTPHandler(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Email string `json:"email"`
-		Code  string `json:"code"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	email := strings.TrimSpace(strings.ToLower(req.Email))
-	code := strings.TrimSpace(req.Code)
-
-	if email == "" || len(code) != 6 {
-		http.Error(w, "Email and 6-digit code are required", http.StatusBadRequest)
-		return
-	}
-
-	userID, err := repository.VerifyOTPCode(email, code)
-	if err != nil {
-		log.Printf("[OTP-VERIFY] ❌ Failed for %s: %v", email, err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// Send welcome email after successful verification
-	go service.SendWelcomeEmail(email)
-
-	log.Printf("[OTP-VERIFY] ✅ User %d (%s) verified", userID, email)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":  "verified",
-		"message": "Email подтверждён. Теперь войдите в аккаунт.",
-	})
-}
-
-// ResendOTPHandler — POST /api/v1/auth/resend-otp
-// Generates new 6-digit OTP and sends via email.
-func ResendOTPHandler(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Email string `json:"email"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	email := strings.TrimSpace(strings.ToLower(req.Email))
-	if email == "" {
-		http.Error(w, "Email is required", http.StatusBadRequest)
-		return
-	}
-
-	user, err := repository.GetUserByEmail(email)
-	if err != nil {
-		// Don't reveal if email exists
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok", "message": "Если аккаунт существует, код отправлен."})
-		return
-	}
-
-	if user.IsVerified {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok", "message": "Email уже подтверждён."})
-		return
-	}
-
-	code, err := repository.CreateOTPCode(user.ID)
-	if err != nil {
-		log.Printf("[RESEND-OTP] Failed to create OTP for %s: %v", email, err)
-		http.Error(w, "Failed to generate code", http.StatusInternalServerError)
-		return
-	}
-
-	if err := service.SendOTPEmail(email, code); err != nil {
-		log.Printf("[RESEND-OTP] Failed to send OTP to %s: %v", email, err)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "message": "Новый код отправлен на вашу почту."})
+	http.Redirect(w, r, appDomain+"/auth?verified=1", http.StatusFound)
 }
 
 // ResendVerificationHandler — POST /api/v1/auth/resend-verification

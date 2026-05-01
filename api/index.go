@@ -131,6 +131,27 @@ func ensureDB() {
 
 	// 7. Create tables that schema_guard doesn't cover (tables, not columns)
 	tableMigrations := []string{
+		// Auth: email verification tokens (required for register/verify-email flow)
+		`CREATE TABLE IF NOT EXISTS verification_tokens (
+			id SERIAL PRIMARY KEY,
+			user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+			token VARCHAR(255) UNIQUE NOT NULL,
+			expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+			used BOOLEAN DEFAULT FALSE,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_verification_tokens_token ON verification_tokens(token)`,
+		`CREATE INDEX IF NOT EXISTS idx_verification_tokens_user_id ON verification_tokens(user_id)`,
+		// Auth: password reset tokens
+		`CREATE TABLE IF NOT EXISTS password_reset_tokens (
+			id SERIAL PRIMARY KEY,
+			user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+			token VARCHAR(255) UNIQUE NOT NULL,
+			expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+			used BOOLEAN DEFAULT FALSE,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token ON password_reset_tokens(token)`,
 		// Wallet (internal balances)
 		`CREATE TABLE IF NOT EXISTS internal_balances (
 			id SERIAL PRIMARY KEY,
@@ -605,8 +626,6 @@ func buildRouter() *mux.Router {
 	r.HandleFunc("/api/v1/auth/register", h.RegisterHandler).Methods("POST")
 	r.HandleFunc("/api/v1/auth/login", h.LoginHandler).Methods("POST")
 	r.HandleFunc("/api/v1/auth/verify-email", h.VerifyEmailHandler).Methods("GET")
-	r.HandleFunc("/api/v1/auth/verify-otp", h.VerifyOTPHandler).Methods("POST")
-	r.HandleFunc("/api/v1/auth/resend-otp", h.ResendOTPHandler).Methods("POST")
 	r.HandleFunc("/api/v1/auth/resend-verification", h.ResendVerificationHandler).Methods("POST")
 	r.HandleFunc("/api/v1/auth/reset-password-request", h.ResetPasswordRequestHandler).Methods("POST")
 	r.HandleFunc("/api/v1/auth/reset-password", h.ResetPasswordHandler).Methods("POST")
