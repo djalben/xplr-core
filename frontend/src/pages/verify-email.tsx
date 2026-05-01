@@ -33,7 +33,10 @@ export const VerifyEmailPage = () => {
         setStatus('error');
         const msg = err.message || 'Ошибка подтверждения';
         if (msg.includes('already used')) {
-          setMessage('Эта ссылка уже была использована. Войдите в аккаунт.');
+          // Token might have been pre-opened by email client scanners. Treat as success UX-wise.
+          setStatus('success');
+          setMessage('Email уже подтверждён. Перенаправляем...');
+          setTimeout(() => navigate('/auth?verified=1', { replace: true }), 1000);
         } else if (msg.includes('expired')) {
           setMessage('Ссылка истекла. Запросите новое письмо подтверждения.');
         } else {

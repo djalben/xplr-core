@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/djalben/xplr-core/backend/domain"
@@ -194,12 +193,16 @@ func VerifyEmailHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("[VERIFY] ✅ Email verified for user %d", userID)
-	// Redirect to /auth with verified flag — user must log in manually (no auto-session)
-	appDomain := os.Getenv("APP_DOMAIN")
-	if appDomain == "" {
-		appDomain = "https://xplr.pro"
-	}
-	http.Redirect(w, r, appDomain+"/auth?verified=1", http.StatusFound)
+	// IMPORTANT: do NOT redirect here.
+	// Frontend verification page calls this endpoint via fetch().
+	// Redirects can be treated as network/CORS failures even though verification succeeded,
+	// which results in a false "error" screen for the user.
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":   "ok",
+		"user_id":  userID,
+		"verified": true,
+	})
 }
 
 // ResendVerificationHandler — POST /api/v1/auth/resend-verification
