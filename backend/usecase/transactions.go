@@ -176,6 +176,6 @@ func AuthorizeCard(req AuthorizeCardRequest) domain.AuthResponse {
 
 // TestAuthorizeCard - Заглушка для тестирования (POST /v1/authorize)
 func TestAuthorizeCard(req AuthorizeCardRequest) domain.AuthResponse {
-	log.Printf("Test authorize request received: CardID=%d, Amount=%.2f, Merchant=%s", req.CardID, req.Amount, req.MerchantName)
+	log.Printf("Test authorize request received: CardID=%d, Amount=%s, Merchant=%s", req.CardID, req.Amount.StringFixed(2), req.MerchantName)
 	return AuthorizeCard(req)
 }
