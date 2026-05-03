@@ -72,6 +72,9 @@ func main() {
 	service.MonitorDB = DB
 	service.StartVPNTrafficMonitor()
 
+	// Start VPN cleanup job (every 6h: fix 0/0 records, expire over-limit/timed-out keys)
+	service.StartVPNCleanupJob()
+
 	// Тест "Дыхания" — проверка таблицы services в Supabase
 	log.Println("Testing Supabase connection: SELECT slug FROM services...")
 	rows, err := DB.Query("SELECT slug FROM services")

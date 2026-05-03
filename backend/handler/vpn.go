@@ -346,7 +346,7 @@ func AdminVPNServerStatusHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// ── Financial metrics ──
+	// ── Financial metrics (LTV) ──
 	serverCostEUR := 4.94
 	if envCost := os.Getenv("VPN_SERVER_MONTHLY_COST"); envCost != "" {
 		if v, err := strconv.ParseFloat(envCost, 64); err == nil && v > 0 {
@@ -354,49 +354,71 @@ func AdminVPNServerStatusHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Revenue: sum of all completed VPN orders this month
-	var monthlyRevenue float64
-	var uniqueVPNClients int
-	var currentMonthClients int
-	var prevMonthClients int
+	var monthlyRevenue, allTimeRevenue, last30dRevenue float64
+	var uniqueVPNClients, currentMonthClients, prevMonthClients, totalOrders int
+	var firstOrderDate string
 	if GlobalDB != nil {
+		vpnFilter := `(product_name ILIKE '%vpn%' OR product_name ILIKE '%vless%' OR product_name ILIKE '%безопасный%' OR activation_key LIKE 'vless://%')`
+
+		// All-time revenue
+		_ = GlobalDB.QueryRow(`
+			SELECT COALESCE(SUM(price_usd), 0), COUNT(*)
+			FROM store_orders WHERE status = 'completed' AND `+vpnFilter).Scan(&allTimeRevenue, &totalOrders)
+
+		// Current calendar month revenue
 		_ = GlobalDB.QueryRow(`
 			SELECT COALESCE(SUM(price_usd), 0)
-			FROM store_orders
-			WHERE status = 'completed'
-			  AND (product_name ILIKE '%vpn%' OR product_name ILIKE '%vless%' OR product_name ILIKE '%безопасный%')
-			  AND created_at >= date_trunc('month', NOW())
-		`).Scan(&monthlyRevenue)
+			FROM store_orders WHERE status = 'completed' AND ` + vpnFilter + `
+			  AND created_at >= date_trunc('month', NOW())`).Scan(&monthlyRevenue)
 
-		// Unique VPN clients (users with at least one active=completed VPN order)
+		// Last 30 days (sliding window) revenue
 		_ = GlobalDB.QueryRow(`
-			SELECT COUNT(DISTINCT user_id)
-			FROM store_orders
-			WHERE status = 'completed'
-			  AND (activation_key LIKE 'vless://%' OR product_name ILIKE '%vpn%' OR product_name ILIKE '%безопасный%')
-		`).Scan(&uniqueVPNClients)
+			SELECT COALESCE(SUM(price_usd), 0)
+			FROM store_orders WHERE status = 'completed' AND ` + vpnFilter + `
+			  AND created_at >= NOW() - INTERVAL '30 days'`).Scan(&last30dRevenue)
+
+		// Unique VPN clients (all-time)
+		_ = GlobalDB.QueryRow(`
+			SELECT COUNT(DISTINCT user_id) FROM store_orders
+			WHERE status = 'completed' AND ` + vpnFilter).Scan(&uniqueVPNClients)
 
 		// Current month new VPN clients
 		_ = GlobalDB.QueryRow(`
-			SELECT COUNT(DISTINCT user_id)
-			FROM store_orders
-			WHERE status = 'completed'
-			  AND (activation_key LIKE 'vless://%' OR product_name ILIKE '%vpn%' OR product_name ILIKE '%безопасный%')
-			  AND created_at >= date_trunc('month', NOW())
-		`).Scan(&currentMonthClients)
+			SELECT COUNT(DISTINCT user_id) FROM store_orders
+			WHERE status = 'completed' AND ` + vpnFilter + `
+			  AND created_at >= date_trunc('month', NOW())`).Scan(&currentMonthClients)
 
 		// Previous month VPN clients
 		_ = GlobalDB.QueryRow(`
-			SELECT COUNT(DISTINCT user_id)
-			FROM store_orders
-			WHERE status = 'completed'
-			  AND (activation_key LIKE 'vless://%' OR product_name ILIKE '%vpn%' OR product_name ILIKE '%безопасный%')
+			SELECT COUNT(DISTINCT user_id) FROM store_orders
+			WHERE status = 'completed' AND ` + vpnFilter + `
 			  AND created_at >= date_trunc('month', NOW()) - INTERVAL '1 month'
-			  AND created_at < date_trunc('month', NOW())
-		`).Scan(&prevMonthClients)
+			  AND created_at < date_trunc('month', NOW())`).Scan(&prevMonthClients)
+
+		// First order date (for total months calculation)
+		_ = GlobalDB.QueryRow(`
+			SELECT COALESCE(MIN(created_at)::text, NOW()::text)
+			FROM store_orders WHERE status = 'completed' AND ` + vpnFilter).Scan(&firstOrderDate)
 	}
 
-	margin := monthlyRevenue - serverCostEUR
+	// Total months of operation for cost calculation
+	totalMonths := 1
+	if firstOrderDate != "" {
+		if t, err := time.Parse("2006-01-02 15:04:05", firstOrderDate[:19]); err == nil {
+			months := int(time.Since(t).Hours()/(24*30)) + 1
+			if months > totalMonths {
+				totalMonths = months
+			}
+		}
+	}
+
+	totalCosts := serverCostEUR * float64(totalMonths)
+	allTimeProfit := allTimeRevenue - totalCosts
+	monthlyMargin := monthlyRevenue - serverCostEUR
+	arpu := float64(0)
+	if uniqueVPNClients > 0 {
+		arpu = allTimeRevenue / float64(uniqueVPNClients)
+	}
 
 	// ── Traffic alert: critical when remaining <= 5 GB ──
 	remainingBytes := serverLimitBytes - stats.TotalTraffic
@@ -422,10 +444,17 @@ func AdminVPNServerStatusHandler(w http.ResponseWriter, r *http.Request) {
 		"unique_vpn_clients":    uniqueVPNClients,
 		"current_month_clients": currentMonthClients,
 		"prev_month_clients":    prevMonthClients,
-		// Financial
-		"monthly_revenue": monthlyRevenue,
-		"server_cost":     serverCostEUR,
-		"margin":          margin,
+		// Financial — LTV
+		"monthly_revenue":  monthlyRevenue,
+		"last_30d_revenue": last30dRevenue,
+		"all_time_revenue": allTimeRevenue,
+		"server_cost":      serverCostEUR,
+		"total_costs":      totalCosts,
+		"margin":           monthlyMargin,
+		"all_time_profit":  allTimeProfit,
+		"total_orders":     totalOrders,
+		"total_months":     totalMonths,
+		"arpu":             arpu,
 	})
 }
 
