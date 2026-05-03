@@ -293,6 +293,22 @@ func AdminVPNServerStatusHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	// ── Hard floor: server 1767112 (SWEs-2) is 60 GB minimum ──
+	aezaServerID := os.Getenv("AEZA_SERVER_ID")
+	if aezaServerID == "" {
+		aezaServerID = "1767112"
+	}
+	if aezaServerID == "1767112" && serverLimitGB < 60 {
+		log.Printf("[VPN-SERVER-STATUS] ⚠️ Overriding stale limit %d → 60 GB for server 1767112 (SWEs-2 plan)", serverLimitGB)
+		serverLimitGB = 60
+		// Persist corrected value to DB
+		if GlobalDB != nil {
+			GlobalDB.Exec(`
+				INSERT INTO system_settings (setting_key, setting_value, description)
+				VALUES ('vpn_bandwidth_limit_gb', '60', 'VPN server traffic limit — forced 60GB for SWEs-2')
+				ON CONFLICT (setting_key) DO UPDATE SET setting_value = '60', updated_at = NOW()`)
+		}
+	}
 	log.Printf("[VPN-SERVER-STATUS] Final serverLimitGB=%d (source: aeza=%v, apiErr=%v)", serverLimitGB, aezaInfo != nil && aezaInfo.BandwidthGB > 0, aezaErr)
 	serverLimitBytes := int64(serverLimitGB) * 1024 * 1024 * 1024
 
