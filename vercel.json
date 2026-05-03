@@ -1,8 +1,4 @@
 {
-  "crons": [
-    { "path": "/api/v1/cron/vpn-traffic", "schedule": "*/30 * * * *" },
-    { "path": "/api/v1/cron/vpn-cleanup", "schedule": "0 */6 * * *" }
-  ],
   "buildCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
   "framework": "vite",
