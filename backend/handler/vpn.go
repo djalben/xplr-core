@@ -312,9 +312,33 @@ func AdminVPNServerStatusHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[VPN-SERVER-STATUS] Final serverLimitGB=%d (source: aeza=%v, apiErr=%v)", serverLimitGB, aezaInfo != nil && aezaInfo.BandwidthGB > 0, aezaErr)
 	serverLimitBytes := int64(serverLimitGB) * 1024 * 1024 * 1024
 
+	// ── Traffic Offset: subtract old-plan traffic to show usage since last reset ──
+	var trafficOffsetBytes int64
+	if GlobalDB != nil {
+		var offsetStr string
+		if err := GlobalDB.QueryRow(`SELECT setting_value FROM system_settings WHERE setting_key = 'vpn_traffic_offset_bytes'`).Scan(&offsetStr); err == nil {
+			if v, e := strconv.ParseInt(offsetStr, 10, 64); e == nil && v > 0 {
+				trafficOffsetBytes = v
+			}
+		}
+	}
+	rawTotalTraffic := stats.TotalTraffic
+	displayTraffic := stats.TotalTraffic - trafficOffsetBytes
+	if displayTraffic < 0 {
+		displayTraffic = 0
+	}
+	displayUp := stats.TotalUp - trafficOffsetBytes/2
+	if displayUp < 0 {
+		displayUp = 0
+	}
+	displayDown := stats.TotalDown - trafficOffsetBytes/2
+	if displayDown < 0 {
+		displayDown = 0
+	}
+
 	usedPercent := float64(0)
 	if serverLimitBytes > 0 {
-		usedPercent = float64(stats.TotalTraffic) / float64(serverLimitBytes) * 100
+		usedPercent = float64(displayTraffic) / float64(serverLimitBytes) * 100
 		if usedPercent > 100 {
 			usedPercent = 100
 		}
@@ -420,8 +444,8 @@ func AdminVPNServerStatusHandler(w http.ResponseWriter, r *http.Request) {
 		arpu = allTimeRevenue / float64(uniqueVPNClients)
 	}
 
-	// ── Traffic alert: critical when remaining <= 5 GB ──
-	remainingBytes := serverLimitBytes - stats.TotalTraffic
+	// ── Traffic alert: critical when remaining <= 5 GB (based on display traffic) ──
+	remainingBytes := serverLimitBytes - displayTraffic
 	if remainingBytes < 0 {
 		remainingBytes = 0
 	}
@@ -429,14 +453,16 @@ func AdminVPNServerStatusHandler(w http.ResponseWriter, r *http.Request) {
 	trafficAlert := false
 	if remainingGB <= 5.0 {
 		trafficAlert = true
-		go notifyTrafficCritical(stats.TotalTraffic, serverLimitBytes)
+		go notifyTrafficCritical(displayTraffic, serverLimitBytes)
 	}
 
 	json.NewEncoder(w).Encode(map[string]any{
 		"active_clients":        stats.ActiveClients,
-		"total_upload":          stats.TotalUp,
-		"total_download":        stats.TotalDown,
-		"total_traffic":         stats.TotalTraffic,
+		"total_upload":          displayUp,
+		"total_download":        displayDown,
+		"total_traffic":         displayTraffic,
+		"raw_total_traffic":     rawTotalTraffic,
+		"traffic_offset_bytes":  trafficOffsetBytes,
 		"server_limit_bytes":    serverLimitBytes,
 		"server_limit_gb":       serverLimitGB,
 		"used_percent":          usedPercent,
@@ -455,6 +481,61 @@ func AdminVPNServerStatusHandler(w http.ResponseWriter, r *http.Request) {
 		"total_orders":     totalOrders,
 		"total_months":     totalMonths,
 		"arpu":             arpu,
+	})
+}
+
+// ══════════════════════════════════════════════════════════════
+// POST /api/v1/admin/vpn/reset-traffic-offset — Reset traffic counter
+// Saves current raw traffic as the offset, so display shows 0 from now.
+// ══════════════════════════════════════════════════════════════
+
+func AdminResetTrafficOffsetHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if GlobalDB == nil {
+		json.NewEncoder(w).Encode(map[string]any{"error": "DB not ready"})
+		return
+	}
+
+	// Get current raw traffic from 3X-UI
+	provider := shop.GetRegistry().Get("vless")
+	if provider == nil {
+		json.NewEncoder(w).Encode(map[string]any{"error": "vless provider not registered"})
+		return
+	}
+	vp, ok := provider.(*vless.VlessProvider)
+	if !ok {
+		json.NewEncoder(w).Encode(map[string]any{"error": "provider type assertion failed"})
+		return
+	}
+
+	stats, err := vp.GetServerTraffic()
+	if err != nil {
+		log.Printf("[VPN-OFFSET] ❌ GetServerTraffic error: %v", err)
+		json.NewEncoder(w).Encode(map[string]any{"error": err.Error()})
+		return
+	}
+
+	offsetBytes := stats.TotalTraffic
+	_, dbErr := GlobalDB.Exec(`
+		INSERT INTO system_settings (setting_key, setting_value, description)
+		VALUES ('vpn_traffic_offset_bytes', $1, 'Traffic offset — zero point for new billing period')
+		ON CONFLICT (setting_key) DO UPDATE SET setting_value = $1, updated_at = NOW()`,
+		strconv.FormatInt(offsetBytes, 10))
+	if dbErr != nil {
+		log.Printf("[VPN-OFFSET] ❌ DB write error: %v", dbErr)
+		json.NewEncoder(w).Encode(map[string]any{"error": dbErr.Error()})
+		return
+	}
+
+	offsetGB := float64(offsetBytes) / (1024 * 1024 * 1024)
+	log.Printf("[VPN-OFFSET] ✅ Traffic offset set to %d bytes (%.2f GB)", offsetBytes, offsetGB)
+
+	json.NewEncoder(w).Encode(map[string]any{
+		"ok":           true,
+		"offset_bytes": offsetBytes,
+		"offset_gb":    offsetGB,
+		"message":      fmt.Sprintf("Traffic counter reset. Offset set to %.2f GB.", offsetGB),
 	})
 }
 

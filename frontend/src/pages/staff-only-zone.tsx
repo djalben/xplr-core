@@ -37,6 +37,7 @@ import {
   Tag,
   ShoppingBag,
   Pencil,
+  RotateCcw,
 } from 'lucide-react';
 
 type Tab = 'dashboard' | 'users' | 'commissions' | 'tickets' | 'news' | 'logs' | 'store' | 'rates' | 'security';
@@ -318,6 +319,8 @@ export const StaffOnlyZone = () => {
     total_upload: number;
     total_download: number;
     total_traffic: number;
+    raw_total_traffic: number;
+    traffic_offset_bytes: number;
     server_limit_bytes: number;
     server_limit_gb: number;
     used_percent: number;
@@ -415,6 +418,25 @@ export const StaffOnlyZone = () => {
     } catch { /* ignore */ }
     finally { setVpnServerLoading(false); }
   }, []);
+
+  const [resetOffsetLoading, setResetOffsetLoading] = useState(false);
+  const resetTrafficOffset = useCallback(async () => {
+    if (!confirm('Сбросить счётчик трафика? Текущее использование станет нулевой точкой.')) return;
+    setResetOffsetLoading(true);
+    try {
+      const res = await apiClient.post('/admin/vpn/reset-traffic-offset');
+      if (res.data?.ok) {
+        showToast(`Счётчик сброшен. Offset: ${res.data.offset_gb?.toFixed(2)} ГБ`);
+        fetchVPNServerStatus();
+      } else {
+        showToast(res.data?.error || 'Ошибка сброса', 'err');
+      }
+    } catch (err: any) {
+      showToast(err?.response?.data?.error || 'Ошибка сброса счётчика', 'err');
+    } finally {
+      setResetOffsetLoading(false);
+    }
+  }, [fetchVPNServerStatus]);
 
   const fetchVPNActiveClients = useCallback(async () => {
     try {
@@ -1099,6 +1121,28 @@ export const StaffOnlyZone = () => {
                           </>
                         );
                       })()}
+                    </div>
+                  </div>
+
+                  {/* Traffic offset reset */}
+                  <div className="pt-3 border-t border-white/5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] text-white/30 uppercase tracking-wider">Точка отсчёта</p>
+                        <p className="text-xs text-white/50 tabular-nums">
+                          {vpnServerStatus.traffic_offset_bytes > 0
+                            ? `Offset: ${(vpnServerStatus.traffic_offset_bytes / (1024 * 1024 * 1024)).toFixed(2)} ГБ | Raw: ${(vpnServerStatus.raw_total_traffic / (1024 * 1024 * 1024)).toFixed(2)} ГБ`
+                            : 'Offset не установлен (показан полный трафик сервера)'}
+                        </p>
+                      </div>
+                      <button
+                        onClick={resetTrafficOffset}
+                        disabled={resetOffsetLoading}
+                        className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs text-amber-400 hover:bg-amber-500/20 transition-all disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap"
+                      >
+                        {resetOffsetLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
+                        Новый тариф
+                      </button>
                     </div>
                   </div>
                 </div>

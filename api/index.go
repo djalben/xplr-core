@@ -812,6 +812,7 @@ func buildRouter() *mux.Router {
 	admin.HandleFunc("/infra/vpn-active-clients", h.AdminVPNActiveClientsHandler).Methods("GET")
 	admin.HandleFunc("/vpn/client/{email}", h.AdminDeleteVPNClientHandler).Methods("DELETE")
 	admin.HandleFunc("/vpn/client/{email}", h.AdminEditVPNClientHandler).Methods("PATCH")
+	admin.HandleFunc("/vpn/reset-traffic-offset", h.AdminResetTrafficOffsetHandler).Methods("POST")
 
 	// VPN traffic cron (called by Vercel cron every 30 min, protected by CRON_SECRET)
 	r.HandleFunc("/api/v1/cron/vpn-traffic", h.VPNTrafficCronHandler).Methods("GET")
