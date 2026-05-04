@@ -38,7 +38,7 @@ func VPNTrafficCronHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 1. Fetch bandwidth limit from Aeza API
-	limitGB := 30
+	limitGB := 60
 	aezaInfo, aezaErr := service.GetAezaServerInfo()
 	if aezaErr != nil {
 		log.Printf("[VPN-CRON] ⚠️ Aeza API error: %v", aezaErr)
