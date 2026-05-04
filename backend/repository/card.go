@@ -735,7 +735,7 @@ func IssueCards(userID int, req domain.MassIssueRequest) (interface{}, error) {
 			if issueAmount.LessThanOrEqual(decimal.Zero) {
 				issueAmount = decimal.NewFromInt(int64(successCount))
 			}
-			desc := fmt.Sprintf("%d cards issued (limit $%.2f each)", successCount, req.DailyLimit)
+			desc := fmt.Sprintf("%d cards issued (limit $%s each)", successCount, req.DailyLimit.StringFixed(2))
 			if err := CreditRevShare(referrerID, userID, issueAmount, desc); err != nil {
 				log.Printf("Warning: RevShare failed for user %d -> referrer %d: %v", userID, referrerID, err)
 			}

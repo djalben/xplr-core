@@ -323,8 +323,15 @@ export const StaffOnlyZone = () => {
     used_percent: number;
     traffic_alert: boolean;
     monthly_revenue: number;
+    last_30d_revenue: number;
+    all_time_revenue: number;
     server_cost: number;
+    total_costs: number;
     margin: number;
+    all_time_profit: number;
+    total_orders: number;
+    total_months: number;
+    arpu: number;
     unique_vpn_clients: number;
     current_month_clients: number;
     prev_month_clients: number;
@@ -884,31 +891,61 @@ export const StaffOnlyZone = () => {
               <StatCard icon={CreditCard} label="Всего карт" value={stats?.total_cards ?? '—'} accent="bg-slate-500" />
             </div>
 
-            {/* ── Финансы VPN ── */}
-            {vpnServerStatus && (
+            {/* ── Финансы VPN (LTV) ── */}
+            {vpnServerStatus && (() => {
+              const periods = [
+                { label: 'Этот месяц', revenue: vpnServerStatus.monthly_revenue, cost: vpnServerStatus.server_cost, profit: vpnServerStatus.margin },
+                { label: 'Последние 30д', revenue: vpnServerStatus.last_30d_revenue, cost: vpnServerStatus.server_cost, profit: (vpnServerStatus.last_30d_revenue ?? 0) - (vpnServerStatus.server_cost ?? 0) },
+                { label: 'За всё время', revenue: vpnServerStatus.all_time_revenue, cost: vpnServerStatus.total_costs, profit: vpnServerStatus.all_time_profit },
+              ];
+              return (
               <div className="glass-card p-6">
                 <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
                   <DollarSign className="w-5 h-5 text-emerald-400" />
-                  Финансы VPN (текущий месяц)
+                  Финансы VPN
                 </h3>
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-emerald-500/[0.08] border border-emerald-500/20 rounded-xl p-4">
-                    <p className="text-[10px] text-emerald-400/60 uppercase tracking-wider mb-1">Выручка</p>
-                    <p className="text-2xl font-bold text-emerald-400 tabular-nums">€{vpnServerStatus.monthly_revenue?.toFixed(2) ?? '0.00'}</p>
+
+                {/* Period rows */}
+                <div className="space-y-2 mb-4">
+                  {periods.map((p) => (
+                    <div key={p.label} className="grid grid-cols-4 gap-2 items-center">
+                      <span className="text-xs text-white/50 truncate">{p.label}</span>
+                      <div className="bg-emerald-500/[0.08] border border-emerald-500/20 rounded-lg px-3 py-2 text-center">
+                        <p className="text-[9px] text-emerald-400/50 uppercase tracking-wider">Выручка</p>
+                        <p className="text-sm font-bold text-emerald-400 tabular-nums">€{(p.revenue ?? 0).toFixed(2)}</p>
+                      </div>
+                      <div className="bg-red-500/[0.06] border border-red-500/15 rounded-lg px-3 py-2 text-center">
+                        <p className="text-[9px] text-red-400/50 uppercase tracking-wider">Затраты</p>
+                        <p className="text-sm font-bold text-red-400 tabular-nums">€{(p.cost ?? 0).toFixed(2)}</p>
+                      </div>
+                      <div className={`${(p.profit ?? 0) >= 0 ? 'bg-blue-500/[0.08] border-blue-500/20' : 'bg-amber-500/[0.08] border-amber-500/20'} border rounded-lg px-3 py-2 text-center`}>
+                        <p className="text-[9px] text-white/40 uppercase tracking-wider">Прибыль</p>
+                        <p className={`text-sm font-bold tabular-nums ${(p.profit ?? 0) >= 0 ? 'text-blue-400' : 'text-amber-400'}`}>
+                          {(p.profit ?? 0) >= 0 ? '+' : ''}€{(p.profit ?? 0).toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Summary row */}
+                <div className="grid grid-cols-3 gap-3 pt-3 border-t border-white/[0.06]">
+                  <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3 text-center">
+                    <p className="text-[9px] text-white/40 uppercase tracking-wider mb-0.5">Заказов всего</p>
+                    <p className="text-lg font-bold text-white tabular-nums">{vpnServerStatus.total_orders ?? 0}</p>
                   </div>
-                  <div className="bg-red-500/[0.06] border border-red-500/15 rounded-xl p-4">
-                    <p className="text-[10px] text-red-400/60 uppercase tracking-wider mb-1">Затраты</p>
-                    <p className="text-2xl font-bold text-red-400 tabular-nums">€{vpnServerStatus.server_cost?.toFixed(2) ?? '4.94'}</p>
+                  <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3 text-center">
+                    <p className="text-[9px] text-white/40 uppercase tracking-wider mb-0.5">ARPU</p>
+                    <p className="text-lg font-bold text-cyan-400 tabular-nums">€{(vpnServerStatus.arpu ?? 0).toFixed(2)}</p>
                   </div>
-                  <div className={`${(vpnServerStatus.margin ?? 0) >= 0 ? 'bg-blue-500/[0.08] border-blue-500/20' : 'bg-amber-500/[0.08] border-amber-500/20'} border rounded-xl p-4`}>
-                    <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Прибыль</p>
-                    <p className={`text-2xl font-bold tabular-nums ${(vpnServerStatus.margin ?? 0) >= 0 ? 'text-blue-400' : 'text-amber-400'}`}>
-                      {(vpnServerStatus.margin ?? 0) >= 0 ? '+' : ''}€{vpnServerStatus.margin?.toFixed(2) ?? '0.00'}
-                    </p>
+                  <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3 text-center">
+                    <p className="text-[9px] text-white/40 uppercase tracking-wider mb-0.5">Месяцев работы</p>
+                    <p className="text-lg font-bold text-white tabular-nums">{vpnServerStatus.total_months ?? 1}</p>
                   </div>
                 </div>
               </div>
-            )}
+              );
+            })()}
 
             {/* ── Aeza Server Info ── */}
             {aezaServer && aezaServer.api_status !== 'error' && (
