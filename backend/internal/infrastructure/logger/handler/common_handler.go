@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"path"
 	"runtime"
 	"slices"
@@ -64,7 +65,8 @@ func (ch *commonHandler) handle(ctx context.Context, record slog.Record) error {
 	defer func() {
 		err := writer.Flush()
 		if err != nil {
-			return
+			// Внутри slog.Handler нельзя логировать через slog (риск рекурсии). Пишем в stderr.
+			_, _ = fmt.Fprintf(os.Stderr, "xplr: log flush error: %v\n", err)
 		}
 	}()
 

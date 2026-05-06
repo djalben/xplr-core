@@ -99,7 +99,11 @@ func (uc *UseCase) GetMe(ctx context.Context, userID domain.UUID) (map[string]an
 
 	if uc.systemRepo != nil {
 		enabled, err := sbpTopupEnabled(ctx, uc.systemRepo)
-		if err == nil && !enabled {
+		if err != nil {
+			// fail-closed: при ошибке чтения системной настройки считаем СБП недоступным
+			sbpEnabled = false
+			sbpMessage = "Пополнение через СБП временно недоступно. Попробуйте позже."
+		} else if !enabled {
 			sbpEnabled = false
 			sbpMessage = "Пополнение через СБП временно недоступно. Выберите другой способ или попробуйте позже."
 		}

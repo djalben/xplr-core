@@ -111,6 +111,10 @@ func (uc *UseCase) TopUpCard(ctx context.Context, userID domain.UUID, cardID dom
 		return wrapper.Wrap(err)
 	}
 
+	if card.UserID != userID {
+		return domain.NewInvalidInput("card not found")
+	}
+
 	err = wallet.Withdraw(amount)
 	if err != nil {
 		return wrapper.Wrap(err)
