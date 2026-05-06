@@ -240,6 +240,10 @@ func (uc *UseCase) CloseCard(ctx context.Context, userID domain.UUID, cardID dom
 
 // AutoTopUpCard — главный метод автотопапа (вызывается, когда карте не хватило денег).
 func (uc *UseCase) AutoTopUpCard(ctx context.Context, userID domain.UUID, cardID domain.UUID, neededAmount domain.Numeric) error {
+	if uc.walletUC == nil {
+		return domain.NewInvalidInput("wallet usecase not configured")
+	}
+
 	return uc.walletUC.AutoTopUpCard(ctx, userID, cardID, neededAmount)
 }
 
