@@ -58,7 +58,7 @@ func (uc *UseCase) Purchase(ctx context.Context, userID domain.UUID, productID d
 		return nil, wrapper.Wrap(err)
 	}
 	if !p.InStock {
-		return nil, wrapper.Wrap(domain.NewInvalidInput("OUT_OF_STOCK"))
+		return nil, domain.NewInvalidInput("OUT_OF_STOCK")
 	}
 
 	// MVP: оплата из кошелька (в main это «через карту»). Для sandbox сейчас делаем так, чтобы цепочка работала.
@@ -104,12 +104,12 @@ func (uc *UseCase) Purchase(ctx context.Context, userID domain.UUID, productID d
 	}
 	if p.ProductType == domain.StoreProductTypeESIM {
 		if uc.esim == nil {
-			return nil, wrapper.Wrap(domain.NewInvalidInput("PROVIDER_ERROR"))
+			return nil, domain.NewInvalidInput("PROVIDER_ERROR")
 		}
 		// For catalog-driven purchase, external_id stores plan ID.
 		res, err := uc.esim.OrderESIM(ctx, p.ExternalID)
 		if err != nil {
-			return nil, wrapper.Wrap(domain.NewInvalidInput("PROVIDER_ERROR"))
+			return nil, domain.NewInvalidInput("PROVIDER_ERROR")
 		}
 		qr = res.QRData
 		providerRef = res.ProviderRef
@@ -180,7 +180,7 @@ func (uc *UseCase) ESIMPlans(ctx context.Context, countryCode string) ([]domain.
 
 func (uc *UseCase) ESIMOrder(ctx context.Context, planID string) (*domain.ESIMOrderResult, error) {
 	if uc.esim == nil {
-		return nil, wrapper.Wrap(domain.NewInvalidInput("PROVIDER_ERROR"))
+		return nil, domain.NewInvalidInput("PROVIDER_ERROR")
 	}
 
 	return uc.esim.OrderESIM(ctx, planID)

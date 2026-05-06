@@ -35,7 +35,7 @@ func NewAuthRateLimiter(db *sqlx.DB) ports.AuthRateLimiter {
 func (l *authRateLimiter) Allow(ctx context.Context, key string, now time.Time) (bool, time.Duration, error) {
 	key = normalizeKey(key)
 	if key == "" {
-		return false, 0, wrapper.Wrap(domain.NewInvalidInput("rate limit key is required"))
+		return false, 0, domain.NewInvalidInput("rate limit key is required")
 	}
 	if now.IsZero() {
 		now = time.Now().UTC()
@@ -62,7 +62,7 @@ func (l *authRateLimiter) Allow(ctx context.Context, key string, now time.Time) 
 func (l *authRateLimiter) Fail(ctx context.Context, key string, now time.Time) (time.Duration, error) {
 	key = normalizeKey(key)
 	if key == "" {
-		return 0, wrapper.Wrap(domain.NewInvalidInput("rate limit key is required"))
+		return 0, domain.NewInvalidInput("rate limit key is required")
 	}
 	if now.IsZero() {
 		now = time.Now().UTC()
@@ -120,7 +120,7 @@ func (l *authRateLimiter) Fail(ctx context.Context, key string, now time.Time) (
 func (l *authRateLimiter) Success(ctx context.Context, key string, _ time.Time) error {
 	key = normalizeKey(key)
 	if key == "" {
-		return wrapper.Wrap(domain.NewInvalidInput("rate limit key is required"))
+		return domain.NewInvalidInput("rate limit key is required")
 	}
 
 	const q = `DELETE FROM auth_rate_limits WHERE key = $1`

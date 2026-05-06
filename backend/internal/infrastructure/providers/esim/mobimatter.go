@@ -75,7 +75,7 @@ func (m *MobiMatterProvider) GetDestinations(ctx context.Context) ([]domain.ESIM
 
 func (m *MobiMatterProvider) GetPlans(ctx context.Context, countryCode string) ([]domain.ESIMPlan, error) {
 	if countryCode == "" {
-		return nil, wrapper.Wrap(domain.NewInvalidInput("countryCode is required"))
+		return nil, domain.NewInvalidInput("countryCode is required")
 	}
 
 	if !m.isConfigured() {
@@ -137,7 +137,7 @@ func (m *MobiMatterProvider) OrderESIM(_ context.Context, planID string) (*domai
 
 func (m *MobiMatterProvider) CheckAvailability(ctx context.Context, planID string) (bool, error) {
 	if planID == "" {
-		return false, wrapper.Wrap(domain.NewInvalidInput("planId is required"))
+		return false, domain.NewInvalidInput("planId is required")
 	}
 
 	if !m.isConfigured() {

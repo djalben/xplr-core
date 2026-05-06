@@ -177,7 +177,7 @@ func (r *userRepo) Update(ctx context.Context, user *domain.User) error {
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
-			return wrapper.Wrap(domain.NewAlreadyExists("telegram chat is already linked to another account"))
+			return domain.NewAlreadyExists("telegram chat is already linked to another account")
 		}
 
 		return wrapper.Wrap(err)
@@ -264,7 +264,7 @@ func (r *userRepo) SetIsAdmin(ctx context.Context, id domain.UUID, isAdmin bool)
 
 func (r *userRepo) SetLastLogin(ctx context.Context, id domain.UUID, at time.Time, ip *string, userAgent string) error {
 	if id == (domain.UUID{}) {
-		return wrapper.Wrap(domain.NewInvalidInput("user_id is required"))
+		return domain.NewInvalidInput("user_id is required")
 	}
 	if at.IsZero() {
 		at = time.Now().UTC()

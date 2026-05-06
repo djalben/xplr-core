@@ -216,10 +216,10 @@ func (uc *UseCase) CompleteMFALogin(ctx context.Context, mfaToken, totpCode stri
 
 func (uc *UseCase) RememberTrustedDevice(ctx context.Context, userID domain.UUID, userAgent string, ip *string, now time.Time) (rawToken string, expiresAt time.Time, err error) {
 	if uc.trustedDeviceRepo == nil {
-		return "", time.Time{}, wrapper.Wrap(domain.NewInvalidInput("trusted device repository is not configured"))
+		return "", time.Time{}, domain.NewInvalidInput("trusted device repository is not configured")
 	}
 	if userID == (domain.UUID{}) {
-		return "", time.Time{}, wrapper.Wrap(domain.NewInvalidInput("user_id is required"))
+		return "", time.Time{}, domain.NewInvalidInput("user_id is required")
 	}
 	if now.IsZero() {
 		now = time.Now().UTC()
@@ -251,10 +251,10 @@ func (uc *UseCase) RememberTrustedDevice(ctx context.Context, userID domain.UUID
 
 func (uc *UseCase) RevokeAllTrustedDevices(ctx context.Context, userID domain.UUID) error {
 	if uc.trustedDeviceRepo == nil {
-		return wrapper.Wrap(domain.NewInvalidInput("trusted device repository is not configured"))
+		return domain.NewInvalidInput("trusted device repository is not configured")
 	}
 	if userID == (domain.UUID{}) {
-		return wrapper.Wrap(domain.NewInvalidInput("user_id is required"))
+		return domain.NewInvalidInput("user_id is required")
 	}
 
 	return uc.trustedDeviceRepo.RevokeAll(ctx, userID)

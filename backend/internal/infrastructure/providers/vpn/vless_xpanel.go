@@ -82,7 +82,7 @@ func (v *VlessXPanelProvider) Enabled() bool { return v.cfg.PanelURL != "" }
 
 func (v *VlessXPanelProvider) CreateOrder(ctx context.Context, externalProductID string) (providerRef string, activationKey string, meta string, err error) {
 	if !v.Enabled() {
-		return "", "", "", wrapper.Wrap(domain.NewInvalidInput("vpn provider is not configured"))
+		return "", "", "", domain.NewInvalidInput("vpn provider is not configured")
 	}
 
 	durationDays := 30
@@ -132,7 +132,7 @@ func (v *VlessXPanelProvider) CreateOrder(ctx context.Context, externalProductID
 
 func (v *VlessXPanelProvider) GetClientTraffic(ctx context.Context, providerRef string) (*domain.VPNClientTraffic, error) {
 	if !v.Enabled() {
-		return nil, wrapper.Wrap(domain.NewInvalidInput("vpn provider is not configured"))
+		return nil, domain.NewInvalidInput("vpn provider is not configured")
 	}
 
 	resp, err := v.doAPIRequest(ctx, http.MethodGet, v.writeAPI()+"/getClientTraffics/"+providerRef, nil)
@@ -157,7 +157,7 @@ func (v *VlessXPanelProvider) GetClientTraffic(ctx context.Context, providerRef 
 		return nil, wrapper.Wrap(err)
 	}
 	if !result.Success || result.Obj == nil {
-		return nil, wrapper.Wrap(domain.NewNotFound("vpn client not found"))
+		return nil, domain.NewNotFound("vpn client not found")
 	}
 
 	return &domain.VPNClientTraffic{
@@ -182,11 +182,11 @@ type inboundClient struct {
 
 func (v *VlessXPanelProvider) DeleteClientByEmail(ctx context.Context, email string) error {
 	if !v.Enabled() {
-		return wrapper.Wrap(domain.NewInvalidInput("vpn provider is not configured"))
+		return domain.NewInvalidInput("vpn provider is not configured")
 	}
 	email = strings.TrimSpace(email)
 	if email == "" {
-		return wrapper.Wrap(domain.NewInvalidInput("email is required"))
+		return domain.NewInvalidInput("email is required")
 	}
 
 	// 3x-ui: POST /{id}/delClientByEmail/{email}
@@ -207,7 +207,7 @@ func (v *VlessXPanelProvider) DeleteClientByEmail(ctx context.Context, email str
 		return wrapper.Wrap(err)
 	}
 	if !result.Success {
-		return wrapper.Wrap(domain.NewInvalidInput("xpanel delClientByEmail failed"))
+		return domain.NewInvalidInput("xpanel delClientByEmail failed")
 	}
 
 	return nil
@@ -215,14 +215,14 @@ func (v *VlessXPanelProvider) DeleteClientByEmail(ctx context.Context, email str
 
 func (v *VlessXPanelProvider) UpdateClientByEmail(ctx context.Context, email string, totalBytes *int64, expiryMs *int64) error {
 	if !v.Enabled() {
-		return wrapper.Wrap(domain.NewInvalidInput("vpn provider is not configured"))
+		return domain.NewInvalidInput("vpn provider is not configured")
 	}
 	email = strings.TrimSpace(email)
 	if email == "" {
-		return wrapper.Wrap(domain.NewInvalidInput("email is required"))
+		return domain.NewInvalidInput("email is required")
 	}
 	if totalBytes == nil && expiryMs == nil {
-		return wrapper.Wrap(domain.NewInvalidInput("nothing to update"))
+		return domain.NewInvalidInput("nothing to update")
 	}
 
 	client, err := v.getClientByEmail(ctx, email)
@@ -230,7 +230,7 @@ func (v *VlessXPanelProvider) UpdateClientByEmail(ctx context.Context, email str
 		return wrapper.Wrap(err)
 	}
 	if client == nil {
-		return wrapper.Wrap(domain.NewNotFound("vpn client not found"))
+		return domain.NewNotFound("vpn client not found")
 	}
 
 	if totalBytes != nil {
@@ -267,7 +267,7 @@ func (v *VlessXPanelProvider) UpdateClientByEmail(ctx context.Context, email str
 		return wrapper.Wrap(err)
 	}
 	if !result.Success {
-		return wrapper.Wrap(domain.NewInvalidInput("xpanel updateClient failed"))
+		return domain.NewInvalidInput("xpanel updateClient failed")
 	}
 
 	return nil
@@ -297,7 +297,7 @@ func (v *VlessXPanelProvider) getClientByEmail(ctx context.Context, email string
 		return nil, wrapper.Wrap(err)
 	}
 	if !result.Success || result.Obj == nil {
-		return nil, wrapper.Wrap(domain.NewNotFound("xpanel inbound not found"))
+		return nil, domain.NewNotFound("xpanel inbound not found")
 	}
 
 	var settings struct {
@@ -320,7 +320,7 @@ func (v *VlessXPanelProvider) getClientByEmail(ctx context.Context, email string
 		}
 	}
 
-	return nil, wrapper.Wrap(domain.NewNotFound("vpn client not found"))
+	return nil, domain.NewNotFound("vpn client not found")
 }
 
 func (v *VlessXPanelProvider) addClient(ctx context.Context, clientUUID string, email string, expiryMs int64, totalBytes int64) error {
@@ -363,7 +363,7 @@ func (v *VlessXPanelProvider) addClient(ctx context.Context, clientUUID string, 
 		return wrapper.Wrap(err)
 	}
 	if !result.Success {
-		return wrapper.Wrap(domain.NewInvalidInput("xpanel addClient failed"))
+		return domain.NewInvalidInput("xpanel addClient failed")
 	}
 
 	return nil
@@ -402,7 +402,7 @@ func (v *VlessXPanelProvider) login(ctx context.Context) error {
 		return wrapper.Wrap(err)
 	}
 	if !result.Success {
-		return wrapper.Wrap(domain.NewInvalidInput("xpanel login rejected"))
+		return domain.NewInvalidInput("xpanel login rejected")
 	}
 
 	v.authed = true
