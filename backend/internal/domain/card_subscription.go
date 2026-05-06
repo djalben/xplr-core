@@ -20,4 +20,3 @@ type CardSubscription struct {
 	IsBlocked   bool       `json:"isBlocked" db:"is_blocked"`
 	BlockedAt   *time.Time `json:"blockedAt,omitempty" db:"blocked_at"`
 }
-

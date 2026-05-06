@@ -25,4 +25,3 @@ type CardSubscriptionRepository interface {
 
 	GetByCardAndMerchantKey(ctx context.Context, cardID domain.UUID, merchantKey string) (*domain.CardSubscription, error)
 }
-

@@ -13,4 +13,3 @@ type SubscriptionUseCase interface {
 	SetBlocked(ctx context.Context, userID domain.UUID, subscriptionID domain.UUID, isBlocked bool) error
 	SetBlockedByCard(ctx context.Context, userID domain.UUID, cardID domain.UUID, isBlocked bool) error
 }
-

@@ -8,10 +8,10 @@ import (
 
 // Общие ошибки домена (базовые sentinel errors).
 var (
-	ErrInvalidInput      = errors.New("invalid input")
-	ErrInsufficientFunds = errors.New("insufficient funds")
-	ErrNotFound          = errors.New("not found")
-	ErrAlreadyExists     = errors.New("already exists")
+	ErrInvalidInput        = errors.New("invalid input")
+	ErrInsufficientFunds   = errors.New("insufficient funds")
+	ErrNotFound            = errors.New("not found")
+	ErrAlreadyExists       = errors.New("already exists")
 	ErrSubscriptionBlocked = errors.New("subscription blocked")
 	// ErrCardBlockedAntifraud — карта заблокирована после серии неудачных авторизаций.
 	ErrCardBlockedAntifraud = errors.New("card blocked: too many failed authorization attempts")

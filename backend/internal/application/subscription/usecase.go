@@ -22,16 +22,16 @@ const (
 
 type AuthorizationResult struct {
 	Decision AuthorizationDecision `json:"decision"`
-	Reason   string               `json:"reason,omitempty"`
+	Reason   string                `json:"reason,omitempty"`
 }
 
 type AuthorizationEvent struct {
-	ProviderCardID string `json:"provider_card_id"`
-	ProviderTxID   string `json:"provider_tx_id"`
+	ProviderCardID string `json:"providerCardId"`
+	ProviderTxID   string `json:"providerTxId"`
 	Amount         string `json:"amount"`
 	Currency       string `json:"currency"`
-	MerchantName   string `json:"merchant_name"`
-	ExecutedAt     string `json:"executed_at,omitempty"` // RFC3339, optional
+	MerchantName   string `json:"merchantName"`
+	ExecutedAt     string `json:"executedAt,omitempty"` // RFC3339, optional
 }
 
 type UseCase struct {
@@ -85,10 +85,10 @@ func (uc *UseCase) SetBlockedByCard(ctx context.Context, userID domain.UUID, car
 
 func (uc *UseCase) HandleAuthorization(ctx context.Context, event AuthorizationEvent) (AuthorizationResult, error) {
 	if strings.TrimSpace(event.ProviderCardID) == "" {
-		return AuthorizationResult{}, domain.NewInvalidInput("provider_card_id is required")
+		return AuthorizationResult{}, domain.NewInvalidInput("providerCardId is required")
 	}
 	if strings.TrimSpace(event.MerchantName) == "" {
-		return AuthorizationResult{}, domain.NewInvalidInput("merchant_name is required")
+		return AuthorizationResult{}, domain.NewInvalidInput("merchantName is required")
 	}
 
 	card, err := uc.cardRepo.GetByProviderCardID(ctx, event.ProviderCardID)
@@ -122,6 +122,7 @@ func (uc *UseCase) HandleAuthorization(ctx context.Context, event AuthorizationE
 		if errors.Is(err, domain.ErrInsufficientFunds) {
 			return AuthorizationResult{Decision: AuthorizationDecisionDecline, Reason: "INSUFFICIENT_FUNDS"}, nil
 		}
+
 		return AuthorizationResult{}, wrapper.Wrap(err)
 	}
 
@@ -140,4 +141,3 @@ func (uc *UseCase) HandleAuthorization(ctx context.Context, event AuthorizationE
 
 	return AuthorizationResult{Decision: AuthorizationDecisionApprove}, nil
 }
-

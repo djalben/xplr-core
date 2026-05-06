@@ -22,10 +22,10 @@ func NewTrustedDeviceRepository(db *sqlx.DB) ports.TrustedDeviceRepository {
 
 func (r *trustedDeviceRepo) Add(ctx context.Context, td *domain.TrustedDevice) error {
 	if td == nil {
-		return domain.NewInvalidInput("trusted device is required")
+		return wrapper.Wrap(domain.NewInvalidInput("trusted device is required"))
 	}
 	if td.UserID == (domain.UUID{}) || td.TokenHash == "" || td.ExpiresAt.IsZero() {
-		return domain.NewInvalidInput("user_id, token_hash and expires_at are required")
+		return wrapper.Wrap(domain.NewInvalidInput("user_id, token_hash and expires_at are required"))
 	}
 
 	const q = `
@@ -47,7 +47,7 @@ func (r *trustedDeviceRepo) Add(ctx context.Context, td *domain.TrustedDevice) e
 
 func (r *trustedDeviceRepo) IsTrusted(ctx context.Context, userID domain.UUID, tokenHash string, now time.Time) (bool, error) {
 	if userID == (domain.UUID{}) || tokenHash == "" {
-		return false, domain.NewInvalidInput("user_id and token_hash are required")
+		return false, wrapper.Wrap(domain.NewInvalidInput("user_id and token_hash are required"))
 	}
 	if now.IsZero() {
 		now = time.Now().UTC()
@@ -76,7 +76,7 @@ func (r *trustedDeviceRepo) IsTrusted(ctx context.Context, userID domain.UUID, t
 
 func (r *trustedDeviceRepo) TouchLastUsed(ctx context.Context, tokenHash string, now time.Time) error {
 	if tokenHash == "" {
-		return domain.NewInvalidInput("token_hash is required")
+		return wrapper.Wrap(domain.NewInvalidInput("token_hash is required"))
 	}
 	if now.IsZero() {
 		now = time.Now().UTC()
@@ -93,7 +93,7 @@ func (r *trustedDeviceRepo) TouchLastUsed(ctx context.Context, tokenHash string,
 
 func (r *trustedDeviceRepo) RevokeAll(ctx context.Context, userID domain.UUID) error {
 	if userID == (domain.UUID{}) {
-		return domain.NewInvalidInput("user_id is required")
+		return wrapper.Wrap(domain.NewInvalidInput("user_id is required"))
 	}
 
 	const q = `DELETE FROM trusted_devices WHERE user_id = $1`

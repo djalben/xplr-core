@@ -30,6 +30,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	list, err := h.uc.List(r.Context(), userID)
 	if err != nil {
 		_ = handler.WriteInternalServerError(r.Context(), w, err)
+
 		return
 	}
 
@@ -43,23 +44,26 @@ func (h *Handler) SetBlocked(w http.ResponseWriter, r *http.Request) {
 	subID, err := domain.ParseUUID(idStr)
 	if err != nil {
 		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный id")
+
 		return
 	}
 
 	type req struct {
-		IsBlocked bool `json:"is_blocked"`
+		IsBlocked bool `json:"isBlocked"`
 	}
 
 	var body req
 	err = handler.ReadJSON(r, &body)
 	if err != nil {
 		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный запрос")
+
 		return
 	}
 
 	err = h.uc.SetBlocked(r.Context(), userID, subID, body.IsBlocked)
 	if err != nil {
 		_ = handler.WriteInternalServerError(r.Context(), w, err)
+
 		return
 	}
 
@@ -73,26 +77,28 @@ func (h *Handler) SetBlockedByCard(w http.ResponseWriter, r *http.Request) {
 	cardID, err := domain.ParseUUID(idStr)
 	if err != nil {
 		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный id карты")
+
 		return
 	}
 
 	type req struct {
-		IsBlocked bool `json:"is_blocked"`
+		IsBlocked bool `json:"isBlocked"`
 	}
 
 	var body req
 	err = handler.ReadJSON(r, &body)
 	if err != nil {
 		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный запрос")
+
 		return
 	}
 
 	err = h.uc.SetBlockedByCard(r.Context(), userID, cardID, body.IsBlocked)
 	if err != nil {
 		_ = handler.WriteInternalServerError(r.Context(), w, err)
+
 		return
 	}
 
 	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, map[string]any{"ok": true})
 }
-

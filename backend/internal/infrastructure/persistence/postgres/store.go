@@ -238,7 +238,7 @@ WHERE p.id = $1`
 	err := r.db.GetContext(ctx, &p, q, id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, domain.NewNotFound("product not found")
+			return nil, wrapper.Wrap(domain.NewNotFound("product not found"))
 		}
 
 		return nil, wrapper.Wrap(err)
@@ -301,7 +301,7 @@ FROM store_orders WHERE provider_ref = $1 AND status = 'COMPLETED' ORDER BY crea
 	err := r.db.GetContext(ctx, &o, q, providerRef)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, domain.NewNotFound("order not found")
+			return nil, wrapper.Wrap(domain.NewNotFound("order not found"))
 		}
 
 		return nil, wrapper.Wrap(err)
@@ -322,7 +322,7 @@ func (r *storeRepo) GetLatestCompletedOrderMetaByProviderRef(ctx context.Context
 	err := r.db.GetContext(ctx, &meta, q, args...)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return "", domain.NewNotFound("order not found")
+			return "", wrapper.Wrap(domain.NewNotFound("order not found"))
 		}
 
 		return "", wrapper.Wrap(err)

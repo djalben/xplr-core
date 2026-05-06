@@ -28,12 +28,14 @@ func (h *Handler) Authorization(w http.ResponseWriter, r *http.Request) {
 	err := handler.ReadJSON(r, &body)
 	if err != nil {
 		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Неверный запрос")
+
 		return
 	}
 
 	res, err := h.subUC.HandleAuthorization(r.Context(), body)
 	if err != nil {
 		_ = handler.WriteInternalServerError(r.Context(), w, err)
+
 		return
 	}
 

@@ -3,6 +3,9 @@ package app
 import (
 	"context"
 
+	"github.com/jmoiron/sqlx"
+	"gitlab.com/libs-artifex/wrapper/v2"
+
 	"github.com/djalben/xplr-core/backend/internal/application/auth"
 	"github.com/djalben/xplr-core/backend/internal/application/card"
 	"github.com/djalben/xplr-core/backend/internal/application/commission"
@@ -20,8 +23,6 @@ import (
 	esimProvider "github.com/djalben/xplr-core/backend/internal/infrastructure/providers/esim"
 	vpnProvider "github.com/djalben/xplr-core/backend/internal/infrastructure/providers/vpn"
 	"github.com/djalben/xplr-core/backend/internal/ports"
-	"github.com/jmoiron/sqlx"
-	"gitlab.com/libs-artifex/wrapper/v2"
 )
 
 type Container struct {

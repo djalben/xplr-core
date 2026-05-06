@@ -21,10 +21,10 @@ export async function listSubscriptions(): Promise<CardSubscription[]> {
 }
 
 export async function setSubscriptionBlocked(id: string, isBlocked: boolean): Promise<void> {
-  await apiClient.patch(`/subscriptions/${id}`, { is_blocked: isBlocked });
+  await apiClient.patch(`/subscriptions/${id}`, { isBlocked });
 }
 
 export async function setBlockedByCard(cardId: string, isBlocked: boolean): Promise<void> {
-  await apiClient.post(`/subscriptions/block-by-card/${cardId}`, { is_blocked: isBlocked });
+  await apiClient.post(`/subscriptions/block-by-card/${cardId}`, { isBlocked });
 }
 

@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"strings"
 	"time"
 
@@ -35,7 +36,7 @@ func (r *subscriptionRepo) UpsertOnCharge(
 ) (*domain.CardSubscription, error) {
 	key := normalizeMerchantKey(merchantName)
 	if key == "" {
-		return nil, domain.NewInvalidInput("merchant_name is required")
+		return nil, wrapper.Wrap(domain.NewInvalidInput("merchant_name is required"))
 	}
 
 	const query = `
@@ -124,7 +125,7 @@ func (r *subscriptionRepo) SetBlockedByCardID(ctx context.Context, userID domain
 func (r *subscriptionRepo) GetByCardAndMerchantKey(ctx context.Context, cardID domain.UUID, merchantKey string) (*domain.CardSubscription, error) {
 	key := strings.ToLower(strings.TrimSpace(merchantKey))
 	if key == "" {
-		return nil, domain.NewInvalidInput("merchant_key is required")
+		return nil, wrapper.Wrap(domain.NewInvalidInput("merchant_key is required"))
 	}
 
 	const query = `
@@ -139,12 +140,12 @@ func (r *subscriptionRepo) GetByCardAndMerchantKey(ctx context.Context, cardID d
 	var out domain.CardSubscription
 	err := r.store.GetContext(ctx, &out, query, cardID, key)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, domain.NewNotFound("subscription not found")
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, wrapper.Wrap(domain.NewNotFound("subscription not found"))
 		}
+
 		return nil, wrapper.Wrap(err)
 	}
 
 	return &out, nil
 }
-

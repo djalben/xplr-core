@@ -157,7 +157,7 @@ func (v *VlessXPanelProvider) GetClientTraffic(ctx context.Context, providerRef 
 		return nil, wrapper.Wrap(err)
 	}
 	if !result.Success || result.Obj == nil {
-		return nil, domain.NewNotFound("vpn client not found")
+		return nil, wrapper.Wrap(domain.NewNotFound("vpn client not found"))
 	}
 
 	return &domain.VPNClientTraffic{
@@ -230,7 +230,7 @@ func (v *VlessXPanelProvider) UpdateClientByEmail(ctx context.Context, email str
 		return wrapper.Wrap(err)
 	}
 	if client == nil {
-		return domain.NewNotFound("vpn client not found")
+		return wrapper.Wrap(domain.NewNotFound("vpn client not found"))
 	}
 
 	if totalBytes != nil {
@@ -297,7 +297,7 @@ func (v *VlessXPanelProvider) getClientByEmail(ctx context.Context, email string
 		return nil, wrapper.Wrap(err)
 	}
 	if !result.Success || result.Obj == nil {
-		return nil, domain.NewNotFound("xpanel inbound not found")
+		return nil, wrapper.Wrap(domain.NewNotFound("xpanel inbound not found"))
 	}
 
 	var settings struct {
@@ -320,7 +320,7 @@ func (v *VlessXPanelProvider) getClientByEmail(ctx context.Context, email string
 		}
 	}
 
-	return nil, domain.NewNotFound("vpn client not found")
+	return nil, wrapper.Wrap(domain.NewNotFound("vpn client not found"))
 }
 
 func (v *VlessXPanelProvider) addClient(ctx context.Context, clientUUID string, email string, expiryMs int64, totalBytes int64) error {

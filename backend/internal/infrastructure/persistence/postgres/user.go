@@ -177,7 +177,7 @@ func (r *userRepo) Update(ctx context.Context, user *domain.User) error {
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
-			return domain.NewAlreadyExists("telegram chat is already linked to another account")
+			return wrapper.Wrap(domain.NewAlreadyExists("telegram chat is already linked to another account"))
 		}
 
 		return wrapper.Wrap(err)

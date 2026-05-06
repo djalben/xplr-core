@@ -22,10 +22,10 @@ func NewAuthSessionsRepository(db *sqlx.DB) ports.AuthSessionsRepository {
 
 func (r *authSessionsRepo) Add(ctx context.Context, s *domain.AuthSession) error {
 	if s == nil {
-		return domain.NewInvalidInput("session is required")
+		return wrapper.Wrap(domain.NewInvalidInput("session is required"))
 	}
 	if s.UserID == (domain.UUID{}) {
-		return domain.NewInvalidInput("user_id is required")
+		return wrapper.Wrap(domain.NewInvalidInput("user_id is required"))
 	}
 
 	if s.ID == (domain.UUID{}) {
@@ -48,7 +48,7 @@ func (r *authSessionsRepo) Add(ctx context.Context, s *domain.AuthSession) error
 
 func (r *authSessionsRepo) ListByUserID(ctx context.Context, userID domain.UUID, limit int) ([]*domain.AuthSession, error) {
 	if userID == (domain.UUID{}) {
-		return nil, domain.NewInvalidInput("user_id is required")
+		return nil, wrapper.Wrap(domain.NewInvalidInput("user_id is required"))
 	}
 	if limit <= 0 {
 		limit = 50
@@ -76,7 +76,7 @@ func (r *authSessionsRepo) ListByUserID(ctx context.Context, userID domain.UUID,
 
 func (r *authSessionsRepo) DeleteByUserID(ctx context.Context, userID domain.UUID) error {
 	if userID == (domain.UUID{}) {
-		return domain.NewInvalidInput("user_id is required")
+		return wrapper.Wrap(domain.NewInvalidInput("user_id is required"))
 	}
 
 	const q = `DELETE FROM auth_sessions WHERE user_id = $1`
@@ -90,7 +90,7 @@ func (r *authSessionsRepo) DeleteByUserID(ctx context.Context, userID domain.UUI
 
 func (r *authSessionsRepo) DeleteOlderThan(ctx context.Context, userID domain.UUID, keepLast int) error {
 	if userID == (domain.UUID{}) {
-		return domain.NewInvalidInput("user_id is required")
+		return wrapper.Wrap(domain.NewInvalidInput("user_id is required"))
 	}
 	if keepLast <= 0 {
 		return nil
