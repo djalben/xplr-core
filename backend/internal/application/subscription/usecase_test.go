@@ -2,41 +2,16 @@ package subscription_test
 
 import (
 	"context"
-	"errors"
 	"testing"
-	"time"
 
 	"github.com/djalben/xplr-core/backend/internal/application/card"
 	"github.com/djalben/xplr-core/backend/internal/application/card/mocks"
+	submocks "github.com/djalben/xplr-core/backend/internal/application/subscription/mocks"
 	"github.com/djalben/xplr-core/backend/internal/application/subscription"
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 )
-
-type fakeSubRepo struct {
-	getFn    func(ctx context.Context, cardID domain.UUID, merchantKey string) (*domain.CardSubscription, error)
-	upsertFn func(ctx context.Context, userID, cardID domain.UUID, merchantName string, amount domain.Numeric, currency string) error
-}
-
-func (f *fakeSubRepo) UpsertOnCharge(ctx context.Context, userID domain.UUID, cardID domain.UUID, merchantName string, amount domain.Numeric, currency string, _ time.Time) (*domain.CardSubscription, error) {
-	if f.upsertFn != nil {
-		err := f.upsertFn(ctx, userID, cardID, merchantName, amount, currency)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return &domain.CardSubscription{ID: uuid.New(), UserID: userID, CardID: cardID, MerchantName: merchantName, MerchantKey: merchantName, ChargeCount: 1}, nil
-}
-func (f *fakeSubRepo) ListByUserID(context.Context, domain.UUID) ([]*domain.CardSubscription, error) { return nil, nil }
-func (f *fakeSubRepo) SetBlocked(context.Context, domain.UUID, domain.UUID, bool) error                 { return nil }
-func (f *fakeSubRepo) SetBlockedByCardID(context.Context, domain.UUID, domain.UUID, bool) error        { return nil }
-func (f *fakeSubRepo) GetByCardAndMerchantKey(ctx context.Context, cardID domain.UUID, merchantKey string) (*domain.CardSubscription, error) {
-	if f.getFn == nil {
-		return nil, domain.NewNotFound("subscription not found")
-	}
-	return f.getFn(ctx, cardID, merchantKey)
-}
 
 func TestUseCase_HandleAuthorization_BlockedDecline(t *testing.T) {
 	t.Parallel()
@@ -61,11 +36,10 @@ func TestUseCase_HandleAuthorization_BlockedDecline(t *testing.T) {
 
 	cardRepo.EXPECT().GetByProviderCardID(gomock.Any(), providerCardID).Return(c, nil)
 
-	subRepo := &fakeSubRepo{
-		getFn: func(ctx context.Context, cardID domain.UUID, merchantKey string) (*domain.CardSubscription, error) {
-			return &domain.CardSubscription{ID: uuid.New(), CardID: cardID, MerchantKey: merchantKey, IsBlocked: true}, nil
-		},
-	}
+	subRepo := submocks.NewMockCardSubscriptionRepository(ctrl)
+	subRepo.EXPECT().
+		GetByCardAndMerchantKey(gomock.Any(), cid, "netflix").
+		Return(&domain.CardSubscription{ID: uuid.New(), CardID: cid, MerchantKey: "netflix", IsBlocked: true}, nil)
 
 	cardUC := card.NewUseCase(cardRepo, walletRepo, txRepo, gradeRepo, nil)
 	uc := subscription.NewUseCase(cardRepo, subRepo, cardUC)
@@ -113,19 +87,13 @@ func TestUseCase_HandleAuthorization_ApproveAndUpsert(t *testing.T) {
 	cardRepo.EXPECT().Update(gomock.Any(), gomock.Any()).Return(nil)
 	txRepo.EXPECT().Save(gomock.Any(), gomock.Any()).Return(nil)
 
-	upsertCalled := false
-	subRepo := &fakeSubRepo{
-		getFn: func(ctx context.Context, cardID domain.UUID, merchantKey string) (*domain.CardSubscription, error) {
-			return nil, domain.NewNotFound("subscription not found")
-		},
-		upsertFn: func(ctx context.Context, userID, cardID domain.UUID, merchantName string, amount domain.Numeric, currency string) error {
-			upsertCalled = true
-			if merchantName != "Netflix" || currency != "USD" {
-				return errors.New("bad args")
-			}
-			return nil
-		},
-	}
+	subRepo := submocks.NewMockCardSubscriptionRepository(ctrl)
+	subRepo.EXPECT().
+		GetByCardAndMerchantKey(gomock.Any(), cid, "netflix").
+		Return(nil, domain.NewNotFound("subscription not found"))
+	subRepo.EXPECT().
+		UpsertOnCharge(gomock.Any(), uid, cid, "Netflix", gomock.Any(), "USD", gomock.Any()).
+		Return(&domain.CardSubscription{ID: uuid.New(), UserID: uid, CardID: cid, MerchantName: "Netflix", MerchantKey: "netflix", ChargeCount: 1}, nil)
 
 	cardUC := card.NewUseCase(cardRepo, walletRepo, txRepo, gradeRepo, nil)
 	uc := subscription.NewUseCase(cardRepo, subRepo, cardUC)
@@ -141,9 +109,6 @@ func TestUseCase_HandleAuthorization_ApproveAndUpsert(t *testing.T) {
 	}
 	if res.Decision != subscription.AuthorizationDecisionApprove {
 		t.Fatalf("res: %+v", res)
-	}
-	if !upsertCalled {
-		t.Fatalf("expected upsert")
 	}
 }
 
