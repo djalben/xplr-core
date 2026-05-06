@@ -32,6 +32,9 @@ type ENV struct {
 	CardEmitterAPIKey string `env:"CARD_EMITTER_API_KEY"`
 	CardEmitterURL    string `env:"CARD_EMITTER_URL"`
 
+	// Provider webhooks (авторизации/списания)
+	ProviderWebhookSecret string `env:"PROVIDER_WEBHOOK_SECRET"`
+
 	// Дополнительно
 	Debug bool `env:"DEBUG" default:"false"`
 

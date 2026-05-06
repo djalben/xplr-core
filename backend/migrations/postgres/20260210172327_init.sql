@@ -125,6 +125,26 @@ CREATE TABLE transactions (
     executed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- 4.1 Подписки/мерчанты по картам (защита от автоподписок).
+CREATE TABLE card_subscriptions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    card_id UUID NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+
+    merchant_name TEXT NOT NULL,
+    merchant_key TEXT NOT NULL,
+
+    last_amount NUMERIC(20, 4),
+    last_currency VARCHAR(3) NOT NULL DEFAULT 'USD',
+    charge_count INT NOT NULL DEFAULT 1,
+
+    first_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    is_blocked BOOLEAN NOT NULL DEFAULT FALSE,
+    blocked_at TIMESTAMPTZ
+);
+
 -- 5. API Ключи
 CREATE TABLE api_keys (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -295,6 +315,9 @@ CREATE INDEX idx_transactions_user_id ON transactions(user_id);
 CREATE INDEX idx_transactions_card_id ON transactions(card_id);
 CREATE INDEX idx_transactions_executed_at ON transactions(executed_at DESC);
 CREATE INDEX idx_transactions_provider_tx_id ON transactions(provider_tx_id) WHERE provider_tx_id IS NOT NULL;
+CREATE UNIQUE INDEX idx_card_subscriptions_card_merchant_key ON card_subscriptions(card_id, merchant_key);
+CREATE INDEX idx_card_subscriptions_user_id ON card_subscriptions(user_id);
+CREATE INDEX idx_card_subscriptions_user_last_seen ON card_subscriptions(user_id, last_seen_at DESC);
 CREATE INDEX idx_user_grades_user_id ON user_grades(user_id);
 CREATE INDEX idx_referrals_referrer_id ON referrals(referrer_id);
 CREATE INDEX idx_referrals_referred_id ON referrals(referred_id);
@@ -332,6 +355,7 @@ DROP TABLE IF EXISTS referrals;
 DROP TABLE IF EXISTS user_grades;
 DROP TABLE IF EXISTS api_keys;
 DROP TABLE IF EXISTS transactions;
+DROP TABLE IF EXISTS card_subscriptions;
 DROP TABLE IF EXISTS cards;
 DROP TABLE IF EXISTS wallets;
 DROP TABLE IF EXISTS kyc_applications;

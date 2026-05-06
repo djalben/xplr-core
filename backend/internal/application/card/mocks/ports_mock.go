@@ -53,6 +53,21 @@ func (mr *MockCardRepositoryMockRecorder) GetByID(arg0, arg1 interface{}) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockCardRepository)(nil).GetByID), arg0, arg1)
 }
 
+// GetByProviderCardID mocks base method.
+func (m *MockCardRepository) GetByProviderCardID(arg0 context.Context, arg1 string) (*domain.Card, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetByProviderCardID", arg0, arg1)
+	ret0, _ := ret[0].(*domain.Card)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetByProviderCardID indicates an expected call of GetByProviderCardID.
+func (mr *MockCardRepositoryMockRecorder) GetByProviderCardID(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByProviderCardID", reflect.TypeOf((*MockCardRepository)(nil).GetByProviderCardID), arg0, arg1)
+}
+
 // ListByUserID mocks base method.
 func (m *MockCardRepository) ListByUserID(arg0 context.Context, arg1 uuid.UUID) ([]*domain.Card, error) {
 	m.ctrl.T.Helper()

@@ -56,6 +56,25 @@ func (r *cardRepo) GetByID(ctx context.Context, id domain.UUID) (*domain.Card, e
 	return &c, nil
 }
 
+func (r *cardRepo) GetByProviderCardID(ctx context.Context, providerCardID string) (*domain.Card, error) {
+	const query = `
+		SELECT 
+			id, user_id, provider_card_id, bin, last_4_digits, card_status,
+			nickname, daily_spend_limit, failed_auth_count, card_type,
+			currency, balance, expiry_date, created_at
+		FROM cards 
+		WHERE provider_card_id = $1`
+
+	var c domain.Card
+
+	err := r.store.GetContext(ctx, &c, query, providerCardID)
+	if err != nil {
+		return nil, wrapper.Wrap(err)
+	}
+
+	return &c, nil
+}
+
 func (r *cardRepo) ListByUserID(ctx context.Context, userID domain.UUID) ([]*domain.Card, error) {
 	const query = `
 		SELECT id, user_id, provider_card_id, bin, last_4_digits, card_status,

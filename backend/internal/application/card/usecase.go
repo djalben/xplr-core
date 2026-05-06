@@ -135,6 +135,11 @@ func (uc *UseCase) TopUpCard(ctx context.Context, userID domain.UUID, cardID dom
 
 // SpendFromCard — списание с баланса карты с проверкой дневного лимита (на карту) и месячного (по типу карты).
 func (uc *UseCase) SpendFromCard(ctx context.Context, userID domain.UUID, cardID domain.UUID, amount domain.Numeric) error {
+	return uc.SpendFromCardWithDetails(ctx, userID, cardID, amount, "Списание с карты")
+}
+
+// SpendFromCardWithDetails — списание с баланса карты с проверкой лимитов + запись details (например, merchant/service).
+func (uc *UseCase) SpendFromCardWithDetails(ctx context.Context, userID domain.UUID, cardID domain.UUID, amount domain.Numeric, details string) error {
 	if amount.LessThanOrEqual(domain.NewNumeric(0)) {
 		return domain.NewInvalidInput("amount must be positive")
 	}
@@ -195,7 +200,7 @@ func (uc *UseCase) SpendFromCard(ctx context.Context, userID domain.UUID, cardID
 	}
 
 	tx := domain.NewTransaction(userID, &cardID, amount, domain.NewNumeric(0),
-		domain.TransactionTypeCardSpend, "COMPLETED", "Списание с карты")
+		domain.TransactionTypeCardSpend, "COMPLETED", details)
 
 	return uc.txRepo.Save(ctx, tx)
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/djalben/xplr-core/backend/internal/application/grades"
 	"github.com/djalben/xplr-core/backend/internal/application/kyc"
 	"github.com/djalben/xplr-core/backend/internal/application/store"
+	"github.com/djalben/xplr-core/backend/internal/application/subscription"
 	"github.com/djalben/xplr-core/backend/internal/application/ticket"
 	"github.com/djalben/xplr-core/backend/internal/application/transaction"
 	"github.com/djalben/xplr-core/backend/internal/application/user"
@@ -29,6 +30,7 @@ type Container struct {
 	WalletRepo        ports.WalletRepository
 	CardRepo          ports.CardRepository
 	TransactionRepo   ports.TransactionRepository
+	SubscriptionRepo  ports.CardSubscriptionRepository
 	TicketRepo        ports.TicketRepository
 	UserRepo          ports.UserRepository
 	TrustedDeviceRepo ports.TrustedDeviceRepository
@@ -46,12 +48,14 @@ type Container struct {
 	AdminDashRepo     ports.AdminDashboardRepository
 
 	TelegramBotUsername string
+	ProviderWebhookSecret string
 
 	AuthUseCase        *auth.UseCase
 	UserUseCase        *user.UseCase
 	WalletUseCase      *wallet.UseCase
 	CardUseCase        *card.UseCase
 	TransactionUseCase *transaction.UseCase
+	SubscriptionUseCase *subscription.UseCase
 	TicketUseCase      *ticket.UseCase
 	CommissionUseCase  *commission.UseCase
 	GradesUseCase      *grades.UseCase
@@ -70,6 +74,7 @@ func NewContainer(ctx context.Context, cfg *config.ENV) (*Container, error) {
 	walletRepo := postgres.NewWalletRepository(db)
 	cardRepo := postgres.NewCardRepository(db)
 	transactionRepo := postgres.NewTransactionRepository(db)
+	subscriptionRepo := postgres.NewCardSubscriptionRepository(db)
 	ticketRepo := postgres.NewTicketRepository(db)
 	userRepo := postgres.NewUserRepository(db)
 	trustedDeviceRepo := postgres.NewTrustedDeviceRepository(db)
@@ -118,12 +123,16 @@ func NewContainer(ctx context.Context, cfg *config.ENV) (*Container, error) {
 	}
 	storeUC := store.NewUseCase(storeRepo, walletRepo, esim, vpnPort)
 
+	cardUC := card.NewUseCase(cardRepo, walletRepo, transactionRepo, gradeRepo, walletUC)
+	subUC := subscription.NewUseCase(cardRepo, subscriptionRepo, cardUC)
+
 	return &Container{
 		DB: db,
 
 		WalletRepo:        walletRepo,
 		CardRepo:          cardRepo,
 		TransactionRepo:   transactionRepo,
+		SubscriptionRepo:  subscriptionRepo,
 		TicketRepo:        ticketRepo,
 		UserRepo:          userRepo,
 		TrustedDeviceRepo: trustedDeviceRepo,
@@ -140,13 +149,15 @@ func NewContainer(ctx context.Context, cfg *config.ENV) (*Container, error) {
 		AdminLogsRepo:     adminLogsRepo,
 		AdminDashRepo:     adminDashRepo,
 
-		TelegramBotUsername: cfg.TelegramBotUsername,
+		TelegramBotUsername:   cfg.TelegramBotUsername,
+		ProviderWebhookSecret: cfg.ProviderWebhookSecret,
 
 		AuthUseCase:        authUC,
 		UserUseCase:        userUC,
 		WalletUseCase:      walletUC,
-		CardUseCase:        card.NewUseCase(cardRepo, walletRepo, transactionRepo, gradeRepo, walletUC),
+		CardUseCase:        cardUC,
 		TransactionUseCase: transaction.NewUseCase(transactionRepo),
+		SubscriptionUseCase: subUC,
 		TicketUseCase:      ticket.NewUseCase(ticketRepo),
 		CommissionUseCase:  commission.NewUseCase(commissionRepo),
 		GradesUseCase:      grades.NewUseCase(gradeRepo),

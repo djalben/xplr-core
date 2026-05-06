@@ -12,6 +12,7 @@ var (
 	ErrInsufficientFunds = errors.New("insufficient funds")
 	ErrNotFound          = errors.New("not found")
 	ErrAlreadyExists     = errors.New("already exists")
+	ErrSubscriptionBlocked = errors.New("subscription blocked")
 	// ErrCardBlockedAntifraud — карта заблокирована после серии неудачных авторизаций.
 	ErrCardBlockedAntifraud = errors.New("card blocked: too many failed authorization attempts")
 	// ErrSBPTopUpDisabled — глобально отключено пополнение через СБП.
@@ -46,4 +47,8 @@ func NewCardBlockedAntifraud() error {
 // NewAlreadyExists — сущность уже существует (например, занятый telegram_chat_id).
 func NewAlreadyExists(msg string) error {
 	return wrapper.Wrapf(ErrAlreadyExists, "%s", msg)
+}
+
+func NewSubscriptionBlocked(merchant string) error {
+	return wrapper.Wrapf(ErrSubscriptionBlocked, "подписка заблокирована: %s", merchant)
 }

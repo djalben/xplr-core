@@ -14,7 +14,9 @@ import (
 	authApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/auth"
 	cardApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/card"
 	newsApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/news"
+	providerApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/provider"
 	settingscompatApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/settingscompat"
+	subscriptionApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/subscription"
 	staffPinApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/staffpin"
 	storeApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/store"
 	ticketApi "github.com/djalben/xplr-core/backend/internal/transport/http/handler/v1/ticket"
@@ -221,12 +223,19 @@ func (s *Server) setupRoutes(jwtSecret []byte) {
 			// Public: статус пополнения через СБП нужен модалке до попытки платежа.
 			r.Get("/sbp-status", s.handleSBPStatus)
 
+			// Public: provider callbacks (authorization/charge). Protected by shared secret.
+			r.Group(func(r chi.Router) {
+				r.Use(authMiddleware.ProviderSecret(s.container.ProviderWebhookSecret))
+				providerApi.NewHandler(s.container.SubscriptionUseCase).Register(r)
+			})
+
 			// Protected: user (BFF), wallet, card, transaction, ticket
 			r.Group(func(r chi.Router) {
 				r.Use(authMiddleware.Auth(jwtSecret))
 				userApi.NewHandler(s.container.UserUseCase, s.container.WalletUseCase, s.container.GradesUseCase, s.container.CardUseCase, s.container.TransactionUseCase, s.container.TicketUseCase, s.container.AuthUseCase, s.container.KYCUseCase).Register(r)
 				walletApi.NewHandler(s.container.WalletUseCase).Register(r)
 				cardApi.NewHandler(s.container.CardUseCase).Register(r)
+				subscriptionApi.NewHandler(s.container.SubscriptionUseCase).Register(r)
 				ticketApi.NewHandler(s.container.TicketUseCase).Register(r)
 				transactionApi.NewHandler(s.container.TransactionUseCase).Register(r)
 				storeApi.NewHandler(s.container.StoreUseCase, s.container.StoreRepo).Register(r)

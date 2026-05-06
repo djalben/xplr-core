@@ -19,7 +19,8 @@ import {
   HelpCircle,
   Lock,
   Newspaper,
-  ShoppingBag
+  ShoppingBag,
+  Shield
 } from 'lucide-react';
 import { getUnreadNewsCount } from '../services/news';
 
@@ -306,6 +307,7 @@ export const Sidebar = () => {
   const navItems = [
     { href: '/dashboard', icon: <LayoutDashboard className="w-5 h-5" />, label: t('nav.home'), badge: 0 },
     { href: '/cards', icon: <CreditCard className="w-5 h-5" />, label: t('nav.cards'), badge: 0 },
+    { href: '/subscriptions', icon: <Shield className="w-5 h-5" />, label: 'Мои подписки', badge: 0 },
     { href: '/history', icon: <Receipt className="w-5 h-5" />, label: 'История', badge: 0 },
     { href: '/referrals', icon: <Gift className="w-5 h-5" />, label: t('nav.referrals'), badge: 0 },
     { href: '/store', icon: <ShoppingBag className="w-5 h-5" />, label: 'Магазин', badge: 0 },
