@@ -357,7 +357,7 @@ func (uc *UseCase) ResetPassword(ctx context.Context, plainToken, newPassword st
 
 	err = uc.userRepo.Update(ctx, user)
 	if err != nil {
-		return err
+		return wrapper.Wrap(err)
 	}
 
 	if uc.trustedDeviceRepo != nil {

@@ -214,7 +214,7 @@ func (h *Handler) UnblockCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.cardUseCase.UnblockCard(r.Context(), id)
+	err = h.cardUseCase.UnblockCardAdmin(r.Context(), id)
 	if err != nil {
 		_ = handler.WrapAndWriteError(r.Context(), w, err, http.StatusBadRequest, "Не удалось разблокировать карту")
 

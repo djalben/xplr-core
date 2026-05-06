@@ -283,8 +283,30 @@ func (uc *UseCase) RecordFailedAuthorization(ctx context.Context, userID, cardID
 	return uc.cardRepo.Update(ctx, card)
 }
 
-// UnblockCard — разблокирует карту.
-func (uc *UseCase) UnblockCard(ctx context.Context, cardID domain.UUID) error {
+// UnblockCard — разблокирует карту (только владелец).
+func (uc *UseCase) UnblockCard(ctx context.Context, userID domain.UUID, cardID domain.UUID) error {
+	card, err := uc.cardRepo.GetByID(ctx, cardID)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	if card.UserID != userID {
+		return domain.NewInvalidInput("card not found")
+	}
+
+	card.FailedAuthCount = 0
+	card.CardStatus = domain.CardStatusActive
+
+	err = uc.cardRepo.Update(ctx, card)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	return nil
+}
+
+// UnblockCardAdmin — разблокирует карту без проверки владельца (только админ-эндпоинт).
+func (uc *UseCase) UnblockCardAdmin(ctx context.Context, cardID domain.UUID) error {
 	card, err := uc.cardRepo.GetByID(ctx, cardID)
 	if err != nil {
 		return wrapper.Wrap(err)
@@ -324,7 +346,7 @@ func (uc *UseCase) UpdateStatus(ctx context.Context, userID domain.UUID, cardID 
 	}
 
 	if status == domain.CardStatusActive {
-		return uc.UnblockCard(ctx, cardID)
+		return uc.UnblockCard(ctx, userID, cardID)
 	}
 
 	return domain.NewInvalidInput("invalid status")
