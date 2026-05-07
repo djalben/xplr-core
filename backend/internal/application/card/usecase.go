@@ -2,6 +2,7 @@ package card
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/djalben/xplr-core/backend/internal/application/wallet"
@@ -128,7 +129,17 @@ func (uc *UseCase) TopUpCard(ctx context.Context, userID domain.UUID, cardID dom
 	}
 	err = uc.cardRepo.Update(ctx, card)
 	if err != nil {
-		return wrapper.Wrap(err)
+		updateCardErr := wrapper.Wrap(err)
+
+		refundErr := wallet.TopUp(amount)
+		if refundErr == nil {
+			refundErr = uc.walletRepo.Update(ctx, wallet)
+		}
+		if refundErr != nil {
+			return wrapper.Wrap(errors.Join(updateCardErr, refundErr))
+		}
+
+		return updateCardErr
 	}
 
 	tx := domain.NewTransaction(userID, &cardID, amount, domain.NewNumeric(0),
