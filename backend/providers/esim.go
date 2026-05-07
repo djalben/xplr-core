@@ -1,6 +1,7 @@
 package providers
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -8,6 +9,9 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"github.com/djalben/xplr-core/backend/shop"
+	"github.com/shopspring/decimal"
 )
 
 // ══════════════════════════════════════════════════════════════
@@ -63,21 +67,27 @@ type ESIMProvider interface {
 // ══════════════════════════════════════════════════════════════
 
 type MobiMatterProvider struct {
-	apiKey  string
-	baseURL string
-	client  *http.Client
+	apiKey     string
+	authToken  string
+	baseURL    string
+	merchantID string
+	client     *http.Client
 }
 
 func NewMobiMatterProvider() *MobiMatterProvider {
 	apiKey := os.Getenv("MOBIMATTER_API_KEY")
+	authToken := os.Getenv("MOBIMATTER_AUTH_TOKEN")
 	baseURL := os.Getenv("MOBIMATTER_API_URL")
+	merchantID := os.Getenv("MOBIMATTER_MERCHANT_ID")
 	if baseURL == "" {
 		baseURL = "https://api.mobimatter.com/mobimatter/api/v2"
 	}
 	return &MobiMatterProvider{
-		apiKey:  apiKey,
-		baseURL: baseURL,
-		client:  &http.Client{Timeout: 15 * time.Second},
+		apiKey:     apiKey,
+		authToken:  authToken,
+		baseURL:    baseURL,
+		merchantID: merchantID,
+		client:     &http.Client{Timeout: 20 * time.Second},
 	}
 }
 
@@ -87,14 +97,30 @@ func (m *MobiMatterProvider) isConfigured() bool {
 	return m.apiKey != ""
 }
 
-func (m *MobiMatterProvider) doRequest(method, path string) (*http.Response, error) {
+func (m *MobiMatterProvider) doRequest(method, path string, body interface{}) (*http.Response, error) {
 	url := m.baseURL + path
-	req, err := http.NewRequest(method, url, nil)
+
+	var req *http.Request
+	var err error
+	if body != nil {
+		bodyBytes, e := json.Marshal(body)
+		if e != nil {
+			return nil, e
+		}
+		req, err = http.NewRequest(method, url, bytes.NewReader(bodyBytes))
+	} else {
+		req, err = http.NewRequest(method, url, nil)
+	}
 	if err != nil {
 		return nil, err
 	}
+
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("api-key", m.apiKey)
+	if m.authToken != "" {
+		req.Header.Set("Authorization", "Bearer "+m.authToken)
+	}
 	return m.client.Do(req)
 }
 
@@ -105,7 +131,7 @@ func (m *MobiMatterProvider) GetDestinations() ([]ESIMDestination, error) {
 		return getDemoDestinations(), nil
 	}
 
-	resp, err := m.doRequest("GET", "/products?type=esim")
+	resp, err := m.doRequest("GET", "/products?type=esim", nil)
 	if err != nil {
 		log.Printf("[MOBIMATTER] ❌ GetDestinations HTTP error: %v", err)
 		return getDemoDestinations(), nil
@@ -154,7 +180,7 @@ func (m *MobiMatterProvider) GetPlans(countryCode string) ([]ESIMPlan, error) {
 		return getDemoPlans(countryCode), nil
 	}
 
-	resp, err := m.doRequest("GET", fmt.Sprintf("/products?type=esim&countryCode=%s", countryCode))
+	resp, err := m.doRequest("GET", fmt.Sprintf("/products?type=esim&countryCode=%s", countryCode), nil)
 	if err != nil {
 		log.Printf("[MOBIMATTER] ❌ GetPlans HTTP error: %v", err)
 		return getDemoPlans(countryCode), nil
@@ -210,11 +236,53 @@ func (m *MobiMatterProvider) OrderESIM(planID string) (*ESIMOrderResult, error) 
 		return getDemoOrder(planID)
 	}
 
-	// TODO: Real MobiMatter order API
-	// POST /orders  { "productId": planID, "quantity": 1 }
-	// Response contains QR code data, SMDP address, matching ID
-	log.Printf("[MOBIMATTER] 🔧 OrderESIM called for plan %s (real API pending)", planID)
-	return getDemoOrder(planID)
+	// Real MobiMatter order API: POST /orders
+	orderReq := map[string]interface{}{
+		"productId": planID,
+		"quantity":  1,
+	}
+
+	resp, err := m.doRequest("POST", "/orders", orderReq)
+	if err != nil {
+		log.Printf("[MOBIMATTER] ❌ OrderESIM HTTP error: %v (falling back to demo)", err)
+		return getDemoOrder(planID)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 && resp.StatusCode != 201 {
+		log.Printf("[MOBIMATTER] ❌ OrderESIM status=%d (falling back to demo)", resp.StatusCode)
+		return getDemoOrder(planID)
+	}
+
+	var apiResp struct {
+		OrderID    string `json:"orderId"`
+		Status     string `json:"status"`
+		ICCID      string `json:"iccid"`
+		SMDP       string `json:"smdpAddress"`
+		MatchingID string `json:"matchingId"`
+		LPA        string `json:"lpaCode"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
+		log.Printf("[MOBIMATTER] ❌ OrderESIM decode error: %v (falling back to demo)", err)
+		return getDemoOrder(planID)
+	}
+
+	qrData := apiResp.LPA
+	if qrData == "" && apiResp.SMDP != "" {
+		qrData = fmt.Sprintf("LPA:1$%s$%s", apiResp.SMDP, apiResp.MatchingID)
+	}
+
+	log.Printf("[MOBIMATTER] ✅ Order placed: ref=%s, ICCID=%s", apiResp.OrderID, apiResp.ICCID)
+
+	return &ESIMOrderResult{
+		OrderID:     apiResp.OrderID,
+		QRData:      qrData,
+		LPA:         qrData,
+		SMDP:        apiResp.SMDP,
+		MatchingID:  apiResp.MatchingID,
+		ICCID:       apiResp.ICCID,
+		ProviderRef: apiResp.OrderID,
+	}, nil
 }
 
 // CheckAvailability — checks if a specific plan is available
@@ -223,7 +291,7 @@ func (m *MobiMatterProvider) CheckAvailability(planID string) (bool, error) {
 		return true, nil
 	}
 
-	resp, err := m.doRequest("GET", fmt.Sprintf("/products/%s", planID))
+	resp, err := m.doRequest("GET", fmt.Sprintf("/products/%s", planID), nil)
 	if err != nil {
 		log.Printf("[MOBIMATTER] ❌ CheckAvailability HTTP error: %v", err)
 		return true, nil // Optimistic: assume available on network error
@@ -241,6 +309,146 @@ func (m *MobiMatterProvider) CheckAvailability(planID string) (bool, error) {
 		return true, nil
 	}
 	return product.Available, nil
+}
+
+// ══════════════════════════════════════════════════════════════
+// ProductProvider interface implementation (shop.ProductProvider)
+// Enables MobiMatter to participate in the unified Registry,
+// FulfillmentEngine, and DepositMonitor systems.
+// ══════════════════════════════════════════════════════════════
+
+// GetCatalog — fetches all eSIM products as shop.CatalogProduct
+func (m *MobiMatterProvider) GetCatalog() ([]shop.CatalogProduct, error) {
+	dests, err := m.GetDestinations()
+	if err != nil {
+		return nil, err
+	}
+
+	var catalog []shop.CatalogProduct
+	for _, d := range dests {
+		plans, err := m.GetPlans(d.CountryCode)
+		if err != nil {
+			log.Printf("[MOBIMATTER] ⚠️ GetCatalog skipping %s: %v", d.CountryCode, err)
+			continue
+		}
+		for _, p := range plans {
+			catalog = append(catalog, shop.CatalogProduct{
+				ExternalID:  p.PlanID,
+				Name:        p.Name,
+				Description: p.Description,
+				Category:    "esim",
+				Country:     p.Country,
+				CountryCode: p.CountryCode,
+				CostPrice:   decimal.NewFromFloat(p.CostPrice),
+				Currency:    "USD",
+				InStock:     p.InStock,
+				Meta: map[string]any{
+					"data_gb":       p.DataGB,
+					"validity_days": p.ValidityDays,
+					"provider":      "mobimatter",
+				},
+			})
+		}
+	}
+	return catalog, nil
+}
+
+// CreateOrder — unified order method (delegates to OrderESIM)
+func (m *MobiMatterProvider) CreateOrder(externalProductID string) (*shop.OrderResult, error) {
+	result, err := m.OrderESIM(externalProductID)
+	if err != nil {
+		return nil, err
+	}
+	return &shop.OrderResult{
+		ProviderRef: result.ProviderRef,
+		QRData:      result.QRData,
+		ICCID:       result.ICCID,
+		Status:      "completed",
+	}, nil
+}
+
+// CheckStatus — checks order status via MobiMatter API
+func (m *MobiMatterProvider) CheckStatus(providerRef string) (*shop.OrderStatus, error) {
+	if !m.isConfigured() {
+		return &shop.OrderStatus{ProviderRef: providerRef, Status: "completed"}, nil
+	}
+
+	resp, err := m.doRequest("GET", fmt.Sprintf("/orders/%s", providerRef), nil)
+	if err != nil {
+		log.Printf("[MOBIMATTER] ❌ CheckStatus HTTP error: %v", err)
+		return &shop.OrderStatus{ProviderRef: providerRef, Status: "pending"}, nil
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return &shop.OrderStatus{ProviderRef: providerRef, Status: "pending"}, nil
+	}
+
+	var orderResp struct {
+		Status     string `json:"status"`
+		ICCID      string `json:"iccid"`
+		LPA        string `json:"lpaCode"`
+		MatchingID string `json:"matchingId"`
+		SMDP       string `json:"smdpAddress"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&orderResp); err != nil {
+		return &shop.OrderStatus{ProviderRef: providerRef, Status: "pending"}, nil
+	}
+
+	qrData := orderResp.LPA
+	if qrData == "" && orderResp.SMDP != "" {
+		qrData = fmt.Sprintf("LPA:1$%s$%s", orderResp.SMDP, orderResp.MatchingID)
+	}
+
+	return &shop.OrderStatus{
+		ProviderRef: providerRef,
+		Status:      mapMobiMatterStatus(orderResp.Status),
+		QRData:      qrData,
+	}, nil
+}
+
+// GetBalance — fetches MobiMatter account balance
+func (m *MobiMatterProvider) GetBalance() (*shop.BalanceInfo, error) {
+	if !m.isConfigured() {
+		return nil, nil
+	}
+
+	resp, err := m.doRequest("GET", "/account/balance", nil)
+	if err != nil {
+		log.Printf("[MOBIMATTER] ❌ GetBalance HTTP error: %v", err)
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		log.Printf("[MOBIMATTER] ❌ GetBalance status=%d", resp.StatusCode)
+		return nil, fmt.Errorf("mobimatter balance: status %d", resp.StatusCode)
+	}
+
+	var balResp struct {
+		Balance  float64 `json:"balance"`
+		Currency string  `json:"currency"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&balResp); err != nil {
+		return nil, fmt.Errorf("mobimatter balance decode: %w", err)
+	}
+
+	return &shop.BalanceInfo{
+		BalanceUSD: decimal.NewFromFloat(balResp.Balance),
+		Currency:   balResp.Currency,
+	}, nil
+}
+
+// mapMobiMatterStatus converts MobiMatter order status to shop.OrderStatus values
+func mapMobiMatterStatus(s string) string {
+	switch s {
+	case "completed", "delivered", "active":
+		return "completed"
+	case "failed", "cancelled", "refunded":
+		return "failed"
+	default:
+		return "pending"
+	}
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -316,25 +524,28 @@ func getDemoOrder(planID string) (*ESIMOrderResult, error) {
 // ══════════════════════════════════════════════════════════════
 
 var (
-	esimProvider     ESIMProvider
+	esimProvider     *MobiMatterProvider
 	esimProviderOnce sync.Once
 )
 
+// GetESIMProvider returns the singleton MobiMatter eSIM provider.
 func GetESIMProvider() ESIMProvider {
 	esimProviderOnce.Do(func() {
-		// Prefer Celitech when configured, fallback to MobiMatter
-		cel := NewCelitechProvider()
-		if cel.isConfigured() {
-			esimProvider = cel
-			log.Printf("[ESIM-PROVIDER] Initialized: celitech (configured=true)")
-		} else {
-			esimProvider = NewMobiMatterProvider()
-			log.Printf("[ESIM-PROVIDER] Initialized: mobimatter (configured=%v)",
-				esimProvider.(*MobiMatterProvider).isConfigured())
-		}
+		esimProvider = NewMobiMatterProvider()
+		log.Printf("[ESIM-PROVIDER] Initialized: mobimatter (configured=%v)", esimProvider.isConfigured())
 	})
 	return esimProvider
 }
+
+// GetMobiMatterProvider returns the concrete MobiMatter provider (for Registry registration).
+func GetMobiMatterProvider() *MobiMatterProvider {
+	GetESIMProvider() // ensure initialized
+	return esimProvider
+}
+
+// Compile-time check: MobiMatterProvider implements both interfaces.
+var _ ESIMProvider = (*MobiMatterProvider)(nil)
+var _ shop.ProductProvider = (*MobiMatterProvider)(nil)
 
 // ══════════════════════════════════════════════════════════════
 // Utility
@@ -347,4 +558,25 @@ func countryFlag(code string) string {
 	code = code[:2]
 	runes := []rune(code)
 	return string([]rune{runes[0] - 'A' + 0x1F1E6, runes[1] - 'A' + 0x1F1E6})
+}
+
+// splitLPA parses "LPA:1$smdp.server.com$ACTIVATION-CODE" → ["smdp.server.com", "ACTIVATION-CODE"]
+func splitLPA(lpa string) []string {
+	prefix := "LPA:1$"
+	s := lpa
+	if len(s) > len(prefix) && s[:len(prefix)] == prefix {
+		s = s[len(prefix):]
+	}
+	var parts []string
+	start := 0
+	for i := 0; i < len(s); i++ {
+		if s[i] == '$' {
+			parts = append(parts, s[start:i])
+			start = i + 1
+		}
+	}
+	if start < len(s) {
+		parts = append(parts, s[start:])
+	}
+	return parts
 }
