@@ -36,7 +36,12 @@ func (uc *UseCase) SubmitApplication(ctx context.Context, userID domain.UUID, pa
 
 	app := domain.NewKYCApplication(userID, payloadJSON)
 
-	return uc.kycRepo.Save(ctx, app)
+	err = uc.kycRepo.Save(ctx, app)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	return nil
 }
 
 // ListPending — заявки в статусе PENDING (админка).
@@ -81,5 +86,10 @@ func (uc *UseCase) DecideApplication(ctx context.Context, applicationID, adminID
 		return wrapper.Wrap(err)
 	}
 
-	return uc.kycRepo.Update(ctx, app)
+	err = uc.kycRepo.Update(ctx, app)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	return nil
 }

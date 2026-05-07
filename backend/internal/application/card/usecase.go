@@ -307,7 +307,12 @@ func (uc *UseCase) RecordFailedAuthorization(ctx context.Context, userID, cardID
 		card.CardStatus = domain.CardStatusBlocked
 	}
 
-	return uc.cardRepo.Update(ctx, card)
+	err = uc.cardRepo.Update(ctx, card)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	return nil
 }
 
 // UnblockCard — разблокирует карту (только владелец).
@@ -363,7 +368,12 @@ func (uc *UseCase) SetSpendingLimit(ctx context.Context, userID domain.UUID, car
 
 	card.DailySpendLimit = limit
 
-	return uc.cardRepo.Update(ctx, card)
+	err = uc.cardRepo.Update(ctx, card)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	return nil
 }
 
 // UpdateStatus — меняет статус карты (ACTIVE/CLOSED).
