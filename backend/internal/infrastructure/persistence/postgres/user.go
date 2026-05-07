@@ -264,7 +264,7 @@ func (r *userRepo) SetIsAdmin(ctx context.Context, id domain.UUID, isAdmin bool)
 
 func (r *userRepo) SetLastLogin(ctx context.Context, id domain.UUID, at time.Time, ip *string, userAgent string) error {
 	if id == (domain.UUID{}) {
-		return domain.NewInvalidInput("user_id is required")
+		return wrapper.Wrap(domain.NewInvalidInput("user_id is required"))
 	}
 	if at.IsZero() {
 		at = time.Now().UTC()

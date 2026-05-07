@@ -6,8 +6,8 @@ import (
 
 	"github.com/djalben/xplr-core/backend/internal/application/card"
 	"github.com/djalben/xplr-core/backend/internal/application/card/mocks"
-	submocks "github.com/djalben/xplr-core/backend/internal/application/subscription/mocks"
 	"github.com/djalben/xplr-core/backend/internal/application/subscription"
+	submocks "github.com/djalben/xplr-core/backend/internal/application/subscription/mocks"
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
@@ -111,4 +111,3 @@ func TestUseCase_HandleAuthorization_ApproveAndUpsert(t *testing.T) {
 		t.Fatalf("res: %+v", res)
 	}
 }
-

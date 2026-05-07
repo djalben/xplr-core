@@ -9,4 +9,3 @@ import (
 type SubscriptionAuthorizationUseCase interface {
 	HandleAuthorization(ctx context.Context, event subscriptionUC.AuthorizationEvent) (subscriptionUC.AuthorizationResult, error)
 }
-

@@ -41,4 +41,3 @@ func (h *Handler) Authorization(w http.ResponseWriter, r *http.Request) {
 
 	handler.WriteJSONWithContext(r.Context(), w, http.StatusOK, res)
 }
-

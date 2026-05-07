@@ -3,9 +3,6 @@ package app
 import (
 	"context"
 
-	"github.com/jmoiron/sqlx"
-	"gitlab.com/libs-artifex/wrapper/v2"
-
 	"github.com/djalben/xplr-core/backend/internal/application/auth"
 	"github.com/djalben/xplr-core/backend/internal/application/card"
 	"github.com/djalben/xplr-core/backend/internal/application/commission"
@@ -23,6 +20,8 @@ import (
 	esimProvider "github.com/djalben/xplr-core/backend/internal/infrastructure/providers/esim"
 	vpnProvider "github.com/djalben/xplr-core/backend/internal/infrastructure/providers/vpn"
 	"github.com/djalben/xplr-core/backend/internal/ports"
+	"github.com/jmoiron/sqlx"
+	"gitlab.com/libs-artifex/wrapper/v2"
 )
 
 type Container struct {
@@ -48,20 +47,20 @@ type Container struct {
 	AdminLogsRepo     ports.AdminLogsRepository
 	AdminDashRepo     ports.AdminDashboardRepository
 
-	TelegramBotUsername string
+	TelegramBotUsername   string
 	ProviderWebhookSecret string
 
-	AuthUseCase        *auth.UseCase
-	UserUseCase        *user.UseCase
-	WalletUseCase      *wallet.UseCase
-	CardUseCase        *card.UseCase
-	TransactionUseCase *transaction.UseCase
+	AuthUseCase         *auth.UseCase
+	UserUseCase         *user.UseCase
+	WalletUseCase       *wallet.UseCase
+	CardUseCase         *card.UseCase
+	TransactionUseCase  *transaction.UseCase
 	SubscriptionUseCase *subscription.UseCase
-	TicketUseCase      *ticket.UseCase
-	CommissionUseCase  *commission.UseCase
-	GradesUseCase      *grades.UseCase
-	KYCUseCase         *kyc.UseCase
-	StoreUseCase       *store.UseCase
+	TicketUseCase       *ticket.UseCase
+	CommissionUseCase   *commission.UseCase
+	GradesUseCase       *grades.UseCase
+	KYCUseCase          *kyc.UseCase
+	StoreUseCase        *store.UseCase
 
 	VPNAdminProvider ports.VPNAdminProvider
 }
@@ -153,18 +152,18 @@ func NewContainer(ctx context.Context, cfg *config.ENV) (*Container, error) {
 		TelegramBotUsername:   cfg.TelegramBotUsername,
 		ProviderWebhookSecret: cfg.ProviderWebhookSecret,
 
-		AuthUseCase:        authUC,
-		UserUseCase:        userUC,
-		WalletUseCase:      walletUC,
-		CardUseCase:        cardUC,
-		TransactionUseCase: transaction.NewUseCase(transactionRepo),
+		AuthUseCase:         authUC,
+		UserUseCase:         userUC,
+		WalletUseCase:       walletUC,
+		CardUseCase:         cardUC,
+		TransactionUseCase:  transaction.NewUseCase(transactionRepo),
 		SubscriptionUseCase: subUC,
-		TicketUseCase:      ticket.NewUseCase(ticketRepo),
-		CommissionUseCase:  commission.NewUseCase(commissionRepo),
-		GradesUseCase:      grades.NewUseCase(gradeRepo),
-		KYCUseCase:         kycUC,
-		StoreUseCase:       storeUC,
-		VPNAdminProvider:   vpnAdmin,
+		TicketUseCase:       ticket.NewUseCase(ticketRepo),
+		CommissionUseCase:   commission.NewUseCase(commissionRepo),
+		GradesUseCase:       grades.NewUseCase(gradeRepo),
+		KYCUseCase:          kycUC,
+		StoreUseCase:        storeUC,
+		VPNAdminProvider:    vpnAdmin,
 	}, nil
 }
 

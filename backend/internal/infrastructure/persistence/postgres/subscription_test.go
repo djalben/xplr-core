@@ -80,4 +80,3 @@ func TestSubscriptionRepository_UpsertListBlock(t *testing.T) {
 		t.Fatalf("unblocked: %+v", got2)
 	}
 }
-
