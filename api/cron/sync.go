@@ -12,8 +12,15 @@ import (
 // Handler is the Vercel Cron entry point for syncing card balances.
 func Handler(w http.ResponseWriter, r *http.Request) {
 	// Verify cron secret (Vercel sends this header for cron jobs)
-	if r.Header.Get("Authorization") != "Bearer "+os.Getenv("CRON_SECRET") {
+	secret := os.Getenv("CRON_SECRET")
+	if secret == "" {
+		http.Error(w, "CRON_SECRET not set", http.StatusInternalServerError)
+
+		return
+	}
+	if r.Header.Get("Authorization") != "Bearer "+secret {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+
 		return
 	}
 
