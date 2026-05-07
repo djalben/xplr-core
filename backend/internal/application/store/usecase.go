@@ -51,7 +51,7 @@ type PurchaseResult struct {
 	ProviderRef   string      `json:"providerRef"`
 }
 
-var ErrNoActiveCard = domain.NewInvalidInput("NO_ACTIVE_CARD")
+func ErrNoActiveCard() error { return domain.NewInvalidInput("NO_ACTIVE_CARD") }
 
 func (uc *UseCase) Purchase(ctx context.Context, userID domain.UUID, productID domain.UUID) (*PurchaseResult, error) {
 	p, err := uc.storeRepo.GetProductByID(ctx, productID)

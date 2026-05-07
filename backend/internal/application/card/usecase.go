@@ -215,6 +215,10 @@ func (uc *UseCase) CloseCard(ctx context.Context, userID domain.UUID, cardID dom
 		return wrapper.Wrap(err)
 	}
 
+	if card.UserID != userID {
+		return domain.NewInvalidInput("card not found")
+	}
+
 	if card.Balance.GreaterThan(domain.NewNumeric(0)) {
 		wallet, err := uc.walletRepo.GetByUserID(ctx, userID)
 		if err != nil {
