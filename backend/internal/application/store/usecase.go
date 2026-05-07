@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/djalben/xplr-core/backend/internal/domain"
@@ -140,7 +141,18 @@ func (uc *UseCase) Purchase(ctx context.Context, userID domain.UUID, productID d
 	}
 	err = uc.storeRepo.CreateOrder(ctx, o)
 	if err != nil {
-		return nil, wrapper.Wrap(err)
+		createErr := wrapper.Wrap(err)
+
+		// Компенсация: если заказ не создался, возвращаем деньги в кошелёк.
+		refundErr := w.TopUp(p.PriceUSD)
+		if refundErr == nil {
+			refundErr = uc.walletRepo.Update(ctx, w)
+		}
+		if refundErr != nil {
+			return nil, wrapper.Wrap(errors.Join(createErr, refundErr))
+		}
+
+		return nil, createErr
 	}
 
 	return &PurchaseResult{
