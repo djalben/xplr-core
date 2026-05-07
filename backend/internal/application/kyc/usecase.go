@@ -2,6 +2,7 @@ package kyc
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/djalben/xplr-core/backend/internal/domain"
@@ -65,6 +66,12 @@ func (uc *UseCase) DecideApplication(ctx context.Context, applicationID, adminID
 		return wrapper.Wrap(err)
 	}
 
+	prevKYCStatus := user.KYCStatus
+	prevStatus := app.Status
+	prevReviewedBy := app.ReviewedBy
+	prevReviewedAt := app.ReviewedAt
+	prevAdminComment := app.AdminComment
+
 	now := time.Now().UTC()
 	app.ReviewedBy = &adminID
 	app.ReviewedAt = &now
@@ -81,14 +88,29 @@ func (uc *UseCase) DecideApplication(ctx context.Context, applicationID, adminID
 		user.KYCStatus = domain.KYCRejected
 	}
 
-	err = uc.userRepo.Update(ctx, user)
+	err = uc.kycRepo.Update(ctx, app)
 	if err != nil {
 		return wrapper.Wrap(err)
 	}
 
-	err = uc.kycRepo.Update(ctx, app)
+	err = uc.userRepo.Update(ctx, user)
 	if err != nil {
-		return wrapper.Wrap(err)
+		updateUserErr := wrapper.Wrap(err)
+
+		app.Status = prevStatus
+		app.ReviewedBy = prevReviewedBy
+		app.ReviewedAt = prevReviewedAt
+		app.AdminComment = prevAdminComment
+		rollbackErr := uc.kycRepo.Update(ctx, app)
+		if rollbackErr != nil {
+			user.KYCStatus = prevKYCStatus
+
+			return wrapper.Wrap(errors.Join(updateUserErr, rollbackErr))
+		}
+
+		user.KYCStatus = prevKYCStatus
+
+		return updateUserErr
 	}
 
 	return nil
