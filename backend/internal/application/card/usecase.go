@@ -82,7 +82,12 @@ func (uc *UseCase) BuyCard(ctx context.Context, userID domain.UUID, cardType dom
 	tx := domain.NewTransaction(userID, &card.ID, domain.NewNumeric(2.00), domain.NewNumeric(0),
 		"CARD_ISSUE", "COMPLETED", "Выпуск виртуальной карты")
 
-	return card, uc.txRepo.Save(ctx, tx)
+	err = uc.txRepo.Save(ctx, tx)
+	if err != nil {
+		return nil, wrapper.Wrap(err)
+	}
+
+	return card, nil
 }
 
 // ListByUserID — список карт пользователя.
