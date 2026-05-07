@@ -70,15 +70,6 @@ func (uc *UseCase) Purchase(ctx context.Context, userID domain.UUID, productID d
 	if w.Balance.LessThan(p.PriceUSD) {
 		return nil, domain.NewInsufficientFunds()
 	}
-	err = w.Withdraw(p.PriceUSD)
-	if err != nil {
-		return nil, wrapper.Wrap(err)
-	}
-
-	err = uc.walletRepo.Update(ctx, w)
-	if err != nil {
-		return nil, wrapper.Wrap(err)
-	}
 
 	activationKey := ""
 	qr := ""
@@ -139,6 +130,17 @@ func (uc *UseCase) Purchase(ctx context.Context, userID domain.UUID, productID d
 		Meta:          string(metaBytes),
 		CreatedAt:     time.Now().UTC(),
 	}
+
+	err = w.Withdraw(p.PriceUSD)
+	if err != nil {
+		return nil, wrapper.Wrap(err)
+	}
+
+	err = uc.walletRepo.Update(ctx, w)
+	if err != nil {
+		return nil, wrapper.Wrap(err)
+	}
+
 	err = uc.storeRepo.CreateOrder(ctx, o)
 	if err != nil {
 		createErr := wrapper.Wrap(err)
