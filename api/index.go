@@ -21,10 +21,7 @@ var (
 	errNilHTTPHandler = errors.New("http handler is nil")
 )
 
-func ensureRouter() {
-	initMu.Lock()
-	defer initMu.Unlock()
-
+func ensureRouterLocked() {
 	if handler != nil || initErr != nil {
 		return
 	}
@@ -58,6 +55,13 @@ func ensureRouter() {
 	}()
 }
 
+func ensureRouter() {
+	initMu.Lock()
+	defer initMu.Unlock()
+
+	ensureRouterLocked()
+}
+
 // Handler is the Vercel serverless entry point for /api/*.
 func Handler(w http.ResponseWriter, r *http.Request) {
 	defer func() {
@@ -70,13 +74,18 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "panic: "+logPanicString(rec), http.StatusInternalServerError)
 	}()
 
-	ensureRouter()
-	if initErr != nil {
-		http.Error(w, "init error: "+initErr.Error(), http.StatusInternalServerError)
+	initMu.Lock()
+	ensureRouterLocked()
+	h := handler
+	err := initErr
+	initMu.Unlock()
+
+	if err != nil {
+		http.Error(w, "init error: "+err.Error(), http.StatusInternalServerError)
 
 		return
 	}
-	if handler == nil {
+	if h == nil {
 		http.Error(w, "init error: handler is nil (this should not happen; check router init logs)", http.StatusInternalServerError)
 
 		return
@@ -98,7 +107,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	handler.ServeHTTP(w, r)
+	h.ServeHTTP(w, r)
 }
 
 func logPanicString(v any) string {
