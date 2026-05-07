@@ -101,14 +101,13 @@ func (uc *UseCase) DecideApplication(ctx context.Context, applicationID, adminID
 		app.ReviewedBy = prevReviewedBy
 		app.ReviewedAt = prevReviewedAt
 		app.AdminComment = prevAdminComment
-		rollbackErr := uc.kycRepo.Update(ctx, app)
-		if rollbackErr != nil {
-			user.KYCStatus = prevKYCStatus
-
-			return wrapper.Wrap(errors.Join(updateUserErr, rollbackErr))
-		}
-
 		user.KYCStatus = prevKYCStatus
+		rollbackAppErr := uc.kycRepo.Update(ctx, app)
+		rollbackUserErr := uc.userRepo.Update(ctx, user)
+
+		if rollbackAppErr != nil || rollbackUserErr != nil {
+			return wrapper.Wrap(errors.Join(updateUserErr, rollbackAppErr, rollbackUserErr))
+		}
 
 		return updateUserErr
 	}
