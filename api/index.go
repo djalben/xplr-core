@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"runtime/debug"
 	"strings"
 	"sync"
 
 	"github.com/djalben/xplr-core/backend/vercel"
+	"gitlab.com/libs-artifex/wrapper/v2"
 )
 
 var (
@@ -33,20 +33,17 @@ func ensureRouterLocked() {
 				return
 			}
 
-			initErr = fmt.Errorf("panic during router init: %v\n%s", rec, string(debug.Stack()))
-			log.Printf("router init panic: %v", initErr)
+			initErr = wrapper.Wrap(fmt.Errorf("panic during router init: %v\n%s", rec, string(debug.Stack())))
 		}()
 
 		h, err := vercel.NewHTTPHandlerFromEnv(context.Background())
 		if err != nil {
-			initErr = err
-			log.Printf("router init error: %v", err)
+			initErr = wrapper.Wrap(err)
 
 			return
 		}
 		if h == nil {
-			initErr = errNilHTTPHandler
-			log.Printf("router init error: %v", initErr)
+			initErr = wrapper.Wrap(errNilHTTPHandler)
 
 			return
 		}
@@ -70,7 +67,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		log.Printf("panic: %v\n%s", rec, string(debug.Stack()))
+		_ = wrapper.Wrap(fmt.Errorf("panic: %v\n%s", rec, string(debug.Stack())))
 		http.Error(w, "panic: "+logPanicString(rec), http.StatusInternalServerError)
 	}()
 

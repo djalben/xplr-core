@@ -196,7 +196,6 @@ func (uc *UseCase) SpendFromCardWithDetails(ctx context.Context, userID domain.U
 	}
 
 	card.Balance = card.Balance.Sub(amount)
-	card.FailedAuthCount = 0
 
 	err = uc.cardRepo.Update(ctx, card)
 	if err != nil {
