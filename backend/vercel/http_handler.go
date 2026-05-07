@@ -12,6 +12,23 @@ import (
 	"gitlab.com/libs-artifex/wrapper/v2"
 )
 
+type closableHandler struct {
+	h     http.Handler
+	close func() error
+}
+
+func (c closableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	c.h.ServeHTTP(w, r)
+}
+
+func (c closableHandler) Close() error {
+	if c.close == nil {
+		return nil
+	}
+
+	return wrapper.Wrap(c.close())
+}
+
 // NewHTTPHandlerFromEnv строит http.Handler для serverless окружений (Vercel).
 // Важно: пакет публичный, но использует internal компоненты внутри модуля backend.
 func NewHTTPHandlerFromEnv(ctx context.Context) (http.Handler, error) {
@@ -31,5 +48,10 @@ func NewHTTPHandlerFromEnv(ctx context.Context) (http.Handler, error) {
 
 	s := httpServer.NewServer(container, cfg.ServerHost, cfg.ServerPort, []byte(cfg.JWTSecret), cfg.CORSAllowedOrigins, logger)
 
-	return s.Handler(), nil
+	return closableHandler{
+		h: s.Handler(),
+		close: func() error {
+			return container.Close()
+		},
+	}, nil
 }

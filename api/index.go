@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os/signal"
 	"runtime/debug"
 	"strings"
 	"sync"
+	"syscall"
 
 	"github.com/djalben/xplr-core/backend/vercel"
 	"gitlab.com/libs-artifex/wrapper/v2"
@@ -15,6 +17,7 @@ import (
 
 var (
 	handler http.Handler
+	handlerClose func() error
 	initMu  sync.Mutex
 	initErr error
 
@@ -49,6 +52,18 @@ func ensureRouterLocked() {
 		}
 
 		handler = h
+
+		if c, ok := h.(interface{ Close() error }); ok {
+			handlerClose = c.Close
+			go func() {
+				ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+				defer stop()
+				<-ctx.Done()
+				if handlerClose != nil {
+					_ = wrapper.Wrap(handlerClose())
+				}
+			}()
+		}
 	}()
 }
 
