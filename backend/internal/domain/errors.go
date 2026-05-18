@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"strings"
 
 	"gitlab.com/libs-artifex/wrapper/v2"
 )
@@ -51,4 +52,16 @@ func NewAlreadyExists(msg string) error {
 
 func NewSubscriptionBlocked(merchant string) error {
 	return wrapper.Wrapf(ErrSubscriptionBlocked, "подписка заблокирована: %s", merchant)
+}
+
+// IsInvalidInputCode — проверка кода бизнес-ошибки внутри ErrInvalidInput.
+func IsInvalidInputCode(err error, code string) bool {
+	if err == nil || code == "" {
+		return false
+	}
+	if !errors.Is(err, ErrInvalidInput) {
+		return false
+	}
+
+	return strings.Contains(err.Error(), code)
 }

@@ -121,7 +121,7 @@ func NewContainer(ctx context.Context, cfg *config.ENV) (*Container, error) {
 		vpnPort = vpn
 		vpnAdmin = vpn
 	}
-	storeUC := store.NewUseCase(storeRepo, walletRepo, esim, vpnPort)
+	storeUC := store.NewUseCase(storeRepo, walletRepo, transactionRepo, esim, vpnPort)
 
 	cardUC := card.NewUseCase(cardRepo, walletRepo, transactionRepo, gradeRepo, walletUC)
 	subUC := subscription.NewUseCase(cardRepo, subscriptionRepo, cardUC)

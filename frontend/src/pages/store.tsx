@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   ShoppingBag, Search, Globe, Gamepad2, X, Copy, Check, Loader2,
   AlertTriangle, QrCode, Key, ChevronRight, ArrowLeft,
-  Download, Smartphone, Wifi, CreditCard, Shield, Zap
+  Download, Smartphone, Wifi, Wallet, Shield, Zap
 } from 'lucide-react';
 import { DashboardLayout } from '../components/dashboard-layout';
 import { BackButton } from '../components/back-button';
@@ -12,7 +12,13 @@ import {
   getESIMDestinations, getESIMPlans, orderESIM,
   type StoreProduct, type ESIMDestination, type ESIMPlan, type ESIMOrderResult,
 } from '../services/store';
-import { getUserCards, type Card } from '../services/cards';
+import { getWallet } from '../services/wallet';
+import { WalletTopUpModal } from '../components/wallet-topup-modal';
+
+const parsePriceUsd = (value: string) => {
+  const n = parseFloat(value);
+  return Number.isFinite(n) ? n : 0;
+};
 
 // ── Country flag (SVG via flagcdn — cross-platform) ──
 const CountryFlag = ({ code, size = 24 }: { code: string; size?: number }) => {
@@ -226,25 +232,21 @@ const DigitalResultModal = ({ productName, priceUsd, activationKey, onClose }: {
 // Confirm Purchase Modal (unified for eSIM + Digital)
 // ══════════════════════════════════════════════════════════════
 const ConfirmPurchaseModal = ({
-  title, itemLabel, priceLabel, loading, onConfirm, onClose, allCards, onCardChange,
+  title, itemLabel, priceLabel, priceUsd, walletBalance, loading, onConfirm, onClose, onTopUp,
 }: {
-  title: string; itemLabel: string; priceLabel: string; loading: boolean;
-  onConfirm: () => void; onClose: () => void;
-  allCards: Card[]; onCardChange: (card: Card) => void;
+  title: string; itemLabel: string; priceLabel: string; priceUsd: string;
+  walletBalance: number | null; loading: boolean;
+  onConfirm: () => void; onClose: () => void; onTopUp: () => void;
 }) => {
-  const [selectedIdx, setSelectedIdx] = useState(0);
-  const card = allCards[selectedIdx] || null;
+  const price = parsePriceUsd(priceUsd);
+  const balance = walletBalance ?? 0;
+  const insufficient = walletBalance !== null && balance < price;
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && !loading) onClose(); };
     document.addEventListener('keydown', h); document.body.style.overflow = 'hidden';
     return () => { document.removeEventListener('keydown', h); document.body.style.overflow = ''; };
   }, [onClose, loading]);
-
-  const handleCardSwitch = (idx: number) => {
-    setSelectedIdx(idx);
-    if (allCards[idx]) onCardChange(allCards[idx]);
-  };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => !loading && onClose()}>
@@ -259,38 +261,30 @@ const ConfirmPurchaseModal = ({
             <span className="text-sm text-white/40">Товар</span>
             <span className="text-sm text-white font-medium text-right max-w-[180px] truncate">{itemLabel}</span>
           </div>
-          {/* Card selector */}
           <div className="flex justify-between items-center">
-            <span className="text-sm text-white/40">Карта</span>
-            {allCards.length <= 1 && card ? (
-              <span className="text-sm text-white font-medium flex items-center gap-1.5">
-                <CreditCard className="w-3.5 h-3.5 text-[#38BDF8]" />
-                {card.nickname ? `${card.nickname} ` : ''}•••• {card.last_4_digits}
-              </span>
-            ) : (
-              <select
-                value={selectedIdx}
-                onChange={e => handleCardSwitch(Number(e.target.value))}
-                disabled={loading}
-                className="bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-1 text-sm text-white font-medium outline-none focus:border-[#38BDF8]/50 transition-colors cursor-pointer max-w-[200px] truncate"
-              >
-                {allCards.map((c, i) => (
-                  <option key={c.id} value={i} className="bg-[#0F1629] text-white">
-                    {c.nickname ? `${c.nickname} ` : ''}•••• {c.last_4_digits}
-                  </option>
-                ))}
-              </select>
-            )}
+            <span className="text-sm text-white/40">Кошелёк XPLR</span>
+            <span className="text-sm text-white font-medium flex items-center gap-1.5">
+              <Wallet className="w-3.5 h-3.5 text-[#38BDF8]" />
+              {walletBalance === null ? '...' : `$${balance.toFixed(2)}`}
+            </span>
           </div>
           <div className="border-t border-white/[0.05] pt-2.5 flex justify-between items-center">
             <span className="text-sm text-white/60 font-medium">Итого</span>
             <span className="text-lg font-bold gradient-text">{priceLabel}</span>
           </div>
         </div>
-        <p className="text-[11px] text-white/30 mb-4 text-center leading-relaxed">При нехватке средств — авто-пополнение из Кошелька XPLR</p>
-        <button onClick={onConfirm} disabled={loading} className="w-full py-3 rounded-xl font-semibold text-sm transition-all duration-200 bg-gradient-to-r from-[#38BDF8] to-[#A78BFA] text-white hover:opacity-90 active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2">
-          {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Оплата...</> : 'Подтвердить оплату'}
-        </button>
+        {insufficient && (
+          <p className="text-xs text-amber-400/90 mb-3 text-center">Недостаточно средств в кошельке</p>
+        )}
+        {insufficient ? (
+          <button onClick={onTopUp} disabled={loading} className="w-full py-3 rounded-xl font-semibold text-sm transition-all duration-200 bg-gradient-to-r from-[#38BDF8] to-[#A78BFA] text-white hover:opacity-90 active:scale-[0.98]">
+            Пополнить кошелёк
+          </button>
+        ) : (
+          <button onClick={onConfirm} disabled={loading || walletBalance === null} className="w-full py-3 rounded-xl font-semibold text-sm transition-all duration-200 bg-gradient-to-r from-[#38BDF8] to-[#A78BFA] text-white hover:opacity-90 active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2">
+            {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Оплата...</> : 'Оплатить с кошелька'}
+          </button>
+        )}
         <button onClick={onClose} disabled={loading} className="w-full py-2.5 mt-2 text-sm text-white/40 hover:text-white/60 transition-colors disabled:opacity-30">Отмена</button>
       </div>
     </div>
@@ -298,9 +292,9 @@ const ConfirmPurchaseModal = ({
 };
 
 // ══════════════════════════════════════════════════════════════
-// No Card Warning Modal
+// Insufficient balance modal
 // ══════════════════════════════════════════════════════════════
-const NoCardWarningModal = ({ onClose, onGoToCards }: { onClose: () => void; onGoToCards: () => void }) => {
+const InsufficientBalanceModal = ({ onClose, onTopUp }: { onClose: () => void; onTopUp: () => void }) => {
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', h); document.body.style.overflow = 'hidden';
@@ -314,11 +308,11 @@ const NoCardWarningModal = ({ onClose, onGoToCards }: { onClose: () => void; onG
         <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-amber-500/10 mb-5 mx-auto">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" className="text-amber-400"><path d="M12 9V13M12 17H12.01M10.29 3.86L1.82 18A2 2 0 003.54 21H20.46A2 2 0 0022.18 18L13.71 3.86A2 2 0 0010.29 3.86Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
         </div>
-        <h3 className="text-lg font-bold text-white text-center mb-2">Требуется карта XPLR</h3>
+        <h3 className="text-lg font-bold text-white text-center mb-2">Недостаточно средств</h3>
         <p className="text-sm text-white/50 text-center leading-relaxed mb-6">
-          Для покупки необходима карта для подписок или премиальная карта. Карта для путешествий не подходит.
+          Пополните кошелёк XPLR, чтобы оплатить покупку в магазине.
         </p>
-        <button onClick={onGoToCards} className="w-full py-3 rounded-xl font-semibold text-sm transition-all duration-200 bg-gradient-to-r from-[#38BDF8] to-[#A78BFA] text-white hover:opacity-90 active:scale-[0.98]">Открыть карты</button>
+        <button onClick={onTopUp} className="w-full py-3 rounded-xl font-semibold text-sm transition-all duration-200 bg-gradient-to-r from-[#38BDF8] to-[#A78BFA] text-white hover:opacity-90 active:scale-[0.98]">Пополнить кошелёк</button>
         <button onClick={onClose} className="w-full py-2.5 mt-2 text-sm text-white/40 hover:text-white/60 transition-colors">Отмена</button>
       </div>
     </div>
@@ -448,28 +442,51 @@ export const StorePage = () => {
   const [vpnPurchasing, setVpnPurchasing] = useState(false);
   const [vpnResult, setVpnResult] = useState<{ productName: string; priceUsd: string; vlessKey: string } | null>(null);
 
-  // Card state — purchases only via active non-travel cards
-  const [activeCards, setActiveCards] = useState<Card[]>([]);
-  const [selectedCard, setSelectedCard] = useState<Card | null>(null);
-  const [showNoCardWarning, setShowNoCardWarning] = useState(false);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [showInsufficientBalance, setShowInsufficientBalance] = useState(false);
+  const [showTopUpModal, setShowTopUpModal] = useState(false);
 
-  useEffect(() => {
-    getUserCards()
-      .then(cards => {
-        // Filter: only ACTIVE, non-travel cards; sort subscription first
-        const slugOrder: Record<string, number> = { subscriptions: 0, premium: 1, travel: 9 };
-        const eligible = (cards || [])
-          .filter(c => c.card_status === 'ACTIVE' && c.card_type !== 'travel')
-          .sort((a, b) => (slugOrder[a.card_type || ''] ?? 9) - (slugOrder[b.card_type || ''] ?? 9));
-        setActiveCards(eligible);
-        if (eligible.length > 0) setSelectedCard(eligible[0]);
-      })
-      .catch(() => setActiveCards([]));
+  const loadWallet = useCallback(async () => {
+    try {
+      const w = await getWallet();
+      setWalletBalance(Number(w.master_balance) || 0);
+    } catch {
+      setWalletBalance(0);
+    }
   }, []);
 
-  const tryBuyESIM = (plan: ESIMPlan) => { if (activeCards.length === 0) { setShowNoCardWarning(true); return; } setConfirmPlan(plan); };
-  const tryBuyDigital = (product: StoreProduct) => { if (activeCards.length === 0) { setShowNoCardWarning(true); return; } setConfirmDigital(product); };
-  const tryBuyVpn = (product: StoreProduct) => { if (activeCards.length === 0) { setShowNoCardWarning(true); return; } setConfirmVpn(product); };
+  useEffect(() => { loadWallet(); }, [loadWallet]);
+
+  const openTopUp = () => {
+    setShowInsufficientBalance(false);
+    setShowTopUpModal(true);
+  };
+
+  const canAfford = (priceUsd: string) => walletBalance !== null && walletBalance >= parsePriceUsd(priceUsd);
+
+  const tryBuyESIM = (plan: ESIMPlan) => {
+    if (!canAfford(plan.priceUsd)) { setShowInsufficientBalance(true); return; }
+    setConfirmPlan(plan);
+  };
+  const tryBuyDigital = (product: StoreProduct) => {
+    if (!canAfford(product.priceUsd)) { setShowInsufficientBalance(true); return; }
+    setConfirmDigital(product);
+  };
+  const tryBuyVpn = (product: StoreProduct) => {
+    if (!canAfford(product.priceUsd)) { setShowInsufficientBalance(true); return; }
+    setConfirmVpn(product);
+  };
+
+  const handlePurchaseError = (err: unknown, fallback: string) => {
+    const e = err as { response?: { status?: number; data?: { code?: string; error?: string } } };
+    if (e?.response?.status === 402 || e?.response?.data?.code === 'INSUFFICIENT_FUNDS') {
+      setShowInsufficientBalance(true);
+      loadWallet();
+      return;
+    }
+    const msg = e?.response?.data?.error || fallback;
+    setError(typeof msg === 'string' ? msg : fallback);
+  };
 
   // Load eSIM destinations
   const loadDestinations = useCallback(async () => {
@@ -519,11 +536,12 @@ export const StorePage = () => {
     try {
       const res = await orderESIM(confirmPlan);
       const planName = confirmPlan.name;
-      setConfirmPlan(null); setEsimResult({ result: res, planName, priceUsd: confirmPlan.priceUsd });
-    } catch (err: any) {
       setConfirmPlan(null);
-      if (err?.response?.data?.code === 'NO_ACTIVE_CARD') setShowNoCardWarning(true);
-      else { const msg = err?.response?.data?.error || 'Ошибка при покупке eSIM'; setError(typeof msg === 'string' ? msg : 'Ошибка при покупке'); }
+      setEsimResult({ result: res, planName, priceUsd: confirmPlan.priceUsd });
+      loadWallet();
+    } catch (err: unknown) {
+      setConfirmPlan(null);
+      handlePurchaseError(err, 'Ошибка при покупке eSIM');
     } finally { setEsimPurchasing(false); }
   };
 
@@ -532,11 +550,12 @@ export const StorePage = () => {
     setDigitalPurchasing(true); setError('');
     try {
       const res = await purchaseProduct(confirmDigital.id);
-      setConfirmDigital(null); setDigitalResult({ productName: res.productName, priceUsd: res.priceUsd, activationKey: res.activationKey });
-    } catch (err: any) {
       setConfirmDigital(null);
-      if (err?.response?.data?.code === 'NO_ACTIVE_CARD') setShowNoCardWarning(true);
-      else { const msg = err?.response?.data?.error || 'Ошибка при покупке'; setError(typeof msg === 'string' ? msg : 'Ошибка при покупке'); }
+      setDigitalResult({ productName: res.productName, priceUsd: res.priceUsd, activationKey: res.activationKey });
+      loadWallet();
+    } catch (err: unknown) {
+      setConfirmDigital(null);
+      handlePurchaseError(err, 'Ошибка при покупке');
     } finally { setDigitalPurchasing(false); }
   };
 
@@ -547,10 +566,10 @@ export const StorePage = () => {
       const res = await purchaseProduct(confirmVpn.id);
       setConfirmVpn(null);
       setVpnResult({ productName: res.productName, priceUsd: res.priceUsd, vlessKey: res.activationKey });
-    } catch (err: any) {
+      loadWallet();
+    } catch (err: unknown) {
       setConfirmVpn(null);
-      if (err?.response?.data?.code === 'NO_ACTIVE_CARD') setShowNoCardWarning(true);
-      else { const msg = err?.response?.data?.error || 'Ошибка при покупке VPN'; setError(typeof msg === 'string' ? msg : 'Ошибка при покупке'); }
+      handlePurchaseError(err, 'Ошибка при покупке VPN');
     } finally { setVpnPurchasing(false); }
   };
 
@@ -974,13 +993,23 @@ export const StorePage = () => {
       </div>
 
       {/* ═══════ Modals ═══════ */}
-      {showNoCardWarning && <NoCardWarningModal onClose={() => setShowNoCardWarning(false)} onGoToCards={() => navigate('/cards')} />}
+      {showInsufficientBalance && (
+        <InsufficientBalanceModal onClose={() => setShowInsufficientBalance(false)} onTopUp={openTopUp} />
+      )}
+      {showTopUpModal && (
+        <WalletTopUpModal onClose={() => setShowTopUpModal(false)} onSuccess={() => { setShowTopUpModal(false); loadWallet(); }} />
+      )}
       {confirmPlan && (
         <ConfirmPurchaseModal
           title="Подтвердите покупку eSIM"
           itemLabel={`${confirmPlan.name} — ${confirmPlan.country}`}
           priceLabel={`$${confirmPlan.priceUsd}`}
-          loading={esimPurchasing} onConfirm={handleESIMPurchase} onClose={() => !esimPurchasing && setConfirmPlan(null)} allCards={activeCards} onCardChange={setSelectedCard}
+          priceUsd={confirmPlan.priceUsd}
+          walletBalance={walletBalance}
+          loading={esimPurchasing}
+          onConfirm={handleESIMPurchase}
+          onClose={() => !esimPurchasing && setConfirmPlan(null)}
+          onTopUp={openTopUp}
         />
       )}
       {esimResult && <ESIMActivationModal result={esimResult.result} planName={esimResult.planName} priceUsd={esimResult.priceUsd} onClose={() => setEsimResult(null)} />}
@@ -989,7 +1018,12 @@ export const StorePage = () => {
           title="Подтвердите покупку"
           itemLabel={confirmDigital.name}
           priceLabel={`$${confirmDigital.priceUsd}`}
-          loading={digitalPurchasing} onConfirm={handleDigitalPurchase} onClose={() => !digitalPurchasing && setConfirmDigital(null)} allCards={activeCards} onCardChange={setSelectedCard}
+          priceUsd={confirmDigital.priceUsd}
+          walletBalance={walletBalance}
+          loading={digitalPurchasing}
+          onConfirm={handleDigitalPurchase}
+          onClose={() => !digitalPurchasing && setConfirmDigital(null)}
+          onTopUp={openTopUp}
         />
       )}
       {digitalResult && <DigitalResultModal productName={digitalResult.productName} priceUsd={digitalResult.priceUsd} activationKey={digitalResult.activationKey} onClose={() => setDigitalResult(null)} />}
@@ -998,7 +1032,12 @@ export const StorePage = () => {
           title="Подтвердите покупку — Безопасный доступ"
           itemLabel={confirmVpn.name}
           priceLabel={`$${confirmVpn.priceUsd}`}
-          loading={vpnPurchasing} onConfirm={handleVpnPurchase} onClose={() => !vpnPurchasing && setConfirmVpn(null)} allCards={activeCards} onCardChange={setSelectedCard}
+          priceUsd={confirmVpn.priceUsd}
+          walletBalance={walletBalance}
+          loading={vpnPurchasing}
+          onConfirm={handleVpnPurchase}
+          onClose={() => !vpnPurchasing && setConfirmVpn(null)}
+          onTopUp={openTopUp}
         />
       )}
       {vpnResult && <VpnSuccessModal productName={vpnResult.productName} priceUsd={vpnResult.priceUsd} vlessKey={vpnResult.vlessKey} onClose={() => setVpnResult(null)} />}

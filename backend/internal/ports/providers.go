@@ -10,6 +10,7 @@ type ESIMProvider interface {
 	Name() string
 	GetDestinations(ctx context.Context) ([]domain.ESIMDestination, error)
 	GetPlans(ctx context.Context, countryCode string) ([]domain.ESIMPlan, error)
+	GetPlan(ctx context.Context, planID string) (*domain.ESIMPlan, error)
 	OrderESIM(ctx context.Context, planID string) (*domain.ESIMOrderResult, error)
 	CheckAvailability(ctx context.Context, planID string) (bool, error)
 }

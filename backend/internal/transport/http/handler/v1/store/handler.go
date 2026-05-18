@@ -82,13 +82,7 @@ func (h *Handler) Purchase(w http.ResponseWriter, r *http.Request) {
 	}
 	out, err := h.uc.Purchase(r.Context(), userID, pid)
 	if err != nil {
-		// Minimal error mapping for existing frontend UX
-		if errorsIs(err, domain.ErrInsufficientFunds) {
-			handler.WriteJSON(w, http.StatusPaymentRequired, map[string]string{"error": "Недостаточно средств", "code": "INSUFFICIENT_FUNDS"})
-
-			return
-		}
-		handler.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error(), "code": "PURCHASE_FAILED"})
+		writeStorePurchaseError(w, err)
 
 		return
 	}
@@ -202,9 +196,9 @@ func (h *Handler) ESIMOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, err := h.uc.ESIMOrder(r.Context(), req.PlanID)
+	res, err := h.uc.PurchaseESIM(r.Context(), userID, req.PlanID)
 	if err != nil {
-		http.Error(w, wrapper.Wrap(err).Error(), http.StatusBadRequest)
+		writeStorePurchaseError(w, err)
 
 		return
 	}
@@ -231,6 +225,37 @@ func (h *Handler) Subscription(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	//nolint:gosec // subscription is plain text base64.
 	_, _ = w.Write([]byte(encoded))
+}
+
+func writeStorePurchaseError(w http.ResponseWriter, err error) {
+	if errorsIs(err, domain.ErrInsufficientFunds) {
+		handler.WriteJSON(w, http.StatusPaymentRequired, map[string]string{
+			"error": "Недостаточно средств в кошельке",
+			"code":  "INSUFFICIENT_FUNDS",
+		})
+
+		return
+	}
+	if domain.IsInvalidInputCode(err, "OUT_OF_STOCK") {
+		handler.WriteJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "Товар недоступен",
+			"code":  "OUT_OF_STOCK",
+		})
+
+		return
+	}
+	if domain.IsInvalidInputCode(err, "PROVIDER_ERROR") {
+		handler.WriteJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "Ошибка провайдера",
+			"code":  "PROVIDER_ERROR",
+		})
+
+		return
+	}
+	handler.WriteJSON(w, http.StatusBadRequest, map[string]string{
+		"error": err.Error(),
+		"code":  "PURCHASE_FAILED",
+	})
 }
 
 func errorsIs(err, target error) bool {

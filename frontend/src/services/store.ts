@@ -104,6 +104,7 @@ export interface ESIMPlan {
 }
 
 export interface ESIMOrderResult {
+  storeOrderId?: string;
   orderId: string;
   qrData: string;
   lpa: string;
@@ -111,6 +112,9 @@ export interface ESIMOrderResult {
   matchingId: string;
   iccid: string;
   providerRef: string;
+  status?: string;
+  priceUsd?: string;
+  productName?: string;
 }
 
 export const getESIMDestinations = async (search?: string): Promise<{ destinations: ESIMDestination[] }> => {

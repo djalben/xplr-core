@@ -30,4 +30,6 @@ type ESIMOrderResult struct {
 	MatchingID  string `json:"matchingId"`
 	ICCID       string `json:"iccid"`
 	ProviderRef string `json:"providerRef"`
+	PendingKYC  bool   `json:"pendingKyc,omitempty"`
+	KYCURL      string `json:"kycUrl,omitempty"`
 }
