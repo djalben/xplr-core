@@ -9,7 +9,7 @@ import (
 
 // SyncCardBalances пересчитывает balance в таблице cards по данным из transactions.
 // Правило:
-// - TOPUP_CARD (COMPLETED) увеличивает баланс.
+// - TOPUP_CARD, AUTO_TOPUP (COMPLETED) увеличивают баланс.
 // - CARD_SPEND (COMPLETED) уменьшает баланс.
 func SyncCardBalances(ctx context.Context, dsn string) (int64, error) {
 	db, err := postgres.Connect(ctx, dsn)
@@ -24,7 +24,7 @@ func SyncCardBalances(ctx context.Context, dsn string) (int64, error) {
 			SELECT card_id, SUM(amount) AS sum_amount
 			FROM transactions
 			WHERE card_id IS NOT NULL
-			  AND transaction_type = 'TOPUP_CARD'
+			  AND transaction_type IN ('TOPUP_CARD', 'AUTO_TOPUP')
 			  AND status = 'COMPLETED'
 			GROUP BY card_id
 		),
