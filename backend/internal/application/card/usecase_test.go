@@ -35,6 +35,7 @@ func activeCard(uid domain.UUID, ct domain.CardType) *domain.Card {
 type cardUCTest struct {
 	UC     *card.UseCase
 	Cards  *mocks.MockCardRepository
+	Wallet *mocks.MockWalletRepository
 	Tx     *mocks.MockTransactionRepository
 	Grades *mocks.MockGradeRepository
 }
@@ -44,9 +45,9 @@ func newCardUCTest(ctrl *gomock.Controller) cardUCTest {
 	wr := mocks.NewMockWalletRepository(ctrl)
 	tr := mocks.NewMockTransactionRepository(ctrl)
 	gr := mocks.NewMockGradeRepository(ctrl)
-	uc := card.NewUseCase(cr, wr, tr, gr)
+	uc := card.NewUseCase(cr, wr, tr, gr, nil)
 
-	return cardUCTest{UC: uc, Cards: cr, Tx: tr, Grades: gr}
+	return cardUCTest{UC: uc, Cards: cr, Wallet: wr, Tx: tr, Grades: gr}
 }
 
 func TestUseCase_BuyCard_StandardLimitReached(t *testing.T) {
@@ -91,6 +92,18 @@ func TestUseCase_BuyCard_OK_EmptyList(t *testing.T) {
 	m.Grades.EXPECT().EnsureGrade(gomock.Any(), uid).Return(nil)
 	m.Grades.EXPECT().GetByUserID(gomock.Any(), uid).Return(&domain.UserGrade{Grade: domain.UserGradeGold}, nil)
 	m.Cards.EXPECT().ListByUserID(gomock.Any(), uid).Return([]*domain.Card{}, nil)
+
+	w := domain.NewWallet(uid)
+	_ = w.TopUp(domain.NewNumeric(10))
+	m.Wallet.EXPECT().GetByUserID(gomock.Any(), uid).Return(w, nil)
+	m.Wallet.EXPECT().Update(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, upd *domain.Wallet) error {
+		if !upd.Balance.Equal(domain.NewNumeric(8)) {
+			t.Fatalf("wallet after issue fee: %s", upd.Balance.String())
+		}
+
+		return nil
+	})
+
 	m.Cards.EXPECT().Save(gomock.Any(), gomock.Any()).Return(nil)
 	m.Tx.EXPECT().Save(gomock.Any(), gomock.Any()).Return(nil)
 

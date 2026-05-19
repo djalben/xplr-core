@@ -11,10 +11,11 @@ import (
 )
 
 type UseCase struct {
-	cardRepo   ports.CardRepository
-	walletRepo ports.WalletRepository
-	txRepo     ports.TransactionRepository
-	gradeRepo  ports.GradeRepository
+	cardRepo       ports.CardRepository
+	walletRepo     ports.WalletRepository
+	txRepo         ports.TransactionRepository
+	gradeRepo      ports.GradeRepository
+	commissionRepo ports.CommissionConfigRepository
 }
 
 func NewUseCase(
@@ -22,12 +23,14 @@ func NewUseCase(
 	wr ports.WalletRepository,
 	tr ports.TransactionRepository,
 	gr ports.GradeRepository,
+	commissionRepo ports.CommissionConfigRepository,
 ) *UseCase {
 	return &UseCase{
-		cardRepo:   cr,
-		walletRepo: wr,
-		txRepo:     tr,
-		gradeRepo:  gr,
+		cardRepo:       cr,
+		walletRepo:     wr,
+		txRepo:         tr,
+		gradeRepo:      gr,
+		commissionRepo: commissionRepo,
 	}
 }
 
@@ -65,6 +68,17 @@ func (uc *UseCase) BuyCard(ctx context.Context, userID domain.UUID, cardType dom
 	if currency == "" {
 		currency = domain.CardCurrencyUSD
 	}
+
+	issueFee, err := uc.cardIssueFee(ctx)
+	if err != nil {
+		return nil, wrapper.Wrap(err)
+	}
+
+	wallet, err := uc.chargeCardIssueFee(ctx, userID, issueFee)
+	if err != nil {
+		return nil, err
+	}
+
 	card, err := domain.NewCard(userID, cardType, currency, "TEMP_PROVIDER_ID", nickname)
 	if err != nil {
 		return nil, wrapper.Wrap(err)
@@ -72,15 +86,24 @@ func (uc *UseCase) BuyCard(ctx context.Context, userID domain.UUID, cardType dom
 
 	err = uc.cardRepo.Save(ctx, card)
 	if err != nil {
-		return nil, wrapper.Wrap(err)
+		saveErr := wrapper.Wrap(err)
+
+		refundErr := uc.refundCardIssueFee(ctx, wallet, issueFee)
+		if refundErr != nil {
+			return nil, wrapper.Wrap(errors.Join(saveErr, refundErr))
+		}
+
+		return nil, saveErr
 	}
 
-	tx := domain.NewTransaction(userID, &card.ID, domain.NewNumeric(2.00), domain.NewNumeric(0),
-		"CARD_ISSUE", "COMPLETED", "Выпуск виртуальной карты")
+	if issueFee.GreaterThan(domain.NewNumeric(0)) {
+		tx := domain.NewTransaction(userID, &card.ID, issueFee, domain.NewNumeric(0),
+			"CARD_ISSUE", "COMPLETED", "Выпуск виртуальной карты")
 
-	err = uc.txRepo.Save(ctx, tx)
-	if err != nil {
-		return nil, wrapper.Wrap(err)
+		err = uc.txRepo.Save(ctx, tx)
+		if err != nil {
+			return nil, wrapper.Wrap(err)
+		}
 	}
 
 	return card, nil
@@ -440,4 +463,68 @@ func (uc *UseCase) UpdateStatus(ctx context.Context, userID domain.UUID, cardID 
 	}
 
 	return domain.NewInvalidInput("invalid status")
+}
+
+func (uc *UseCase) chargeCardIssueFee(ctx context.Context, userID domain.UUID, fee domain.Numeric) (*domain.Wallet, error) {
+	wallet, err := uc.walletRepo.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, wrapper.Wrap(err)
+	}
+
+	if !fee.GreaterThan(domain.NewNumeric(0)) {
+		return wallet, nil
+	}
+
+	if wallet.Balance.LessThan(fee) {
+		return nil, domain.NewInsufficientFunds()
+	}
+
+	err = wallet.Withdraw(fee)
+	if err != nil {
+		return nil, wrapper.Wrap(err)
+	}
+
+	err = uc.walletRepo.Update(ctx, wallet)
+	if err != nil {
+		return nil, wrapper.Wrap(err)
+	}
+
+	return wallet, nil
+}
+
+func (uc *UseCase) refundCardIssueFee(ctx context.Context, wallet *domain.Wallet, fee domain.Numeric) error {
+	if !fee.GreaterThan(domain.NewNumeric(0)) {
+		return nil
+	}
+
+	err := wallet.TopUp(fee)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	err = uc.walletRepo.Update(ctx, wallet)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	return nil
+}
+
+func (uc *UseCase) cardIssueFee(ctx context.Context) (domain.Numeric, error) {
+	defaultFee := domain.NewNumeric(2)
+
+	if uc.commissionRepo == nil {
+		return defaultFee, nil
+	}
+
+	cfg, err := uc.commissionRepo.GetByKey(ctx, domain.CardIssueFee)
+	if err != nil {
+		return domain.NewNumeric(0), wrapper.Wrap(err)
+	}
+
+	if cfg.Value.LessThanOrEqual(domain.NewNumeric(0)) {
+		return defaultFee, nil
+	}
+
+	return cfg.Value, nil
 }

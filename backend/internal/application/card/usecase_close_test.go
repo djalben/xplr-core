@@ -24,7 +24,7 @@ func TestUseCase_CloseCard_RefundsAndZerosBalance(t *testing.T) {
 	wr := mocks.NewMockWalletRepository(ctrl)
 	tr := mocks.NewMockTransactionRepository(ctrl)
 	gr := mocks.NewMockGradeRepository(ctrl)
-	uc := card.NewUseCase(cr, wr, tr, gr)
+	uc := card.NewUseCase(cr, wr, tr, gr, nil)
 
 	c, _ := domain.NewCard(uid, domain.CardTypeSubscriptions, domain.CardCurrencyUSD, "p", "n")
 	c.ID = cid
@@ -73,7 +73,7 @@ func TestUseCase_CloseCard_IdempotentWhenAlreadyClosed(t *testing.T) {
 	wr := mocks.NewMockWalletRepository(ctrl)
 	tr := mocks.NewMockTransactionRepository(ctrl)
 	gr := mocks.NewMockGradeRepository(ctrl)
-	uc := card.NewUseCase(cr, wr, tr, gr)
+	uc := card.NewUseCase(cr, wr, tr, gr, nil)
 
 	c, _ := domain.NewCard(uid, domain.CardTypeSubscriptions, domain.CardCurrencyUSD, "p", "n")
 	c.ID = cid

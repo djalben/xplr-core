@@ -24,7 +24,7 @@ func TestUseCase_AutoTopUpCard_OK(t *testing.T) {
 	wr := mocks.NewMockWalletRepository(ctrl)
 	tr := mocks.NewMockTransactionRepository(ctrl)
 	gr := mocks.NewMockGradeRepository(ctrl)
-	uc := card.NewUseCase(cr, wr, tr, gr)
+	uc := card.NewUseCase(cr, wr, tr, gr, nil)
 
 	w := domain.NewWallet(uid)
 	_ = w.TopUp(domain.NewNumeric(100))

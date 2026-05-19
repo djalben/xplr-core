@@ -119,8 +119,8 @@ func (uc *UseCase) HandleAuthorization(ctx context.Context, event AuthorizationE
 	details := strings.TrimSpace(event.MerchantName)
 	err = uc.cardUC.SpendFromCardWithDetails(ctx, card.UserID, card.ID, amt, details)
 	if err != nil {
-		if errors.Is(err, domain.ErrInsufficientFunds) {
-			return AuthorizationResult{Decision: AuthorizationDecisionDecline, Reason: "INSUFFICIENT_FUNDS"}, nil
+		if decline, ok := authorizationDeclineFromSpendErr(err); ok {
+			return decline, nil
 		}
 
 		return AuthorizationResult{}, wrapper.Wrap(err)
@@ -140,4 +140,40 @@ func (uc *UseCase) HandleAuthorization(ctx context.Context, event AuthorizationE
 	}
 
 	return AuthorizationResult{Decision: AuthorizationDecisionApprove}, nil
+}
+
+func authorizationDeclineFromSpendErr(err error) (AuthorizationResult, bool) {
+	if err == nil {
+		return AuthorizationResult{}, false
+	}
+
+	if errors.Is(err, domain.ErrInsufficientFunds) {
+		return AuthorizationResult{Decision: AuthorizationDecisionDecline, Reason: "INSUFFICIENT_FUNDS"}, true
+	}
+
+	if !errors.Is(err, domain.ErrInvalidInput) {
+		return AuthorizationResult{}, false
+	}
+
+	return AuthorizationResult{
+		Decision: AuthorizationDecisionDecline,
+		Reason:   spendInvalidInputDeclineReason(err),
+	}, true
+}
+
+func spendInvalidInputDeclineReason(err error) string {
+	switch {
+	case domain.IsInvalidInputCode(err, "daily spend limit exceeded"):
+		return "DAILY_LIMIT_EXCEEDED"
+	case domain.IsInvalidInputCode(err, "monthly spend limit exceeded"):
+		return "MONTHLY_LIMIT_EXCEEDED"
+	case domain.IsInvalidInputCode(err, "card is not active"):
+		return "CARD_NOT_ACTIVE"
+	case domain.IsInvalidInputCode(err, "card not found"):
+		return "CARD_NOT_FOUND"
+	case domain.IsInvalidInputCode(err, "amount must be positive"):
+		return "INVALID_AMOUNT"
+	default:
+		return "DECLINED"
+	}
 }
