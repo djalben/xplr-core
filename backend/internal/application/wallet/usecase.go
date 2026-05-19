@@ -126,37 +126,3 @@ func (uc *UseCase) ToggleAutoTopUp(ctx context.Context, userID domain.UUID, enab
 
 	return nil
 }
-
-// AutoTopUpCard — автоматическое пополнение карты с кошелька (вызывается при недостатке средств).
-func (uc *UseCase) AutoTopUpCard(ctx context.Context, userID domain.UUID, cardID domain.UUID, neededAmount domain.Numeric) error {
-	wallet, err := uc.walletRepo.GetByUserID(ctx, userID)
-	if err != nil {
-		return wrapper.Wrap(err)
-	}
-
-	if !wallet.AutoTopUpEnabled {
-		return domain.NewInvalidInput("auto top-up is disabled on wallet")
-	}
-
-	err = wallet.Withdraw(neededAmount)
-	if err != nil {
-		return wrapper.Wrap(err)
-	}
-
-	err = uc.walletRepo.Update(ctx, wallet)
-	if err != nil {
-		return wrapper.Wrap(err)
-	}
-
-	tx := domain.NewTransaction(
-		userID,
-		&cardID,
-		neededAmount,
-		domain.NewNumeric(0),
-		"AUTO_TOPUP",
-		"COMPLETED",
-		"Автоматическое пополнение карты с кошелька",
-	)
-
-	return uc.txRepo.Save(ctx, tx)
-}

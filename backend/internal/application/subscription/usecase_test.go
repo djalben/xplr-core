@@ -41,7 +41,7 @@ func TestUseCase_HandleAuthorization_BlockedDecline(t *testing.T) {
 		GetByCardAndMerchantKey(gomock.Any(), cid, "netflix").
 		Return(&domain.CardSubscription{ID: uuid.New(), CardID: cid, MerchantKey: "netflix", IsBlocked: true}, nil)
 
-	cardUC := card.NewUseCase(cardRepo, walletRepo, txRepo, gradeRepo, nil)
+	cardUC := card.NewUseCase(cardRepo, walletRepo, txRepo, gradeRepo)
 	uc := subscription.NewUseCase(cardRepo, subRepo, cardUC)
 
 	res, err := uc.HandleAuthorization(ctx, subscription.AuthorizationEvent{
@@ -95,7 +95,7 @@ func TestUseCase_HandleAuthorization_ApproveAndUpsert(t *testing.T) {
 		UpsertOnCharge(gomock.Any(), uid, cid, "Netflix", gomock.Any(), "USD", gomock.Any()).
 		Return(&domain.CardSubscription{ID: uuid.New(), UserID: uid, CardID: cid, MerchantName: "Netflix", MerchantKey: "netflix", ChargeCount: 1}, nil)
 
-	cardUC := card.NewUseCase(cardRepo, walletRepo, txRepo, gradeRepo, nil)
+	cardUC := card.NewUseCase(cardRepo, walletRepo, txRepo, gradeRepo)
 	uc := subscription.NewUseCase(cardRepo, subRepo, cardUC)
 
 	res, err := uc.HandleAuthorization(ctx, subscription.AuthorizationEvent{

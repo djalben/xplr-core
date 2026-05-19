@@ -44,7 +44,7 @@ func newCardUCTest(ctrl *gomock.Controller) cardUCTest {
 	wr := mocks.NewMockWalletRepository(ctrl)
 	tr := mocks.NewMockTransactionRepository(ctrl)
 	gr := mocks.NewMockGradeRepository(ctrl)
-	uc := card.NewUseCase(cr, wr, tr, gr, nil)
+	uc := card.NewUseCase(cr, wr, tr, gr)
 
 	return cardUCTest{UC: uc, Cards: cr, Tx: tr, Grades: gr}
 }

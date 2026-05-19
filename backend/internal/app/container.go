@@ -123,7 +123,7 @@ func NewContainer(ctx context.Context, cfg *config.ENV) (*Container, error) {
 	}
 	storeUC := store.NewUseCase(storeRepo, walletRepo, transactionRepo, esim, vpnPort)
 
-	cardUC := card.NewUseCase(cardRepo, walletRepo, transactionRepo, gradeRepo, walletUC)
+	cardUC := card.NewUseCase(cardRepo, walletRepo, transactionRepo, gradeRepo)
 	subUC := subscription.NewUseCase(cardRepo, subscriptionRepo, cardUC)
 
 	return &Container{

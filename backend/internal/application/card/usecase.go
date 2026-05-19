@@ -5,7 +5,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/djalben/xplr-core/backend/internal/application/wallet"
 	"github.com/djalben/xplr-core/backend/internal/domain"
 	"github.com/djalben/xplr-core/backend/internal/ports"
 	"gitlab.com/libs-artifex/wrapper/v2"
@@ -16,7 +15,6 @@ type UseCase struct {
 	walletRepo ports.WalletRepository
 	txRepo     ports.TransactionRepository
 	gradeRepo  ports.GradeRepository
-	walletUC   *wallet.UseCase
 }
 
 func NewUseCase(
@@ -24,14 +22,12 @@ func NewUseCase(
 	wr ports.WalletRepository,
 	tr ports.TransactionRepository,
 	gr ports.GradeRepository,
-	walletUC *wallet.UseCase,
 ) *UseCase {
 	return &UseCase{
 		cardRepo:   cr,
 		walletRepo: wr,
 		txRepo:     tr,
 		gradeRepo:  gr,
-		walletUC:   walletUC,
 	}
 }
 
@@ -234,26 +230,34 @@ func (uc *UseCase) CloseCard(ctx context.Context, userID domain.UUID, cardID dom
 	if card.UserID != userID {
 		return domain.NewInvalidInput("card not found")
 	}
-
-	if card.Balance.GreaterThan(domain.NewNumeric(0)) {
-		wallet, err := uc.walletRepo.GetByUserID(ctx, userID)
-		if err != nil {
-			return wrapper.Wrap(err)
-		}
-
-		err = wallet.TopUp(card.Balance)
-		if err != nil {
-			return wrapper.Wrap(err)
-		}
-
-		err = uc.walletRepo.Update(ctx, wallet)
-		if err != nil {
-			return wrapper.Wrap(err)
-		}
+	if card.CardStatus == domain.CardStatusClosed {
+		return nil
 	}
 
+	refund := card.Balance
+	card.Balance = domain.NewNumeric(0)
 	card.CardStatus = domain.CardStatusClosed
+
 	err = uc.cardRepo.Update(ctx, card)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	if !refund.GreaterThan(domain.NewNumeric(0)) {
+		return nil
+	}
+
+	wallet, err := uc.walletRepo.GetByUserID(ctx, userID)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	err = wallet.TopUp(refund)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	err = uc.walletRepo.Update(ctx, wallet)
 	if err != nil {
 		return wrapper.Wrap(err)
 	}
@@ -261,13 +265,62 @@ func (uc *UseCase) CloseCard(ctx context.Context, userID domain.UUID, cardID dom
 	return nil
 }
 
-// AutoTopUpCard — главный метод автотопапа (вызывается, когда карте не хватило денег).
+// AutoTopUpCard — автопополнение карты с кошелька (при включённом auto top-up).
 func (uc *UseCase) AutoTopUpCard(ctx context.Context, userID domain.UUID, cardID domain.UUID, neededAmount domain.Numeric) error {
-	if uc.walletUC == nil {
-		return domain.NewInvalidInput("wallet usecase not configured")
+	if neededAmount.LessThanOrEqual(domain.NewNumeric(0)) {
+		return domain.NewInvalidInput("amount must be positive")
 	}
 
-	return uc.walletUC.AutoTopUpCard(ctx, userID, cardID, neededAmount)
+	wallet, err := uc.walletRepo.GetByUserID(ctx, userID)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+	if !wallet.AutoTopUpEnabled {
+		return domain.NewInvalidInput("auto top-up is disabled on wallet")
+	}
+
+	card, err := uc.cardRepo.GetByID(ctx, cardID)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+	if card.UserID != userID {
+		return domain.NewInvalidInput("card not found")
+	}
+	if card.CardStatus != domain.CardStatusActive {
+		return domain.NewInvalidInput("card is not active")
+	}
+
+	err = wallet.Withdraw(neededAmount)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	card.Balance = card.Balance.Add(neededAmount)
+
+	err = uc.walletRepo.Update(ctx, wallet)
+	if err != nil {
+		return wrapper.Wrap(err)
+	}
+
+	err = uc.cardRepo.Update(ctx, card)
+	if err != nil {
+		updateCardErr := wrapper.Wrap(err)
+
+		refundErr := wallet.TopUp(neededAmount)
+		if refundErr == nil {
+			refundErr = uc.walletRepo.Update(ctx, wallet)
+		}
+		if refundErr != nil {
+			return wrapper.Wrap(errors.Join(updateCardErr, refundErr))
+		}
+
+		return updateCardErr
+	}
+
+	tx := domain.NewTransaction(userID, &cardID, neededAmount, domain.NewNumeric(0),
+		"AUTO_TOPUP", "COMPLETED", "Автоматическое пополнение карты с кошелька")
+
+	return uc.txRepo.Save(ctx, tx)
 }
 
 // BlockCard — блокирует карту.
