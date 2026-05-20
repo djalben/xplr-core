@@ -2,6 +2,7 @@ package card
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"time"
 
@@ -519,6 +520,10 @@ func (uc *UseCase) cardIssueFee(ctx context.Context) (domain.Numeric, error) {
 
 	cfg, err := uc.commissionRepo.GetByKey(ctx, domain.CardIssueFee)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return defaultFee, nil
+		}
+
 		return domain.NewNumeric(0), wrapper.Wrap(err)
 	}
 
