@@ -202,3 +202,70 @@ func TestPurchaseVPN_OK(t *testing.T) {
 		t.Fatalf("activation key: %q", out.ActivationKey)
 	}
 }
+
+func TestPurchaseVPN_WalletUpdateFailsBeforeFulfill(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	uid := testUID()
+	pid := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+
+	product := &domain.StoreProduct{
+		ID:           pid,
+		ExternalID:   "vpn-plan-1",
+		Name:         "VPN 30d",
+		ProductType:  domain.StoreProductTypeVPN,
+		PriceUSD:     domain.NewNumeric(5),
+		ValidityDays: 30,
+		InStock:      true,
+	}
+
+	vpn := &fakeVPN{provider: "ref-1", key: "vless://real-key"}
+	uc := store.NewUseCase(
+		&fakeStoreRepo{product: product},
+		&fakeWalletRepo{wallet: testWallet(20), updateErr: errors.New("wallet db down")},
+		nil,
+		nil,
+		vpn,
+	)
+
+	_, err := uc.Purchase(ctx, uid, pid)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if vpn.createCalls != 0 {
+		t.Fatalf("fulfill called before wallet persisted, createCalls=%d", vpn.createCalls)
+	}
+}
+
+func TestPurchaseESIM_RefundOnFulfillFail(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	uid := testUID()
+
+	plan := &domain.ESIMPlan{
+		PlanID:   "demo-tr-1gb",
+		Name:     "Demo 1 GB",
+		PriceUSD: domain.NewNumeric(3.5),
+		InStock:  true,
+	}
+
+	walletRepo := &fakeWalletRepo{wallet: testWallet(20)}
+	esim := &fakeESIM{plan: plan, orderErr: errors.New("provider down")}
+	uc := store.NewUseCase(
+		&fakeStoreRepo{},
+		walletRepo,
+		nil,
+		esim,
+		nil,
+	)
+
+	_, err := uc.PurchaseESIM(ctx, uid, plan.PlanID)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !walletRepo.wallet.Balance.Equal(domain.NewNumeric(20)) {
+		t.Fatalf("wallet not refunded, balance=%s", walletRepo.wallet.Balance.String())
+	}
+}

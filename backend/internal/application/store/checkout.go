@@ -37,8 +37,23 @@ func (uc *UseCase) checkoutFromWallet(
 		return nil, domain.NewInsufficientFunds()
 	}
 
+	err = w.Withdraw(price)
+	if err != nil {
+		return nil, wrapper.Wrap(err)
+	}
+
+	err = uc.walletRepo.Update(ctx, w)
+	if err != nil {
+		return nil, wrapper.Wrap(err)
+	}
+
 	ff, err := fulfill(ctx)
 	if err != nil {
+		refundErr := uc.refundWalletWithdraw(ctx, w, price)
+		if refundErr != nil {
+			return nil, wrapper.Wrap(errors.Join(err, refundErr))
+		}
+
 		return nil, err
 	}
 
@@ -49,7 +64,14 @@ func (uc *UseCase) checkoutFromWallet(
 
 	metaBytes, err := json.Marshal(ff.Meta)
 	if err != nil {
-		return nil, wrapper.Wrap(err)
+		marshalErr := wrapper.Wrap(err)
+
+		refundErr := uc.refundWalletWithdraw(ctx, w, price)
+		if refundErr != nil {
+			return nil, wrapper.Wrap(errors.Join(marshalErr, refundErr))
+		}
+
+		return nil, marshalErr
 	}
 
 	oid := uuid.New()
@@ -67,24 +89,11 @@ func (uc *UseCase) checkoutFromWallet(
 		CreatedAt:     time.Now().UTC(),
 	}
 
-	err = w.Withdraw(price)
-	if err != nil {
-		return nil, wrapper.Wrap(err)
-	}
-
-	err = uc.walletRepo.Update(ctx, w)
-	if err != nil {
-		return nil, wrapper.Wrap(err)
-	}
-
 	err = uc.storeRepo.CreateOrder(ctx, o)
 	if err != nil {
 		createErr := wrapper.Wrap(err)
 
-		refundErr := w.TopUp(price)
-		if refundErr == nil {
-			refundErr = uc.walletRepo.Update(ctx, w)
-		}
+		refundErr := uc.refundWalletWithdraw(ctx, w, price)
 		if refundErr != nil {
 			return nil, wrapper.Wrap(errors.Join(createErr, refundErr))
 		}
@@ -129,4 +138,18 @@ func (uc *UseCase) recordStorePurchaseTx(ctx context.Context, userID domain.UUID
 	)
 
 	return uc.txRepo.Save(ctx, tx)
+}
+
+func (uc *UseCase) refundWalletWithdraw(ctx context.Context, w *domain.Wallet, price domain.Numeric) error {
+	refundErr := w.TopUp(price)
+	if refundErr != nil {
+		return wrapper.Wrap(refundErr)
+	}
+
+	updateErr := uc.walletRepo.Update(ctx, w)
+	if updateErr != nil {
+		return wrapper.Wrap(updateErr)
+	}
+
+	return nil
 }

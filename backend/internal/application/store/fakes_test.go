@@ -11,6 +11,7 @@ import (
 type fakeWalletRepo struct {
 	wallet      *domain.Wallet
 	updateCalls int
+	updateErr   error
 }
 
 func (f *fakeWalletRepo) GetByUserID(_ context.Context, _ domain.UUID) (*domain.Wallet, error) {
@@ -22,6 +23,10 @@ func (f *fakeWalletRepo) EnsureWallet(_ context.Context, _ domain.UUID) error {
 }
 
 func (f *fakeWalletRepo) Update(_ context.Context, w *domain.Wallet) error {
+	if f.updateErr != nil {
+		return f.updateErr
+	}
+
 	f.wallet = w
 	f.updateCalls++
 
@@ -90,9 +95,10 @@ func (f *fakeStoreRepo) AdminListVPNOrders(context.Context, int) ([]*domain.Admi
 }
 
 type fakeESIM struct {
-	plan     *domain.ESIMPlan
-	orderRes *domain.ESIMOrderResult
-	orderErr error
+	plan       *domain.ESIMPlan
+	orderRes   *domain.ESIMOrderResult
+	orderErr   error
+	orderCalls int
 }
 
 func (f *fakeESIM) Name() string { return "fake" }
@@ -110,6 +116,8 @@ func (f *fakeESIM) GetPlan(context.Context, string) (*domain.ESIMPlan, error) {
 }
 
 func (f *fakeESIM) OrderESIM(context.Context, string) (*domain.ESIMOrderResult, error) {
+	f.orderCalls++
+
 	return f.orderRes, f.orderErr
 }
 
@@ -118,14 +126,17 @@ func (f *fakeESIM) CheckAvailability(context.Context, string) (bool, error) {
 }
 
 type fakeVPN struct {
-	key       string
-	provider  string
-	createErr error
+	key        string
+	provider   string
+	createErr  error
+	createCalls int
 }
 
 func (f *fakeVPN) Name() string { return "fake" }
 
 func (f *fakeVPN) CreateOrder(context.Context, string) (string, string, string, error) {
+	f.createCalls++
+
 	if f.createErr != nil {
 		return "", "", "", f.createErr
 	}
