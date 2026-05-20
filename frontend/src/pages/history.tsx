@@ -100,6 +100,7 @@ export const HistoryPage = () => {
       const sourceLabels: Record<string, string> = {
         wallet_topup: 'Пополнение кошелька',
         card_transfer: 'Перевод на карту',
+        card_refund: 'Возврат с карты на кошелёк',
         card_charge: 'Списание',
         referral_bonus: 'Реферальный бонус',
         refund: 'Возврат',

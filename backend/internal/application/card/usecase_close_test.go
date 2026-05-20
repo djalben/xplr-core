@@ -52,6 +52,19 @@ func TestUseCase_CloseCard_RefundsAndZerosBalance(t *testing.T) {
 
 		return nil
 	})
+	tr.EXPECT().Save(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, tx *domain.Transaction) error {
+		if tx.TransactionType != domain.TransactionTypeCardRefund {
+			t.Fatalf("tx type: %s", tx.TransactionType)
+		}
+		if tx.CardID == nil || *tx.CardID != cid {
+			t.Fatal("tx card_id mismatch")
+		}
+		if !tx.Amount.Equal(domain.NewNumeric(25)) {
+			t.Fatalf("tx amount: %s", tx.Amount.String())
+		}
+
+		return nil
+	})
 
 	err := uc.CloseCard(ctx, uid, cid)
 	if err != nil {

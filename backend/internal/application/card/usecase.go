@@ -127,11 +127,6 @@ func (uc *UseCase) GetByID(ctx context.Context, cardID domain.UUID) (*domain.Car
 
 // TopUpCard — ручное пополнение карты.
 func (uc *UseCase) TopUpCard(ctx context.Context, userID domain.UUID, cardID domain.UUID, amount domain.Numeric) error {
-	wallet, err := uc.walletRepo.GetByUserID(ctx, userID)
-	if err != nil {
-		return wrapper.Wrap(err)
-	}
-
 	card, err := uc.cardRepo.GetByID(ctx, cardID)
 	if err != nil {
 		return wrapper.Wrap(err)
@@ -139,6 +134,15 @@ func (uc *UseCase) TopUpCard(ctx context.Context, userID domain.UUID, cardID dom
 
 	if card.UserID != userID {
 		return domain.NewInvalidInput("card not found")
+	}
+
+	if card.CardStatus != domain.CardStatusActive {
+		return domain.NewInvalidInput("card is not active")
+	}
+
+	wallet, err := uc.walletRepo.GetByUserID(ctx, userID)
+	if err != nil {
+		return wrapper.Wrap(err)
 	}
 
 	err = wallet.Withdraw(amount)
@@ -286,7 +290,10 @@ func (uc *UseCase) CloseCard(ctx context.Context, userID domain.UUID, cardID dom
 		return wrapper.Wrap(err)
 	}
 
-	return nil
+	tx := domain.NewTransaction(userID, &cardID, refund, domain.NewNumeric(0),
+		domain.TransactionTypeCardRefund, "COMPLETED", "Возврат остатка при закрытии карты")
+
+	return uc.txRepo.Save(ctx, tx)
 }
 
 // AutoTopUpCard — автопополнение карты с кошелька (при включённом auto top-up).

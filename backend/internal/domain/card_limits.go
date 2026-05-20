@@ -8,6 +8,9 @@ import (
 // TransactionTypeCardSpend — списание с баланса карты (оплата / трата).
 const TransactionTypeCardSpend = "CARD_SPEND"
 
+// TransactionTypeCardRefund — возврат остатка с карты на кошелёк (закрытие карты).
+const TransactionTypeCardRefund = "CARD_REFUND"
+
 // MaxActiveCardsPerTypeByGrade — максимум активных (не CLOSED) карт одного типа на пользователя.
 // STANDARD: 3 каждого вида; GOLD: 5. Иное значение в БД (устаревшее) обрабатывается как STANDARD.
 func MaxActiveCardsPerTypeByGrade(grade string) int {

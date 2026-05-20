@@ -10,7 +10,8 @@ import (
 // SyncCardBalances пересчитывает balance в таблице cards по данным из transactions.
 // Правило:
 // - TOPUP_CARD, AUTO_TOPUP (COMPLETED) увеличивают баланс.
-// - CARD_SPEND (COMPLETED) уменьшает баланс.
+// - CARD_SPEND, CARD_REFUND (COMPLETED) уменьшают баланс.
+// - Карты CLOSED не трогаем (защита для закрытий до появления CARD_REFUND).
 func SyncCardBalances(ctx context.Context, dsn string) (int64, error) {
 	db, err := postgres.Connect(ctx, dsn)
 	if err != nil {
@@ -32,7 +33,7 @@ func SyncCardBalances(ctx context.Context, dsn string) (int64, error) {
 			SELECT card_id, SUM(amount) AS sum_amount
 			FROM transactions
 			WHERE card_id IS NOT NULL
-			  AND transaction_type = 'CARD_SPEND'
+			  AND transaction_type IN ('CARD_SPEND', 'CARD_REFUND')
 			  AND status = 'COMPLETED'
 			GROUP BY card_id
 		)
@@ -41,7 +42,8 @@ func SyncCardBalances(ctx context.Context, dsn string) (int64, error) {
 			COALESCE(t.sum_amount, 0) - COALESCE(s.sum_amount, 0)
 		FROM topups t
 		FULL OUTER JOIN spends s ON s.card_id = t.card_id
-		WHERE c.id = COALESCE(t.card_id, s.card_id)`
+		WHERE c.id = COALESCE(t.card_id, s.card_id)
+		  AND c.card_status <> 'CLOSED'`
 
 	res, err := db.ExecContext(ctx, query)
 	if err != nil {

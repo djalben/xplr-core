@@ -489,6 +489,7 @@ func (h *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
 		"CARD_ISSUE":                    "card_transfer",
 		"AUTO_TOPUP":                    "card_transfer",
 		domain.TransactionTypeCardSpend: "card_charge",
+		domain.TransactionTypeCardRefund:  "card_refund",
 	}
 
 	out := make([]txResp, 0, len(txs))
