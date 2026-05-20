@@ -29,6 +29,7 @@ func (f *fakeWalletRepo) Update(_ context.Context, w *domain.Wallet) error {
 }
 
 type fakeStoreRepo struct {
+	product   *domain.StoreProduct
 	createErr error
 }
 
@@ -40,7 +41,11 @@ func (f *fakeStoreRepo) ListProducts(context.Context, ports.StoreProductFilter) 
 	return nil, nil
 }
 
-func (f *fakeStoreRepo) GetProductByID(context.Context, domain.UUID) (*domain.StoreProduct, error) {
+func (f *fakeStoreRepo) GetProductByID(_ context.Context, id domain.UUID) (*domain.StoreProduct, error) {
+	if f.product != nil && f.product.ID == id {
+		return f.product, nil
+	}
+
 	return nil, domain.NewNotFound("product")
 }
 
@@ -110,6 +115,26 @@ func (f *fakeESIM) OrderESIM(context.Context, string) (*domain.ESIMOrderResult, 
 
 func (f *fakeESIM) CheckAvailability(context.Context, string) (bool, error) {
 	return true, nil
+}
+
+type fakeVPN struct {
+	key       string
+	provider  string
+	createErr error
+}
+
+func (f *fakeVPN) Name() string { return "fake" }
+
+func (f *fakeVPN) CreateOrder(context.Context, string) (string, string, string, error) {
+	if f.createErr != nil {
+		return "", "", "", f.createErr
+	}
+
+	return f.provider, f.key, "{}", nil
+}
+
+func (f *fakeVPN) GetClientTraffic(context.Context, string) (*domain.VPNClientTraffic, error) {
+	return nil, nil
 }
 
 type fakeTxRepo struct {

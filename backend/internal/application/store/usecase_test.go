@@ -130,3 +130,75 @@ func TestPurchaseESIM_RefundOnCreateOrderFail(t *testing.T) {
 		t.Fatalf("wallet not refunded, balance=%s", walletRepo.wallet.Balance.String())
 	}
 }
+
+func TestPurchaseVPN_ProviderErrorNoCharge(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	uid := testUID()
+	pid := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+
+	product := &domain.StoreProduct{
+		ID:           pid,
+		ExternalID:   "vpn-plan-1",
+		Name:         "VPN 30d",
+		ProductType:  domain.StoreProductTypeVPN,
+		PriceUSD:     domain.NewNumeric(5),
+		ValidityDays: 30,
+		InStock:      true,
+	}
+
+	walletRepo := &fakeWalletRepo{wallet: testWallet(20)}
+	uc := store.NewUseCase(
+		&fakeStoreRepo{product: product},
+		walletRepo,
+		nil,
+		nil,
+		&fakeVPN{createErr: errors.New("xpanel down")},
+	)
+
+	_, err := uc.Purchase(ctx, uid, pid)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !domain.IsInvalidInputCode(err, "PROVIDER_ERROR") {
+		t.Fatalf("want PROVIDER_ERROR, got %v", err)
+	}
+	if !walletRepo.wallet.Balance.Equal(domain.NewNumeric(20)) {
+		t.Fatalf("wallet charged, balance=%s", walletRepo.wallet.Balance.String())
+	}
+}
+
+func TestPurchaseVPN_OK(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	uid := testUID()
+	pid := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+
+	product := &domain.StoreProduct{
+		ID:           pid,
+		ExternalID:   "vpn-plan-1",
+		Name:         "VPN 30d",
+		ProductType:  domain.StoreProductTypeVPN,
+		PriceUSD:     domain.NewNumeric(5),
+		ValidityDays: 30,
+		InStock:      true,
+	}
+
+	uc := store.NewUseCase(
+		&fakeStoreRepo{product: product},
+		&fakeWalletRepo{wallet: testWallet(20)},
+		&fakeTxRepo{},
+		nil,
+		&fakeVPN{provider: "ref-1", key: "vless://real-key"},
+	)
+
+	out, err := uc.Purchase(ctx, uid, pid)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.ActivationKey != "vless://real-key" {
+		t.Fatalf("activation key: %q", out.ActivationKey)
+	}
+}

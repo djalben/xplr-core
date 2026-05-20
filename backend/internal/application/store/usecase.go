@@ -206,13 +206,17 @@ func (uc *UseCase) fulfillCatalogProduct(ctx context.Context, p *domain.StorePro
 	case domain.StoreProductTypeVPN:
 		if uc.vpn != nil {
 			pRef, key, metaStr, err := uc.vpn.CreateOrder(ctx, p.ExternalID)
-			if err == nil {
-				providerRef = pRef
-				activationKey = key
-				meta["provider_meta"] = metaStr
+			if err != nil {
+				return nil, domain.NewInvalidInput("PROVIDER_ERROR")
 			}
-		}
-		if activationKey == "" {
+			if key == "" {
+				return nil, domain.NewInvalidInput("PROVIDER_ERROR")
+			}
+
+			providerRef = pRef
+			activationKey = key
+			meta["provider_meta"] = metaStr
+		} else {
 			activationKey = "vless://" + uuid.New().String()
 			meta["traffic_bytes"] = int64(0)
 			meta["expire_ms"] = time.Now().Add(time.Duration(p.ValidityDays) * 24 * time.Hour).UnixMilli()
