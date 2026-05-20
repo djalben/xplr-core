@@ -410,6 +410,11 @@ func (uc *UseCase) UnblockCard(ctx context.Context, userID domain.UUID, cardID d
 		return domain.NewInvalidInput("card not found")
 	}
 
+	err = rejectUnblockClosedCard(card)
+	if err != nil {
+		return err
+	}
+
 	card.FailedAuthCount = 0
 	card.CardStatus = domain.CardStatusActive
 
@@ -426,6 +431,11 @@ func (uc *UseCase) UnblockCardAdmin(ctx context.Context, cardID domain.UUID) err
 	card, err := uc.cardRepo.GetByID(ctx, cardID)
 	if err != nil {
 		return wrapper.Wrap(err)
+	}
+
+	err = rejectUnblockClosedCard(card)
+	if err != nil {
+		return err
 	}
 
 	card.FailedAuthCount = 0
@@ -460,7 +470,7 @@ func (uc *UseCase) SetSpendingLimit(ctx context.Context, userID domain.UUID, car
 	return nil
 }
 
-// UpdateStatus — меняет статус карты (ACTIVE/CLOSED).
+// UpdateStatus — меняет статус карты: CLOSED — закрытие; ACTIVE — только разблокировка BLOCKED (не реактивация CLOSED).
 func (uc *UseCase) UpdateStatus(ctx context.Context, userID domain.UUID, cardID domain.UUID, status string) error {
 	if status == domain.CardStatusClosed {
 		return uc.CloseCard(ctx, userID, cardID)
@@ -471,6 +481,14 @@ func (uc *UseCase) UpdateStatus(ctx context.Context, userID domain.UUID, cardID 
 	}
 
 	return domain.NewInvalidInput("invalid status")
+}
+
+func rejectUnblockClosedCard(card *domain.Card) error {
+	if card.CardStatus == domain.CardStatusClosed {
+		return domain.NewInvalidInput("card is closed")
+	}
+
+	return nil
 }
 
 func (uc *UseCase) chargeCardIssueFee(ctx context.Context, userID domain.UUID, fee domain.Numeric) (*domain.Wallet, error) {
