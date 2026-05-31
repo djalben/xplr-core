@@ -37,29 +37,43 @@ func (f *flexID) UnmarshalJSON(b []byte) error {
 
 func (f flexID) String() string { return string(f) }
 
-// ── Esimba API DTOs ──
+// ── Keepgo (Esimba) API DTOs ──
+// Schema confirmed live against https://myaccount.keepgo.com/api/v2/bundles:
+//   {"ack":"success","bundles":[{"id":1,"bundle_type":"regional","name":"Orion",
+//     "img":".../flags/3x2/vn.svg","coverage":["Vietnam"],
+//     "refills":[{"title":"3 GB / 30 days","amount_mb":3072,"amount_days":30,"price_usd":5.53}]}]}
 
 // esimbaRefill is a single data package attached to a bundle.
 type esimbaRefill struct {
-	ID         flexID  `json:"id"`
-	RefillMB   int     `json:"refill_mb"`
-	RefillDays int     `json:"refill_days"`
-	Price      float64 `json:"price"`
-	Currency   string  `json:"currency"`
+	Title      string  `json:"title"`
+	AmountMB   int     `json:"amount_mb"`
+	AmountDays *int    `json:"amount_days"` // nullable (regional volume bundles have no validity)
+	PriceUSD   float64 `json:"price_usd"`
 }
 
-// esimbaBundle is a country/region offer containing one or more refills.
+// days returns the validity in days (0 when the API sends null).
+func (r esimbaRefill) days() int {
+	if r.AmountDays == nil {
+		return 0
+	}
+	return *r.AmountDays
+}
+
+// esimbaBundle is a country/regional offer containing one or more refills.
 type esimbaBundle struct {
 	ID          flexID         `json:"id"`
 	Name        string         `json:"name"`
-	Type        string         `json:"type"`
-	Country     string         `json:"country"`
-	CountryCode string         `json:"country_code"`
+	BundleType  string         `json:"bundle_type"` // "country" | "regional"
+	ProductType string         `json:"product_type"`
+	Img         string         `json:"img"`
+	Description string         `json:"description"`
+	Coverage    []string       `json:"coverage"`
 	Refills     []esimbaRefill `json:"refills"`
 }
 
 // esimbaBundlesResponse is the envelope returned by GET /bundles.
 type esimbaBundlesResponse struct {
+	Ack     string         `json:"ack"`
 	Bundles []esimbaBundle `json:"bundles"`
 }
 
@@ -197,13 +211,11 @@ func (e *EsimbaProvider) GetDestinations() ([]ESIMDestination, error) {
 	counts := map[string]int{}
 	names := map[string]string{}
 	for _, b := range bundles {
-		cc := strings.ToUpper(b.CountryCode)
-		if cc == "" {
-			continue
-		}
-		counts[cc] += len(b.Refills)
-		if names[cc] == "" {
-			names[cc] = b.Country
+		for code, name := range b.coveredCountries() {
+			counts[code] += len(b.Refills)
+			if names[code] == "" {
+				names[code] = name
+			}
 		}
 	}
 
@@ -216,6 +228,7 @@ func (e *EsimbaProvider) GetDestinations() ([]ESIMDestination, error) {
 			PlanCount:   n,
 		})
 	}
+	log.Printf("[ESIMBA] GetDestinations: %d countries derived from %d bundles", len(dests), len(bundles))
 	return dests, nil
 }
 
@@ -232,23 +245,25 @@ func (e *EsimbaProvider) GetPlans(countryCode string) ([]ESIMPlan, error) {
 	cc := strings.ToUpper(strings.TrimSpace(countryCode))
 	var plans []ESIMPlan
 	for _, b := range bundles {
-		if cc != "" && strings.ToUpper(b.CountryCode) != cc {
+		covered := b.coveredCountries()
+		countryName, ok := covered[cc]
+		if cc != "" && !ok {
 			continue
 		}
 		for _, r := range b.Refills {
-			retail := round2(r.Price * retailMarkup)
+			retail := round2(r.PriceUSD * retailMarkup)
 			plans = append(plans, ESIMPlan{
-				PlanID:       encodeEsimbaPlanID(b.ID.String(), r.RefillMB, r.RefillDays),
+				PlanID:       encodeEsimbaPlanID(b.ID.String(), r.AmountMB, r.days()),
 				Provider:     "esimba",
 				Name:         bundlePlanName(b, r),
-				Country:      b.Country,
-				CountryCode:  strings.ToUpper(b.CountryCode),
-				DataGB:       formatMBasGB(r.RefillMB),
-				ValidityDays: r.RefillDays,
+				Country:      countryName,
+				CountryCode:  cc,
+				DataGB:       formatMBasGB(r.AmountMB),
+				ValidityDays: r.days(),
 				PriceUSD:     retail,               // retail = wholesale × 5
 				OldPrice:     round2(retail * 1.2), // strike-through reference price
-				CostPrice:    r.Price,              // original wholesale price
-				Description:  b.Name,
+				CostPrice:    r.PriceUSD,           // original wholesale price
+				Description:  b.Description,
 				InStock:      true,
 			})
 		}
@@ -333,27 +348,29 @@ func (e *EsimbaProvider) GetCatalog() ([]shop.CatalogProduct, error) {
 
 	var catalog []shop.CatalogProduct
 	for _, b := range bundles {
+		// Pick a representative country code/name for the catalog entry.
+		var code, name string
+		for c, n := range b.coveredCountries() {
+			code, name = c, n
+			break
+		}
 		for _, r := range b.Refills {
-			currency := r.Currency
-			if currency == "" {
-				currency = "USD"
-			}
 			catalog = append(catalog, shop.CatalogProduct{
-				ExternalID:  encodeEsimbaPlanID(b.ID.String(), r.RefillMB, r.RefillDays),
+				ExternalID:  encodeEsimbaPlanID(b.ID.String(), r.AmountMB, r.days()),
 				Name:        bundlePlanName(b, r),
-				Description: b.Name,
+				Description: b.Description,
 				Category:    "esim",
-				Country:     b.Country,
-				CountryCode: strings.ToUpper(b.CountryCode),
-				CostPrice:   decimal.NewFromFloat(r.Price),
-				Currency:    currency,
+				Country:     name,
+				CountryCode: code,
+				CostPrice:   decimal.NewFromFloat(r.PriceUSD),
+				Currency:    "USD",
 				InStock:     true,
 				Meta: map[string]any{
-					"data_gb":       formatMBasGB(r.RefillMB),
-					"validity_days": r.RefillDays,
-					"refill_mb":     r.RefillMB,
+					"data_gb":       formatMBasGB(r.AmountMB),
+					"validity_days": r.days(),
+					"amount_mb":     r.AmountMB,
 					"bundle_id":     b.ID.String(),
-					"bundle_type":   b.Type,
+					"bundle_type":   b.BundleType,
 					"provider":      "esimba",
 				},
 			})
@@ -430,15 +447,68 @@ func formatMBasGB(mb int) string {
 }
 
 func bundlePlanName(b esimbaBundle, r esimbaRefill) string {
-	country := b.Country
-	if country == "" {
-		country = strings.ToUpper(b.CountryCode)
+	// Keepgo already provides a human title (e.g. "3 GB / 30 days").
+	if r.Title != "" {
+		return fmt.Sprintf("%s · %s", b.Name, r.Title)
 	}
-	data := formatMBasGB(r.RefillMB)
-	if r.RefillDays > 0 {
-		return fmt.Sprintf("%s %s · %d дн.", country, data, r.RefillDays)
+	data := formatMBasGB(r.AmountMB)
+	if r.days() > 0 {
+		return fmt.Sprintf("%s %s · %d дн.", b.Name, data, r.days())
 	}
-	return fmt.Sprintf("%s %s", country, data)
+	return fmt.Sprintf("%s %s", b.Name, data)
+}
+
+// ── Country resolution ──
+// Keepgo bundles carry no ISO code: country bundles encode it in the flag image
+// URL (".../flags/3x2/XX.svg"), while regional bundles only list `coverage`
+// country names. coveredCountries maps a bundle to {ISO-2: display name}.
+
+func (b esimbaBundle) coveredCountries() map[string]string {
+	out := map[string]string{}
+
+	// Country-type bundles: authoritative ISO-2 from the flag image.
+	if code := isoFromFlagImg(b.Img); code != "" {
+		name := b.Name
+		if len(b.Coverage) == 1 {
+			name = b.Coverage[0]
+		}
+		out[code] = name
+	}
+
+	// Expand coverage names (handles regional bundles and adds missing codes).
+	for _, name := range b.Coverage {
+		if code := isoFromName(name); code != "" {
+			if _, exists := out[code]; !exists {
+				out[code] = name
+			}
+		}
+	}
+	return out
+}
+
+// isoFromFlagImg extracts the ISO-2 code from a Keepgo flag URL such as
+// "https://myaccount.keepgo.com/img/flags/3x2/vn.svg" → "VN".
+func isoFromFlagImg(img string) string {
+	const marker = "/flags/"
+	i := strings.Index(img, marker)
+	if i < 0 {
+		return ""
+	}
+	rest := img[i+len(marker):]
+	// rest is like "3x2/vn.svg" or "vn.svg"
+	if slash := strings.LastIndex(rest, "/"); slash >= 0 {
+		rest = rest[slash+1:]
+	}
+	code := strings.TrimSuffix(rest, ".svg")
+	if len(code) == 2 {
+		return strings.ToUpper(code)
+	}
+	return ""
+}
+
+// isoFromName resolves a Keepgo coverage country name to its ISO-2 code.
+func isoFromName(name string) string {
+	return countryNameToISO[strings.TrimSpace(name)]
 }
 
 // Compile-time checks: EsimbaProvider implements both interfaces.
