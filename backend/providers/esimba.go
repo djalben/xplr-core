@@ -316,7 +316,7 @@ func (e *EsimbaProvider) GetPlans(countryCode string) ([]ESIMPlan, error) {
 			plans = append(plans, ESIMPlan{
 				PlanID:       encodeEsimbaPlanID(b.ID.String(), r.AmountMB, r.days()),
 				Provider:     "esimba",
-				Name:         bundlePlanName(b, r),
+				Name:         bundlePlanName(r),
 				Country:      countryName,
 				CountryCode:  cc,
 				DataGB:       formatMBasGB(r.AmountMB),
@@ -418,7 +418,7 @@ func (e *EsimbaProvider) GetCatalog() ([]shop.CatalogProduct, error) {
 		for _, r := range b.Refills {
 			catalog = append(catalog, shop.CatalogProduct{
 				ExternalID:  encodeEsimbaPlanID(b.ID.String(), r.AmountMB, r.days()),
-				Name:        bundlePlanName(b, r),
+				Name:        bundlePlanName(r),
 				Description: b.Description,
 				Category:    "esim",
 				Country:     name,
@@ -507,16 +507,46 @@ func formatMBasGB(mb int) string {
 	return fmt.Sprintf("%dMB", mb)
 }
 
-func bundlePlanName(b esimbaBundle, r esimbaRefill) string {
-	// Keepgo already provides a human title (e.g. "3 GB / 30 days").
-	if r.Title != "" {
-		return fmt.Sprintf("%s · %s", b.Name, r.Title)
-	}
-	data := formatMBasGB(r.AmountMB)
+// bundlePlanName builds a clean, user-facing tariff name purely from refill
+// data — e.g. "1 GB / 30 дней". The Keepgo bundle name (Andromeda/Orion/
+// Eridanus, etc.) is an internal system ID and must NEVER reach the frontend.
+func bundlePlanName(r esimbaRefill) string {
+	data := dataLabel(r.AmountMB)
 	if r.days() > 0 {
-		return fmt.Sprintf("%s %s · %d дн.", b.Name, data, r.days())
+		return fmt.Sprintf("%s / %d %s", data, r.days(), pluralDays(r.days()))
 	}
-	return fmt.Sprintf("%s %s", b.Name, data)
+	return fmt.Sprintf("%s / Бессрочно", data)
+}
+
+// dataLabel renders a traffic volume as a human string: "1 GB", "1.5 GB", "512 MB".
+func dataLabel(mb int) string {
+	if mb <= 0 {
+		return "0 MB"
+	}
+	if mb%1024 == 0 {
+		return fmt.Sprintf("%d GB", mb/1024)
+	}
+	if mb >= 1024 {
+		gb := float64(mb) / 1024.0
+		return strconv.FormatFloat(gb, 'f', 1, 64) + " GB"
+	}
+	return fmt.Sprintf("%d MB", mb)
+}
+
+// pluralDays returns the correct Russian plural for the number of days.
+func pluralDays(n int) string {
+	mod100 := n % 100
+	if mod100 >= 11 && mod100 <= 14 {
+		return "дней"
+	}
+	switch n % 10 {
+	case 1:
+		return "день"
+	case 2, 3, 4:
+		return "дня"
+	default:
+		return "дней"
+	}
 }
 
 // ── Country resolution ──
