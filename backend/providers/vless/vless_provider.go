@@ -25,6 +25,10 @@ import (
 // Communicates with a 3X-UI panel (MHSanaei) via its REST API.
 // ══════════════════════════════════════════════════════════════
 
+// defaultRealitySNI is the Reality masquerade target (SNI/host/peer).
+// Override via the VPN_REALITY_SNI environment variable.
+const defaultRealitySNI = "store.steampowered.com"
+
 // Config holds all settings loaded from environment variables.
 type Config struct {
 	PanelURL   string // e.g. "https://109.120.157.144:2053"
@@ -92,7 +96,7 @@ func NewVlessProvider() *VlessProvider {
 		InboundID:  1, // default; override via XPANEL_INBOUND_ID
 		ServerIP:   getEnvOr("XPANEL_SERVER_IP", "109.120.157.144"),
 		ServerPort: getEnvOr("XPANEL_SERVER_PORT", "443"),
-		SNI:        getEnvOr("XPANEL_SNI", "www.microsoft.com"),
+		SNI:        getEnvOr("VPN_REALITY_SNI", defaultRealitySNI),
 		PublicKey:  publicKey,
 		ShortID:    shortID,
 		Flow:       getEnvOr("XPANEL_FLOW", "xtls-rprx-vision"),
