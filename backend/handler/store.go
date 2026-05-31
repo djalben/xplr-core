@@ -1278,7 +1278,13 @@ func AdminUpdateESIMTariffHandler(w http.ResponseWriter, r *http.Request) {
 		Hidden        *bool    `json:"hidden"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.PlanID == "" {
+		log.Printf("[ADMIN-ESIM] ✖ tariff update: bad request (err=%v plan_id=%q)", err, req.PlanID)
 		http.Error(w, "Invalid request (plan_id required)", http.StatusBadRequest)
+		return
+	}
+	if GlobalDB == nil {
+		log.Printf("[ADMIN-ESIM] ✖ tariff update aborted: GlobalDB is nil")
+		http.Error(w, "Database not initialized", http.StatusInternalServerError)
 		return
 	}
 
@@ -1286,6 +1292,7 @@ func AdminUpdateESIMTariffHandler(w http.ResponseWriter, r *http.Request) {
 		`INSERT INTO esim_tariff_overrides (plan_id) VALUES ($1) ON CONFLICT (plan_id) DO NOTHING`,
 		req.PlanID,
 	); err != nil {
+		log.Printf("[ADMIN-ESIM] ✖ tariff update: upsert failed for %s: %v", req.PlanID, err)
 		http.Error(w, "Failed to upsert tariff override", http.StatusInternalServerError)
 		return
 	}
@@ -1312,20 +1319,40 @@ func AdminGetESIMMarkupHandler(w http.ResponseWriter, r *http.Request) {
 
 // PUT /api/v1/admin/esim/markup — set global markup; instantly repriced for all users.
 func AdminSetESIMMarkupHandler(w http.ResponseWriter, r *http.Request) {
+	if GlobalDB == nil {
+		log.Printf("[ADMIN-ESIM] ✖ markup save aborted: GlobalDB is nil")
+		http.Error(w, "Database not initialized", http.StatusInternalServerError)
+		return
+	}
 	var req struct {
 		MarkupPercent float64 `json:"markup_percent"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.MarkupPercent < 0 {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("[ADMIN-ESIM] ✖ markup save: bad JSON body: %v", err)
 		http.Error(w, "Invalid request (markup_percent required)", http.StatusBadRequest)
 		return
 	}
-	if _, err := GlobalDB.Exec(`UPDATE esim_settings SET markup_percent = $1, updated_at = now() WHERE id = 1`, req.MarkupPercent); err != nil {
+	if req.MarkupPercent < 0 {
+		log.Printf("[ADMIN-ESIM] ✖ markup save: negative markup %.2f", req.MarkupPercent)
+		http.Error(w, "Invalid request (markup_percent must be >= 0)", http.StatusBadRequest)
+		return
+	}
+
+	// UPSERT — works even if the singleton row was never seeded by the schema guard,
+	// which was the root cause of the silent "save failed" error in production.
+	if _, err := GlobalDB.Exec(
+		`INSERT INTO esim_settings (id, markup_percent, updated_at)
+		 VALUES (1, $1, now())
+		 ON CONFLICT (id) DO UPDATE SET markup_percent = $1, updated_at = now()`,
+		req.MarkupPercent,
+	); err != nil {
+		log.Printf("[ADMIN-ESIM] ✖ markup save: DB upsert failed: %v", err)
 		http.Error(w, "Failed to update markup", http.StatusInternalServerError)
 		return
 	}
 
 	providers.ResetESIMCache()
-	log.Printf("[ADMIN-ESIM] Global markup set to %.2f%% — prices repriced for all users", req.MarkupPercent)
+	log.Printf("[ADMIN-ESIM] ✓ Global markup set to %.2f%% — prices repriced for all users", req.MarkupPercent)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{"status": "ok", "markup_percent": req.MarkupPercent})

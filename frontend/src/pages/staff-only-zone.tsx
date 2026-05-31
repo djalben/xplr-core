@@ -41,7 +41,7 @@ import {
   Smartphone,
 } from 'lucide-react';
 
-type Tab = 'dashboard' | 'users' | 'commissions' | 'tickets' | 'news' | 'logs' | 'store' | 'esim' | 'rates' | 'security';
+type Tab = 'dashboard' | 'users' | 'commissions' | 'tickets' | 'news' | 'logs' | 'store' | 'rates' | 'security';
 
 interface DashboardStats {
   total_users: number;
@@ -814,8 +814,7 @@ export const StaffOnlyZone = () => {
     if (tab === 'tickets') { loadTickets(); loadChats(); }
     if (tab === 'news') loadNews();
     if (tab === 'logs') loadLogs();
-    if (tab === 'store') loadStoreProducts();
-    if (tab === 'esim') { loadESIMTariffs(); loadESIMOrders(); }
+    if (tab === 'store') { loadESIMTariffs(); loadESIMOrders(); }
     if (tab === 'rates') fetchExchangeRates();
   }, [tab, loadAllUsers, loadCommissions, loadSysSettings, loadTickets, loadChats, loadNews, loadLogs, loadStoreProducts, loadESIMTariffs, loadESIMOrders, fetchExchangeRates]);
 
@@ -962,7 +961,6 @@ export const StaffOnlyZone = () => {
           <TabBtn id="tickets" icon={MessageSquare} label="Тикеты" />
           <TabBtn id="news" icon={Newspaper} label="Новости" />
           <TabBtn id="store" icon={ShoppingBag} label="Магазин" />
-          <TabBtn id="esim" icon={Smartphone} label="eSIM" />
           <TabBtn id="rates" icon={DollarSign} label="Курсы валют" />
           <TabBtn id="logs" icon={Clock} label="Логи" />
           <TabBtn id="security" icon={Shield} label="Безопасность" />
@@ -2389,175 +2387,8 @@ export const StaffOnlyZone = () => {
           </div>
         )}
 
-        {/* ════════════ STORE TAB ════════════ */}
-        {tab === 'store' && (() => {
-          const filtered = storeProducts.filter(p => p.product_type === storeSubTab);
-          return (
-          <div className="space-y-5">
-            {/* Header: sub-tabs + bulk markup */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex gap-2">
-                {([['esim', 'eSIM'], ['digital', 'Цифровые'], ['vpn', 'VPN']] as const).map(([key, label]) => (
-                  <button key={key} onClick={() => { setStoreSubTab(key); setEditingProduct(null); }}
-                    className={`px-4 py-2 rounded-xl text-xs font-medium border transition-all ${
-                      storeSubTab === key
-                        ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
-                        : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
-                    }`}>
-                    {label} ({storeProducts.filter(p => p.product_type === key).length})
-                  </button>
-                ))}
-              </div>
-              <div className="flex items-center gap-2">
-                <input type="number" step="1" value={bulkDelta} onChange={e => setBulkDelta(e.target.value)} className="w-20 px-2 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-xs outline-none focus:border-blue-500/50" placeholder="+%" />
-                <button onClick={handleBulkMarkup} disabled={saving} className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap">
-                  <TrendingUp className="w-3.5 h-3.5" />{saving ? '...' : `+${bulkDelta}% ${storeSubTab}`}
-                </button>
-              </div>
-            </div>
-
-            {/* Products table */}
-            <div className="glass-card overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-white/10">
-                      <th className="text-left px-4 py-3 text-slate-400 font-medium">ID</th>
-                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Товар</th>
-                      {storeSubTab !== 'vpn' && <th className="text-left px-4 py-3 text-slate-400 font-medium">Себестоимость</th>}
-                      {storeSubTab !== 'vpn' && <th className="text-left px-4 py-3 text-slate-400 font-medium">Наценка %</th>}
-                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Розница</th>
-                      {storeSubTab !== 'vpn' && <th className="text-left px-4 py-3 text-slate-400 font-medium">Старая цена</th>}
-                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Статус</th>
-                      <th className="text-left px-4 py-3 text-slate-400 font-medium"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map(p => (
-                      <tr key={p.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                        <td className="px-4 py-3 text-slate-500 font-mono text-xs">{p.id}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2.5">
-                            {p.product_type === 'esim' && p.country_code ? (
-                              p.country_code === 'GLOBAL' || p.country_code === 'EU' ? (
-                                <div className="w-7 h-5 rounded-[3px] bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-white/10 flex items-center justify-center shrink-0">
-                                  <span className="text-[9px] font-bold text-blue-300">{p.country_code}</span>
-                                </div>
-                              ) : (
-                                <img
-                                  src={`https://flagcdn.com/w80/${p.country_code.toLowerCase()}.png`}
-                                  srcSet={`https://flagcdn.com/w160/${p.country_code.toLowerCase()}.png 2x`}
-                                  alt={p.country_code}
-                                  className="w-7 h-5 rounded-[3px] object-cover shadow-sm shrink-0"
-                                  loading="lazy"
-                                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                                />
-                              )
-                            ) : p.product_type === 'vpn' ? (
-                              <div className="w-7 h-7 rounded bg-gradient-to-br from-indigo-600/30 to-purple-600/30 border border-indigo-500/20 flex items-center justify-center shrink-0">
-                                <Shield className="w-3.5 h-3.5 text-indigo-400" />
-                              </div>
-                            ) : p.image_url ? (
-                              <img src={p.image_url} alt="" className="w-7 h-7 rounded object-contain shrink-0 bg-white/5 p-0.5" />
-                            ) : (
-                              <div className="w-7 h-7 rounded bg-white/5 shrink-0" />
-                            )}
-                            <div className="min-w-0">
-                              <span className="text-white text-xs font-medium truncate block max-w-[180px]" title={p.name}>{p.name}</span>
-                              <span className="text-[10px] text-slate-500 font-mono">{p.external_id}</span>
-                            </div>
-                          </div>
-                        </td>
-                        {storeSubTab !== 'vpn' && (
-                          <td className="px-4 py-3">
-                            {editingProduct?.id === p.id ? (
-                              <input type="number" step="0.01" value={editingProduct.cost_price} onChange={e => setEditingProduct({ ...editingProduct, cost_price: e.target.value })} className="w-20 px-2 py-1 bg-white/10 border border-blue-500/50 rounded text-white text-xs outline-none" />
-                            ) : (
-                              <span className="text-emerald-400 font-medium text-xs">${parseFloat(p.cost_price).toFixed(2)}</span>
-                            )}
-                          </td>
-                        )}
-                        {storeSubTab !== 'vpn' && (
-                          <td className="px-4 py-3">
-                            {editingProduct?.id === p.id ? (
-                              <input type="number" step="1" value={editingProduct.markup_percent} onChange={e => setEditingProduct({ ...editingProduct, markup_percent: e.target.value })} className="w-16 px-2 py-1 bg-white/10 border border-blue-500/50 rounded text-white text-xs outline-none" />
-                            ) : (
-                              <span className="text-orange-400 font-medium text-xs">{parseFloat(p.markup_percent).toFixed(0)}%</span>
-                            )}
-                          </td>
-                        )}
-                        <td className="px-4 py-3">
-                          {editingProduct?.id === p.id ? (
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={editingProduct.retail_price ?? p.retail_price}
-                              onChange={e => setEditingProduct({ ...editingProduct, retail_price: e.target.value })}
-                              className="w-20 px-2 py-1 bg-white/10 border border-blue-500/50 rounded text-white text-xs outline-none"
-                              autoFocus={storeSubTab === 'vpn'}
-                            />
-                          ) : (
-                            <span className="text-white font-bold text-xs">${parseFloat(p.retail_price).toFixed(2)}</span>
-                          )}
-                        </td>
-                        {storeSubTab !== 'vpn' && (
-                          <td className="px-4 py-3 text-slate-500 text-xs line-through">${parseFloat(p.old_price).toFixed(2)}</td>
-                        )}
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${p.in_stock ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-                            {p.in_stock ? 'В наличии' : 'Нет'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          {editingProduct?.id === p.id ? (
-                            <div className="flex gap-1">
-                              <button onClick={handleSaveProduct} disabled={saving} className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-xs transition-colors disabled:opacity-50">
-                                {saving ? '...' : 'OK'}
-                              </button>
-                              <button onClick={() => setEditingProduct(null)} className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-slate-300 rounded text-xs transition-colors">
-                                ✕
-                              </button>
-                            </div>
-                          ) : (
-                            <button onClick={() => setEditingProduct({ id: p.id, cost_price: p.cost_price, markup_percent: p.markup_percent, image_url: p.image_url, retail_price: p.retail_price })} className="text-blue-400 hover:text-blue-300 text-xs transition-colors">
-                              Изменить
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                    {filtered.length === 0 && (
-                      <tr><td colSpan={storeSubTab === 'vpn' ? 5 : 8} className="px-4 py-8 text-center text-slate-500">Нет товаров</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Image URL editor (shown when editing non-VPN product) */}
-            {editingProduct && storeSubTab !== 'vpn' && (
-              <div className="glass-card p-4">
-                <label className="text-xs text-slate-500 mb-1.5 block">Изображение товара (URL логотипа / флага)</label>
-                <div className="flex items-center gap-3">
-                  {editingProduct.image_url && (
-                    <img src={editingProduct.image_url} alt="" className="w-8 h-8 rounded object-contain bg-white/5 border border-white/10 shrink-0" />
-                  )}
-                  <input
-                    type="text"
-                    value={editingProduct.image_url}
-                    onChange={e => setEditingProduct({ ...editingProduct, image_url: e.target.value })}
-                    placeholder="https://cdn.simpleicons.org/steam/eeeeee"
-                    className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-xs outline-none focus:border-blue-500/50 placeholder-slate-600"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-          );
-        })()}
-
-        {/* ════════════ eSIM TAB ════════════ */}
-        {tab === 'esim' && (
+        {/* ════════════ STORE TAB (eSIM management hub) ════════════ */}
+        {tab === 'store' && (
           <div className="space-y-5">
             {/* Global markup + sub-tabs */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
