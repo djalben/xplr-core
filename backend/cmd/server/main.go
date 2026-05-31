@@ -325,6 +325,12 @@ func main() {
 	adminRouter.HandleFunc("/infra/vpn-active-clients", handler.AdminVPNActiveClientsHandler).Methods("GET")
 	adminRouter.HandleFunc("/vpn/client/{email}", handler.AdminDeleteVPNClientHandler).Methods("DELETE")
 	adminRouter.HandleFunc("/vpn/client/{email}", handler.AdminEditVPNClientHandler).Methods("PATCH")
+	// eSIM dynamic pricing, visibility & order monitoring
+	adminRouter.HandleFunc("/esim/list", handler.AdminESIMListHandler).Methods("GET")
+	adminRouter.HandleFunc("/esim/tariff", handler.AdminUpdateESIMTariffHandler).Methods("PATCH")
+	adminRouter.HandleFunc("/esim/markup", handler.AdminGetESIMMarkupHandler).Methods("GET")
+	adminRouter.HandleFunc("/esim/markup", handler.AdminSetESIMMarkupHandler).Methods("PUT")
+	adminRouter.HandleFunc("/esim/orders", handler.AdminESIMOrdersHandler).Methods("GET")
 	// --------------------------------------------------------
 
 	// CORS: dynamic origins from ALLOWED_ORIGINS env var (comma-separated)

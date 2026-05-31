@@ -231,31 +231,19 @@ func (e *EsimbaProvider) fetchBundlesFromAPI() ([]esimbaBundle, error) {
 	return parsed.Bundles, nil
 }
 
-// retailMarkup is the approved unit-economics multiplier (RetailPrice = wholesale × 5).
-const retailMarkup = 5.0
-
 // round2 rounds a monetary value to 2 decimal places.
 func round2(v float64) float64 { return math.Round(v*100) / 100 }
 
-// applySmartMarkup converts a wholesale USD price into a polished retail price:
-//   - base markup ×5
-//   - $2.00–$5.00  → rounded to the nearest $0.50  (e.g. 2.44 → 2.50)
-//   - above $5.00  → rounded up to the next ".90"  (e.g. 11.55 → 11.90)
-//   - below $2.00  → rounded to 2 decimals
-func applySmartMarkup(wholesale float64) float64 {
-	retail := wholesale * retailMarkup
-	switch {
-	case retail >= 2.0 && retail <= 5.0:
-		return math.Round(retail*2) / 2
-	case retail > 5.0:
-		whole := math.Floor(retail)
-		if retail <= whole+0.90 {
-			return whole + 0.90
-		}
-		return whole + 1.90
-	default:
-		return round2(retail)
-	}
+// ResetESIMCache clears the cached bundle catalog so the next request refetches
+// from Keepgo. Called after admin pricing/visibility changes to make new prices
+// take effect immediately for all users.
+func ResetESIMCache() {
+	p := getEsimbaProvider()
+	p.cacheMu.Lock()
+	p.cachedBundles = nil
+	p.cacheTime = time.Time{}
+	p.cacheMu.Unlock()
+	log.Printf("[ESIMBA] cache RESET — next request will refetch catalog")
 }
 
 // ── ESIMProvider interface ──
@@ -312,7 +300,10 @@ func (e *EsimbaProvider) GetPlans(countryCode string) ([]ESIMPlan, error) {
 			continue
 		}
 		for _, r := range b.Refills {
-			retail := applySmartMarkup(r.PriceUSD)
+			// Pricing is owned by the handler layer (dynamic admin markup from
+			// DB). The provider only exposes the raw wholesale cost; PriceUSD is
+			// a placeholder that the storefront overwrites.
+			wholesale := round2(r.PriceUSD)
 			plans = append(plans, ESIMPlan{
 				PlanID:       encodeEsimbaPlanID(b.ID.String(), r.AmountMB, r.days()),
 				Provider:     "esimba",
@@ -321,15 +312,14 @@ func (e *EsimbaProvider) GetPlans(countryCode string) ([]ESIMPlan, error) {
 				CountryCode:  cc,
 				DataGB:       formatMBasGB(r.AmountMB),
 				ValidityDays: r.days(),
-				PriceUSD:     retail,               // retail = wholesale × 5
-				OldPrice:     round2(retail * 1.2), // strike-through reference price
-				CostPrice:    r.PriceUSD,           // original wholesale price
+				PriceUSD:     wholesale, // overwritten by handler with dynamic markup
+				CostPrice:    wholesale, // original wholesale price
 				Description:  b.Description,
 				InStock:      true,
 			})
 		}
 	}
-	log.Printf("[ESIMBA] GetPlans(%s): %d plans (markup ×%.0f applied)", countryCode, len(plans), retailMarkup)
+	log.Printf("[ESIMBA] GetPlans(%s): %d plans (wholesale cost; markup applied downstream)", countryCode, len(plans))
 	return plans, nil
 }
 

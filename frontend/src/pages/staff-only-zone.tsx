@@ -38,9 +38,10 @@ import {
   ShoppingBag,
   Pencil,
   RotateCcw,
+  Smartphone,
 } from 'lucide-react';
 
-type Tab = 'dashboard' | 'users' | 'commissions' | 'tickets' | 'news' | 'logs' | 'store' | 'rates' | 'security';
+type Tab = 'dashboard' | 'users' | 'commissions' | 'tickets' | 'news' | 'logs' | 'store' | 'esim' | 'rates' | 'security';
 
 interface DashboardStats {
   total_users: number;
@@ -256,6 +257,70 @@ export const StaffOnlyZone = () => {
   const [bulkDelta, setBulkDelta] = useState('10');
   const [bulkType, setBulkType] = useState('');
   const [storeSubTab, setStoreSubTab] = useState<'esim' | 'digital' | 'vpn'>('esim');
+
+  // ── eSIM admin (dynamic markup, tariff toggle, orders) ──
+  type ESIMTariff = { plan_id: string; country: string; country_code: string; tariff: string; data_gb: string; validity_days: number; cost_price: number; markup_percent: number; retail_price: number; hidden: boolean };
+  type ESIMOrderRow = { id: number; user_id: number; product_name: string; price_usd: number; status: string; active: boolean; created_at: string };
+  const [esimTariffs, setEsimTariffs] = useState<ESIMTariff[]>([]);
+  const [esimGlobalMarkup, setEsimGlobalMarkup] = useState('400');
+  const [esimLoading, setEsimLoading] = useState(false);
+  const [esimSubTab, setEsimSubTab] = useState<'tariffs' | 'orders'>('tariffs');
+  const [esimOrders, setEsimOrders] = useState<ESIMOrderRow[]>([]);
+  const [editingTariff, setEditingTariff] = useState<string | null>(null);
+  const [editMarkupValue, setEditMarkupValue] = useState('');
+
+  const loadESIMTariffs = useCallback(async () => {
+    setEsimLoading(true);
+    try {
+      const res = await apiClient.get('/admin/esim/list');
+      setEsimTariffs(res.data?.tariffs || []);
+      if (res.data?.global_markup_percent != null) setEsimGlobalMarkup(String(res.data.global_markup_percent));
+    } catch { /* ignore */ }
+    finally { setEsimLoading(false); }
+  }, []);
+
+  const loadESIMOrders = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/admin/esim/orders');
+      setEsimOrders(res.data?.orders || []);
+    } catch { /* ignore */ }
+  }, []);
+
+  const saveESIMGlobalMarkup = async () => {
+    const mp = parseFloat(esimGlobalMarkup);
+    if (isNaN(mp) || mp < 0) { showToast('Некорректная наценка', 'err'); return; }
+    setSaving(true);
+    try {
+      await apiClient.put('/admin/esim/markup', { markup_percent: mp });
+      showToast('Глобальная наценка обновлена — цены пересчитаны');
+      loadESIMTariffs();
+    } catch { showToast('Ошибка сохранения наценки', 'err'); }
+    finally { setSaving(false); }
+  };
+
+  const saveTariffMarkup = async (planId: string) => {
+    const mp = parseFloat(editMarkupValue);
+    if (isNaN(mp) || mp < 0) { showToast('Некорректная наценка', 'err'); return; }
+    setSaving(true);
+    try {
+      await apiClient.patch('/admin/esim/tariff', { plan_id: planId, markup_percent: mp });
+      showToast('Наценка тарифа обновлена');
+      setEditingTariff(null);
+      loadESIMTariffs();
+    } catch { showToast('Ошибка сохранения', 'err'); }
+    finally { setSaving(false); }
+  };
+
+  const toggleTariffHidden = async (planId: string, hidden: boolean) => {
+    setEsimTariffs(prev => prev.map(t => t.plan_id === planId ? { ...t, hidden } : t));
+    try {
+      await apiClient.patch('/admin/esim/tariff', { plan_id: planId, hidden });
+      showToast(hidden ? 'Тариф скрыт с витрины' : 'Тариф снова в наличии');
+    } catch {
+      showToast('Ошибка изменения статуса', 'err');
+      loadESIMTariffs();
+    }
+  };
 
   // ── Exchange Rates ──
   const [exchangeRates, setExchangeRates] = useState<{ id: number; currency_from: string; currency_to: string; base_rate: string; markup_percent: string; final_rate: string; updated_at: string }[]>([]);
@@ -750,8 +815,9 @@ export const StaffOnlyZone = () => {
     if (tab === 'news') loadNews();
     if (tab === 'logs') loadLogs();
     if (tab === 'store') loadStoreProducts();
+    if (tab === 'esim') { loadESIMTariffs(); loadESIMOrders(); }
     if (tab === 'rates') fetchExchangeRates();
-  }, [tab, loadAllUsers, loadCommissions, loadSysSettings, loadTickets, loadChats, loadNews, loadLogs, loadStoreProducts, fetchExchangeRates]);
+  }, [tab, loadAllUsers, loadCommissions, loadSysSettings, loadTickets, loadChats, loadNews, loadLogs, loadStoreProducts, loadESIMTariffs, loadESIMOrders, fetchExchangeRates]);
 
   // ── Inspect User (Financial Passport) ──
   const inspectUserDetails = async (userId: number) => {
@@ -896,6 +962,7 @@ export const StaffOnlyZone = () => {
           <TabBtn id="tickets" icon={MessageSquare} label="Тикеты" />
           <TabBtn id="news" icon={Newspaper} label="Новости" />
           <TabBtn id="store" icon={ShoppingBag} label="Магазин" />
+          <TabBtn id="esim" icon={Smartphone} label="eSIM" />
           <TabBtn id="rates" icon={DollarSign} label="Курсы валют" />
           <TabBtn id="logs" icon={Clock} label="Логи" />
           <TabBtn id="security" icon={Shield} label="Безопасность" />
@@ -2488,6 +2555,154 @@ export const StaffOnlyZone = () => {
           </div>
           );
         })()}
+
+        {/* ════════════ eSIM TAB ════════════ */}
+        {tab === 'esim' && (
+          <div className="space-y-5">
+            {/* Global markup + sub-tabs */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+              <div className="flex gap-2">
+                {([['tariffs', 'Тарифы'], ['orders', 'Заказы']] as const).map(([key, label]) => (
+                  <button key={key} onClick={() => setEsimSubTab(key)}
+                    className={`px-4 py-2 rounded-xl text-xs font-medium border transition-all ${
+                      esimSubTab === key
+                        ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+                        : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
+                    }`}>
+                    {label}{key === 'tariffs' ? ` (${esimTariffs.length})` : ` (${esimOrders.length})`}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400 whitespace-nowrap">Глобальная наценка %</span>
+                <input type="number" step="1" value={esimGlobalMarkup} onChange={e => setEsimGlobalMarkup(e.target.value)}
+                  className="w-24 px-2 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-xs outline-none focus:border-blue-500/50" />
+                <button onClick={saveESIMGlobalMarkup} disabled={saving}
+                  className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap">
+                  <Save className="w-3.5 h-3.5" />{saving ? '...' : 'Применить ко всем'}
+                </button>
+                <button onClick={loadESIMTariffs} disabled={esimLoading}
+                  className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 rounded-lg transition-colors disabled:opacity-50" title="Обновить">
+                  <Loader2 className={`w-4 h-4 ${esimLoading ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* ── Tariffs table ── */}
+            {esimSubTab === 'tariffs' && (
+              <div className="glass-card overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm min-w-[820px]">
+                    <thead>
+                      <tr className="border-b border-white/10">
+                        <th className="text-left px-4 py-3 text-slate-400 font-medium">Страна</th>
+                        <th className="text-left px-4 py-3 text-slate-400 font-medium">Тариф (ГБ/дни)</th>
+                        <th className="text-left px-4 py-3 text-slate-400 font-medium">Себестоимость</th>
+                        <th className="text-left px-4 py-3 text-slate-400 font-medium">Наценка %</th>
+                        <th className="text-left px-4 py-3 text-slate-400 font-medium">Розница</th>
+                        <th className="text-left px-4 py-3 text-slate-400 font-medium">Статус</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {esimTariffs.map(t => (
+                        <tr key={t.plan_id} className={`border-b border-white/5 hover:bg-white/5 transition-colors ${t.hidden ? 'opacity-50' : ''}`}>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2.5">
+                              {t.country_code && t.country_code !== 'GLOBAL' && t.country_code !== 'EU' ? (
+                                <img src={`https://flagcdn.com/w80/${t.country_code.toLowerCase()}.png`} alt={t.country_code}
+                                  className="w-7 h-5 rounded-[3px] object-cover shadow-sm shrink-0" loading="lazy"
+                                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                              ) : (
+                                <div className="w-7 h-5 rounded-[3px] bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-white/10 flex items-center justify-center shrink-0">
+                                  <span className="text-[9px] font-bold text-blue-300">{t.country_code || '🌍'}</span>
+                                </div>
+                              )}
+                              <span className="text-white text-xs font-medium truncate max-w-[140px]" title={t.country}>{t.country}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-slate-300 text-xs">{t.tariff}</td>
+                          <td className="px-4 py-3 text-slate-400 text-xs font-mono">${t.cost_price.toFixed(2)}</td>
+                          <td className="px-4 py-3">
+                            {editingTariff === t.plan_id ? (
+                              <div className="flex items-center gap-1.5">
+                                <input type="number" step="1" value={editMarkupValue} autoFocus
+                                  onChange={e => setEditMarkupValue(e.target.value)}
+                                  className="w-20 px-2 py-1 bg-white/10 border border-blue-500/50 rounded text-white text-xs outline-none" />
+                                <button onClick={() => saveTariffMarkup(t.plan_id)} disabled={saving} className="p-1 bg-emerald-500/20 text-emerald-400 rounded hover:bg-emerald-500/30"><Save className="w-3.5 h-3.5" /></button>
+                                <button onClick={() => setEditingTariff(null)} className="p-1 bg-white/5 text-slate-400 rounded hover:bg-white/10"><X className="w-3.5 h-3.5" /></button>
+                              </div>
+                            ) : (
+                              <button onClick={() => { setEditingTariff(t.plan_id); setEditMarkupValue(String(t.markup_percent)); }}
+                                className="flex items-center gap-1.5 text-white text-xs font-medium hover:text-blue-400 transition-colors">
+                                {t.markup_percent}% <Pencil className="w-3 h-3 text-slate-500" />
+                              </button>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-white font-bold text-xs">${t.retail_price.toFixed(2)}</td>
+                          <td className="px-4 py-3">
+                            <button onClick={() => toggleTariffHidden(t.plan_id, !t.hidden)}
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-colors flex items-center gap-1 ${
+                                t.hidden ? 'bg-slate-500/20 text-slate-400 hover:bg-slate-500/30' : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
+                              }`}>
+                              {t.hidden ? <><Ban className="w-3 h-3" />Скрыт</> : <><CheckCircle className="w-3 h-3" />В наличии</>}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {esimTariffs.length === 0 && (
+                        <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-500 text-sm">{esimLoading ? 'Загрузка тарифов от провайдера…' : 'Тарифы недоступны'}</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* ── Orders table ── */}
+            {esimSubTab === 'orders' && (
+              <div className="glass-card overflow-hidden">
+                <div className="flex items-center justify-end p-3 border-b border-white/5">
+                  <button onClick={loadESIMOrders} className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 rounded-lg transition-colors text-xs">
+                    <Loader2 className="w-3.5 h-3.5" />Обновить
+                  </button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm min-w-[720px]">
+                    <thead>
+                      <tr className="border-b border-white/10">
+                        <th className="text-left px-4 py-3 text-slate-400 font-medium">ID заказа</th>
+                        <th className="text-left px-4 py-3 text-slate-400 font-medium">User ID</th>
+                        <th className="text-left px-4 py-3 text-slate-400 font-medium">Товар</th>
+                        <th className="text-left px-4 py-3 text-slate-400 font-medium">Цена</th>
+                        <th className="text-left px-4 py-3 text-slate-400 font-medium">Дата покупки</th>
+                        <th className="text-left px-4 py-3 text-slate-400 font-medium">Активация</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {esimOrders.map(o => (
+                        <tr key={o.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                          <td className="px-4 py-3 text-slate-500 font-mono text-xs">#{o.id}</td>
+                          <td className="px-4 py-3 text-slate-300 font-mono text-xs">{o.user_id}</td>
+                          <td className="px-4 py-3 text-white text-xs">{o.product_name}</td>
+                          <td className="px-4 py-3 text-white font-bold text-xs">${o.price_usd.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-slate-500 text-xs">{o.created_at ? new Date(o.created_at).toLocaleString('ru-RU') : ''}</td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-medium ${o.active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-500/20 text-slate-400'}`}>
+                              {o.active ? 'Активен' : 'Не активен'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                      {esimOrders.length === 0 && (
+                        <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-500 text-sm">Заказов пока нет</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ════════════ RATES TAB ════════════ */}
         {tab === 'rates' && (

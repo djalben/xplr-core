@@ -145,6 +145,33 @@ func RunSchemaGuard() {
 		}
 	}
 
+	// eSIM dynamic pricing + per-tariff visibility (admin-managed).
+	//   esim_settings          — single-row global markup percentage.
+	//   esim_tariff_overrides  — per-plan markup override and hidden flag.
+	// Default global markup = 400% → retail = cost × 5 (matches legacy pricing).
+	esimDDL := []string{
+		`CREATE TABLE IF NOT EXISTS esim_settings (
+			id INTEGER PRIMARY KEY DEFAULT 1,
+			markup_percent NUMERIC(10,2) NOT NULL DEFAULT 400,
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+			CONSTRAINT esim_settings_singleton CHECK (id = 1)
+		)`,
+		`INSERT INTO esim_settings (id, markup_percent) VALUES (1, 400) ON CONFLICT (id) DO NOTHING`,
+		`CREATE TABLE IF NOT EXISTS esim_tariff_overrides (
+			plan_id TEXT PRIMARY KEY,
+			markup_percent NUMERIC(10,2),
+			hidden BOOLEAN NOT NULL DEFAULT FALSE,
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+		)`,
+		`ALTER TABLE IF EXISTS esim_settings DISABLE ROW LEVEL SECURITY`,
+		`ALTER TABLE IF EXISTS esim_tariff_overrides DISABLE ROW LEVEL SECURITY`,
+	}
+	for _, ddl := range esimDDL {
+		if _, err := GlobalDB.Exec(ddl); err != nil {
+			log.Printf("[SCHEMA-GUARD] ⚠️ eSIM settings DDL failed: %v", err)
+		}
+	}
+
 	log.Printf("[SCHEMA-GUARD] ✅ Done: %d created, %d already OK, %d errors", created, skipped, errors)
 }
 

@@ -812,16 +812,33 @@ func ESIMPlansHandler(w http.ResponseWriter, r *http.Request) {
 	prov := providers.GetESIMProvider()
 	plans, err := prov.GetPlans(cc)
 	if err != nil {
-		// No demo fallback. Pricing (USD, smart markup ×5) is owned by the provider.
+		// No demo fallback — storefront shows a clean Empty State on failure.
 		log.Printf("[ESIM] ⚠️ GetPlans failed for %s: %v — returning empty list", cc, err)
 		plans = nil
 	}
-	if plans == nil {
-		plans = []providers.ESIMPlan{}
+
+	// Apply dynamic admin pricing (global markup + per-tariff overrides) and
+	// drop any tariff the admin has hidden. Currency is always USD.
+	global, overrides := loadESIMPricing()
+	visible := make([]providers.ESIMPlan, 0, len(plans))
+	for _, pl := range plans {
+		ov := overrides[pl.PlanID]
+		if ov.Hidden {
+			continue
+		}
+		markup := global
+		if ov.Markup != nil {
+			markup = *ov.Markup
+		}
+		retail := calculatePrice(decimal.NewFromFloat(pl.CostPrice), decimal.NewFromFloat(markup))
+		pl.PriceUSD, _ = retail.Float64()
+		pl.OldPrice, _ = calculatePrice(retail, decimal.NewFromInt(20)).Float64()
+		pl.CostPrice = 0 // never expose wholesale cost to the storefront
+		visible = append(visible, pl)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"plans": plans})
+	json.NewEncoder(w).Encode(map[string]interface{}{"plans": visible})
 }
 
 // POST /api/v1/store/esim/order — full eSIM purchase flow
@@ -1135,4 +1152,225 @@ func AdminBulkMarkupHandler(w http.ResponseWriter, r *http.Request) {
 		"affected": affected,
 		"delta":    req.Delta,
 	})
+}
+
+// ══════════════════════════════════════════════════════════════
+// Admin: eSIM dynamic pricing, visibility & order monitoring
+// ══════════════════════════════════════════════════════════════
+
+const defaultESIMMarkup = 400.0 // % → retail = cost × 5
+
+// esimPriceOverride is a per-tariff admin override.
+type esimPriceOverride struct {
+	Markup *float64 // nil → use global markup
+	Hidden bool
+}
+
+// loadESIMPricing returns the global markup percent and the per-plan overrides.
+func loadESIMPricing() (float64, map[string]esimPriceOverride) {
+	global := defaultESIMMarkup
+	overrides := map[string]esimPriceOverride{}
+	if GlobalDB == nil {
+		return global, overrides
+	}
+	GlobalDB.QueryRow(`SELECT markup_percent FROM esim_settings WHERE id = 1`).Scan(&global)
+
+	rows, err := GlobalDB.Query(`SELECT plan_id, markup_percent, hidden FROM esim_tariff_overrides`)
+	if err != nil {
+		return global, overrides
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var planID string
+		var markup sql.NullFloat64
+		var hidden bool
+		if err := rows.Scan(&planID, &markup, &hidden); err != nil {
+			continue
+		}
+		ov := esimPriceOverride{Hidden: hidden}
+		if markup.Valid {
+			m := markup.Float64
+			ov.Markup = &m
+		}
+		overrides[planID] = ov
+	}
+	return global, overrides
+}
+
+// esimCatalogProvider is implemented by the Esimba provider (GetCatalog).
+type esimCatalogProvider interface {
+	GetCatalog() ([]shop.CatalogProduct, error)
+}
+
+// adminESIMTariff is a single row of the admin eSIM store table.
+type adminESIMTariff struct {
+	PlanID        string  `json:"plan_id"`
+	Country       string  `json:"country"`
+	CountryCode   string  `json:"country_code"`
+	Tariff        string  `json:"tariff"`
+	DataGB        string  `json:"data_gb"`
+	ValidityDays  int     `json:"validity_days"`
+	CostPrice     float64 `json:"cost_price"`
+	MarkupPercent float64 `json:"markup_percent"`
+	RetailPrice   float64 `json:"retail_price"`
+	Hidden        bool    `json:"hidden"`
+}
+
+// GET /api/v1/admin/esim/list — all provider tariffs with cost, markup, retail & status.
+func AdminESIMListHandler(w http.ResponseWriter, r *http.Request) {
+	prov := providers.GetESIMProvider()
+	cp, ok := prov.(esimCatalogProvider)
+	if !ok {
+		http.Error(w, "eSIM provider does not expose a catalog", http.StatusInternalServerError)
+		return
+	}
+	catalog, err := cp.GetCatalog()
+	if err != nil {
+		log.Printf("[ADMIN-ESIM] GetCatalog failed: %v", err)
+		http.Error(w, "Failed to fetch eSIM catalog from provider", http.StatusBadGateway)
+		return
+	}
+
+	global, overrides := loadESIMPricing()
+	out := make([]adminESIMTariff, 0, len(catalog))
+	for _, item := range catalog {
+		ov := overrides[item.ExternalID]
+		markup := global
+		if ov.Markup != nil {
+			markup = *ov.Markup
+		}
+		retail := calculatePrice(item.CostPrice, decimal.NewFromFloat(markup))
+		cost, _ := item.CostPrice.Float64()
+		retailF, _ := retail.Float64()
+
+		dataGB, _ := item.Meta["data_gb"].(string)
+		days := 0
+		if v, ok := item.Meta["validity_days"].(int); ok {
+			days = v
+		}
+
+		out = append(out, adminESIMTariff{
+			PlanID:        item.ExternalID,
+			Country:       item.Country,
+			CountryCode:   item.CountryCode,
+			Tariff:        item.Name,
+			DataGB:        dataGB,
+			ValidityDays:  days,
+			CostPrice:     cost,
+			MarkupPercent: markup,
+			RetailPrice:   retailF,
+			Hidden:        ov.Hidden,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"global_markup_percent": global,
+		"tariffs":               out,
+	})
+}
+
+// PATCH /api/v1/admin/esim/tariff — set per-tariff markup and/or hidden flag.
+func AdminUpdateESIMTariffHandler(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		PlanID        string   `json:"plan_id"`
+		MarkupPercent *float64 `json:"markup_percent"` // nil → leave / reset
+		Hidden        *bool    `json:"hidden"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.PlanID == "" {
+		http.Error(w, "Invalid request (plan_id required)", http.StatusBadRequest)
+		return
+	}
+
+	if _, err := GlobalDB.Exec(
+		`INSERT INTO esim_tariff_overrides (plan_id) VALUES ($1) ON CONFLICT (plan_id) DO NOTHING`,
+		req.PlanID,
+	); err != nil {
+		http.Error(w, "Failed to upsert tariff override", http.StatusInternalServerError)
+		return
+	}
+	if req.MarkupPercent != nil {
+		GlobalDB.Exec(`UPDATE esim_tariff_overrides SET markup_percent = $1, updated_at = now() WHERE plan_id = $2`, *req.MarkupPercent, req.PlanID)
+	}
+	if req.Hidden != nil {
+		GlobalDB.Exec(`UPDATE esim_tariff_overrides SET hidden = $1, updated_at = now() WHERE plan_id = $2`, *req.Hidden, req.PlanID)
+	}
+
+	providers.ResetESIMCache()
+	log.Printf("[ADMIN-ESIM] Updated tariff %s (markup=%v hidden=%v)", req.PlanID, req.MarkupPercent, req.Hidden)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+// GET /api/v1/admin/esim/markup — current global markup percent.
+func AdminGetESIMMarkupHandler(w http.ResponseWriter, r *http.Request) {
+	global, _ := loadESIMPricing()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]float64{"markup_percent": global})
+}
+
+// PUT /api/v1/admin/esim/markup — set global markup; instantly repriced for all users.
+func AdminSetESIMMarkupHandler(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		MarkupPercent float64 `json:"markup_percent"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.MarkupPercent < 0 {
+		http.Error(w, "Invalid request (markup_percent required)", http.StatusBadRequest)
+		return
+	}
+	if _, err := GlobalDB.Exec(`UPDATE esim_settings SET markup_percent = $1, updated_at = now() WHERE id = 1`, req.MarkupPercent); err != nil {
+		http.Error(w, "Failed to update markup", http.StatusInternalServerError)
+		return
+	}
+
+	providers.ResetESIMCache()
+	log.Printf("[ADMIN-ESIM] Global markup set to %.2f%% — prices repriced for all users", req.MarkupPercent)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"status": "ok", "markup_percent": req.MarkupPercent})
+}
+
+// adminESIMOrder is a single eSIM purchase row for the admin order monitor.
+type adminESIMOrder struct {
+	ID          int     `json:"id"`
+	UserID      int     `json:"user_id"`
+	ProductName string  `json:"product_name"`
+	PriceUSD    float64 `json:"price_usd"`
+	Status      string  `json:"status"`
+	Active      bool    `json:"active"`
+	CreatedAt   string  `json:"created_at"`
+}
+
+// GET /api/v1/admin/esim/orders — eSIM purchase history (product_id = 0).
+func AdminESIMOrdersHandler(w http.ResponseWriter, r *http.Request) {
+	rows, err := GlobalDB.Query(`
+		SELECT id, user_id, product_name, price_usd, status, COALESCE(activation_key, ''), created_at
+		FROM store_orders
+		WHERE product_id = 0
+		ORDER BY created_at DESC
+		LIMIT 300`)
+	if err != nil {
+		http.Error(w, "Failed to fetch eSIM orders", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	orders := make([]adminESIMOrder, 0)
+	for rows.Next() {
+		var o adminESIMOrder
+		var price decimal.Decimal
+		var activationKey string
+		var createdAt time.Time
+		if err := rows.Scan(&o.ID, &o.UserID, &o.ProductName, &price, &o.Status, &activationKey, &createdAt); err != nil {
+			continue
+		}
+		o.PriceUSD, _ = price.Float64()
+		o.Active = o.Status == "completed" && activationKey != ""
+		o.CreatedAt = createdAt.Format(time.RFC3339)
+		orders = append(orders, o)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"orders": orders})
 }
