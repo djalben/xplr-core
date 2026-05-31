@@ -424,6 +424,8 @@ export const StorePage = () => {
   const [plans, setPlans] = useState<ESIMPlan[]>([]);
   const [plansLoading, setPlansLoading] = useState(false);
   const [showEsimGuide, setShowEsimGuide] = useState(false);
+  const [selectedPlanId, setSelectedPlanId] = useState<string>('');
+  const [planDropdownOpen, setPlanDropdownOpen] = useState(false);
 
   // eSIM purchase flow
   const [confirmPlan, setConfirmPlan] = useState<ESIMPlan | null>(null);
@@ -489,6 +491,13 @@ export const StorePage = () => {
   }, []);
 
   useEffect(() => { if (selectedCountry) loadPlans(selectedCountry.country_code); }, [selectedCountry, loadPlans]);
+
+  // Default the dropdown to the first in-stock plan whenever plans change.
+  useEffect(() => {
+    const primary = plans.find(p => p.in_stock) || plans[0];
+    setSelectedPlanId(primary ? primary.plan_id : '');
+    setPlanDropdownOpen(false);
+  }, [plans]);
 
   const loadDigital = useCallback(async () => {
     setDigitalLoading(true);
@@ -739,28 +748,61 @@ export const StorePage = () => {
                 ))}
               </div>
             ) : plans.length === 0 ? (
-              <div className="py-16 text-center"><Wifi className="w-10 h-10 text-white/10 mx-auto mb-3" /><p className="text-white/30 text-sm">Нет доступных тарифов</p></div>
-            ) : (
-              <div className="rounded-2xl bg-white/[0.02] border border-white/[0.05] overflow-hidden">
-                {plans.map((plan, idx) => (
-                  <div key={plan.plan_id} className={`flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3.5 sm:py-4 ${plan.in_stock ? '' : 'opacity-40'} ${idx < plans.length - 1 ? 'border-b border-white/[0.05]' : ''}`}>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm sm:text-[15px] font-medium text-white truncate">{plan.name}</p>
-                      <p className="text-xs text-white/35 mt-0.5">{plan.data_gb} GB / {plan.validity_days} дней</p>
-                    </div>
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                      <div className="text-right">
-                        <span className="text-sm sm:text-[15px] font-bold gradient-text tabular-nums">€{plan.price_usd.toFixed(2)}</span>
-                        {plan.old_price > 0 && plan.old_price > plan.price_usd && <span className="block text-[10px] text-white/20 line-through">€{plan.old_price.toFixed(2)}</span>}
-                      </div>
-                      {plan.in_stock ? (
-                        <button onClick={() => tryBuyESIM(plan)} className="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold bg-white/[0.06] hover:bg-white/[0.1] text-white transition-all duration-200 active:scale-[0.96]">Купить</button>
-                      ) : <span className="text-xs text-white/20">Нет в наличии</span>}
-                    </div>
-                  </div>
-                ))}
+              <div className="py-16 text-center">
+                <Wifi className="w-10 h-10 text-white/10 mx-auto mb-3" />
+                <p className="text-white/30 text-sm mb-4">Тарифы временно недоступны</p>
+                <button onClick={() => selectedCountry && loadPlans(selectedCountry.country_code)} className="px-4 py-2 rounded-lg text-sm font-semibold bg-white/[0.06] hover:bg-white/[0.1] text-white transition-all duration-200 active:scale-[0.96]">Обновить</button>
               </div>
-            )}
+            ) : (() => {
+              const selectedPlan = plans.find(p => p.plan_id === selectedPlanId) || plans[0];
+              return (
+                <div className="rounded-2xl bg-white/[0.02] border border-white/[0.05] p-4 sm:p-5 space-y-4">
+                  {/* Single plan dropdown selector */}
+                  <div className="relative">
+                    <label className="block text-xs text-white/40 mb-2">Тариф</label>
+                    <button onClick={() => setPlanDropdownOpen(o => !o)}
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.06] transition-colors text-left">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-white truncate">{selectedPlan.name}</p>
+                        <p className="text-xs text-white/35 mt-0.5">{selectedPlan.data_gb} GB / {selectedPlan.validity_days} дней</p>
+                      </div>
+                      <span className="text-sm font-bold gradient-text tabular-nums">${selectedPlan.price_usd.toFixed(2)}</span>
+                      <ChevronRight className={`w-4 h-4 text-white/40 transition-transform duration-200 ${planDropdownOpen ? 'rotate-90' : ''}`} />
+                    </button>
+                    {planDropdownOpen && (
+                      <div className="absolute z-20 mt-2 w-full rounded-xl bg-[#15151c] border border-white/[0.08] shadow-2xl overflow-hidden max-h-72 overflow-y-auto animate-fade-in">
+                        {plans.map(plan => (
+                          <button key={plan.plan_id} disabled={!plan.in_stock}
+                            onClick={() => { setSelectedPlanId(plan.plan_id); setPlanDropdownOpen(false); }}
+                            className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${plan.plan_id === selectedPlan.plan_id ? 'bg-white/[0.06]' : 'hover:bg-white/[0.04]'} ${plan.in_stock ? '' : 'opacity-40 cursor-not-allowed'}`}>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-white truncate">{plan.name}</p>
+                              <p className="text-xs text-white/35 mt-0.5">{plan.data_gb} GB / {plan.validity_days} дней</p>
+                            </div>
+                            <span className="text-sm font-semibold text-white/80 tabular-nums">${plan.price_usd.toFixed(2)}</span>
+                            {plan.plan_id === selectedPlan.plan_id && <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Dynamic price + buy */}
+                  <div className="flex items-center justify-between pt-3 border-t border-white/[0.05]">
+                    <div>
+                      <span className="text-2xl font-bold gradient-text tabular-nums">${selectedPlan.price_usd.toFixed(2)}</span>
+                      {selectedPlan.old_price > 0 && selectedPlan.old_price > selectedPlan.price_usd && (
+                        <span className="ml-2 text-xs text-white/20 line-through tabular-nums">${selectedPlan.old_price.toFixed(2)}</span>
+                      )}
+                      <p className="text-xs text-white/35 mt-0.5">{selectedPlan.data_gb} GB · {selectedPlan.validity_days} дней · USD</p>
+                    </div>
+                    {selectedPlan.in_stock ? (
+                      <button onClick={() => tryBuyESIM(selectedPlan)} className="px-6 py-2.5 rounded-xl text-sm font-semibold bg-white/[0.08] hover:bg-white/[0.12] text-white transition-all duration-200 active:scale-[0.96]">Купить</button>
+                    ) : <span className="text-xs text-white/20">Нет в наличии</span>}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -1015,7 +1057,7 @@ export const StorePage = () => {
         <ConfirmPurchaseModal
           title="Подтвердите покупку eSIM"
           itemLabel={`${confirmPlan.name} — ${confirmPlan.country}`}
-          priceLabel={`€${confirmPlan.price_usd.toFixed(2)}`}
+          priceLabel={`$${confirmPlan.price_usd.toFixed(2)}`}
           loading={esimPurchasing} onConfirm={handleESIMPurchase} onClose={() => !esimPurchasing && setConfirmPlan(null)} allCards={activeCards} onCardChange={setSelectedCard}
         />
       )}

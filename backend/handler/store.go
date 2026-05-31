@@ -775,9 +775,10 @@ func notifyVPNPurchase(userID int, product StoreProduct, activationKey string) {
 func ESIMDestinationsHandler(w http.ResponseWriter, r *http.Request) {
 	p := providers.GetESIMProvider()
 	dests, err := p.GetDestinations()
-	if err != nil || len(dests) == 0 {
-		log.Printf("[ESIM] ⚠️ GetDestinations unavailable (err=%v, count=%d) — using storefront fallback", err, len(dests))
-		dests = providers.FallbackDestinations()
+	if err != nil {
+		// No demo fallback: the storefront shows a clean Empty State instead.
+		log.Printf("[ESIM] ⚠️ GetDestinations failed: %v — returning empty list", err)
+		dests = nil
 	}
 
 	// Optional search filter
@@ -810,33 +811,13 @@ func ESIMPlansHandler(w http.ResponseWriter, r *http.Request) {
 
 	prov := providers.GetESIMProvider()
 	plans, err := prov.GetPlans(cc)
-	if err != nil || len(plans) == 0 {
-		log.Printf("[ESIM] ⚠️ GetPlans unavailable for %s (err=%v, count=%d) — using storefront fallback", cc, err, len(plans))
-		plans = providers.FallbackPlans(cc)
+	if err != nil {
+		// No demo fallback. Pricing (USD, smart markup ×5) is owned by the provider.
+		log.Printf("[ESIM] ⚠️ GetPlans failed for %s: %v — returning empty list", cc, err)
+		plans = nil
 	}
-
-	// Read eSIM default markup from DB (or use 150%)
-	var esimMarkup float64 = 150
-	if GlobalDB != nil {
-		row := GlobalDB.QueryRow(`SELECT COALESCE(AVG(markup_percent), 150) FROM store_products WHERE product_type = 'esim' AND markup_percent > 0`)
-		row.Scan(&esimMarkup)
-	}
-	markupDec := decimal.NewFromFloat(esimMarkup)
-
-	// Apply markup ONLY to plans the provider did not already price.
-	// EsimbaProvider.GetPlans already returns retail price (wholesale × 5) and
-	// sets CostPrice to the wholesale value, so re-marking would double-charge.
-	// Fallback/demo plans arrive with CostPrice == 0 and still need markup.
-	for i := range plans {
-		if plans[i].CostPrice > 0 {
-			continue // already retail-priced by provider
-		}
-		costDec := decimal.NewFromFloat(plans[i].PriceUSD)
-		plans[i].CostPrice = plans[i].PriceUSD
-		retailDec := calculatePrice(costDec, markupDec)
-		plans[i].PriceUSD, _ = retailDec.Float64()
-		oldDec := calculatePrice(retailDec, decimal.NewFromInt(20))
-		plans[i].OldPrice, _ = oldDec.Float64()
+	if plans == nil {
+		plans = []providers.ESIMPlan{}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
