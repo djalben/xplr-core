@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/djalben/xplr-core/backend/shop"
@@ -523,24 +522,9 @@ func getDemoOrder(planID string) (*ESIMOrderResult, error) {
 // Singleton accessor
 // ══════════════════════════════════════════════════════════════
 
-var (
-	esimProvider     *MobiMatterProvider
-	esimProviderOnce sync.Once
-)
-
-// GetESIMProvider returns the singleton MobiMatter eSIM provider.
+// GetESIMProvider returns the singleton eSIM provider (Esimba API v2).
 func GetESIMProvider() ESIMProvider {
-	esimProviderOnce.Do(func() {
-		esimProvider = NewMobiMatterProvider()
-		log.Printf("[ESIM-PROVIDER] Initialized: mobimatter (configured=%v)", esimProvider.isConfigured())
-	})
-	return esimProvider
-}
-
-// GetMobiMatterProvider returns the concrete MobiMatter provider (for Registry registration).
-func GetMobiMatterProvider() *MobiMatterProvider {
-	GetESIMProvider() // ensure initialized
-	return esimProvider
+	return getEsimbaProvider()
 }
 
 // Compile-time check: MobiMatterProvider implements both interfaces.
