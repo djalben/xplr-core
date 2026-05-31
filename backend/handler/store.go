@@ -775,10 +775,9 @@ func notifyVPNPurchase(userID int, product StoreProduct, activationKey string) {
 func ESIMDestinationsHandler(w http.ResponseWriter, r *http.Request) {
 	p := providers.GetESIMProvider()
 	dests, err := p.GetDestinations()
-	if err != nil {
-		log.Printf("[ESIM] ❌ GetDestinations error: %v", err)
-		http.Error(w, "Failed to fetch destinations", http.StatusInternalServerError)
-		return
+	if err != nil || len(dests) == 0 {
+		log.Printf("[ESIM] ⚠️ GetDestinations unavailable (err=%v, count=%d) — using storefront fallback", err, len(dests))
+		dests = providers.FallbackDestinations()
 	}
 
 	// Optional search filter
@@ -811,13 +810,9 @@ func ESIMPlansHandler(w http.ResponseWriter, r *http.Request) {
 
 	prov := providers.GetESIMProvider()
 	plans, err := prov.GetPlans(cc)
-	if err != nil {
-		log.Printf("[ESIM] ❌ GetPlans error for %s: %v", cc, err)
-		http.Error(w, "Failed to fetch plans", http.StatusInternalServerError)
-		return
-	}
-	if plans == nil {
-		plans = []providers.ESIMPlan{}
+	if err != nil || len(plans) == 0 {
+		log.Printf("[ESIM] ⚠️ GetPlans unavailable for %s (err=%v, count=%d) — using storefront fallback", cc, err, len(plans))
+		plans = providers.FallbackPlans(cc)
 	}
 
 	// Read eSIM default markup from DB (or use 150%)

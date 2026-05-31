@@ -657,7 +657,13 @@ export const StorePage = () => {
                 ))}
               </div>
             ) : destinations.length === 0 ? (
-              <div className="py-16 text-center"><Globe className="w-10 h-10 text-white/10 mx-auto mb-3" /><p className="text-white/30 text-sm">{destsSearch ? 'Страна не найдена' : 'Направления загружаются...'}</p></div>
+              <div className="py-16 text-center">
+                <Globe className="w-10 h-10 text-white/10 mx-auto mb-3" />
+                <p className="text-white/30 text-sm mb-4">{destsSearch ? 'Страна не найдена' : 'Не удалось загрузить направления'}</p>
+                {!destsSearch && (
+                  <button onClick={() => loadDestinations()} className="px-4 py-2 rounded-lg text-sm font-semibold bg-white/[0.06] hover:bg-white/[0.1] text-white transition-all duration-200 active:scale-[0.96]">Обновить</button>
+                )}
+              </div>
             ) : (
               <div className="rounded-2xl bg-white/[0.02] border border-white/[0.05] overflow-hidden">
                 {destinations.map((dest, i) => (

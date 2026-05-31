@@ -451,6 +451,19 @@ func mapMobiMatterStatus(s string) string {
 }
 
 // ══════════════════════════════════════════════════════════════
+// Storefront fallback (keeps eSIM UI usable when the live provider
+// is unavailable or returns no data — avoids an empty/loader-stuck UI)
+// ══════════════════════════════════════════════════════════════
+
+// FallbackDestinations returns a built-in country list used by handlers when
+// the live eSIM provider errors out or returns no destinations.
+func FallbackDestinations() []ESIMDestination { return getDemoDestinations() }
+
+// FallbackPlans returns built-in demo plans for a country, used by handlers as
+// a graceful fallback so the storefront always renders cards.
+func FallbackPlans(countryCode string) []ESIMPlan { return getDemoPlans(countryCode) }
+
+// ══════════════════════════════════════════════════════════════
 // Demo data (used when no API key is configured)
 // ══════════════════════════════════════════════════════════════
 
