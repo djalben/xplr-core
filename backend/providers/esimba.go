@@ -93,7 +93,16 @@ type EsimbaProvider struct {
 	apiKey      string
 	accessToken string
 	client      *http.Client
+
+	// In-memory bundle cache (guarded by cacheMu) to avoid hitting the slow
+	// Keepgo API + re-parsing on every GetDestinations/GetPlans call.
+	cacheMu       sync.RWMutex
+	cachedBundles []esimbaBundle
+	cacheTime     time.Time
 }
+
+// bundleCacheTTL is how long a cached catalog stays fresh.
+const bundleCacheTTL = 15 * time.Minute
 
 // NewEsimbaProvider builds the provider from environment variables:
 //
@@ -152,8 +161,40 @@ func (e *EsimbaProvider) doRequest(method, path string, body interface{}) (*http
 	return e.client.Do(req)
 }
 
-// fetchBundles retrieves the raw catalog from GET /bundles?with_async=false.
+// fetchBundles returns the bundle catalog, served from a 15-minute in-memory
+// cache when fresh. Uses RWMutex: a read-lock fast path for cache hits and a
+// write-lock slow path (with double-check) that performs the single API call.
 func (e *EsimbaProvider) fetchBundles() ([]esimbaBundle, error) {
+	// Fast path — read lock, return cached data if still fresh.
+	e.cacheMu.RLock()
+	if e.cachedBundles != nil && time.Since(e.cacheTime) < bundleCacheTTL {
+		bundles, age := e.cachedBundles, time.Since(e.cacheTime)
+		e.cacheMu.RUnlock()
+		log.Printf("[ESIMBA] cache HIT — %d bundles (age %s)", len(bundles), age.Round(time.Second))
+		return bundles, nil
+	}
+	e.cacheMu.RUnlock()
+
+	// Slow path — write lock, re-check (another goroutine may have filled it),
+	// then make the real network call exactly once.
+	e.cacheMu.Lock()
+	defer e.cacheMu.Unlock()
+	if e.cachedBundles != nil && time.Since(e.cacheTime) < bundleCacheTTL {
+		return e.cachedBundles, nil
+	}
+
+	log.Printf("[ESIMBA] cache MISS — fetching fresh catalog from Keepgo")
+	bundles, err := e.fetchBundlesFromAPI()
+	if err != nil {
+		return nil, err
+	}
+	e.cachedBundles = bundles
+	e.cacheTime = time.Now()
+	return bundles, nil
+}
+
+// fetchBundlesFromAPI performs the raw GET /bundles?with_async=false request.
+func (e *EsimbaProvider) fetchBundlesFromAPI() ([]esimbaBundle, error) {
 	const path = "/bundles?with_async=false"
 	fullURL := e.baseURL + path
 
