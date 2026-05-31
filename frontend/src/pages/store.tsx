@@ -423,6 +423,7 @@ export const StorePage = () => {
   const [selectedCountry, setSelectedCountry] = useState<ESIMDestination | null>(null);
   const [plans, setPlans] = useState<ESIMPlan[]>([]);
   const [plansLoading, setPlansLoading] = useState(false);
+  const [showEsimGuide, setShowEsimGuide] = useState(false);
 
   // eSIM purchase flow
   const [confirmPlan, setConfirmPlan] = useState<ESIMPlan | null>(null);
@@ -646,6 +647,40 @@ export const StorePage = () => {
               <input type="text" placeholder="Поиск по стране..." value={destsSearch} onChange={e => setDestsSearch(e.target.value)}
                 className="w-full pl-11 pr-10 py-3 bg-white/[0.04] rounded-xl text-sm text-white placeholder-white/30 outline-none focus:bg-white/[0.06] border border-white/[0.05] transition-colors" />
               {destsSearch && <button onClick={() => setDestsSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg hover:bg-white/10 text-white/30 hover:text-white transition-all"><X className="w-4 h-4" /></button>}
+            </div>
+
+            {/* ═══════ How-to guide (accordion) ═══════ */}
+            <div className="mb-5 rounded-2xl bg-gradient-to-br from-[#38BDF8]/[0.08] to-[#7C3AED]/[0.06] border border-white/[0.07] overflow-hidden">
+              <button
+                onClick={() => setShowEsimGuide(v => !v)}
+                className="w-full flex items-center gap-3 px-4 sm:px-5 py-3.5 text-left hover:bg-white/[0.03] transition-colors"
+              >
+                <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-[#38BDF8]/15 border border-[#38BDF8]/20 flex-shrink-0">
+                  <Smartphone className="w-4 h-4 text-[#38BDF8]" />
+                </div>
+                <span className="flex-1 text-sm sm:text-[15px] font-semibold text-white">Как пользоваться eSIM?</span>
+                <ChevronRight className={`w-4 h-4 text-white/40 transition-transform duration-200 ${showEsimGuide ? 'rotate-90' : ''}`} />
+              </button>
+              {showEsimGuide && (
+                <div className="px-4 sm:px-5 pb-4 pt-1 space-y-3 animate-fade-in">
+                  <div className="flex items-start gap-3">
+                    <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-white/[0.05] flex-shrink-0 mt-0.5"><CreditCard className="w-3.5 h-3.5 text-[#38BDF8]" /></div>
+                    <div><p className="text-[13px] font-semibold text-white/90">Как купить</p><p className="text-xs text-white/45 mt-0.5">Выберите страну и тариф, оплатите с баланса.</p></div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-white/[0.05] flex-shrink-0 mt-0.5"><QrCode className="w-3.5 h-3.5 text-[#38BDF8]" /></div>
+                    <div><p className="text-[13px] font-semibold text-white/90">Как установить</p><p className="text-xs text-white/45 mt-0.5">Отсканируйте выданный QR-код камерой телефона.</p></div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-white/[0.05] flex-shrink-0 mt-0.5"><Wifi className="w-3.5 h-3.5 text-[#38BDF8]" /></div>
+                    <div><p className="text-[13px] font-semibold text-white/90">Как активировать</p><p className="text-xs text-white/45 mt-0.5">Включите роуминг данных в настройках загруженной eSIM.</p></div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-500/10 flex-shrink-0 mt-0.5"><Shield className="w-3.5 h-3.5 text-emerald-400" /></div>
+                    <div><p className="text-[13px] font-semibold text-white/90">Для пользователей из РФ</p><p className="text-xs text-white/45 mt-0.5">Интернет работает напрямую через зарубежные узлы связи — без ограничений и блокировок.</p></div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {destsLoading ? (

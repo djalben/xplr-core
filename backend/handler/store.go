@@ -823,8 +823,14 @@ func ESIMPlansHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	markupDec := decimal.NewFromFloat(esimMarkup)
 
-	// Apply markup to each plan
+	// Apply markup ONLY to plans the provider did not already price.
+	// EsimbaProvider.GetPlans already returns retail price (wholesale × 5) and
+	// sets CostPrice to the wholesale value, so re-marking would double-charge.
+	// Fallback/demo plans arrive with CostPrice == 0 and still need markup.
 	for i := range plans {
+		if plans[i].CostPrice > 0 {
+			continue // already retail-priced by provider
+		}
 		costDec := decimal.NewFromFloat(plans[i].PriceUSD)
 		plans[i].CostPrice = plans[i].PriceUSD
 		retailDec := calculatePrice(costDec, markupDec)

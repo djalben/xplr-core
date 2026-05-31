@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -138,29 +140,57 @@ func (e *EsimbaProvider) doRequest(method, path string, body interface{}) (*http
 
 // fetchBundles retrieves the raw catalog from GET /bundles?with_async=false.
 func (e *EsimbaProvider) fetchBundles() ([]esimbaBundle, error) {
-	resp, err := e.doRequest("GET", "/bundles?with_async=false", nil)
+	const path = "/bundles?with_async=false"
+	fullURL := e.baseURL + path
+
+	log.Printf("[ESIMBA-DEBUG] → GET %s (apiKey set=%v, accessToken set=%v)", fullURL, e.apiKey != "", e.accessToken != "")
+
+	resp, err := e.doRequest("GET", path, nil)
 	if err != nil {
+		log.Printf("[ESIMBA-DEBUG] ❌ request error for %s: %v", fullURL, err)
 		return nil, fmt.Errorf("esimba: GET /bundles: %w", err)
 	}
 	defer resp.Body.Close()
 
+	raw, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		log.Printf("[ESIMBA-DEBUG] ❌ %s status=%d, body read error: %v", fullURL, resp.StatusCode, readErr)
+		return nil, fmt.Errorf("esimba: read bundles body: %w", readErr)
+	}
+
+	// Raw debug output — visible in Vercel logs to diagnose 401/JSON errors.
+	log.Printf("[ESIMBA-DEBUG] ← %s | HTTP %d", fullURL, resp.StatusCode)
+	log.Printf("[ESIMBA-DEBUG] Raw response body: %s", string(raw))
+
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("esimba: GET /bundles status %d", resp.StatusCode)
+		return nil, fmt.Errorf("esimba: GET /bundles status %d: %s", resp.StatusCode, string(raw))
 	}
 
 	var parsed esimbaBundlesResponse
-	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		log.Printf("[ESIMBA-DEBUG] ❌ JSON parse error: %v", err)
 		return nil, fmt.Errorf("esimba: decode bundles: %w", err)
 	}
+
+	log.Printf("[ESIMBA-DEBUG] ✅ parsed %d bundles", len(parsed.Bundles))
 	return parsed.Bundles, nil
 }
+
+// retailMarkup is the approved unit-economics multiplier applied to Esimba's
+// wholesale price before it reaches the frontend (RetailPrice = wholesale × 5).
+const retailMarkup = 5.0
+
+// round2 rounds a monetary value to 2 decimal places.
+func round2(v float64) float64 { return math.Round(v*100) / 100 }
 
 // ── ESIMProvider interface ──
 
 // GetDestinations derives the unique list of countries from the bundle catalog.
 func (e *EsimbaProvider) GetDestinations() ([]ESIMDestination, error) {
+	log.Printf("[ESIMBA] GetDestinations: fetching catalog from %s", e.baseURL)
 	bundles, err := e.fetchBundles()
 	if err != nil {
+		log.Printf("[ESIMBA] GetDestinations failed: %v", err)
 		return nil, err
 	}
 
@@ -190,9 +220,12 @@ func (e *EsimbaProvider) GetDestinations() ([]ESIMDestination, error) {
 }
 
 // GetPlans flattens every refill of every bundle for a country into ESIMPlan.
+// Retail price is computed here as wholesale × retailMarkup, rounded to 2dp.
 func (e *EsimbaProvider) GetPlans(countryCode string) ([]ESIMPlan, error) {
+	log.Printf("[ESIMBA] GetPlans(%s): fetching catalog from %s", countryCode, e.baseURL)
 	bundles, err := e.fetchBundles()
 	if err != nil {
+		log.Printf("[ESIMBA] GetPlans(%s) failed: %v", countryCode, err)
 		return nil, err
 	}
 
@@ -203,6 +236,7 @@ func (e *EsimbaProvider) GetPlans(countryCode string) ([]ESIMPlan, error) {
 			continue
 		}
 		for _, r := range b.Refills {
+			retail := round2(r.Price * retailMarkup)
 			plans = append(plans, ESIMPlan{
 				PlanID:       encodeEsimbaPlanID(b.ID.String(), r.RefillMB, r.RefillDays),
 				Provider:     "esimba",
@@ -211,13 +245,15 @@ func (e *EsimbaProvider) GetPlans(countryCode string) ([]ESIMPlan, error) {
 				CountryCode:  strings.ToUpper(b.CountryCode),
 				DataGB:       formatMBasGB(r.RefillMB),
 				ValidityDays: r.RefillDays,
-				PriceUSD:     r.Price,
-				CostPrice:    r.Price,
+				PriceUSD:     retail,               // retail = wholesale × 5
+				OldPrice:     round2(retail * 1.2), // strike-through reference price
+				CostPrice:    r.Price,              // original wholesale price
 				Description:  b.Name,
 				InStock:      true,
 			})
 		}
 	}
+	log.Printf("[ESIMBA] GetPlans(%s): %d plans (markup ×%.0f applied)", countryCode, len(plans), retailMarkup)
 	return plans, nil
 }
 
